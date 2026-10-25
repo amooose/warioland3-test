@@ -3,6 +3,25 @@
 
 typedef void (*Handler)(GB *gb);
 
+// Set when native code has handed execution back to the asm in the middle
+// of a routine (see dispatch()): every native caller up to the hook must
+// return at once without touching anything. Handlers return void, so they
+// and dispatch() check this after nested calls. Each hook that can set it
+// clears it when it returns (PORT_NESTED), so a hook run from inside
+// another one's native code doesn't leave it set for the outer one.
+static bool g_stop;
+
+// A PORT_JUMP whose native code may stop early (g_stop).
+#define PORT_NESTED(name) \
+	static void body_##name(GB *gb); \
+	PORT_JUMP(name) \
+	{ \
+		g_stop = false; \
+		body_##name(gb); \
+		g_stop = false; \
+	} \
+	static void body_##name(GB *gb)
+
 // call to a routine in this bank. Plain CALL would abort if the bank was
 // switched (a fuzzed wROMBank restored by a farcall, say); the asm then
 // just runs whatever is mapped, and so does this.
@@ -48,6 +67,8 @@ static bool run_until(GB *gb, uint16_t ret_addr, uint16_t sp)
 			gb_tick(gb, cycles);
 	}
 	gb->call_depth--;
+	if (escaped)
+		g_stop = true;
 	return !escaped;
 }
 
@@ -98,7 +119,7 @@ static bool dispatch(GB *gb, uint16_t table, const Handler *handlers, int n, uin
 	int idx = gb->cpu.e >> 1;
 	if (idx < n && handlers[idx]) {
 		handlers[idx](gb);
-		return true;
+		return !g_stop;
 	}
 	if (idx < n && ret_addr) {
 		uint16_t pc = gb->cpu.pc;
@@ -110,6 +131,7 @@ static bool dispatch(GB *gb, uint16_t table, const Handler *handlers, int n, uin
 		return true;
 	}
 	JUMP_TO(t);
+	g_stop = true;
 	return false;
 }
 
@@ -465,10 +487,13 @@ static void prologue_prepare_cave_scene2(GB *gb)
 	prologue_func_ae0ab(gb);
 }
 
-// .configure_hdma_transfer: de = source, b = dest, c = length
-static void prologue_configure_hdma(GB *gb)
+// ld a, bank / ld [wHDMABank], a / ld hl, wHDMA / ld a, d / ld [hli], a /
+// ld a, e / ld [hli], a / ld a, b / ld [hli], a / xor a / ld [hli], a /
+// ld a, c / ld [hl], a / jp Prologue_Next (or Func_af135, the same)
+// de = source, b = dest, c = length
+static void configure_hdma(GB *gb, uint8_t bank)
 {
-	gb->cpu.a = BANK_TempleTilemap;
+	gb->cpu.a = bank;
 	wr8(gb, wHDMABank, gb->cpu.a);
 	SET_HL(gb, wHDMA);
 	gb->cpu.a = gb->cpu.d;
@@ -494,7 +519,7 @@ static void prologue_load_temple_tilemap(GB *gb)
 	SET_DE(gb, ADDR_TempleTilemap);
 	gb->cpu.b = (v0BGMap0 >> 8) - 0x80;
 	gb->cpu.c = 18 * 2 - 1; // 18 dma_rows
-	prologue_configure_hdma(gb);
+	configure_hdma(gb, BANK_TempleTilemap);
 }
 
 static void prologue_load_temple_attrmap(GB *gb)
@@ -504,7 +529,7 @@ static void prologue_load_temple_attrmap(GB *gb)
 	SET_DE(gb, ADDR_TempleAttrmap);
 	gb->cpu.b = (v0BGMap0 >> 8) - 0x80;
 	gb->cpu.c = 18 * 2 - 1; // 18 dma_rows
-	prologue_configure_hdma(gb);
+	configure_hdma(gb, BANK_TempleTilemap);
 }
 
 static void prologue_load_temple_gfx(GB *gb)
@@ -515,7 +540,7 @@ static void prologue_load_temple_gfx(GB *gb)
 	SET_DE(gb, ADDR_TempleGfx);
 	gb->cpu.b = (v0Tiles2 >> 8) - 0x80;
 	gb->cpu.c = 0x80 - 1; // $80 dma_tiles
-	prologue_configure_hdma(gb);
+	configure_hdma(gb, BANK_TempleTilemap);
 }
 
 static void prologue_prepare_temple_scene(GB *gb)
@@ -648,7 +673,7 @@ static const Handler prologue_cutscene[] = {
 	prologue_finish,
 };
 
-PORT_JUMP(Prologue)
+PORT_NESTED(Prologue)
 {
 	// call .PlayCutscene
 	enter(gb, ADDR_Prologue + 3);
@@ -691,7 +716,7 @@ static const Handler ae1de_table[] = {
 	ae1de_wait20, ae1de_func_ae1f5, ae1de_wait10, ae1de_func_ae215, ae1de_wait90, func_ae1d5,
 };
 
-PORT_JUMP(Func_ae1de)
+PORT_NESTED(Func_ae1de)
 {
 	inc_w2d891_ld_a_w2d890(gb);
 	tail_dispatch(gb, ADDR_Func_ae1de + 7, ae1de_table, 6);
@@ -767,7 +792,7 @@ static bool func_ae2dd(GB *gb, uint16_t ret_addr)
 	return leave(gb, ret_addr);
 }
 
-PORT_JUMP(Func_ae2dd)
+PORT_NESTED(Func_ae2dd)
 {
 	func_ae2dd(gb, 0);
 }
@@ -893,7 +918,7 @@ static const Handler enter_cave_table[] = {
 	func_ae1d5,
 };
 
-PORT_JUMP(Prologue_WarioEnterCave)
+PORT_NESTED(Prologue_WarioEnterCave)
 {
 	if (!func_ae2dd(gb, ADDR_Prologue_WarioEnterCave + 3))
 		return;
@@ -1243,7 +1268,7 @@ PORT(Func_ae523)
 	func_ae523(gb);
 }
 
-PORT_JUMP(Prologue_WarioSuckedIntoMusicBox)
+PORT_NESTED(Prologue_WarioSuckedIntoMusicBox)
 {
 	func_ae523(gb);
 	inc_w2d891_ld_a_w2d890(gb);
@@ -1379,7 +1404,7 @@ static const Handler ae55c_table[] = {
 	wario_walk_right, func_ae5fd, func_ae60c, wait_look_back, func_ae61d, func_ae630, wait30, func_ae1d5,
 };
 
-PORT_JUMP(Func_ae55c)
+PORT_NESTED(Func_ae55c)
 {
 	inc_w2d891_ld_bc_a_w2d890(gb);
 	tail_dispatch(gb, ADDR_Func_ae55c + 9, ae55c_table, 16);
@@ -1407,7 +1432,7 @@ static const Handler ae641_table[] = {
 	func_ae652, func_ae657, wait_look_back, func_ae1d5,
 };
 
-PORT_JUMP(Func_ae641)
+PORT_NESTED(Func_ae641)
 {
 	inc_w2d891_ld_bc_a_w2d890(gb);
 	tail_dispatch(gb, ADDR_Func_ae641 + 9, ae641_table, 4);
@@ -1474,7 +1499,7 @@ static const Handler ae668_table[] = {
 	func_ae6ae, func_ae6b3, func_ae6c1, wait30, func_ae1d5,
 };
 
-PORT_JUMP(Func_ae668)
+PORT_NESTED(Func_ae668)
 {
 	inc_w2d891_ld_a_w2d890(gb);
 	tail_dispatch(gb, ADDR_Func_ae668 + 7, ae668_table, 10);
@@ -1669,7 +1694,7 @@ static const Handler fall_table[] = {
 
 static bool func_ae8bb(GB *gb, uint16_t ret_addr);
 
-PORT_JUMP(Prologue_WarioFallFromPlane)
+PORT_NESTED(Prologue_WarioFallFromPlane)
 {
 	if (!func_ae8bb(gb, ADDR_Prologue_WarioFallFromPlane + 3))
 		return;
@@ -1724,7 +1749,7 @@ static const Handler walk_table[] = {
 	func_ae1d5,
 };
 
-PORT_JUMP(Prologue_WarioWalkToCaveEntrance)
+PORT_NESTED(Prologue_WarioWalkToCaveEntrance)
 {
 	inc_w2d891_ld_a_w2d890(gb);
 	tail_dispatch(gb, ADDR_Prologue_WarioWalkToCaveEntrance + 7, walk_table, 13);
@@ -1954,7 +1979,7 @@ static bool func_ae924(GB *gb, uint16_t ret_addr)
 	return plane_part(gb, ADDR_Func_ae924, P1C, p1_table, 13, ret_addr);
 }
 
-PORT_JUMP(Func_ae924)
+PORT_NESTED(Func_ae924)
 {
 	func_ae924(gb, 0);
 }
@@ -2046,7 +2071,7 @@ static bool func_ae9ee(GB *gb, uint16_t ret_addr)
 	return plane_part(gb, ADDR_Func_ae9ee, P2C, p2_table, 15, ret_addr);
 }
 
-PORT_JUMP(Func_ae9ee)
+PORT_NESTED(Func_ae9ee)
 {
 	func_ae9ee(gb, 0);
 }
@@ -2129,7 +2154,7 @@ static bool func_aeb0d(GB *gb, uint16_t ret_addr)
 	return plane_part(gb, ADDR_Func_aeb0d, P3C, p3_table, 15, ret_addr);
 }
 
-PORT_JUMP(Func_aeb0d)
+PORT_NESTED(Func_aeb0d)
 {
 	func_aeb0d(gb, 0);
 }
@@ -2194,7 +2219,7 @@ static bool func_aec1f(GB *gb, uint16_t ret_addr)
 	return plane_part(gb, ADDR_Func_aec1f, P4C, p4_table, 11, ret_addr);
 }
 
-PORT_JUMP(Func_aec1f)
+PORT_NESTED(Func_aec1f)
 {
 	func_aec1f(gb, 0);
 }
@@ -2237,7 +2262,7 @@ static bool func_ae8bb(GB *gb, uint16_t ret_addr)
 	return leave(gb, ret_addr);
 }
 
-PORT_JUMP(Func_ae8bb)
+PORT_NESTED(Func_ae8bb)
 {
 	func_ae8bb(gb, 0);
 }
@@ -2253,4 +2278,1040 @@ PORT(Func_af130)
 PORT(Func_af135)
 {
 	prologue_next(gb); // same as Prologue_Next
+}
+
+// ---------------------------------------------------------------------------
+// Func_af13c: the epilogue
+
+#define EPI(local) (ADDR_Func_af13c + ((local) - 0x713c))
+#define EPI_RET (ADDR_Func_af13c + 3) // return address of call .Func_af14c
+
+// ld a, [bc] / cp n: returns true (and the asm returns) if a < n
+#define BC_BELOW(n) w2d891_below(gb, (n))
+
+// ld hl, palettes / ld de, dest / ld c, 8 palettes / ld b, bank / call CopyFarBytes
+static void copy_pals(GB *gb, uint16_t src, uint16_t dest, uint8_t bank)
+{
+	SET_HL(gb, src);
+	SET_DE(gb, dest);
+	gb->cpu.c = 8 * PAL_SIZE;
+	gb->cpu.b = bank;
+	CALL(CopyFarBytes);
+}
+
+static void epi_func_af1bd(GB *gb)
+{
+	CALL_2B(Func_aca09);
+	copy_pals(gb, ADDR_Pals_86add, wTempPals1, BANK_Pals_86add);
+	copy_pals(gb, ADDR_Pals_86b1d, wTempPals2, BANK_Pals_86b1d);
+}
+
+static void epi_func_af1db(GB *gb)
+{
+	SET_HL(gb, EPI(0x735e)); // .Pals_af35e
+	SET_DE(gb, wTempPals2 + PAL_SIZE * 4);
+	gb->cpu.b = 3 * PAL_SIZE;
+	CALL(CopyHLToDE);
+}
+
+static void epi_func_af197(GB *gb)
+{
+	gb->cpu.c = 0x3c;
+	prologue_delay(gb); // Func_af130
+}
+
+static void epi_func_af19c(GB *gb)
+{
+	set_obj_coord(gb, wSceneObj9, 0x60, 0x50);
+	set_obj_state(gb, wSceneObj9State, 0x18);
+	epi_func_af1bd(gb);
+	epi_func_af1db(gb);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, wPalConfig1TotalSteps, 0);
+	wr8(gb, wPalConfig2TotalSteps, 0);
+	prologue_next(gb);
+}
+
+// xor a or ld a, 1 / ld [wHDMADestVRAMBank], a / ld de, src / ld b, dest /
+// ld c, length / jr .asm_af1f2
+static void epi_hdma(GB *gb, uint8_t vram_bank, uint16_t src, uint8_t dest, uint8_t len)
+{
+	gb->cpu.a = vram_bank;
+	if (!vram_bank)
+		gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wHDMADestVRAMBank, vram_bank);
+	SET_DE(gb, src);
+	gb->cpu.b = dest;
+	gb->cpu.c = len;
+	configure_hdma(gb, BANK_OldMan1Gfx);
+}
+
+static void epi_func_af1e7(GB *gb)
+{
+	epi_hdma(gb, 0, ADDR_OldMan1Gfx, (v0Tiles1 >> 8) - 0x80, 0x40 - 1);
+}
+
+static void epi_func_af207(GB *gb)
+{
+	epi_hdma(gb, 1, ADDR_OldMan2Gfx, (v1Tiles0 >> 8) - 0x80, 0x80 - 1);
+}
+
+static void epi_func_af215(GB *gb)
+{
+	epi_hdma(gb, 0, ADDR_EpilogueCrowdTilemap, (v0BGMap0 >> 8) - 0x80, 18 * 2 - 1);
+}
+
+static void epi_func_af222(GB *gb)
+{
+	epi_hdma(gb, 1, ADDR_EpilogueCrowdAttrmap, (v1BGMap0 >> 8) - 0x80, 18 * 2 - 1);
+}
+
+static void epi_func_af230(GB *gb)
+{
+	epi_hdma(gb, 1, wAttrmap, (v1Tiles1 >> 8) - 0x80, 0x50 - 1);
+}
+
+// .Func_af2ab: hl = obj, d = y, e = x, b = state
+static void epi_func_af2ab(GB *gb, uint16_t obj, uint8_t y, uint8_t x, uint8_t state)
+{
+	SET_HL(gb, obj);
+	gb->cpu.d = y;
+	gb->cpu.e = x;
+	gb->cpu.b = state;
+	gb->cpu.a = y;
+	wr8(gb, obj, y);
+	gb->cpu.a = x;
+	wr8(gb, obj + 1, x);
+	SET_HL(gb, obj + 2);
+	gb->cpu.l |= 1 << 2; // set 2, l
+	gb->cpu.a = gb->cpu.b;
+	CALL(SetSceneObjState);
+}
+
+static void epi_func_af23e(GB *gb)
+{
+	gb->cpu.a = SCREEN_WIDTH_PX;
+	wr8(gb, rSCX, SCREEN_WIDTH_PX);
+	wr8(gb, wSCX, SCREEN_WIDTH_PX);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, rSCY, 0);
+	wr8(gb, wSCY, 0);
+	SET_HL(gb, wOWUIObj1YCoord + 1);
+	gb->cpu.a = 0x60;
+	wr8(gb, wOWUIObj1YCoord, 0x60);
+	wr8(gb, wOWUIObj1YCoord + 1, 0x5c);
+	gb->cpu.a = 0xff;
+	wr8(gb, wOWUIObj2YCoord, 0xff);
+	set_wario_state(gb, 0x0c);
+
+	epi_func_af2ab(gb, wSceneObj10, 0x30, 0x00, 0x1b);
+	epi_func_af2ab(gb, wSceneObj11, 0x35, 0x20, 0x1c);
+	epi_func_af2ab(gb, wSceneObj12, 0x32, 0x70, 0x1b);
+	epi_func_af2ab(gb, wSceneObj13, 0x38, 0xc0, 0x1c);
+
+	copy_pals(gb, ADDR_Pals_86add, wTempPals1, BANK_Pals_86add); // .Func_af2b5
+	copy_pals(gb, ADDR_Pals_86b1d, wTempPals2, BANK_Pals_86add);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, wPalConfig1TotalSteps, 0);
+	wr8(gb, wPalConfig2TotalSteps, 0);
+	wr8(gb, w2d890, 0);
+	wr8(gb, w2d891, 0);
+	prologue_next(gb);
+}
+
+static void epi_func_af2bc(GB *gb)
+{
+	gb->cpu.c = 0x1e;
+	prologue_delay(gb); // Func_af130
+}
+
+// .asm_af3d7: ld a, b / ld hl, wSceneObj9State / jp SetSceneObjState
+static void epi_set_obj9_state_b(GB *gb)
+{
+	gb->cpu.a = gb->cpu.b;
+	SET_HL(gb, wSceneObj9State);
+	CALL(SetSceneObjState);
+}
+
+// .asm_af3bf
+static void epi_af3bf(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wPalFade7Colour3RedSign);
+	alu_cp(gb, gb->cpu.a, 0x01);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	set_obj_state(gb, wSceneObj9State, 0x0b);
+}
+
+// .asm_af3d0: b = state
+static void epi_af3d0(GB *gb, uint8_t state)
+{
+	gb->cpu.b = state;
+	gb->cpu.a = 0x01;
+	SET_HL(gb, wPalFade7Colour3RedSign);
+	alu_cp(gb, gb->cpu.a, rd8(gb, wPalFade7Colour3RedSign));
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	epi_set_obj9_state_b(gb);
+}
+
+// .asm_af3ea: b = state, a = sign
+static void epi_af3ea(GB *gb, uint8_t state, uint8_t sign)
+{
+	gb->cpu.b = state;
+	gb->cpu.a = sign;
+	SET_HL(gb, wPalFade7Colour3RedSign);
+	alu_cp(gb, gb->cpu.a, rd8(gb, wPalFade7Colour3RedSign));
+	if (!(gb->cpu.f & FLAG_Z)) {
+		epi_af3bf(gb);
+		return;
+	}
+	epi_set_obj9_state_b(gb);
+}
+
+static void epi_func_af376(GB *gb)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wPendingCharDest), rd8(gb, wPendingCharDest));
+	if (!gb->cpu.a)
+		return;
+	gb->cpu.a = rd8(gb, wCurTextLinePos);
+	alu_cp(gb, gb->cpu.a, 1);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = alu_and(gb, rd8(gb, wLanguage), rd8(gb, wLanguage));
+	bool english = gb->cpu.a;
+	gb->cpu.a = rd8(gb, wPalFade7Colour3RedUnk1);
+	// each entry: value compared, then what to do (0: .asm_af3d0 with
+	// state, 1: .asm_af3ea with state and sign)
+	static const struct { uint8_t value, kind, state, sign; } jp[] = {
+		{0x01, 0, 0x10, 0}, {0x04, 0, 0x0c, 0}, {0x05, 1, 0x0d, 2},
+		{0x07, 1, 0x0e, 2}, {0x0a, 1, 0x10, 2}, {0x0b, 1, 0x0c, 3},
+	}, en[] = {
+		{0x01, 0, 0x10, 0}, {0x04, 0, 0x0c, 0}, {0x05, 0, 0x0d, 0},
+		{0x08, 1, 0x0e, 2}, {0x0b, 0, 0x10, 0}, {0x0c, 0, 0x0c, 0},
+	};
+	const __typeof__(jp[0]) *cases = english ? en : jp;
+	for (int i = 0; i < 6; i++) {
+		alu_cp(gb, gb->cpu.a, cases[i].value);
+		if (gb->cpu.f & FLAG_Z) {
+			if (cases[i].kind == 0)
+				epi_af3d0(gb, cases[i].state);
+			else
+				epi_af3ea(gb, cases[i].state, cases[i].sign);
+			return;
+		}
+	}
+	epi_af3bf(gb);
+}
+
+static void epi_func_af2c1(GB *gb)
+{
+	CALL_2B(PrintTextWithoutHeader);
+	epi_func_af376(gb);
+	gb->cpu.a = rd8(gb, wCurTextLine);
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	prologue_next(gb);
+}
+
+static void epi_func_af2df(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, wHDMADestVRAMBank, 0);
+	SET_DE(gb, ADDR_PrologueBackgroundGfx);
+	gb->cpu.b = (v0Tiles2 >> 8) - 0x80;
+	gb->cpu.c = 0x80 - 1;
+	configure_hdma(gb, BANK_PrologueBackgroundGfx);
+}
+
+static void epi_func_af2f2(GB *gb)
+{
+	set_obj_coord(gb, wSceneObj9, 0x3c, 0xb2);
+	set_obj_state(gb, wSceneObj9State, 0x13);
+	set_obj_coord(gb, wOWUIObj1YCoord, 0x3c, 0xc8);
+	set_wario_state(gb, 0x1c);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, wSceneObj10State, 0);
+	wr8(gb, wSceneObj11State, 0);
+	wr8(gb, wSceneObj12State, 0);
+	wr8(gb, wSceneObj13State, 0);
+	gb->cpu.a = 0x08;
+	wr8(gb, wCollectionRow, 0x08);
+	CALL_2B(Func_aca09);
+	copy_pals(gb, ADDR_Pals_869cd, wTempPals1, BANK_Pals_869cd);
+	copy_pals(gb, ADDR_Pals_86b1d, wTempPals2, BANK_Pals_86b1d);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, wPalConfig1TotalSteps, 0);
+	wr8(gb, wPalConfig2TotalSteps, 0);
+	prologue_next(gb);
+}
+
+static void epi_func_af34a(GB *gb)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d014), 0x03);
+	if (gb->cpu.a)
+		return;
+	CALL_2B(PrologueFade);
+}
+
+static void epi_func_af353(GB *gb)
+{
+	gb->cpu.a = rd8(gb, w2d014);
+	alu_cp(gb, gb->cpu.a, 0x3c);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	prologue_finish(gb);
+}
+
+// .asm_af400: b = state to wait for
+static void epi_wait_owui_obj1_state(GB *gb, uint8_t state)
+{
+	gb->cpu.b = state;
+	gb->cpu.a = rd8(gb, wOWUIObj1State);
+	alu_cp(gb, gb->cpu.a, gb->cpu.b);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	advance_w2d890(gb);
+}
+
+static void epi_func_af41c(GB *gb)
+{
+	FARCALL(Func_84e43);
+	gb->cpu.a = alu_and(gb, rd8(gb, wPalConfig1TotalSteps), rd8(gb, wPalConfig1TotalSteps));
+	if (gb->cpu.a)
+		return;
+	SET_HL(gb, w2d890);
+	wr8(gb, w2d891, 0);
+	wr8(gb, w2d890, alu_inc(gb, rd8(gb, w2d890)));
+}
+
+// ld hl, w2d890 / ld a, [hli] / inc [hl] / ld b, h / ld c, l
+static void epi_ld_a_w2d890_inc_w2d891(GB *gb)
+{
+	gb->cpu.a = rd8(gb, w2d890);
+	SET_HL(gb, w2d891);
+	wr8(gb, w2d891, alu_inc(gb, rd8(gb, w2d891)));
+	gb->cpu.b = gb->cpu.h;
+	gb->cpu.c = gb->cpu.l;
+}
+
+// .Func_af436: the old man's transformation
+
+// .Func_af60d's jumptable
+static void epi_af643(GB *gb)
+{
+	SET_HL(gb, wTempleRock5Action);
+	wr8(gb, wTempleRock5Action, alu_inc(gb, rd8(gb, wTempleRock5Action)));
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, wTempleRock5Counter, 0);
+}
+static void epi_af639(GB *gb) { (void)gb; }
+static void epi_af63a(GB *gb)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, wPalFade2Colour4GreenSign, 0x01);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, wSceneObj9Unk7, 0);
+	epi_af643(gb);
+}
+static void epi_af64c(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wSceneObj9YCoord);
+	alu_cp(gb, gb->cpu.a, 0x60);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	play_bump_sfx(gb); // .Func_af667
+	epi_af643(gb);
+}
+static void epi_af657(GB *gb)
+{
+	SET_HL(gb, wTempleRock5Counter);
+	wr8(gb, wTempleRock5Counter, alu_inc(gb, rd8(gb, wTempleRock5Counter)));
+	gb->cpu.a = rd8(gb, wTempleRock5Counter);
+	alu_cp(gb, gb->cpu.a, 0x04);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	epi_af643(gb);
+}
+static void epi_af661(GB *gb)
+{
+	gb->cpu.a = 0x80;
+	wr8(gb, wTempleRock5Action, 0x80);
+}
+
+static const Handler epi_af60d_table[] = {
+	epi_af639, epi_af63a, epi_af64c, epi_af657, epi_af64c, epi_af657, epi_af64c, epi_af661,
+};
+
+static bool epi_func_af60d(GB *gb, uint16_t ret_addr)
+{
+	enter(gb, ret_addr);
+	gb->cpu.a = alu_and(gb, rd8(gb, wPalFade2Colour4GreenSign), rd8(gb, wPalFade2Colour4GreenSign));
+	if (gb->cpu.a) {
+		SET_HL(gb, wSceneObj9);
+		SET_DE(gb, ADDR_Data_aed06);
+		CALL(ApplyOWMovement_Mirrored);
+		if (gb->cpu.f & FLAG_Z) {
+			gb->cpu.a = 0;
+			gb->cpu.f = FLAG_Z;
+			wr8(gb, wPalFade2Colour4GreenSign, 0);
+		}
+	}
+	// .asm_af622
+	gb->cpu.a = rd8(gb, wTempleRock5Action);
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (gb->cpu.f & FLAG_Z)
+		return leave(gb, ret_addr);
+	if (!dispatch(gb, EPI(0x760d) + 28, epi_af60d_table, 8, ret_addr))
+		return false;
+	return leave(gb, ret_addr);
+}
+
+// .Func_af57b's jumptable
+static void epi_af5b2(GB *gb) { (void)gb; }
+static void epi_af5b3(GB *gb)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, wPalFade2Colour2GreenUnk1, 0x01);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, wSceneWarioUnk7, 0);
+	fall_next_bounce_step(gb); // .asm_af5bc
+}
+static void epi_af5c5(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wOWUIObj1YCoord);
+	alu_cp(gb, gb->cpu.a, 0x60);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	set_wario_state(gb, 0x1b);
+	play_bump_sfx(gb); // .Func_af604
+	fall_next_bounce_step(gb);
+}
+static void epi_af5df(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wOWUIObj1State);
+	alu_cp(gb, gb->cpu.a, 0x1c);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	fall_next_bounce_step(gb);
+}
+static void epi_af5e7(GB *gb)
+{
+	SET_HL(gb, w2d893);
+	wr8(gb, w2d893, alu_inc(gb, rd8(gb, w2d893)));
+	gb->cpu.a = rd8(gb, w2d893);
+	alu_cp(gb, gb->cpu.a, 0x42);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	set_wario_state(gb, 0x0c);
+	play_sfx(gb, SFX_12A);
+	fall_next_bounce_step(gb);
+}
+static void epi_af5fe(GB *gb)
+{
+	gb->cpu.a = 0x80;
+	wr8(gb, w2d892, 0x80);
+}
+
+static const Handler epi_af57b_table[] = {
+	epi_af5b2, epi_af5b3, epi_af5c5, fall_wait_4, epi_af5c5,
+	fall_wait_4, epi_af5c5, epi_af5df, epi_af5e7, epi_af5fe,
+};
+
+static bool epi_func_af57b(GB *gb, uint16_t ret_addr)
+{
+	enter(gb, ret_addr);
+	gb->cpu.a = alu_and(gb, rd8(gb, wPalFade2Colour2GreenUnk1), rd8(gb, wPalFade2Colour2GreenUnk1));
+	if (gb->cpu.a) {
+		gb->cpu.a = alu_and(gb, rd8(gb, w2d891), 0x03);
+		if (gb->cpu.a) {
+			SET_DE(gb, ADDR_Data_aed06);
+			SET_HL(gb, wOWUIObj1YCoord);
+			CALL(ApplyOWMovement_Mirrored);
+			if (gb->cpu.f & FLAG_Z) {
+				gb->cpu.a = 0;
+				gb->cpu.f = FLAG_Z;
+				wr8(gb, wPalFade2Colour2GreenUnk1, 0);
+			}
+		}
+	}
+	// .asm_af597
+	gb->cpu.a = rd8(gb, w2d892);
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (gb->cpu.f & FLAG_Z)
+		return leave(gb, ret_addr);
+	if (!dispatch(gb, EPI(0x757b) + 35, epi_af57b_table, 10, ret_addr))
+		return false;
+	return leave(gb, ret_addr);
+}
+
+// .Func_af436's jumptable (bc = w2d891)
+static void epi_af466(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, wPalFade2Colour2GreenUnk1, 0);
+	wr8(gb, w2d892, 0);
+	wr8(gb, wTempleRock5Action, 0);
+	wr8(gb, wPalFade2Colour4GreenSign, 0);
+	advance_w2d890(gb);
+}
+static void epi_af476(GB *gb)
+{
+	if (BC_BELOW(0x40))
+		return;
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d892, 0x01);
+	play_sfx(gb, SFX_THROW);
+	advance_w2d890(gb);
+}
+static void epi_af48a(GB *gb)
+{
+	if (BC_BELOW(0x56))
+		return;
+	gb->cpu.a = 0x01;
+	wr8(gb, wTempleRock5Action, 0x01);
+	play_sfx(gb, SFX_THROW);
+	advance_w2d890(gb);
+}
+static void epi_af49e(GB *gb)
+{
+	gb->cpu.a = rd8(gb, w2d892);
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = rd8(gb, wTempleRock5Action);
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	advance_w2d890(gb);
+}
+static void epi_af4ad(GB *gb)
+{
+	if (BC_BELOW(0x3c))
+		return;
+	set_wario_state_and_advance(gb, 0x05);
+}
+static void epi_af4b9(GB *gb) { epi_wait_owui_obj1_state(gb, 0x02); }
+static void epi_af4be(GB *gb)
+{
+	if (BC_BELOW(0x28))
+		return;
+	set_wario_state_and_advance(gb, 0x14);
+}
+static void epi_af4ca(GB *gb) { epi_wait_owui_obj1_state(gb, 0x0c); }
+static void epi_af4cf(GB *gb)
+{
+	if (BC_BELOW(0x2d))
+		return;
+	set_wario_state(gb, 0x0b);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, wSceneObj9Unk7, 0);
+	play_sfx(gb, SFX_GRAB);
+	advance_w2d890(gb);
+}
+static void epi_af4e7(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wSceneObj9Unk7);
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = rd8(gb, wOWUIObj1State);
+	alu_cp(gb, gb->cpu.a, 0x0a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	advance_w2d890(gb);
+}
+// .asm_af50a: place Obj9 at OWUIObj1 + (d, e)
+static void epi_af50a(GB *gb, uint8_t dy, uint8_t dx)
+{
+	gb->cpu.d = dy;
+	gb->cpu.e = dx;
+	SET_HL(gb, wSceneObj9);
+	gb->cpu.a = alu_add(gb, rd8(gb, wOWUIObj1YCoord), gb->cpu.d);
+	wr8(gb, wSceneObj9, gb->cpu.a);
+	SET_HL(gb, wSceneObj9 + 1);
+	gb->cpu.a = alu_add(gb, rd8(gb, wOWUIObj1XCoord), gb->cpu.e);
+	wr8(gb, wSceneObj9 + 1, gb->cpu.a);
+}
+static void epi_af4f6(GB *gb)
+{
+	gb->cpu.a = rd8(gb, w2d891);
+	alu_cp(gb, gb->cpu.a, 0x04);
+	if (gb->cpu.f & FLAG_Z) {
+		epi_af50a(gb, 0xdf, 0xfa);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x06);
+	if (gb->cpu.f & FLAG_Z) {
+		epi_af50a(gb, 0xe0, 0xfb);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x07);
+	if (gb->cpu.f & FLAG_Z) {
+		epi_af50a(gb, 0xe2, 0xfc);
+		advance_w2d890(gb);
+	}
+}
+static void epi_af528(GB *gb)
+{
+	if (BC_BELOW(0x32))
+		return;
+	set_wario_state_and_advance(gb, 0x21);
+}
+static void epi_af534(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wOWUIObj1Frame);
+	alu_cp(gb, gb->cpu.a, 0x0b);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	play_sfx(gb, SFX_106);
+	advance_w2d890(gb);
+}
+static void epi_af545(GB *gb) { epi_wait_owui_obj1_state(gb, 0x0a); }
+static void epi_af54a(GB *gb)
+{
+	if (BC_BELOW(0x32))
+		return;
+	set_wario_state(gb, 0x09);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, wSceneObj9Unk7, 0);
+	advance_w2d890(gb);
+}
+static void epi_af55a(GB *gb)
+{
+	CALL_2B(Func_aca63);
+	gb->cpu.a = rd8(gb, wOWUIObj1XCoord);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_sub(gb, gb->cpu.a, 0x04);
+	wr8(gb, wSceneObj9XCoord, gb->cpu.a);
+	gb->cpu.a = 0xf0;
+	alu_cp(gb, gb->cpu.a, gb->cpu.b);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, wOWUIObj1State, 0);
+	wr8(gb, wSceneObj9State, 0);
+	advance_w2d890(gb);
+}
+static void epi_af574(GB *gb)
+{
+	if (BC_BELOW(0x3c))
+		return;
+	func_ae1d5(gb); // .asm_af413
+}
+
+static const Handler epi_af436_table[] = {
+	epi_af466, epi_af476, epi_af48a, epi_af49e, epi_af4ad, epi_af4b9, epi_af4be, epi_af4ca, epi_af4cf,
+	epi_af4e7, epi_af4f6, epi_af528, epi_af534, epi_af545, epi_af54a, epi_af55a, epi_af574,
+};
+
+static void epi_func_af436(GB *gb)
+{
+	if (!epi_func_af60d(gb, EPI(0x7436) + 3) || !epi_func_af57b(gb, EPI(0x7436) + 6))
+		return;
+	epi_ld_a_w2d890_inc_w2d891(gb);
+	dispatch(gb, EPI(0x7436) + 14, epi_af436_table, 17, EPI_RET);
+}
+
+// .Func_af670: the old man thanks Wario
+
+static void epi_af68b(GB *gb)
+{
+	if (BC_BELOW(0x1e))
+		return;
+	set_obj_state(gb, wSceneObj1State, 0x01);
+	advance_w2d890(gb);
+}
+static void epi_af69a(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (!alu_bit(gb, gb->cpu.a, B_PAD_A))
+		return;
+	clear_obj_state(gb, wSceneObj1State);
+	stop_music2(gb);
+	CALL_2B(ClearTextbox);
+	set_obj_state(gb, wSceneObj9State, 0x0f);
+	advance_w2d890(gb);
+}
+static void epi_af6c1(GB *gb)
+{
+	if (BC_BELOW(0x3c))
+		return;
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d150, 0x01);
+	advance_w2d890(gb);
+}
+static void epi_af6cd(GB *gb)
+{
+	if (BC_BELOW(0x28))
+		return;
+	gb->cpu.a = 0x80;
+	wr8(gb, w2d150, 0x80);
+	SET_HL(gb, wCurSceneObj);
+	gb->cpu.a = alu_sub(gb, rd8(gb, wOWUIObj1YCoord), 0x04);
+	wr8(gb, wCurSceneObj, gb->cpu.a);
+	SET_HL(gb, wCurSceneObj + 1);
+	gb->cpu.a = rd8(gb, wOWUIObj1XCoord);
+	wr8(gb, wCurSceneObj + 1, gb->cpu.a);
+	set_obj_state(gb, wCurSceneObjState, 0x11);
+	advance_w2d890(gb);
+}
+static void epi_af6ee(GB *gb)
+{
+	if (BC_BELOW(0x14))
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	CALL_2B(SetSceneWarioState);
+	advance_w2d890(gb);
+}
+static void epi_af6f9(GB *gb)
+{
+	if (BC_BELOW(0x5a))
+		return;
+	advance_w2d890(gb);
+}
+static void epi_af700(GB *gb)
+{
+	SET_HL(gb, wCurSceneObj);
+	gb->cpu.a = rd8(gb, wCurSceneObj);
+	alu_cp(gb, gb->cpu.a, 0x50);
+	if (!(gb->cpu.f & FLAG_C)) {
+		gb->cpu.a = rd8(gb, w2d891);
+		gb->cpu.b = gb->cpu.a;
+		gb->cpu.a = alu_and(gb, gb->cpu.a, 0x03);
+		if (gb->cpu.a)
+			return;
+		wr8(gb, wCurSceneObj, alu_dec(gb, rd8(gb, wCurSceneObj)));
+		return;
+	}
+	// .asm_af711
+	wr8(gb, wCurSceneObj, alu_dec(gb, rd8(gb, wCurSceneObj)));
+	wr8(gb, wCurSceneObj, alu_dec(gb, rd8(gb, wCurSceneObj)));
+	wr8(gb, wCurSceneObj, alu_dec(gb, rd8(gb, wCurSceneObj)));
+	gb->cpu.a = rd8(gb, wCurSceneObj);
+	alu_cp(gb, gb->cpu.a, 0x18);
+	if (gb->cpu.f & FLAG_C) {
+		// .asm_af733
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z;
+		wr8(gb, wCurSceneObjState, 0);
+		advance_w2d890(gb);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x40);
+	if (!(gb->cpu.f & FLAG_C))
+		return;
+	gb->cpu.a = rd8(gb, wCurSceneObjState);
+	alu_cp(gb, gb->cpu.a, 0x12);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	set_obj_state(gb, wCurSceneObjState, 0x12);
+	set_obj_state(gb, wSceneObj9State, 0x0a);
+}
+static void epi_af73a(GB *gb)
+{
+	if (BC_BELOW(0x2d))
+		return;
+	func_ae1d5(gb); // .asm_af413
+}
+
+static const Handler epi_af670_table[] = {
+	epi_af68b, epi_af69a, epi_af6c1, epi_af6cd, epi_af6ee, epi_af6f9, epi_af700, epi_af73a,
+};
+
+static void epi_func_af670(GB *gb)
+{
+	func_ae523(gb);
+	epi_ld_a_w2d890_inc_w2d891(gb);
+	dispatch(gb, EPI(0x7670) + 11, epi_af670_table, 8, EPI_RET);
+}
+
+// .Func_af741: the old man walks away
+
+// .Func_af7a7
+static void epi_af7a7(GB *gb)
+{
+	SET_HL(gb, wSceneObj9XCoord);
+	wr8(gb, wSceneObj9XCoord, alu_inc(gb, rd8(gb, wSceneObj9XCoord)));
+	gb->cpu.a = alu_and(gb, rd8(gb, wSceneObj9XCoord), 0xfe);
+}
+static void epi_af755(GB *gb)
+{
+	if (BC_BELOW(0x3c))
+		return;
+	set_obj_state(gb, wSceneObj9State, 0x08);
+	SET_HL(gb, wSceneObj9 + 1);
+	gb->cpu.a = 0x60;
+	wr8(gb, wSceneObj9, 0x60);
+	wr8(gb, wSceneObj9 + 1, 0x80);
+	advance_w2d890(gb);
+}
+static void epi_af76c(GB *gb)
+{
+	epi_af7a7(gb);
+	alu_cp(gb, gb->cpu.a, 0xe0);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	advance_w2d890(gb);
+}
+static void epi_af775(GB *gb)
+{
+	epi_af7a7(gb);
+	SET_HL(gb, wSCX);
+	wr8(gb, wSCX, alu_inc(gb, rd8(gb, wSCX)));
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	set_obj_state(gb, wSceneObj9State, 0x09);
+	advance_w2d890(gb);
+}
+static void epi_af788(GB *gb)
+{
+	if (BC_BELOW(0x1e))
+		return;
+	set_obj_state(gb, wSceneObj9State, 0x06);
+	advance_w2d890(gb);
+}
+static void epi_af797(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wSceneObj9State);
+	alu_cp(gb, gb->cpu.a, 0x0a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	advance_w2d890(gb);
+}
+static void epi_af7a0(GB *gb)
+{
+	if (BC_BELOW(0x3c))
+		return;
+	func_ae1d5(gb); // .asm_af413
+}
+
+static const Handler epi_af741_table[] = {
+	epi_af755, epi_af76c, epi_af775, epi_af788, epi_af797, epi_af7a0,
+};
+
+static void epi_func_af741(GB *gb)
+{
+	epi_ld_a_w2d890_inc_w2d891(gb);
+	dispatch(gb, EPI(0x7741) + 8, epi_af741_table, 6, EPI_RET);
+}
+
+// .Func_af7af: the transformation into the princess
+
+// .asm_af7ff
+static void epi_set_attributes(GB *gb)
+{
+	wr8(gb, wSceneObj5Attributes, gb->cpu.a);
+	wr8(gb, wSceneObj6Attributes, gb->cpu.a);
+	wr8(gb, wSceneObj7Attributes, gb->cpu.a);
+	wr8(gb, wSceneObj8Attributes, gb->cpu.a);
+	wr8(gb, wSceneObj1Attributes, gb->cpu.a);
+}
+static void epi_af7ff(GB *gb)
+{
+	epi_set_attributes(gb);
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d8a0, 0x01);
+	advance_w2d890(gb);
+}
+static void epi_af7ee(GB *gb)
+{
+	play_music2(gb, MUSIC_EPILOGUE);
+	advance_w2d890(gb);
+}
+static void epi_af7fd(GB *gb)
+{
+	gb->cpu.a = 0x04;
+	epi_af7ff(gb);
+}
+static void epi_af816(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wSceneObj1YCoord);
+	alu_cp(gb, gb->cpu.a, 0x50);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	play_sfx(gb, SFX_0EB);
+	CALL_2B(Func_aca09);
+	CALL_2B(Func_aca25);
+	advance_w2d890(gb);
+}
+// ld a, state / ld hl, wSceneObj9State / call SetSceneObjState /
+// ld hl, wSceneObj9XCoord / dec [hl] (times) / .asm_af839
+static void epi_af839(GB *gb, uint8_t state, int decs)
+{
+	set_obj_state(gb, wSceneObj9State, state);
+	SET_HL(gb, wSceneObj9XCoord);
+	for (int i = 0; i < decs; i++)
+		wr8(gb, wSceneObj9XCoord, alu_dec(gb, rd8(gb, wSceneObj9XCoord)));
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, wSceneObj1State, 0);
+	epi_func_af1bd(gb);
+	advance_w2d890(gb);
+}
+static void epi_af82d(GB *gb) { epi_af839(gb, 0x02, 1); }
+static void epi_af863(GB *gb) { epi_af839(gb, 0x03, 1); }
+static void epi_af893(GB *gb) { epi_af839(gb, 0x04, 2); }
+// .Func_af843 / .Func_af871
+static void epi_show_princess(GB *gb, uint8_t state, uint8_t x)
+{
+	if (BC_BELOW(0x50))
+		return;
+	set_obj_state(gb, wSceneObj9State, state);
+	gb->cpu.a = x;
+	wr8(gb, wSceneObj9XCoord, x);
+	epi_func_af1db(gb);
+	SET_DE(gb, ADDR_Data_aca04);
+	CALL_2B(Func_ac9e4);
+	advance_w2d890(gb);
+}
+static void epi_af843(GB *gb) { epi_show_princess(gb, 0x19, 0x48); }
+static void epi_af871(GB *gb) { epi_show_princess(gb, 0x1a, 0x58); }
+static void epi_af860(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	epi_af7ff(gb);
+}
+static void epi_af88e(GB *gb)
+{
+	gb->cpu.a = 0x03;
+	epi_af7ff(gb);
+}
+static void epi_af8a2(GB *gb)
+{
+	if (BC_BELOW(0x50))
+		return;
+	advance_w2d890(gb);
+}
+static void epi_af8a9(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	epi_set_attributes(gb);
+	func_ae1d5(gb); // .asm_af413
+}
+
+static const Handler epi_af7af_table[] = {
+	epi_af7ee, epi_af7fd, epi_af816, epi_func_af41c, epi_af82d, epi_func_af41c, epi_af843,
+	epi_af860, epi_af816, epi_func_af41c, epi_af863, epi_func_af41c, epi_af871, epi_af88e,
+	epi_af816, epi_func_af41c, epi_af893, epi_func_af41c, epi_af8a2, epi_af8a9,
+};
+
+static void epi_func_af7af(GB *gb)
+{
+	FARCALL(Func_15848a);
+	epi_ld_a_w2d890_inc_w2d891(gb);
+	dispatch(gb, EPI(0x77af) + 23, epi_af7af_table, 20, EPI_RET);
+}
+
+// .Func_af8bc: the crowd
+
+// ld a, [wGlobalCounter] / and mask / ret nz / ld a, $07 / xor l / ld l, a /
+// inc [hl]
+static void epi_crowd_step(GB *gb, uint8_t mask)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wGlobalCounter), mask);
+	if (gb->cpu.a)
+		return;
+	gb->cpu.a = alu_xor(gb, 0x07, gb->cpu.l);
+	gb->cpu.l = gb->cpu.a;
+	wr8(gb, REG_HL(gb), alu_inc(gb, rd8(gb, REG_HL(gb))));
+}
+
+// ld hl, obj_state / ld a, [hl] / cp state / ret nz / then epi_crowd_step;
+// returns false if it returned early
+static bool epi_crowd_member(GB *gb, uint16_t obj_state, uint8_t state, uint8_t mask)
+{
+	SET_HL(gb, obj_state);
+	gb->cpu.a = rd8(gb, obj_state);
+	alu_cp(gb, gb->cpu.a, state);
+	if (!(gb->cpu.f & FLAG_Z))
+		return false;
+	epi_crowd_step(gb, mask);
+	return true;
+}
+
+static void epi_func_af8bc(GB *gb)
+{
+	SET_HL(gb, wSceneObj10State);
+	gb->cpu.a = rd8(gb, wSceneObj10State);
+	alu_cp(gb, gb->cpu.a, 0x1b);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	epi_crowd_step(gb, 0x03); // .Func_af8d0
+	epi_crowd_member(gb, wSceneObj11State, 0x1c, 0x07);
+	epi_crowd_member(gb, wSceneObj12State, 0x1b, 0x03);
+	epi_crowd_member(gb, wSceneObj13State, 0x1c, 0x07);
+}
+
+static const Handler epi_table[] = {
+	prologue_next, // Func_af135
+	epi_func_af197,
+	epi_func_af19c,
+	NULL, // Func_ac9ca
+	epi_func_af7af,
+	prologue_set_fade_to_black, // .Func_af2d0
+	NULL, // PrologueFade
+	epi_func_af1e7,
+	epi_func_af207,
+	epi_func_af215,
+	epi_func_af222,
+	epi_func_af230,
+	epi_func_af23e,
+	NULL, // Func_ac9ca
+	epi_func_af741,
+	NULL, // InitTextPrinting
+	NULL, // Func_aca9e
+	epi_func_af2bc,
+	NULL, // LoadCurTextPageBufferPage
+	NULL, // Func_acacd
+	epi_func_af2c1,
+	NULL, // Func_acaf3
+	epi_func_af670,
+	prologue_set_fade_to_black, // .Func_af2d0
+	NULL, // PrologueFade
+	epi_func_af2df,
+	epi_func_af2f2,
+	NULL, // Func_ac9ca
+	epi_func_af436,
+	prologue_set_fade_to_black, // .Func_af2d0
+	epi_func_af34a,
+	epi_func_af353,
+};
+
+PORT_NESTED(Func_af13c)
+{
+	// call .Func_af14c
+	enter(gb, EPI_RET);
+	epi_func_af8bc(gb);
+	SET_HL(gb, w2d014);
+	wr8(gb, w2d014, alu_inc(gb, rd8(gb, w2d014)));
+	gb->cpu.a = rd8(gb, w2d013);
+	if (!dispatch(gb, EPI(0x714c) + 11, epi_table, 32, EPI_RET))
+		return;
+	leave(gb, EPI_RET);
+
+	if (!call_ret(gb, ADDR_Func_ac074, ADDR_Func_af13c + 6) ||
+		!call_ret(gb, ADDR_UpdateSceneWario, ADDR_Func_af13c + 9) ||
+		!call_ret(gb, ADDR_Func_ac080, ADDR_Func_af13c + 12) ||
+		!call_ret(gb, ADDR_ClearUnusedVirtualOAM, ADDR_Func_af13c + 15))
+		return;
+	RET();
 }
