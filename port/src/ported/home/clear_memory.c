@@ -66,3 +66,9 @@ PORT(ClearBGMap1)
 	SET_BC(gb, v0End - v0BGMap1);
 	CALL(WriteAToHL_BCTimes);
 }
+
+PORT(ClearBGMap0)
+{
+	gb->cpu.a = 0xff;
+	CALL(FillBGMap0);
+}

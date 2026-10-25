@@ -75,6 +75,13 @@ static inline void bankswitch(GB *gb, uint8_t bank)
 	wr8(gb, rROMB0 + 0x100, bank);
 }
 
+// The sramswitch macro: ld [wSRAMBank], a / ld [rRAMB + $100], a
+static inline void sramswitch(GB *gb, uint8_t bank)
+{
+	wr8(gb, wSRAMBank, bank);
+	wr8(gb, rRAMB + 0x100, bank);
+}
+
 // push af / pop af, on the real stack, like the asm.
 static inline void push_af(GB *gb)
 {
@@ -147,6 +154,13 @@ static inline uint8_t alu_dec(GB *gb, uint8_t v)
 	uint8_t r = (uint8_t)(v - 1);
 	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_C) | FLAG_N | (r ? 0 : FLAG_Z) | ((r & 0xf) == 0xf ? FLAG_H : 0));
 	return r;
+}
+// bit n, r: z set if the bit is clear, h set, carry unchanged
+static inline bool alu_bit(GB *gb, uint8_t v, int bit)
+{
+	bool set = (v >> bit) & 1;
+	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_C) | FLAG_H | (set ? 0 : FLAG_Z));
+	return set;
 }
 // add hl, rr (z unchanged)
 static inline uint16_t alu_add16(GB *gb, uint16_t hl, uint16_t v)

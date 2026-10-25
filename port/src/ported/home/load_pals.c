@@ -55,3 +55,11 @@ PORT(LoadPalsToTempPals2)
 {
 	copy_short(gb, wTempPals2, 8 * PAL_SIZE);
 }
+
+// copies b bytes from hl to de
+// given that e doesn't overflow
+PORT(CopyHLToDE_Short)
+{
+	int n = gb->cpu.b ? gb->cpu.b : 256;
+	copy_short(gb, REG_DE(gb), n);
+}

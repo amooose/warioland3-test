@@ -113,3 +113,10 @@ PORT(LoadFarPalsToTempPals1)
 	CALL(LoadPalsToTempPals1);
 	pop_bank(gb);
 }
+
+PORT(LoadFarPalsToTempPals2)
+{
+	push_bank_switch_to_b(gb);
+	CALL(LoadPalsToTempPals2);
+	pop_bank(gb);
+}
