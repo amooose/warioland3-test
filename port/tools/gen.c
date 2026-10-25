@@ -12,7 +12,7 @@
 //     from src/constants, with the exact value the assembler computed.
 //
 //   gen ports <out.c> <ported/*.c...>
-//     Finds every PORT(Name) / PORT_EX(Name, ...) definition and writes the
+//     Finds every PORT(Name) / PORT_JUMP(Name) / PORT_EX(Name, ...) and writes the
 //     table that registers them as hooks at startup.
 #include <ctype.h>
 #include <stdio.h>
@@ -108,12 +108,14 @@ static int gen_ports(const char *out, int nfiles, char **files)
 		}
 		char line[512];
 		while (fgets(line, sizeof(line), f)) {
-			const char *p;
-			if (!strncmp(line, "PORT(", 5))
-				p = line + 5;
-			else if (!strncmp(line, "PORT_EX(", 8))
-				p = line + 8;
-			else
+			// Any PORT macro at the start of a line: PORT(Name), PORT_JUMP(Name),
+			// PORT_EX(Name, ...)
+			if (strncmp(line, "PORT", 4))
+				continue;
+			const char *p = line + 4;
+			while (*p == '_' || (*p >= 'A' && *p <= 'Z'))
+				p++;
+			if (*p++ != '(')
 				continue;
 			size_t len = strcspn(p, ",) \t");
 			if (n == cap) {

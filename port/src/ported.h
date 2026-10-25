@@ -47,6 +47,10 @@ void port_register(const PortInfo *info);
 // A routine that ends in `ret` and whose register outputs must all match the
 // original exactly.
 #define PORT(name) PORT_EX(name, 0, 0)
+// A routine that ends by jumping to another one (jp Label, jr Label, jp hl,
+// or falling through into the next label): it must end with JUMP() or
+// JUMP_TO(), or RET() on paths that return.
+#define PORT_JUMP(name) PORT_EX(name, HOOK_MANUAL_RET, 0)
 
 // Memory access. Hardware registers are addresses too (rJOYP = $ff00 etc.,
 // from hardware.inc), so ldh [rLCDC], a is wr8(gb, rLCDC, a).
@@ -71,7 +75,17 @@ static inline void wr16(GB *gb, uint16_t addr, uint16_t v) { gb_write16(gb, addr
 // hCallFuncBank.
 #define HCALL(name) port_hcall(gb, ADDR_##name)
 
+// A tail jump: execution continues at the label with the stack exactly as
+// it is, as in the asm. (CALL would push a return address, which a routine
+// that inspects or pops the stack would see.) Only in PORT_JUMP routines.
+#define JUMP(name) port_jump(gb, BANK_##name, ADDR_##name, #name)
+// jp hl and other computed jumps.
+#define JUMP_TO(addr) (gb->cpu.pc = (uint16_t)(addr))
+// ret, in PORT_JUMP routines.
+#define RET() (gb->cpu.pc = gb_pop16(gb))
+
 void port_call(GB *gb, int bank, uint16_t addr, const char *name);
+void port_jump(GB *gb, int bank, uint16_t addr, const char *name);
 void port_farcall(GB *gb, int bank, uint16_t addr);
 void port_hcall(GB *gb, uint16_t addr);
 

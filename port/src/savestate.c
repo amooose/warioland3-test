@@ -203,9 +203,13 @@ bool savestate_load(GB *gb, const uint8_t *data, size_t len)
 	// Load into a copy so a truncated file can't leave a half-loaded state.
 	GB *tmp = malloc(sizeof(GB));
 	*tmp = *gb;
+	uint32_t *framebuffer = malloc(GB_SCREEN_W * GB_SCREEN_H * sizeof(uint32_t));
+	tmp->ppu.framebuffer = framebuffer;
 	sync_gb(&s, tmp);
 	bool ok = !s.error && s.len == len;
 	if (ok) {
+		memcpy(gb->ppu.framebuffer, framebuffer, GB_SCREEN_W * GB_SCREEN_H * sizeof(uint32_t));
+		tmp->ppu.framebuffer = gb->ppu.framebuffer;
 		tmp->ppu.frame_ready = false;
 		tmp->apu.buffer_len = 0;
 		tmp->sram_dirty = false;
@@ -213,6 +217,7 @@ bool savestate_load(GB *gb, const uint8_t *data, size_t len)
 	} else {
 		fprintf(stderr, "savestate: file is truncated or corrupt\n");
 	}
+	free(framebuffer);
 	free(tmp);
 	return ok;
 }

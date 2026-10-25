@@ -20,6 +20,7 @@ PORT(FillBGMap0)
 	SET_HL(gb, v1BGMap0);
 	SET_BC(gb, v1BGMap1 - v1BGMap0);
 	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
 	CALL(WriteAToHL_BCTimes);
 
 	wr8(gb, rVBK, gb->cpu.a); // a is still 0: VRAM0
@@ -53,10 +54,10 @@ PORT(ClearUnusedVirtualOAM)
 }
 
 // fills v0BGMap0 and v1BGMap0 with $7f
-PORT(FillBGMap0_With7f)
+PORT_JUMP(FillBGMap0_With7f)
 {
 	gb->cpu.a = 0x7f;
-	CALL(FillBGMap0);
+	JUMP(FillBGMap0); // fallthrough
 }
 
 PORT(ClearBGMap1)
@@ -67,8 +68,8 @@ PORT(ClearBGMap1)
 	CALL(WriteAToHL_BCTimes);
 }
 
-PORT(ClearBGMap0)
+PORT_JUMP(ClearBGMap0)
 {
 	gb->cpu.a = 0xff;
-	CALL(FillBGMap0);
+	JUMP(FillBGMap0); // jr
 }

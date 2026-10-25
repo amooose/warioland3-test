@@ -221,6 +221,12 @@ void cpu_dump_history(GB *gb, int n)
 
 static void unknown_opcode(GB *gb, uint8_t op)
 {
+	if (gb->test.active) {
+		// Fuzzed inputs can send code anywhere; just stop this run.
+		gb->test.crashed = true;
+		PC--;
+		return;
+	}
 	uint16_t at = (uint16_t)(PC - 1);
 	const char *name = sym_name_at(at < 0x4000 ? 0 : gb->rom_bank, at);
 	fprintf(stderr, "illegal opcode %02x at %02x:%04x (%s)\n", op, gb->rom_bank, at, name ? name : "?");
@@ -530,6 +536,14 @@ int cpu_step(GB *gb)
 		history[idx].sp = SP;
 		history[idx].bank = (uint8_t)gb->rom_bank;
 		history[idx].a = A;
+		// Under test: game code runs from ROM, and HRAM (hCallFunc and the
+		// OAM DMA routine); anywhere else means a fuzzed input sent it astray.
+		if (gb->test.active && PC >= 0x8000 && PC < 0xff80)
+			gb->test.unrealistic = true;
+		if (gb->test.exec_map && PC < 0x8000) {
+			size_t off = PC < 0x4000 ? PC : (size_t)(gb->rom_bank % gb->rom_banks) * 0x4000 + (PC - 0x4000);
+			gb->test.exec_map[off] = 1;
+		}
 		if (break_bank >= 0 && PC == break_addr && (PC >= 0x4000 ? gb->rom_bank : 0) == break_bank) {
 			fprintf(stderr, "break #%d at frame %llu\n", ++break_count, (unsigned long long)gb->frame_count);
 			cpu_dump_history(gb, HISTORY_LEN);
@@ -554,7 +568,11 @@ void gb_call(GB *gb, uint16_t addr)
 	gb_push16(gb, CALL_SENTINEL);
 	PC = addr;
 	gb->call_depth++;
-	while (!(PC == CALL_SENTINEL && SP == saved_sp)) {
+	while (!(PC == CALL_SENTINEL && SP == saved_sp) && !gb->test.crashed) {
+		// Under test, steps count against the budget too: a halted CPU
+		// makes no memory accesses.
+		if (gb->test.budget && --gb->test.budget == 0)
+			gb->test.out_of_budget(gb);
 		int cycles = cpu_step(gb);
 		if (!gb->no_tick)
 			gb_tick(gb, cycles);

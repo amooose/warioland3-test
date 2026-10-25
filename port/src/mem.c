@@ -15,8 +15,58 @@ static int wram_bank(GB *gb)
 	return b ? b : 1;
 }
 
+uint8_t *gb_ram_byte(GB *gb, uint16_t addr)
+{
+	switch (addr >> 12) {
+	case 0x8: case 0x9:
+		return &gb->vram[gb->io[0x4f] & 1][addr - 0x8000];
+	case 0xa: case 0xb:
+		return gb->sram_enabled ? &gb->sram[gb->sram_bank % GB_SRAM_BANKS][addr - 0xa000] : NULL;
+	case 0xc:
+		return &gb->wram[0][addr - 0xc000];
+	case 0xd:
+		return &gb->wram[wram_bank(gb)][addr - 0xd000];
+	case 0xe:
+		return &gb->wram[0][addr - 0xe000];
+	case 0xf:
+		if (addr < 0xfe00)
+			return &gb->wram[wram_bank(gb)][addr - 0xf000];
+		if (addr < 0xfea0)
+			return &gb->oam[addr - 0xfe00];
+		if (addr < 0xff00)
+			return NULL;
+		if (addr < 0xff80)
+			return &gb->io[addr - 0xff00];
+		if (addr < 0xffff)
+			return &gb->hram[addr - 0xff80];
+		return &gb->ie;
+	default:
+		return NULL;
+	}
+}
+
+static void test_access(GB *gb, uint16_t addr, bool read)
+{
+	if (gb->test.budget && --gb->test.budget == 0)
+		gb->test.out_of_budget(gb);
+	if (!gb->test.in_stack_op && gb->test.stack_hi) {
+		uint16_t a = addr >= 0xe000 && addr < 0xfe00 ? (uint16_t)(addr - 0x2000) : addr; // echo RAM
+		if (a >= gb->test.stack_lo && a < gb->test.stack_hi)
+			gb->test.unrealistic = true;
+	}
+	if (!read && addr >= 0x2000 && addr < 0x4000 && gb->cpu.pc >= 0x4000 && gb->cpu.pc < 0x8000)
+		gb->test.unrealistic = true;
+	if (read && gb->test.read_log_len < gb->test.read_log_cap) {
+		uint8_t *p = gb_ram_byte(gb, addr);
+		if (p)
+			gb->test.read_log[gb->test.read_log_len++] = (uint32_t)(p - (uint8_t *)gb);
+	}
+}
+
 uint8_t gb_read(GB *gb, uint16_t addr)
 {
+	if (gb->test.active)
+		test_access(gb, addr, true);
 	switch (addr >> 12) {
 	case 0x0: case 0x1: case 0x2: case 0x3:
 		return gb->rom[addr];
@@ -51,6 +101,8 @@ uint8_t gb_read(GB *gb, uint16_t addr)
 
 void gb_write(GB *gb, uint16_t addr, uint8_t val)
 {
+	if (gb->test.active)
+		test_access(gb, addr, false);
 	switch (addr >> 12) {
 	case 0x0: case 0x1:
 		gb->sram_enabled = (val & 0x0f) == 0x0a;
@@ -114,14 +166,18 @@ void gb_write16(GB *gb, uint16_t addr, uint16_t val)
 
 void gb_push16(GB *gb, uint16_t val)
 {
+	gb->test.in_stack_op = true;
 	gb->cpu.sp -= 2;
 	gb_write16(gb, gb->cpu.sp, val);
+	gb->test.in_stack_op = false;
 }
 
 uint16_t gb_pop16(GB *gb)
 {
+	gb->test.in_stack_op = true;
 	uint16_t v = gb_read16(gb, gb->cpu.sp);
 	gb->cpu.sp += 2;
+	gb->test.in_stack_op = false;
 	return v;
 }
 

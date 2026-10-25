@@ -2,7 +2,7 @@
 #include "ported.h"
 
 // processes the block function of wBlockPtrBank:wBlockPtr
-PORT(ProcessBlock)
+PORT_JUMP(ProcessBlock)
 {
 	wr8(gb, wIsInWaterOrSand, FALSE);
 	gb->cpu.a = rd8(gb, wBlockPtrBank);
@@ -20,7 +20,7 @@ PORT(ProcessBlock)
 	SET_HL(gb, func);
 
 	// jp hl: the block function returns to our caller
-	gb_call(gb, func);
+	JUMP_TO(func);
 }
 
 // output:

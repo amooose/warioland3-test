@@ -37,6 +37,8 @@ bool gb_init(GB *gb, const char *rom_path)
 		return false;
 	}
 	gb->rom_banks = (int)(gb->rom_size / 0x4000);
+	gb->ppu.framebuffer = calloc(GB_SCREEN_W * GB_SCREEN_H, sizeof(uint32_t));
+	gb->apu.buffer = calloc(AUDIO_BUFFER_FRAMES * 2, sizeof(int16_t));
 	gb_reset(gb);
 	return true;
 }
@@ -44,6 +46,8 @@ bool gb_init(GB *gb, const char *rom_path)
 void gb_free(GB *gb)
 {
 	free(gb->rom);
+	free(gb->ppu.framebuffer);
+	free(gb->apu.buffer);
 	gb->rom = NULL;
 }
 
@@ -51,7 +55,9 @@ void gb_free(GB *gb)
 void gb_reset(GB *gb)
 {
 	memset(&gb->cpu, 0, sizeof(gb->cpu));
+	uint32_t *framebuffer = gb->ppu.framebuffer;
 	memset(&gb->ppu, 0, sizeof(gb->ppu));
+	gb->ppu.framebuffer = framebuffer;
 	memset(gb->vram, 0, sizeof(gb->vram));
 	memset(gb->wram, 0, sizeof(gb->wram));
 	memset(gb->oam, 0, sizeof(gb->oam));

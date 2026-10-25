@@ -55,8 +55,15 @@ Things that make porting at scale fast and safe:
 - [x] **Progress report**: what's ported, per directory, and which routines
       are ready to port next (call graph, callee-first, most-called first).
 - [x] **CI**: build and run the difftests on every push.
-- [ ] **Coverage**: recordings that play through each world, so every
-      ported routine is exercised by the tests.
+- [x] **Differential fuzzing**: every ported routine is checked against the
+      asm on hundreds of variations of real calls (random registers, mutated
+      inputs, coverage-guided, with a dictionary of the routine's own
+      constants), plus synthetic calls for code no recording reaches; reports
+      the asm instruction coverage of each routine. Recordings are optional.
+- [ ] **Warp tool and play bot**: jump into any level, boss or minigame and
+      play it automatically, for more realistic starting points.
+- [ ] **Parallel porting**: several subsystems ported at once, each verified
+      by the fuzzer before it's merged.
 
 ## Phase 2: port the code
 

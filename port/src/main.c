@@ -361,6 +361,11 @@ static void usage(const char *argv0)
 		"  --wav PATH            record the audio output\n"
 		"  --difftest            check every ported routine against the original asm\n"
 		"  --coverage PATH       write how often each routine runs (with --input)\n"
+		"  --fuzz                fuzz every ported routine against the original asm,\n"
+		"                        seeded from an --input replay\n"
+		"  --fuzz-variants N     variations per seed (default 200)\n"
+		"  --fuzz-routine LABEL  fuzz only this routine\n"
+		"  --fuzz-verbose        list the asm instructions the fuzzing never executed\n"
 		"  --trace               print CPU state every frame\n"
 		"  --break LABEL         print recent instructions whenever LABEL is reached\n"
 		"  --watch LABEL         print the byte at LABEL every frame (repeatable)\n"
@@ -404,7 +409,9 @@ int main(int argc, char **argv)
 	const char *break_sym = NULL;
 	int scale = 4, run_frames = 0;
 	bool no_hooks = false, force_hooks = false, difftest = false;
-	const char *coverage_path = NULL;
+	const char *coverage_path = NULL, *fuzz_routine = NULL;
+	bool fuzz = false, fuzz_verbose = false;
+	int fuzz_variants = 0;
 	static Frontend fe;
 
 	for (int i = 1; i < argc; i++) {
@@ -427,6 +434,10 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--headless")) fe.headless = true;
 		else if (!strcmp(a, "--difftest")) difftest = true;
 		else if (!strcmp(a, "--coverage") && next) coverage_path = argv[++i];
+		else if (!strcmp(a, "--fuzz")) fuzz = true;
+		else if (!strcmp(a, "--fuzz-variants") && next) fuzz_variants = atoi(argv[++i]);
+		else if (!strcmp(a, "--fuzz-routine") && next) fuzz_routine = argv[++i];
+		else if (!strcmp(a, "--fuzz-verbose")) fuzz_verbose = true;
 		else if (!strcmp(a, "--trace")) fe.trace = true;
 		else if (!strcmp(a, "--break") && next) break_sym = argv[++i];
 		else if (!strcmp(a, "--watch") && next && fe.nwatch < 16) fe.watch_names[fe.nwatch++] = argv[++i];
@@ -496,7 +507,7 @@ int main(int argc, char **argv)
 			load_state = fe.script.state_path;
 	}
 
-	if (difftest || coverage_path) {
+	if (difftest || coverage_path || fuzz) {
 		if (load_state && !savestate_load_file(&gb, load_state))
 			return 1;
 		int end = run_frames ? (int)gb.frame_count + run_frames :
@@ -504,6 +515,10 @@ int main(int argc, char **argv)
 		const InputScript *script = fe.have_script ? &fe.script : NULL;
 		if (coverage_path)
 			return coverage_run(&gb, script, end, coverage_path) ? 0 : 1;
+		if (fuzz) {
+			fuzz_configure(fuzz_variants, fuzz_routine, fuzz_verbose);
+			return fuzz_run(&gb, script, end) ? 0 : 1;
+		}
 		return difftest_run(&gb, script, end) ? 0 : 1;
 	}
 

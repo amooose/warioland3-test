@@ -1,7 +1,12 @@
 # Test inputs
 
-Every `inputs/*.input` file is a difftest case: `ctest` replays it and checks
-every ported routine that gets called against the original asm.
+Every `inputs/*.input` file is a test case: `ctest` replays it and checks
+every ported routine that gets called against the original asm, and fuzzes
+every ported routine using calls from the replay as starting points.
+
+The fuzzer reaches every branch of the ported routines on its own, so
+recordings aren't required for porting. They add realistic gameplay
+starting points, and catch problems in how routines work together.
 
 Add coverage by recording yourself playing:
 

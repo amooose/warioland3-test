@@ -9,16 +9,27 @@ void port_register(const PortInfo *info)
 	hook_register(info->name, info->fn, info->flags, info->clobbers);
 }
 
-void port_call(GB *gb, int bank, uint16_t addr, const char *name)
+// A plain call or jump into a ROMX routine only works if its bank is
+// mapped; catch porting mistakes early rather than running the wrong code.
+static void check_bank(GB *gb, int bank, uint16_t addr, const char *what, const char *name)
 {
-	// A plain `call` into a ROMX routine only works if its bank is mapped;
-	// catch porting mistakes early rather than running the wrong code.
 	if (addr >= 0x4000 && addr < 0x8000 && gb->rom_bank != bank) {
-		fprintf(stderr, "port: CALL %s (bank %02x) while bank %02x is mapped; use FARCALL\n",
-			name, bank, gb->rom_bank);
+		fprintf(stderr, "port: %s %s (bank %02x) while bank %02x is mapped\n", what, name, bank,
+			gb->rom_bank);
 		abort();
 	}
+}
+
+void port_call(GB *gb, int bank, uint16_t addr, const char *name)
+{
+	check_bank(gb, bank, addr, "CALL", name);
 	gb_call(gb, addr);
+}
+
+void port_jump(GB *gb, int bank, uint16_t addr, const char *name)
+{
+	check_bank(gb, bank, addr, "JUMP", name);
+	gb->cpu.pc = addr;
 }
 
 void port_hcall(GB *gb, uint16_t addr)

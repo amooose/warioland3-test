@@ -8,21 +8,23 @@ assistants doing the porting.
 1. Pick a routine (see "What to port next" below).
 2. Write its C version in `src/ported/`, mirroring the asm file layout:
    `src/home/copy.asm` becomes `src/ported/home/copy.c`.
-3. Build, then run the difftests:
+3. Build and fuzz it against the original:
    ```sh
    cmake --build port/build
-   ctest --test-dir port/build --output-on-failure
+   ./port/build/wl3 --fuzz --input port/tests/inputs/boot_through_n1.input --fuzz-routine Label
    ```
-   or one input directly, to see the per-routine table:
-   ```sh
-   ./port/build/wl3 --difftest --input port/tests/inputs/intro_to_first_level.input
-   ```
-4. Fix every `FAIL`. Check that the routine was actually called (its `calls`
-   column isn't 0). If not, record an input that reaches it (`--record`, see
-   `tests/README.md`) and add it to `tests/inputs/`.
-5. Play the affected part of the game.
-
-A port is only done when the difftest passes with the routine exercised.
+   The fuzzer takes real calls of the routine from the replay (or makes a
+   synthetic call if the replay never reaches it), then checks hundreds of
+   variations of each: random registers, and mutated values in the memory
+   the routine reads. Every check runs the asm and the C from the same state
+   and compares everything.
+4. Fix every `FAIL`, and look at the `asm cover` column: it counts the
+   instructions of the original routine that the checks executed. A routine
+   is done when it passes with all of them covered (`--fuzz-verbose` lists
+   the ones that weren't). An uncovered instruction is code no check
+   compared, so a bug there would go unnoticed.
+5. Run the replay tests too (`ctest --test-dir port/build`), which check the
+   routine in real gameplay, and play the affected part of the game.
 
 ## Writing a ported routine
 
@@ -86,12 +88,27 @@ return values; that cleanup is a later phase (see ROADMAP.md).
 ### Routines that don't end in `ret`
 
 `PORT()` assumes the routine returns with `ret`; the dispatcher performs that
-`ret` after your C function returns. For routines that leave some other way
-(tail jumps such as `jp SomeOtherRoutine`, `JumpTable`-style code that
-manipulates the stack), use `PORT_EX(Label, HOOK_MANUAL_RET, 0)` and set
-`gb->cpu.pc` (and the stack) yourself. A tail jump `jp Foo` is usually best
-written as `CALL(Foo)` followed by a normal return, provided that `Foo`
-returns with `ret`.
+`ret` after your C function returns. A routine that ends by jumping
+elsewhere (`jp Foo`, `jr Foo`, `jp hl`, or falling through into the next
+label) is a `PORT_JUMP()`, and ends with `JUMP(Foo)` (or `JUMP_TO(address)`
+for computed jumps); paths that return use `RET()`:
+
+```c
+PORT_JUMP(Func_e2b)
+{
+	gb->cpu.a = rd8(gb, wCurObjFlags);
+	if (!alu_bit(gb, gb->cpu.a, OBJFLAG_ON_SCREEN_F)) {
+		RET();
+		return;
+	}
+	JUMP(Func_e31); // fallthrough
+}
+```
+
+Don't write a tail jump as `CALL(Foo)`: a call pushes a return address that
+the asm doesn't, and code that inspects or pops the stack (Game Boy code
+sometimes returns two levels at once that way) then behaves differently.
+The fuzzer catches this.
 
 ### Fallthrough and shared code
 
@@ -129,11 +146,12 @@ the original's timing.
 
 ## Coverage
 
-The difftest only checks calls that actually happen during its run, so
-coverage matters as much as the code. Every script in `tests/inputs/` is run
-by ctest; record new ones by playing (`--record`) to cover more of the game.
-The summary table lists routines that were never called; treat those as
-untested.
+The fuzzer's `asm cover` column is the measure that matters: which
+instructions of the original routine were executed and compared. The replay
+difftest only checks calls that happen during a recording, so it adds
+confidence about real gameplay but doesn't need to reach everything.
+Recordings (`--record`) are still welcome for that, and they give the fuzzer
+more realistic starting points.
 
 ## What to port next
 

@@ -23,12 +23,13 @@ PORT(InitSceneObjParams)
 }
 
 // Animates the scene object at wCurSceneObjPtr.
-PORT(UpdateCurOWObjAnimation)
+PORT_JUMP(UpdateCurOWObjAnimation)
 {
 	gb->cpu.b = 0x2a; // bank of the overworld framesets
 	gb->cpu.l = rd8(gb, wCurSceneObjPtr + 0) | (1 << 2); // set 2, l
-	gb->cpu.h = rd8(gb, wCurSceneObjPtr + 1);
-	CALL(UpdateOWAnimation); // jp
+	gb->cpu.a = rd8(gb, wCurSceneObjPtr + 1);
+	gb->cpu.h = gb->cpu.a;
+	JUMP(UpdateOWAnimation);
 }
 
 // When the animation of the scene object in hl has finished, resets it and

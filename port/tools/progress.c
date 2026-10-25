@@ -239,12 +239,14 @@ static void read_ported(const char *path)
 		return;
 	char line[512];
 	while (fgets(line, sizeof(line), f)) {
-		const char *p;
-		if (!strncmp(line, "PORT(", 5))
-			p = line + 5;
-		else if (!strncmp(line, "PORT_EX(", 8))
-			p = line + 8;
-		else
+		// Any PORT macro at the start of a line: PORT(Name), PORT_JUMP(Name),
+		// PORT_EX(Name, ...)
+		if (strncmp(line, "PORT", 4))
+			continue;
+		const char *p = line + 4;
+		while (*p == '_' || (*p >= 'A' && *p <= 'Z'))
+			p++;
+		if (*p++ != '(')
 			continue;
 		char name[256];
 		size_t n = strcspn(p, ",) \t");

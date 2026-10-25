@@ -110,10 +110,12 @@ PORT(Func_e31)
 	wr8(gb, wc19e, gb->cpu.a);
 }
 
-PORT(Func_e2b)
+PORT_JUMP(Func_e2b)
 {
 	gb->cpu.a = rd8(gb, wCurObjFlags);
-	if (!alu_bit(gb, gb->cpu.a, OBJFLAG_ON_SCREEN_F))
+	if (!alu_bit(gb, gb->cpu.a, OBJFLAG_ON_SCREEN_F)) {
+		RET();
 		return;
-	CALL(Func_e31);
+	}
+	JUMP(Func_e31); // fallthrough
 }

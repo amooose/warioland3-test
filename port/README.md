@@ -135,6 +135,9 @@ Run `wl3 --help` for the full list. The main ones:
   --break LABEL         print recent instructions whenever LABEL is reached
   --watch LABEL         print the byte at LABEL every frame
   --coverage PATH       write how often each routine runs during an --input
+  --fuzz                fuzz every ported routine (seeded from --input)
+  --fuzz-routine LABEL  fuzz only this routine
+  --fuzz-verbose        list the asm instructions fuzzing never executed
 ```
 
 Headless runs don't read or write the battery save unless `--sav` is given.
@@ -145,8 +148,22 @@ Headless runs don't read or write the battery save unless `--sav` is given.
 ctest --test-dir port/build --output-on-failure
 ```
 
-This runs the difftest over every input script in `tests/inputs/`. It fails if
-any ported routine behaves differently from the original.
+For every input script in `tests/inputs/`, this runs:
+
+- the **difftest**, which replays it and checks each ported routine against
+  the original asm on the calls that happen;
+- the **fuzzer**, which takes calls from the replay (or synthetic calls for
+  routines it never reaches) and checks hundreds of variations of each, with
+  random registers and mutated values in the memory the routine reads. It
+  also reports how many instructions of each original routine the checks
+  executed.
+
+Either fails if any ported routine behaves differently from the original.
+To fuzz one routine while porting it:
+
+```sh
+./port/build/wl3 --fuzz --input port/tests/inputs/boot_through_n1.input --fuzz-routine Label --fuzz-verbose
+```
 
 ```sh
 cmake --build port/build --target progress

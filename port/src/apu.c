@@ -21,7 +21,9 @@ static float hp_l, hp_r;
 
 void apu_reset(GB *gb)
 {
+	int16_t *buffer = gb->apu.buffer;
 	memset(&gb->apu, 0, sizeof(gb->apu));
+	gb->apu.buffer = buffer;
 	hp_l = hp_r = 0;
 }
 
