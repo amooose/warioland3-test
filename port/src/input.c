@@ -138,7 +138,7 @@ bool recorder_save(const InputRecorder *r, const char *path)
 		}
 		fclose(f);
 	}
-	f = fopen(path, "w");
+	f = fopen(path, "wb"); // \n line endings on every platform
 	if (!f)
 		return false;
 	fprintf(f, "# Recorded with wl3 --record\n");
