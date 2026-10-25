@@ -1,11 +1,13 @@
 // Porting progress report.
 //
-//   progress <repo root> <asm file list> <out.md> <ported/*.c...>
+//   progress <repo root> <asm file list> <out.md> [--coverage file]... <ported/*.c...>
 //
 // Reads the disassembly's asm sources and builds the routine call graph
 // (call, jp, farcall and friends, jump table entries, and fallthrough into
 // the next label), then reports how much has been ported and which routines
 // are ready to port next: those whose callees are all native already.
+// Coverage files (from wl3 --coverage) mark which routines the test inputs
+// exercise, so the difftest can check them once ported.
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,6 +22,7 @@ typedef struct {
 	int ncallees, capcallees;
 	int callers;
 	int ported;
+	unsigned long long covered; // times entered during the test inputs
 } Routine;
 
 static Routine *routines;
@@ -258,6 +261,23 @@ static void read_ported(const char *path)
 	fclose(f);
 }
 
+static void read_coverage(const char *path)
+{
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		fprintf(stderr, "progress: can't read %s\n", path);
+		return;
+	}
+	char name[256];
+	unsigned long long count;
+	while (fscanf(f, "%255s %llu", name, &count) == 2) {
+		int i = find(name);
+		if (i >= 0)
+			routines[i].covered += count;
+	}
+	fclose(f);
+}
+
 static int is_code(const Routine *r)
 {
 	return r->instructions > 0;
@@ -287,7 +307,9 @@ static int ready(const Routine *r)
 static int by_ready_priority(const void *a, const void *b)
 {
 	const Routine *x = &routines[*(const int *)a], *y = &routines[*(const int *)b];
-	// most-called first, then smallest first
+	// tested first, then most-called, then smallest
+	if (!x->covered != !y->covered)
+		return x->covered ? -1 : 1;
 	if (x->callers != y->callers)
 		return y->callers - x->callers;
 	return x->instructions - y->instructions;
@@ -320,8 +342,12 @@ int main(int argc, char **argv)
 		read_asm(path, rel);
 	}
 	fclose(list);
-	for (int i = 4; i < argc; i++)
-		read_ported(argv[i]);
+	for (int i = 4; i < argc; i++) {
+		if (!strcmp(argv[i], "--coverage") && i + 1 < argc)
+			read_coverage(argv[++i]);
+		else
+			read_ported(argv[i]);
+	}
 
 	for (int e = 0; e < nedges; e++) {
 		int to = find(edges[e].to);
@@ -398,6 +424,17 @@ int main(int argc, char **argv)
 		}
 	}
 
+	int ported_total = 0, ported_tested = 0;
+	for (int i = 0; i < nroutines; i++) {
+		if (routines[i].ported) {
+			ported_total++;
+			ported_tested += routines[i].covered > 0;
+		}
+	}
+	for (int s = 0; s < 2; s++)
+		fprintf(streams[s], "\n%d of %d ported routines are exercised by the test inputs.\n",
+			ported_tested, ported_total);
+
 	// Ready to port: every callee is already native.
 	int *ready_list = malloc((size_t)nroutines * sizeof(int));
 	int nready = 0;
@@ -406,17 +443,23 @@ int main(int argc, char **argv)
 			ready_list[nready++] = i;
 	qsort(ready_list, (size_t)nready, sizeof(int), by_ready_priority);
 
-	fprintf(stdout, "\n%d routines are ready to port (all their callees are native); "
-		"the full list is in %s\n", nready, argv[3]);
+	int nready_tested = 0;
+	for (int k = 0; k < nready; k++)
+		nready_tested += routines[ready_list[k]].covered > 0;
+	fprintf(stdout, "\n%d routines are ready to port (all their callees are native), %d of them "
+		"exercised by the test inputs; the full list is in %s\n", nready, nready_tested, argv[3]);
 	fprintf(out, "\n## Ready to port\n\n");
-	fprintf(out, "Routines whose callees are all native already, most-called first.\n\n");
-	fprintf(out, "| Routine | Callers | Instructions | Location |\n| --- | ---: | ---: | --- |\n");
+	fprintf(out, "Routines whose callees are all native already: the ones the test inputs\n"
+		"exercise first (the difftest can check those), then most-called first.\n\n");
+	fprintf(out, "| Routine | Tested calls | Callers | Instructions | Location |\n"
+		"| --- | ---: | ---: | ---: | --- |\n");
 	for (int k = 0; k < nready; k++) {
 		Routine *r = &routines[ready_list[k]];
-		fprintf(out, "| %s | %d | %d | %s:%d |\n", r->name, r->callers, r->instructions, r->file, r->line);
+		fprintf(out, "| %s | %llu | %d | %d | %s:%d |\n", r->name, r->covered, r->callers,
+			r->instructions, r->file, r->line);
 		if (k < 15)
-			fprintf(stdout, "  %-40s %4d callers %5d instructions  %s:%d\n", r->name, r->callers,
-				r->instructions, r->file, r->line);
+			fprintf(stdout, "  %-36s %8llu tested %4d callers %5d instr  %s:%d\n", r->name,
+				r->covered, r->callers, r->instructions, r->file, r->line);
 	}
 	return fclose(out) != 0;
 }

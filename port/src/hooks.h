@@ -38,6 +38,10 @@ bool sym_lookup(const char *name, int *bank, uint16_t *addr);
 // Name of the label at or before an address (for debugging); NULL if none.
 const char *sym_name_at(int bank, uint16_t addr);
 
+// Global (non-local) ROM labels, for coverage reports.
+int sym_count(void);
+bool sym_get(int i, const char **name, int *bank, uint16_t *addr);
+
 void hooks_init(GB *gb);
 // Register a hook by symbol name. Returns false if the symbol isn't found.
 bool hook_register(const char *name, HookFn fn, unsigned flags, unsigned clobbers);

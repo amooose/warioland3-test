@@ -15,6 +15,9 @@ state the recording starts from. Commit both. To record a later part of the
 game without replaying it from the start, load a save state first
 (`--load-state`, or F7 in game) and the recording starts from there.
 
+Recording uses the original game's timing (see "Recording" in the port's
+README), so recordings stay valid as more of the game gets ported.
+
 The format is described in `src/input.h`. Scripts can also be written by
 hand; ones that start from power-on don't need a state.
 

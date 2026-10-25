@@ -28,11 +28,16 @@ static bool should_sample(uint64_t n)
 }
 
 // Run the asm until the CPU arrives at (pc, sp), without advancing hardware.
-static bool run_asm_until(GB *gb, uint16_t pc, uint16_t sp)
+// *left is set if the asm unwound past entry_sp on the way, i.e. it returned
+// from the routine (somewhere other than (pc, sp)).
+static bool run_asm_until(GB *gb, uint16_t pc, uint16_t sp, uint16_t entry_sp, bool *left)
 {
+	*left = false;
 	for (long i = 0; i < MAX_STEPS; i++) {
 		if (gb->cpu.pc == pc && gb->cpu.sp == sp)
 			return true;
+		if (gb->cpu.sp > entry_sp)
+			*left = true;
 		cpu_step(gb);
 	}
 	return false;
@@ -145,7 +150,6 @@ static void test_call(GB *gb, Hook *h, int index)
 	nat->cpu.ime = false;
 	nat->cpu.ime_delay = 0;
 	uint16_t entry_sp = nat->cpu.sp;
-	uint16_t ret_addr = gb_read16(nat, entry_sp);
 	hooks_set_enabled(true);
 	h->fn(nat);
 	if (!(h->flags & HOOK_MANUAL_RET))
@@ -158,23 +162,25 @@ static void test_call(GB *gb, Hook *h, int index)
 	ref->no_tick = true;
 	ref->cpu.ime = false;
 	ref->cpu.ime_delay = 0;
-	bool done;
-	if (h->flags & HOOK_MANUAL_RET)
-		done = run_asm_until(ref, nat->cpu.pc, nat->cpu.sp);
-	else
-		done = run_asm_until(ref, ret_addr, (uint16_t)(entry_sp + 2));
-	if (!done) {
-		if (h->flags & HOOK_MANUAL_RET) {
-			// Either the asm waits on hardware, or the native code exited
-			// somewhere the asm never goes. Both need a look.
+	// Run the asm until it gets where the native code went. A routine that
+	// ends in a plain ret goes back to the return address on the stack; one
+	// that was jumped to (like HomeJumpRet, which pops a saved bank first) or
+	// ends in a jump goes somewhere else, and the native exit says where.
+	bool left;
+	if (!run_asm_until(ref, nat->cpu.pc, nat->cpu.sp, entry_sp, &left)) {
+		if (!left) {
+			// The asm never finishes, and never leaves the routine, without
+			// hardware time passing: it waits for VBlank, LY or an
+			// interrupt.
+			st->skipped++;
+		} else {
 			st->failed++;
 			if (!st->reported) {
 				st->reported = true;
-				printf("FAIL %s (call %llu): asm never reached the native exit %04x (sp %04x)\n",
+				printf("FAIL %s (call %llu): the native code exits to %04x (sp %04x), "
+					"the asm somewhere else\n",
 					h->name, (unsigned long long)st->seen, nat->cpu.pc, nat->cpu.sp);
 			}
-		} else {
-			st->skipped++;
 		}
 		return;
 	}
@@ -256,4 +262,78 @@ bool difftest_run(GB *gb, const InputScript *input, int end_frame)
 			unexercised, unexercised == 1 ? " was" : "s were", unexercised == 1 ? "it" : "them");
 	printf("\ndifftest: %s\n", ok ? "PASS" : "FAIL");
 	return ok;
+}
+
+typedef struct {
+	size_t offset;
+	int sym;
+} LabelAt;
+
+static int cmp_label_at(const void *a, const void *b)
+{
+	size_t x = ((const LabelAt *)a)->offset, y = ((const LabelAt *)b)->offset;
+	return x < y ? -1 : x > y;
+}
+
+bool coverage_run(GB *gb, const InputScript *input, int end_frame, const char *out_path)
+{
+	// Global ROM labels sorted by ROM offset; a bitmap filters the lookups.
+	size_t bitmap_len = gb->rom_size / 8 + 1;
+	uint8_t *bitmap = calloc(bitmap_len, 1);
+	int nsyms = sym_count(), nlabels = 0;
+	LabelAt *labels = malloc((size_t)nsyms * sizeof(LabelAt));
+	uint64_t *counts = calloc((size_t)nsyms, sizeof(uint64_t));
+	for (int i = 0; i < nsyms; i++) {
+		const char *name;
+		int bank;
+		uint16_t addr;
+		sym_get(i, &name, &bank, &addr);
+		if (addr >= 0x8000 || strchr(name, '.'))
+			continue;
+		size_t off = addr < 0x4000 ? addr : (size_t)bank * 0x4000 + (addr - 0x4000);
+		if (off >= gb->rom_size)
+			continue;
+		labels[nlabels++] = (LabelAt){off, i};
+		bitmap[off / 8] |= (uint8_t)(1 << (off % 8));
+	}
+	qsort(labels, (size_t)nlabels, sizeof(LabelAt), cmp_label_at);
+
+	script = input;
+	hooks_set_enabled(false);
+	gb->frame_cb = difftest_frame;
+	while ((int)gb->frame_count < end_frame) {
+		uint16_t pc = gb->cpu.pc;
+		if (pc < 0x8000 && !gb->cpu.halted) {
+			size_t off = pc < 0x4000 ? pc : (size_t)(gb->rom_bank % gb->rom_banks) * 0x4000 + (pc - 0x4000);
+			if (bitmap[off / 8] & (1 << (off % 8))) {
+				LabelAt key = {off, 0};
+				LabelAt *hit = bsearch(&key, labels, (size_t)nlabels, sizeof(LabelAt), cmp_label_at);
+				// Several labels can share an address; count them all.
+				for (LabelAt *l = hit; l && l >= labels && l->offset == off; l--)
+					counts[l->sym]++;
+				for (LabelAt *l = hit ? hit + 1 : NULL; l && l < labels + nlabels && l->offset == off; l++)
+					counts[l->sym]++;
+			}
+		}
+		gb_tick(gb, cpu_step(gb));
+	}
+
+	FILE *f = fopen(out_path, "w");
+	if (!f) {
+		fprintf(stderr, "coverage: can't write %s\n", out_path);
+		return false;
+	}
+	for (int i = 0; i < nsyms; i++) {
+		if (!counts[i])
+			continue;
+		const char *name;
+		int bank;
+		uint16_t addr;
+		sym_get(i, &name, &bank, &addr);
+		fprintf(f, "%s %llu\n", name, (unsigned long long)counts[i]);
+	}
+	free(bitmap);
+	free(labels);
+	free(counts);
+	return fclose(f) == 0;
 }

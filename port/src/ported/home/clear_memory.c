@@ -51,3 +51,18 @@ PORT(ClearUnusedVirtualOAM)
 	wr8(gb, wVirtualOAMByteSize, 0);
 	gb->cpu.f = FLAG_Z; // xor a
 }
+
+// fills v0BGMap0 and v1BGMap0 with $7f
+PORT(FillBGMap0_With7f)
+{
+	gb->cpu.a = 0x7f;
+	CALL(FillBGMap0);
+}
+
+PORT(ClearBGMap1)
+{
+	gb->cpu.a = 0xff;
+	SET_HL(gb, v0BGMap1);
+	SET_BC(gb, v0End - v0BGMap1);
+	CALL(WriteAToHL_BCTimes);
+}

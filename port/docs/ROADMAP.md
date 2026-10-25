@@ -92,6 +92,13 @@ Once no game code runs in the interpreter:
 - Load graphics, levels, text and music from asset files (the disassembly
   already has most of them as PNG and binary files) instead of from the ROM.
 
+## Open decision: slowdown
+
+Native code is faster than the original, so the port has less slowdown than
+the Game Boy Color. Most PC ports treat that as an improvement. If exact
+original timing turns out to matter (speedrunners, timing-based tricks), an
+option can charge native routines the cycles the original would have taken.
+
 ## Phase 4: beyond the Game Boy
 
 - **Native renderer**: draw layers and sprites directly instead of emulating

@@ -3,7 +3,7 @@
 //   gen syms <warioland3.sym> <out.h>
 //     Turns the linker's symbol file into C constants, so ported code can
 //     refer to labels from the disassembly by name:
-//       RAM labels:  #define wROMBank 0xc5ff   (plus BANK_wFoo for banked RAM)
+//       RAM labels:  #define wROMBank 0xc5ff / #define BANK_wROMBank 0x00
 //       ROM labels:  #define ADDR_Foo 0x4a12 / #define BANK_Foo 0x05
 //
 //   gen consts <state.asm> <out.h>
@@ -52,9 +52,7 @@ static int gen_syms(const char *in, const char *out)
 		if (!valid_c_ident(name))
 			continue; // local labels (Foo.bar) and anonymous labels
 		if (addr >= 0x8000) {
-			fprintf(o, "#define %s 0x%04x\n", name, addr);
-			if (bank)
-				fprintf(o, "#define BANK_%s 0x%02x\n", name, bank);
+			fprintf(o, "#define %s 0x%04x\n#define BANK_%s 0x%02x\n", name, addr, name, bank);
 		} else {
 			fprintf(o, "#define ADDR_%s 0x%04x\n#define BANK_%s 0x%02x\n", name, addr, name, bank);
 		}

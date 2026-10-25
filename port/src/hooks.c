@@ -67,6 +67,21 @@ bool sym_lookup(const char *name, int *bank, uint16_t *addr)
 	return false;
 }
 
+int sym_count(void)
+{
+	return nsyms;
+}
+
+bool sym_get(int i, const char **name, int *bank, uint16_t *addr)
+{
+	if (i < 0 || i >= nsyms)
+		return false;
+	*name = syms[i].name;
+	*bank = syms[i].bank;
+	*addr = syms[i].addr;
+	return true;
+}
+
 const char *sym_name_at(int bank, uint16_t addr)
 {
 	const Sym *best = NULL;

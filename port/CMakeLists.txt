@@ -73,16 +73,10 @@ add_custom_command(
 	DEPENDS ${GEN_CMD} ${PORTED_SOURCES}
 	COMMENT "Generating the ported routine table")
 
-# Porting progress report: cmake --build build --target progress
 add_executable(wl3_progress tools/progress.c)
 file(GLOB_RECURSE ASM_SOURCES CONFIGURE_DEPENDS ${REPO_ROOT}/src/*.asm)
 list(JOIN ASM_SOURCES "\n" ASM_SOURCE_LIST)
 file(WRITE ${GEN_DIR}/asm_sources.txt "${ASM_SOURCE_LIST}\n")
-add_custom_target(progress
-	COMMAND wl3_progress ${REPO_ROOT} ${GEN_DIR}/asm_sources.txt
-		${CMAKE_CURRENT_BINARY_DIR}/progress.md ${PORTED_SOURCES}
-	DEPENDS wl3_progress
-	USES_TERMINAL)
 
 add_executable(wl3
 	src/apu.c
@@ -123,7 +117,21 @@ target_compile_definitions(wl3 PRIVATE WL3_DEFAULT_ROM="${ROM}")
 enable_testing()
 # One difftest per input script in tests/inputs.
 file(GLOB TEST_INPUTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/inputs/*.input)
+set(COVERAGE_COMMANDS)
+set(COVERAGE_ARGS)
 foreach(input ${TEST_INPUTS})
 	get_filename_component(name ${input} NAME_WE)
 	add_test(NAME difftest_${name} COMMAND wl3 --difftest --input ${input})
+	list(APPEND COVERAGE_COMMANDS COMMAND wl3 --coverage ${CMAKE_CURRENT_BINARY_DIR}/coverage/${name}.txt --input ${input})
+	list(APPEND COVERAGE_ARGS --coverage ${CMAKE_CURRENT_BINARY_DIR}/coverage/${name}.txt)
 endforeach()
+
+# Porting progress report: cmake --build build --target progress
+# Runs every test input for coverage first.
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/coverage)
+add_custom_target(progress
+	${COVERAGE_COMMANDS}
+	COMMAND wl3_progress ${REPO_ROOT} ${GEN_DIR}/asm_sources.txt
+		${CMAKE_CURRENT_BINARY_DIR}/progress.md ${COVERAGE_ARGS} ${PORTED_SOURCES}
+	DEPENDS wl3_progress wl3
+	USES_TERMINAL)

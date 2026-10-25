@@ -46,8 +46,8 @@ PORT(ClearVirtualOAM)
   automatically; there's nothing to register.
 - Every label in the disassembly is available as a constant through the
   generated `syms.h`: RAM labels by name (`wVirtualOAM`, `hCallFuncBank`),
-  ROM labels as `ADDR_Label` / `BANK_Label`. Banked RAM labels also have
-  `BANK_Label`.
+  ROM labels as `ADDR_Label` / `BANK_Label`. RAM labels also have
+  `BANK_Label` (their WRAM or VRAM bank).
 - Every constant (`DEF ... EQU`, `const` lists, everything in
   `src/constants/` and `hardware.inc`) is available through the generated
   `constants.h`, with the value rgbasm computed: `OAM_SIZE`, `rLCDC`,
@@ -114,6 +114,18 @@ helper or a `CALL` to the shared entry point.
 - **8-bit arithmetic.** Use `uint8_t` and keep wraparound and carry behaviour
   identical. When the asm uses a carry from `add`/`sub` in a later branch,
   compute it explicitly.
+
+## Timing
+
+Ported routines run in zero emulated time. With them, the game finishes
+each frame's work sooner than the original, so it has fewer slowdown
+frames and shorter loads: that changes when things happen, not what
+happens. It also means a whole playthrough with ported code doesn't match a
+pure-asm playthrough frame for frame (the native run reaches the intro about
+11 frames sooner, just from clearing RAM at boot), so comparing whole runs
+says nothing about correctness. The difftest checks each routine in
+isolation instead, which is independent of timing, and it always replays on
+the original's timing.
 
 ## Coverage
 

@@ -33,7 +33,7 @@ jobs:
         run: ctest --test-dir port/build --output-on-failure
 
       - name: Smoke test
-        run: ./port/build/wl3 --headless --input port/tests/inputs/intro_to_first_level.input --screenshot 4800:smoke.png
+        run: ./port/build/wl3 --headless --hooks --input port/tests/inputs/boot_through_n1.input --screenshot 16000:smoke.png
 
       - uses: actions/upload-artifact@v4
         with:

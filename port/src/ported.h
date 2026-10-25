@@ -75,14 +75,86 @@ static inline void bankswitch(GB *gb, uint8_t bank)
 	wr8(gb, rROMB0 + 0x100, bank);
 }
 
-// Flag helpers for routines whose callers test the flags.
-static inline void set_z(GB *gb, bool z)
+// push af / pop af, on the real stack, like the asm.
+static inline void push_af(GB *gb)
 {
-	gb->cpu.f = (uint8_t)(z ? (gb->cpu.f | FLAG_Z) : (gb->cpu.f & ~FLAG_Z));
+	gb_push16(gb, REG_AF(gb));
 }
-static inline void set_c(GB *gb, bool c)
+static inline void pop_af(GB *gb)
 {
-	gb->cpu.f = (uint8_t)(c ? (gb->cpu.f | FLAG_C) : (gb->cpu.f & ~FLAG_C));
+	uint16_t v = gb_pop16(gb);
+	gb->cpu.a = (uint8_t)(v >> 8);
+	gb->cpu.f = (uint8_t)(v & 0xf0);
+}
+
+// The flag results of 8-bit arithmetic, exactly as the CPU computes them.
+// Use these where the asm's exit flags have to be reproduced: each returns
+// the result and sets gb->cpu.f the way the instruction would.
+static inline uint8_t alu_add(GB *gb, uint8_t a, uint8_t v)
+{
+	unsigned r = (unsigned)a + v;
+	gb->cpu.f = (uint8_t)(((r & 0xff) ? 0 : FLAG_Z) | (((a & 0xf) + (v & 0xf)) > 0xf ? FLAG_H : 0) |
+		(r > 0xff ? FLAG_C : 0));
+	return (uint8_t)r;
+}
+static inline uint8_t alu_adc(GB *gb, uint8_t a, uint8_t v)
+{
+	unsigned carry = (gb->cpu.f & FLAG_C) ? 1 : 0;
+	unsigned r = (unsigned)a + v + carry;
+	gb->cpu.f = (uint8_t)(((r & 0xff) ? 0 : FLAG_Z) | (((a & 0xf) + (v & 0xf) + carry) > 0xf ? FLAG_H : 0) |
+		(r > 0xff ? FLAG_C : 0));
+	return (uint8_t)r;
+}
+static inline uint8_t alu_sub(GB *gb, uint8_t a, uint8_t v)
+{
+	gb->cpu.f = (uint8_t)((a == v ? FLAG_Z : 0) | FLAG_N | ((a & 0xf) < (v & 0xf) ? FLAG_H : 0) |
+		(a < v ? FLAG_C : 0));
+	return (uint8_t)(a - v);
+}
+// cp: flags of a - v, a unchanged
+static inline void alu_cp(GB *gb, uint8_t a, uint8_t v)
+{
+	alu_sub(gb, a, v);
+}
+// and / or / xor
+static inline uint8_t alu_and(GB *gb, uint8_t a, uint8_t v)
+{
+	uint8_t r = a & v;
+	gb->cpu.f = (uint8_t)((r ? 0 : FLAG_Z) | FLAG_H);
+	return r;
+}
+static inline uint8_t alu_or(GB *gb, uint8_t a, uint8_t v)
+{
+	uint8_t r = a | v;
+	gb->cpu.f = r ? 0 : FLAG_Z;
+	return r;
+}
+static inline uint8_t alu_xor(GB *gb, uint8_t a, uint8_t v)
+{
+	uint8_t r = a ^ v;
+	gb->cpu.f = r ? 0 : FLAG_Z;
+	return r;
+}
+// inc r / dec r (carry unchanged)
+static inline uint8_t alu_inc(GB *gb, uint8_t v)
+{
+	uint8_t r = (uint8_t)(v + 1);
+	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_C) | (r ? 0 : FLAG_Z) | ((r & 0xf) == 0 ? FLAG_H : 0));
+	return r;
+}
+static inline uint8_t alu_dec(GB *gb, uint8_t v)
+{
+	uint8_t r = (uint8_t)(v - 1);
+	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_C) | FLAG_N | (r ? 0 : FLAG_Z) | ((r & 0xf) == 0xf ? FLAG_H : 0));
+	return r;
+}
+// add hl, rr (z unchanged)
+static inline uint16_t alu_add16(GB *gb, uint16_t hl, uint16_t v)
+{
+	uint32_t r = (uint32_t)hl + v;
+	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_Z) | (((hl & 0xfff) + (v & 0xfff)) > 0xfff ? FLAG_H : 0) |
+		(r > 0xffff ? FLAG_C : 0));
+	return (uint16_t)r;
 }
 
 

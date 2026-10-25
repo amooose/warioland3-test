@@ -11,4 +11,8 @@
 // comparison matched.
 bool difftest_run(GB *gb, const InputScript *input, int end_frame);
 
+// Play the game in the pure interpreter until end_frame and write how many
+// times each global ROM label was entered, one "<name> <count>" per line.
+bool coverage_run(GB *gb, const InputScript *input, int end_frame, const char *out_path);
+
 #endif

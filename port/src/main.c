@@ -25,6 +25,9 @@ typedef struct {
 	bool quit;
 	int quit_wait_frames;
 	bool trace; // print CPU state every frame
+	uint16_t watch[16]; // RAM addresses printed every frame
+	const char *watch_names[16];
+	int nwatch;
 	FILE *wav;
 	uint32_t wav_frames;
 	int stop_frame; // stop at this frame (0: run until quit)
@@ -264,6 +267,13 @@ static void on_frame(GB *gb)
 			gb->io[0x40], gb->cpu.halted);
 	}
 
+	if (fe->nwatch) {
+		printf("frame %d:", frame);
+		for (int i = 0; i < fe->nwatch; i++)
+			printf(" %s=%02x", fe->watch_names[i], gb_read(gb, fe->watch[i]));
+		printf("\n");
+	}
+
 	if (fe->wav) {
 		fwrite(gb->apu.buffer, 4, (size_t)gb->apu.buffer_len, fe->wav);
 		fe->wav_frames += (uint32_t)gb->apu.buffer_len;
@@ -337,6 +347,8 @@ static void usage(const char *argv0)
 		"                        headless runs only use one if this is given)\n"
 		"  --scale N             window scale (default 4)\n"
 		"  --no-hooks            run everything in the interpreter\n"
+		"  --hooks               use the ported routines even when recording or\n"
+		"                        replaying (which otherwise use the original's timing)\n"
 		"\n"
 		"  --record PATH         record your input to an input script (plus PATH.state)\n"
 		"  --input PATH          play an input script (see src/input.h for the format)\n"
@@ -348,8 +360,10 @@ static void usage(const char *argv0)
 		"  --screenshot N:PATH   write a PNG of frame N (repeatable)\n"
 		"  --wav PATH            record the audio output\n"
 		"  --difftest            check every ported routine against the original asm\n"
+		"  --coverage PATH       write how often each routine runs (with --input)\n"
 		"  --trace               print CPU state every frame\n"
 		"  --break LABEL         print recent instructions whenever LABEL is reached\n"
+		"  --watch LABEL         print the byte at LABEL every frame (repeatable)\n"
 		"\n"
 		"Frame numbers count from power-on, and carry on from a loaded state.\n"
 		"\n"
@@ -389,7 +403,8 @@ int main(int argc, char **argv)
 	const char *sym_path = NULL, *sav_path = NULL, *input_path = NULL, *load_state = NULL;
 	const char *break_sym = NULL;
 	int scale = 4, run_frames = 0;
-	bool no_hooks = false, difftest = false;
+	bool no_hooks = false, force_hooks = false, difftest = false;
+	const char *coverage_path = NULL;
 	static Frontend fe;
 
 	for (int i = 1; i < argc; i++) {
@@ -408,10 +423,13 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--load-state") && next) load_state = argv[++i];
 		else if (!strcmp(a, "--frames") && next) run_frames = atoi(argv[++i]);
 		else if (!strcmp(a, "--no-hooks")) no_hooks = true;
+		else if (!strcmp(a, "--hooks")) force_hooks = true;
 		else if (!strcmp(a, "--headless")) fe.headless = true;
 		else if (!strcmp(a, "--difftest")) difftest = true;
+		else if (!strcmp(a, "--coverage") && next) coverage_path = argv[++i];
 		else if (!strcmp(a, "--trace")) fe.trace = true;
 		else if (!strcmp(a, "--break") && next) break_sym = argv[++i];
+		else if (!strcmp(a, "--watch") && next && fe.nwatch < 16) fe.watch_names[fe.nwatch++] = argv[++i];
 		else if (!strcmp(a, "--wav") && next) {
 			fe.wav = fopen(argv[++i], "wb");
 			if (fe.wav)
@@ -450,9 +468,22 @@ int main(int argc, char **argv)
 		}
 		cpu_set_breakpoint(bank, addr);
 	}
+	for (int i = 0; i < fe.nwatch; i++) {
+		int bank;
+		if (!sym_lookup(fe.watch_names[i], &bank, &fe.watch[i])) {
+			fprintf(stderr, "unknown label %s\n", fe.watch_names[i]);
+			return 1;
+		}
+	}
 	ported_register_all();
 	hooks_init(&gb);
-	if (no_hooks)
+	// Ported routines take no emulated time, so with them the game spends
+	// less time on slow frames and loading than the original does, and
+	// button presses at fixed frame numbers land at different moments.
+	// Recordings and replays therefore use the original's timing: then a
+	// recording stays valid however much of the game gets ported, and
+	// replays exactly in the difftest (which always uses that timing).
+	if (no_hooks || ((fe.record_path || input_path) && !force_hooks))
 		hooks_set_enabled(false);
 
 	if (input_path) {
@@ -465,12 +496,15 @@ int main(int argc, char **argv)
 			load_state = fe.script.state_path;
 	}
 
-	if (difftest) {
+	if (difftest || coverage_path) {
 		if (load_state && !savestate_load_file(&gb, load_state))
 			return 1;
 		int end = run_frames ? (int)gb.frame_count + run_frames :
 			(fe.have_script ? input_end(&fe.script) : 3000);
-		return difftest_run(&gb, fe.have_script ? &fe.script : NULL, end) ? 0 : 1;
+		const InputScript *script = fe.have_script ? &fe.script : NULL;
+		if (coverage_path)
+			return coverage_run(&gb, script, end, coverage_path) ? 0 : 1;
+		return difftest_run(&gb, script, end) ? 0 : 1;
 	}
 
 	// Headless runs are tests and tools: they leave the player's save alone

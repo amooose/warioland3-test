@@ -108,6 +108,13 @@ Records everything you press, until you quit, to `my_run.input`, plus
 Replay it with `--input my_run.input`; replays are exact, on any platform.
 Recordings are how the port gets tested: see [tests/README.md](tests/README.md).
 
+Recording and replaying use the original game's timing, with the ported
+routines switched off (it plays the same). Ported routines take no emulated
+time, so normally the game has less slowdown and shorter loads than the
+original, which would shift when recorded button presses land. On the
+original's timing, a recording stays valid however much of the game gets
+ported.
+
 ## Command line
 
 Run `wl3 --help` for the full list. The main ones:
@@ -125,6 +132,8 @@ Run `wl3 --help` for the full list. The main ones:
   --no-hooks            run everything in the interpreter
   --trace               print CPU state every frame
   --break LABEL         print recent instructions whenever LABEL is reached
+  --watch LABEL         print the byte at LABEL every frame
+  --coverage PATH       write how often each routine runs during an --input
 ```
 
 Headless runs don't read or write the battery save unless `--sav` is given.
