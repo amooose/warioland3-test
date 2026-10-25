@@ -42,3 +42,6 @@ src/data/golf/holes/*.attrmap
 
 # vscode
 *.vscode/*
+
+# Claude Code agent worktrees
+.claude/worktrees/
