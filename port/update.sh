@@ -10,7 +10,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "== Pulling latest changes"
-git pull --ff-only
+# Your own commits (e.g. new recordings) are replayed on top of the latest
+# changes; uncommitted edits are set aside and restored.
+git pull --rebase --autostash
 
 if [ ! -f port/build/CMakeCache.txt ]; then
 	echo "== Configuring the build"
