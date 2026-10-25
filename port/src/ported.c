@@ -21,13 +21,19 @@ void port_call(GB *gb, int bank, uint16_t addr, const char *name)
 	gb_call(gb, addr);
 }
 
-void port_farcall(GB *gb, int bank, uint16_t addr)
+void port_hcall(GB *gb, uint16_t addr)
 {
-	// Same as the farcall macro: ld a, BANK / ldh [hCallFuncBank], a /
-	// hcall (ld a, LOW / ldh / ld a, HIGH / ldh / call hCallFunc).
-	wr8(gb, hCallFuncBank, (uint8_t)bank);
+	// Same as the hcall macro: ld a, LOW / ldh / ld a, HIGH / ldh /
+	// call hCallFunc
 	wr8(gb, hCallFuncPointer, (uint8_t)addr);
 	gb->cpu.a = (uint8_t)(addr >> 8);
 	wr8(gb, hCallFuncPointer + 1, gb->cpu.a);
 	gb_call(gb, hCallFunc);
+}
+
+void port_farcall(GB *gb, int bank, uint16_t addr)
+{
+	// Same as the farcall macro: ld a, BANK / ldh [hCallFuncBank], a / hcall
+	wr8(gb, hCallFuncBank, (uint8_t)bank);
+	port_hcall(gb, addr);
 }

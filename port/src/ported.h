@@ -64,9 +64,25 @@ static inline void wr16(GB *gb, uint16_t addr, uint16_t v) { gb_write16(gb, addr
 // The farcall macro: switch to the routine's bank via hCallFunc, call it,
 // switch back. Runs the real hCallFunc so all side effects match.
 #define FARCALL(name) port_farcall(gb, BANK_##name, ADDR_##name)
+// farcall bank, Label: call a routine with another bank mapped (for
+// routines in ROM0 that read data from that bank).
+#define FARCALL_BANK(bank, name) port_farcall(gb, (bank), ADDR_##name)
+// The hcall macro: call through hCallFunc with whatever bank is already in
+// hCallFuncBank.
+#define HCALL(name) port_hcall(gb, ADDR_##name)
 
 void port_call(GB *gb, int bank, uint16_t addr, const char *name);
 void port_farcall(GB *gb, int bank, uint16_t addr);
+void port_hcall(GB *gb, uint16_t addr);
+
+// The play_sfx macro: ld a, HIGH(sfx) / ldh [hSFXID], a / ld a, LOW(sfx) /
+// ldh [hSFXID + 1], a
+static inline void play_sfx(GB *gb, uint16_t sfx)
+{
+	wr8(gb, hSFXID + 0, (uint8_t)(sfx >> 8));
+	gb->cpu.a = (uint8_t)sfx;
+	wr8(gb, hSFXID + 1, gb->cpu.a);
+}
 
 // The bankswitch macro: ld [wROMBank], a / ld [rROMB0 + $100], a
 static inline void bankswitch(GB *gb, uint8_t bank)

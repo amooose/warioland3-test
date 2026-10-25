@@ -1,4 +1,6 @@
-# Recorded with wl3 --record
+# Recorded with wl3 --record: Action Help, then several later levels with
+# transformations (zombie, fat, bubble underwater), the night town, and W1 on
+# the map.
 state action_help.input.state
 end 32555
 111 7 a
