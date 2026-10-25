@@ -1,5 +1,6 @@
-# Recorded with wl3 --record
-state my_run.input.state
+# Recorded with wl3 --record: N1 Out of the Woods from start to clear, key and
+# treasure chest, clear screen, back on the map with N2 and N3 unlocked.
+state n1_full_clear.input.state
 end 12958
 117 7 a
 945 8 left
