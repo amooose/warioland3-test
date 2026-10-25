@@ -120,3 +120,59 @@ PORT(LoadFarPalsToTempPals2)
 	CALL(LoadPalsToTempPals2);
 	pop_bank(gb);
 }
+
+// hl = OAM data
+// b = sprite bank
+// de = pointer to sprite
+PORT(LoadOWSprite)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.c = 0x10;
+	wr8(gb, wCurSpriteYCoord, alu_add(gb, rd8(gb, hl++), gb->cpu.c));
+	gb->cpu.c = 0x08;
+	wr8(gb, wCurSpriteXCoord, alu_add(gb, rd8(gb, hl++), gb->cpu.c));
+	wr8(gb, wCurSpriteFrame, rd8(gb, hl++));
+	wr8(gb, wCurSpriteAttributes, rd8(gb, hl));
+
+	SET_HL(gb, REG_DE(gb));
+	push_bank_switch_to_b(gb);
+	CALL(LoadSprite);
+	pop_bank(gb);
+}
+
+// returns TRUE in a and carry set if treasure
+// in input a has already been collected
+// if not collected returns z set
+// a = treasure constant
+PORT(IsTreasureCollected)
+{
+	uint8_t treasure = gb->cpu.a;
+	uint8_t e = alu_srl(gb, alu_srl(gb, alu_srl(gb, treasure))); // / 8
+	gb->cpu.d = 0;
+	uint16_t hl = alu_add16(gb, wTreasuresCollected, e);
+
+	// the treasure's bit within its byte
+	e = 1;
+	if (alu_bit(gb, treasure, 2))
+		e = alu_swap(gb, e); // = $10
+	uint8_t d = alu_and(gb, treasure, 0x03);
+	uint8_t a = e;
+	if (d) {
+		a = alu_rla(gb, a);
+		d = alu_dec(gb, d);
+		if (d) {
+			a = alu_rla(gb, a);
+			d = alu_dec(gb, d);
+			if (d)
+				a = alu_rla(gb, a);
+		}
+	}
+	gb->cpu.e = e;
+	gb->cpu.d = a;
+	SET_HL(gb, hl);
+	gb->cpu.a = alu_and(gb, a, rd8(gb, hl));
+	if (!gb->cpu.a)
+		return; // not obtained
+	gb->cpu.a = TRUE;
+	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_Z) | FLAG_C); // scf
+}

@@ -118,6 +118,14 @@ static inline uint8_t alu_sub(GB *gb, uint8_t a, uint8_t v)
 		(a < v ? FLAG_C : 0));
 	return (uint8_t)(a - v);
 }
+static inline uint8_t alu_sbc(GB *gb, uint8_t a, uint8_t v)
+{
+	unsigned carry = (gb->cpu.f & FLAG_C) ? 1 : 0;
+	int r = (int)a - v - (int)carry;
+	gb->cpu.f = (uint8_t)(((r & 0xff) ? 0 : FLAG_Z) | FLAG_N |
+		((int)(a & 0xf) - (int)(v & 0xf) - (int)carry < 0 ? FLAG_H : 0) | (r < 0 ? FLAG_C : 0));
+	return (uint8_t)r;
+}
 // cp: flags of a - v, a unchanged
 static inline void alu_cp(GB *gb, uint8_t a, uint8_t v)
 {
@@ -153,6 +161,27 @@ static inline uint8_t alu_dec(GB *gb, uint8_t v)
 {
 	uint8_t r = (uint8_t)(v - 1);
 	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_C) | FLAG_N | (r ? 0 : FLAG_Z) | ((r & 0xf) == 0xf ? FLAG_H : 0));
+	return r;
+}
+// swap r
+static inline uint8_t alu_swap(GB *gb, uint8_t v)
+{
+	uint8_t r = (uint8_t)(v << 4 | v >> 4);
+	gb->cpu.f = r ? 0 : FLAG_Z;
+	return r;
+}
+// srl r
+static inline uint8_t alu_srl(GB *gb, uint8_t v)
+{
+	uint8_t r = v >> 1;
+	gb->cpu.f = (uint8_t)((r ? 0 : FLAG_Z) | ((v & 1) ? FLAG_C : 0));
+	return r;
+}
+// rla: rotate a left through carry (z always clear)
+static inline uint8_t alu_rla(GB *gb, uint8_t v)
+{
+	uint8_t r = (uint8_t)(v << 1 | ((gb->cpu.f & FLAG_C) ? 1 : 0));
+	gb->cpu.f = (v & 0x80) ? FLAG_C : 0;
 	return r;
 }
 // bit n, r: z set if the bit is clear, h set, carry unchanged

@@ -162,3 +162,21 @@ PORT(HomeJumpRet)
 	pop_af(gb);
 	bankswitch(gb, gb->cpu.a);
 }
+
+// if Wario is underneath a one-way platform,
+// then don't process any actions for it
+PORT(SetOneWayPlatformAction)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wCurObjFlags), OBJFLAG_STEPPED);
+	if (gb->cpu.a)
+		return;
+	gb->cpu.b = rd8(gb, wCurObjCollBoxTop);
+	// wCurObjCollBoxTop + wCurObjScreenYPos + $2a + 3
+	gb->cpu.b = alu_add(gb, alu_add(gb, rd8(gb, wCurObjScreenYPos), 0x2a + 3), gb->cpu.b);
+	gb->cpu.a = alu_add(gb, rd8(gb, wWarioScreenYPos), 0x2a);
+	alu_cp(gb, gb->cpu.a, gb->cpu.b);
+	if (gb->cpu.f & FLAG_C)
+		return; // Wario is over the collision box
+	gb->cpu.a = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
+	wr8(gb, wCurObjAction, gb->cpu.a);
+}

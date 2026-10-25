@@ -89,3 +89,31 @@ PORT(UpdateWarioAnimation)
 	SET_BC(gb, entry);
 	SET_HL(gb, hl);
 }
+
+// Queues the block at hl (in SRAM bank wBlockPtrBank) for a BG map update.
+PORT(Func_e31)
+{
+	// h + (wBlockPtrBank - 1) * $20
+	uint8_t a = alu_dec(gb, rd8(gb, wBlockPtrBank));
+	for (int i = 0; i < 5; i++)
+		a = alu_add(gb, a, a);
+	gb->cpu.b = alu_add(gb, a, gb->cpu.h);
+	gb->cpu.c = gb->cpu.l;
+
+	gb->cpu.e = rd8(gb, wc19e);
+	gb->cpu.d = 0;
+	uint16_t hl = alu_add16(gb, wc18e, gb->cpu.e);
+	wr8(gb, hl++, gb->cpu.b);
+	wr8(gb, hl, gb->cpu.c);
+	SET_HL(gb, hl);
+	gb->cpu.a = alu_and(gb, alu_add(gb, gb->cpu.e, 2), 0x0f);
+	wr8(gb, wc19e, gb->cpu.a);
+}
+
+PORT(Func_e2b)
+{
+	gb->cpu.a = rd8(gb, wCurObjFlags);
+	if (!alu_bit(gb, gb->cpu.a, OBJFLAG_ON_SCREEN_F))
+		return;
+	CALL(Func_e31);
+}
