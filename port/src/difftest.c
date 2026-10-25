@@ -546,18 +546,29 @@ static bool protected_offset(uint32_t off, uint16_t entry_sp)
 		return addr >= stack_bottom && addr < stack_top && addr >= entry_sp;
 	}
 	if (off >= hram && off < hram + 0x7f) {
-		// hCallFunc and hTransferVirtualOAM: code copied to HRAM
-		uint16_t addr = (uint16_t)(0xff80 + (off - hram));
+		// hCallFunc and hTransferVirtualOAM: code the game copies to HRAM
+		// at startup, sized the way it copies them
 		static int bank;
-		static uint16_t call_func, transfer_oam;
+		static uint16_t call_func, call_func_size, transfer_oam, transfer_oam_size;
 		if (!call_func) {
-			if (!sym_lookup("hCallFunc", &bank, &call_func))
-				call_func = 0xff80;
-			if (!sym_lookup("hTransferVirtualOAM", &bank, &transfer_oam))
-				transfer_oam = 0xff80;
+			uint16_t src, src_end;
+			call_func = 0xff80;
+			call_func_size = 0x20;
+			if (sym_lookup("hCallFunc", &bank, &call_func) &&
+				sym_lookup("InitHRAMCallFunc.Func", &bank, &src) &&
+				sym_lookup("InitHRAMCallFunc.end", &bank, &src_end))
+				call_func_size = (uint16_t)(src_end - src);
+			transfer_oam = 0xffe8;
+			transfer_oam_size = 0x10;
+			// start.asm copies (WriteAToHL_BCTimes - PushOAM) + 1 bytes
+			if (sym_lookup("hTransferVirtualOAM", &bank, &transfer_oam) &&
+				sym_lookup("PushOAM", &bank, &src) &&
+				sym_lookup("WriteAToHL_BCTimes", &bank, &src_end))
+				transfer_oam_size = (uint16_t)(src_end - src + 1);
 		}
-		return (addr >= call_func && addr < call_func + 16) ||
-			(addr >= transfer_oam && addr < transfer_oam + 16);
+		uint16_t addr = (uint16_t)(0xff80 + (off - hram));
+		return (addr >= call_func && addr < call_func + call_func_size) ||
+			(addr >= transfer_oam && addr < transfer_oam + transfer_oam_size);
 	}
 	return false;
 }
