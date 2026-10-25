@@ -1,6 +1,7 @@
 // Differential testing of ported routines against the original asm.
 #include "difftest.h"
 #include "hooks.h"
+#include "input.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -115,7 +116,7 @@ static int compare(const GB *a, const GB *n, unsigned clobbers, Report *r)
 		cmp_mem(r, "wram", a->wram[b], n->wram[b], 0x1000, 0xd000, b);
 	for (int b = 0; b < 2; b++)
 		cmp_mem(r, "vram", a->vram[b], n->vram[b], 0x2000, 0x8000, b);
-	for (int b = 0; b < 4; b++)
+	for (int b = 0; b < GB_SRAM_BANKS; b++)
 		cmp_mem(r, "sram", a->sram[b], n->sram[b], 0x2000, 0xa000, b);
 	cmp_mem(r, "oam", a->oam, n->oam, sizeof(a->oam), 0xfe00, 0);
 	cmp_mem(r, "io", a->io, n->io, sizeof(a->io), 0xff00, 0);
@@ -197,47 +198,15 @@ static void test_call(GB *gb, Hook *h, int index)
 	}
 }
 
-static uint8_t *script;
-static int script_frames;
-
-static void load_script(const char *path, int frames)
-{
-	script = calloc((size_t)frames + 1, 1);
-	script_frames = frames;
-	if (!path)
-		return;
-	FILE *f = fopen(path, "r");
-	if (!f) {
-		fprintf(stderr, "can't read input script %s\n", path);
-		return;
-	}
-	char line[256];
-	while (fgets(line, sizeof(line), f)) {
-		int frame, duration, n;
-		if (line[0] == '#' || sscanf(line, "%d %d %n", &frame, &duration, &n) != 2)
-			continue;
-		uint8_t b = 0;
-		for (char *t = strtok(line + n, " ,+\t\r\n"); t; t = strtok(NULL, " ,+\t\r\n")) {
-			static const char *names[8] = {"right", "left", "up", "down", "a", "b", "select", "start"};
-			for (int i = 0; i < 8; i++)
-				if (!strcmp(t, names[i]))
-					b |= (uint8_t)(1 << i);
-		}
-		for (int i = frame; i < frame + duration && i <= frames; i++)
-			if (i >= 0)
-				script[i] |= b;
-	}
-	fclose(f);
-}
+static const InputScript *script;
 
 static void difftest_frame(GB *gb)
 {
-	int f = (int)gb->frame_count;
-	gb->joypad = f <= script_frames ? script[f] : 0;
+	gb->joypad = script ? input_buttons(script, (int)gb->frame_count) : 0;
 	gb->apu.buffer_len = 0;
 }
 
-bool difftest_run(GB *gb, const char *input_path, int frames)
+bool difftest_run(GB *gb, const InputScript *input, int end_frame)
 {
 	int n = hook_count();
 	if (!n) {
@@ -250,13 +219,14 @@ bool difftest_run(GB *gb, const char *input_path, int frames)
 		stack_bottom = 0xcf00;
 	ref = malloc(sizeof(GB));
 	nat = malloc(sizeof(GB));
-	load_script(input_path, frames);
+	script = input;
 
 	hooks_set_enabled(false);
 	gb->frame_cb = difftest_frame;
-	printf("difftest: %d ported routine%s, %d frames\n", n, n == 1 ? "" : "s", frames);
+	printf("difftest: %d ported routine%s, frames %llu-%d\n", n, n == 1 ? "" : "s",
+		(unsigned long long)gb->frame_count, end_frame);
 
-	while ((int)gb->frame_count < frames) {
+	while ((int)gb->frame_count < end_frame) {
 		Hook *h = hook_find_any(gb, gb->cpu.pc);
 		if (h && !gb->cpu.halted) {
 			int index = (int)(h - hook_get(0));

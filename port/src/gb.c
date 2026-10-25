@@ -139,10 +139,9 @@ bool gb_save_sram(GB *gb, const char *path)
 	FILE *f = fopen(path, "wb");
 	if (!f)
 		return false;
-	// The game uses 4 SRAM banks (32 KiB); keep the file the size of the
-	// original cartridge RAM so it's interchangeable with emulator saves.
-	size_t n = fwrite(gb->sram, 1, 4 * 0x2000, f);
+	// Same layout as emulator saves, so they're interchangeable.
+	size_t n = fwrite(gb->sram, 1, sizeof(gb->sram), f);
 	fclose(f);
 	gb->sram_dirty = false;
-	return n == 4 * 0x2000;
+	return n == sizeof(gb->sram);
 }

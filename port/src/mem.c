@@ -27,7 +27,7 @@ uint8_t gb_read(GB *gb, uint16_t addr)
 	case 0xa: case 0xb:
 		if (!gb->sram_enabled)
 			return 0xff;
-		return gb->sram[gb->sram_bank & 0xf][addr - 0xa000];
+		return gb->sram[gb->sram_bank % GB_SRAM_BANKS][addr - 0xa000];
 	case 0xc:
 		return gb->wram[0][addr - 0xc000];
 	case 0xd:
@@ -71,7 +71,7 @@ void gb_write(GB *gb, uint16_t addr, uint8_t val)
 		return;
 	case 0xa: case 0xb:
 		if (gb->sram_enabled) {
-			gb->sram[gb->sram_bank & 0xf][addr - 0xa000] = val;
+			gb->sram[gb->sram_bank % GB_SRAM_BANKS][addr - 0xa000] = val;
 			gb->sram_dirty = true;
 		}
 		return;

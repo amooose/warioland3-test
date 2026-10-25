@@ -21,6 +21,9 @@
 #define GB_LINES_PER_FRAME 154
 #define GB_CYCLES_PER_FRAME (GB_CYCLES_PER_LINE * GB_LINES_PER_FRAME)
 
+// The cartridge has 32 KiB of battery-backed RAM.
+#define GB_SRAM_BANKS 4
+
 #define AUDIO_SAMPLE_RATE 48000
 // Enough for a little over one frame of stereo audio.
 #define AUDIO_BUFFER_FRAMES 4096
@@ -126,7 +129,7 @@ typedef struct GB {
 
 	uint8_t vram[2][0x2000];
 	uint8_t wram[8][0x1000];
-	uint8_t sram[16][0x2000];
+	uint8_t sram[GB_SRAM_BANKS][0x2000];
 	uint8_t oam[0xa0];
 	uint8_t io[0x80];
 	uint8_t hram[0x7f];
@@ -153,6 +156,9 @@ typedef struct GB {
 	// Set while the difftest runs a routine in isolation: gb_call then
 	// executes without advancing the rest of the hardware.
 	bool no_tick;
+	// How many gb_call()s are in progress. Save states can only be taken or
+	// loaded at depth 0, when no native code is mid-routine.
+	int call_depth;
 } GB;
 
 // Pair helpers

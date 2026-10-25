@@ -52,6 +52,20 @@ add_custom_command(
 	DEPENDS ${GEN_CMD} ${SYM}
 	COMMENT "Generating syms.h from warioland3.sym")
 
+# Constants: let rgbasm evaluate everything in src/includes.asm and dump it.
+find_program(WL3_RGBASM NAMES rgbasm HINTS ${RGBDS} REQUIRED)
+file(GLOB ASM_CONSTANT_SOURCES CONFIGURE_DEPENDS
+	${REPO_ROOT}/src/includes.asm ${REPO_ROOT}/src/charmaps.asm
+	${REPO_ROOT}/src/constants/* ${REPO_ROOT}/src/macros/*)
+file(WRITE ${GEN_DIR}/empty.asm "")
+add_custom_command(
+	OUTPUT ${GEN_DIR}/constants.h
+	COMMAND ${WL3_RGBASM} -P includes.asm -I ${REPO_ROOT}/src/
+		-s equ:${GEN_DIR}/constants.asm -o ${GEN_DIR}/constants.o ${GEN_DIR}/empty.asm
+	COMMAND ${GEN_CMD} consts ${GEN_DIR}/constants.asm ${GEN_DIR}/constants.h
+	DEPENDS ${GEN_CMD} ${ASM_CONSTANT_SOURCES}
+	COMMENT "Generating constants.h from the disassembly's constants")
+
 file(GLOB_RECURSE PORTED_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/ported/*.c)
 add_custom_command(
 	OUTPUT ${GEN_DIR}/ported_table.c
@@ -59,19 +73,33 @@ add_custom_command(
 	DEPENDS ${GEN_CMD} ${PORTED_SOURCES}
 	COMMENT "Generating the ported routine table")
 
+# Porting progress report: cmake --build build --target progress
+add_executable(wl3_progress tools/progress.c)
+file(GLOB_RECURSE ASM_SOURCES CONFIGURE_DEPENDS ${REPO_ROOT}/src/*.asm)
+list(JOIN ASM_SOURCES "\n" ASM_SOURCE_LIST)
+file(WRITE ${GEN_DIR}/asm_sources.txt "${ASM_SOURCE_LIST}\n")
+add_custom_target(progress
+	COMMAND wl3_progress ${REPO_ROOT} ${GEN_DIR}/asm_sources.txt
+		${CMAKE_CURRENT_BINARY_DIR}/progress.md ${PORTED_SOURCES}
+	DEPENDS wl3_progress
+	USES_TERMINAL)
+
 add_executable(wl3
 	src/apu.c
 	src/cpu.c
 	src/difftest.c
 	src/gb.c
 	src/hooks.c
+	src/input.c
 	src/main.c
 	src/mem.c
 	src/png.c
 	src/ported.c
 	src/ppu.c
+	src/savestate.c
 	${PORTED_SOURCES}
 	${GEN_DIR}/syms.h
+	${GEN_DIR}/constants.h
 	${GEN_DIR}/ported_table.c)
 target_include_directories(wl3 PRIVATE src ${GEN_DIR})
 # SDL2main (Windows entry point) must come before SDL2 on the link line.
@@ -93,5 +121,9 @@ endif()
 target_compile_definitions(wl3 PRIVATE WL3_DEFAULT_ROM="${ROM}")
 
 enable_testing()
-add_test(NAME difftest COMMAND wl3 --difftest --frames 2400
-	--input ${CMAKE_CURRENT_SOURCE_DIR}/tests/difftest.input)
+# One difftest per input script in tests/inputs.
+file(GLOB TEST_INPUTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/inputs/*.input)
+foreach(input ${TEST_INPUTS})
+	get_filename_component(name ${input} NAME_WE)
+	add_test(NAME difftest_${name} COMMAND wl3 --difftest --input ${input})
+endforeach()

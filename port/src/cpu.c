@@ -553,10 +553,12 @@ void gb_call(GB *gb, uint16_t addr)
 	uint16_t saved_pc = PC;
 	gb_push16(gb, CALL_SENTINEL);
 	PC = addr;
+	gb->call_depth++;
 	while (!(PC == CALL_SENTINEL && SP == saved_sp)) {
 		int cycles = cpu_step(gb);
 		if (!gb->no_tick)
 			gb_tick(gb, cycles);
 	}
+	gb->call_depth--;
 	PC = saved_pc;
 }

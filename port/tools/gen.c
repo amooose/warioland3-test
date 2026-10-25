@@ -6,6 +6,11 @@
 //       RAM labels:  #define wROMBank 0xc5ff   (plus BANK_wFoo for banked RAM)
 //       ROM labels:  #define ADDR_Foo 0x4a12 / #define BANK_Foo 0x05
 //
+//   gen consts <state.asm> <out.h>
+//     Turns an rgbasm state dump (rgbasm -s equ:state.asm) of the
+//     disassembly's includes into C constants: every DEF ... EQU and const
+//     from src/constants, with the exact value the assembler computed.
+//
 //   gen ports <out.c> <ported/*.c...>
 //     Finds every PORT(Name) / PORT_EX(Name, ...) definition and writes the
 //     table that registers them as hooks at startup.
@@ -53,6 +58,40 @@ static int gen_syms(const char *in, const char *out)
 		} else {
 			fprintf(o, "#define ADDR_%s 0x%04x\n#define BANK_%s 0x%02x\n", name, addr, name, bank);
 		}
+	}
+	fprintf(o, "\n#endif\n");
+	fclose(f);
+	return fclose(o) != 0;
+}
+
+// asm constants whose names already mean something in C.
+static const char *const skip_consts[] = {"NULL"};
+
+static int gen_consts(const char *in, const char *out)
+{
+	FILE *f = fopen(in, "r");
+	if (!f) {
+		fprintf(stderr, "gen: can't read %s\n", in);
+		return 1;
+	}
+	FILE *o = fopen(out, "w");
+	if (!o) {
+		fprintf(stderr, "gen: can't write %s\n", out);
+		return 1;
+	}
+	fprintf(o, "// Generated from the disassembly's constants by port/tools/gen.c. Do not edit.\n");
+	fprintf(o, "#ifndef WL3_CONSTANTS_H\n#define WL3_CONSTANTS_H\n\n");
+	char line[512];
+	while (fgets(line, sizeof(line), f)) {
+		char name[400];
+		unsigned long value;
+		if (sscanf(line, "def %399s equ $%lx", name, &value) != 2 || !valid_c_ident(name))
+			continue;
+		int skip = 0;
+		for (size_t i = 0; i < sizeof(skip_consts) / sizeof(*skip_consts); i++)
+			skip |= !strcmp(name, skip_consts[i]);
+		if (!skip)
+			fprintf(o, "#define %s 0x%lx\n", name, value);
 	}
 	fprintf(o, "\n#endif\n");
 	fclose(f);
@@ -111,8 +150,11 @@ int main(int argc, char **argv)
 {
 	if (argc == 4 && !strcmp(argv[1], "syms"))
 		return gen_syms(argv[2], argv[3]);
+	if (argc == 4 && !strcmp(argv[1], "consts"))
+		return gen_consts(argv[2], argv[3]);
 	if (argc >= 3 && !strcmp(argv[1], "ports"))
 		return gen_ports(argv[2], argc - 3, argv + 3);
-	fprintf(stderr, "usage: gen syms <in.sym> <out.h> | gen ports <out.c> <files...>\n");
+	fprintf(stderr, "usage: gen syms <in.sym> <out.h> | gen consts <state.asm> <out.h> |\n"
+		"       gen ports <out.c> <files...>\n");
 	return 1;
 }

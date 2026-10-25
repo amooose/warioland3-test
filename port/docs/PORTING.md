@@ -8,13 +8,18 @@ assistants doing the porting.
 1. Pick a routine (see "What to port next" below).
 2. Write its C version in `src/ported/`, mirroring the asm file layout:
    `src/home/copy.asm` becomes `src/ported/home/copy.c`.
-3. Build, then run the difftest with input that reaches the routine:
+3. Build, then run the difftests:
    ```sh
    cmake --build port/build
-   ./port/build/wl3 --difftest --frames 2400 --input port/tests/difftest.input
+   ctest --test-dir port/build --output-on-failure
+   ```
+   or one input directly, to see the per-routine table:
+   ```sh
+   ./port/build/wl3 --difftest --input port/tests/inputs/intro_to_first_level.input
    ```
 4. Fix every `FAIL`. Check that the routine was actually called (its `calls`
-   column isn't 0); if not, extend the input script until it is.
+   column isn't 0). If not, record an input that reaches it (`--record`, see
+   `tests/README.md`) and add it to `tests/inputs/`.
 5. Play the affected part of the game.
 
 A port is only done when the difftest passes with the routine exercised.
@@ -43,9 +48,14 @@ PORT(ClearVirtualOAM)
   generated `syms.h`: RAM labels by name (`wVirtualOAM`, `hCallFuncBank`),
   ROM labels as `ADDR_Label` / `BANK_Label`. Banked RAM labels also have
   `BANK_Label`.
-- Read and write memory with `rd8` / `wr8` / `rd16` / `wr16`, and I/O
-  registers with `rdio` / `wrio`. Never index the memory arrays directly: the
-  accessors apply banking and hardware side effects exactly like the asm.
+- Every constant (`DEF ... EQU`, `const` lists, everything in
+  `src/constants/` and `hardware.inc`) is available through the generated
+  `constants.h`, with the value rgbasm computed: `OAM_SIZE`, `rLCDC`,
+  `JOYP_GET_BUTTONS`, object and state IDs, and so on.
+- Read and write memory with `rd8` / `wr8` / `rd16` / `wr16`. Hardware
+  registers are addresses too: `ldh [rLCDC], a` is `wr8(gb, rLCDC, a)`. Never
+  index the memory arrays directly: the accessors apply banking and hardware
+  side effects exactly like the asm.
 - Call other routines with `CALL(Label)` (same bank or ROM0) and
   `FARCALL(Label)` (the `farcall` macro). It doesn't matter whether the
   callee has been ported; unported ones run in the interpreter. Arguments and
@@ -108,14 +118,23 @@ helper or a `CALL` to the shared entry point.
 ## Coverage
 
 The difftest only checks calls that actually happen during its run, so
-coverage matters as much as the code. `tests/difftest.input` is a scripted
-playthrough. Extend it (or add new scripts) as more of the game gets ported.
+coverage matters as much as the code. Every script in `tests/inputs/` is run
+by ctest; record new ones by playing (`--record`) to cover more of the game.
 The summary table lists routines that were never called; treat those as
 untested.
 
 ## What to port next
 
-Work outward from small, frequently called leaf routines in `src/home/`
+```sh
+cmake --build port/build --target progress
+```
+
+lists the routines that are ready to port, meaning everything they call is
+native already, most-called first (full list in `port/build/progress.md`).
+Porting in that order means each new routine only calls native code, and the
+most widely used routines get done first.
+
+In general, work outward from small, frequently called leaf routines in `src/home/`
 (memory, copying, decompression, OAM, palette helpers), then whole subsystems
 from the bottom up, so each new routine's callees are already native. Good
 early subsystems are the self-contained ones: decompression, the sprite/OAM

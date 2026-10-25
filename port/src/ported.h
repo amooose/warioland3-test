@@ -15,6 +15,7 @@
 
 #include "gb.h"
 #include "hooks.h"
+#include "constants.h" // generated: every constant in src/constants etc.
 #include "syms.h" // generated: every label in the disassembly
 
 // Registers, for clobber masks.
@@ -47,15 +48,14 @@ void port_register(const PortInfo *info);
 // original exactly.
 #define PORT(name) PORT_EX(name, 0, 0)
 
-// Memory access. Always go through these (not raw arrays) so banking and I/O
+// Memory access. Hardware registers are addresses too (rJOYP = $ff00 etc.,
+// from hardware.inc), so ldh [rLCDC], a is wr8(gb, rLCDC, a).
+// Always go through these (not raw arrays) so banking and I/O
 // side effects behave exactly like the original code.
 static inline uint8_t rd8(GB *gb, uint16_t addr) { return gb_read(gb, addr); }
 static inline void wr8(GB *gb, uint16_t addr, uint8_t v) { gb_write(gb, addr, v); }
 static inline uint16_t rd16(GB *gb, uint16_t addr) { return gb_read16(gb, addr); }
 static inline void wr16(GB *gb, uint16_t addr, uint16_t v) { gb_write16(gb, addr, v); }
-// ldh [rXXX] style access to I/O registers, by offset from $ff00.
-static inline uint8_t rdio(GB *gb, uint8_t reg) { return gb_read(gb, (uint16_t)(0xff00 + reg)); }
-static inline void wrio(GB *gb, uint8_t reg, uint8_t v) { gb_write(gb, (uint16_t)(0xff00 + reg), v); }
 
 // Call another routine by label. If it has been ported it runs natively,
 // otherwise the interpreter runs the original. Registers are passed and
@@ -72,7 +72,7 @@ void port_farcall(GB *gb, int bank, uint16_t addr);
 static inline void bankswitch(GB *gb, uint8_t bank)
 {
 	wr8(gb, wROMBank, bank);
-	wr8(gb, 0x2100, bank);
+	wr8(gb, rROMB0 + 0x100, bank);
 }
 
 // Flag helpers for routines whose callers test the flags.
@@ -85,27 +85,5 @@ static inline void set_c(GB *gb, bool c)
 	gb->cpu.f = (uint8_t)(c ? (gb->cpu.f | FLAG_C) : (gb->cpu.f & ~FLAG_C));
 }
 
-// Hardware registers (offsets from $ff00) used by ported code.
-enum {
-	rJOYP = 0x00,
-	rIF = 0x0f,
-	rLCDC = 0x40,
-	rSTAT = 0x41,
-	rSCY = 0x42,
-	rSCX = 0x43,
-	rLY = 0x44,
-	rVBK = 0x4f,
-	rWBK = 0x70,
-	rIE = 0xff,
-};
-
-// Values of the joypad select register, as in hardware.inc.
-enum {
-	JOYP_GET_BUTTONS = 0x10,
-	JOYP_GET_CTRL_PAD = 0x20,
-	JOYP_GET_NONE = 0x30,
-};
-
-#define OAM_SIZE 0xa0
 
 #endif

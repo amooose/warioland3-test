@@ -16,13 +16,13 @@ PORT(ClearVirtualOAM)
 PORT(FillBGMap0)
 {
 	gb->cpu.d = gb->cpu.a;
-	wrio(gb, rVBK, BANK_v1BGMap0);
+	wr8(gb, rVBK, BANK_v1BGMap0);
 	SET_HL(gb, v1BGMap0);
 	SET_BC(gb, v1BGMap1 - v1BGMap0);
 	gb->cpu.a = 0;
 	CALL(WriteAToHL_BCTimes);
 
-	wrio(gb, rVBK, gb->cpu.a); // a is still 0: VRAM0
+	wr8(gb, rVBK, gb->cpu.a); // a is still 0: VRAM0
 	gb->cpu.a = gb->cpu.d;
 	SET_HL(gb, v0BGMap0);
 	SET_BC(gb, v0BGMap1 - v0BGMap0);

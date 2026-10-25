@@ -83,30 +83,45 @@ you build from this repository.
 | Enter | Start |
 | Backspace / Right Shift | Select |
 | Tab (hold) | Fast forward |
+| F5 / F7 | Save / load state |
 | F11 | Fullscreen |
 | Esc | Quit |
 
 Game controllers are supported through SDL. The game saves to
-`warioland3.sav` next to the ROM, in the same format as emulator saves.
+`warioland3.sav` next to the ROM, in the same format as emulator saves. F5
+saves a snapshot of the exact moment to `warioland3.state`, and F7 loads it.
+
+## Recording
+
+```sh
+./port/build/wl3 --record my_run.input
+```
+
+Records everything you press, until you quit, to `my_run.input`, plus
+`my_run.input.state` (the exact starting point, including save data).
+Replay it with `--input my_run.input`; replays are exact, on any platform.
+Recordings are how the port gets tested: see [tests/README.md](tests/README.md).
 
 ## Command line
 
+Run `wl3 --help` for the full list. The main ones:
+
 ```
-wl3 [options]
-  --rom PATH          ROM built from the disassembly
-  --sym PATH          symbol file (default: ROM path with .sym)
-  --sav PATH          save file (default: ROM path with .sav)
-  --scale N           window scale (default 4)
-  --no-hooks          run everything in the interpreter
-  --input PATH        scripted input: lines of '<frame> <duration> <buttons>'
-  --headless          no window or audio
-  --frames N          stop after N frames
-  --screenshot N:PATH write a PNG of frame N (repeatable)
-  --wav PATH          record the audio output
-  --difftest          check every ported routine against the original asm
-  --trace             print CPU state every frame
-  --break LABEL       print recent instructions whenever LABEL is reached
+  --record PATH         record your input to an input script (plus PATH.state)
+  --input PATH          play an input script
+  --load-state PATH     start from a save state
+  --save-state N:PATH   save a state at frame N
+  --headless            no window or audio
+  --frames N            stop after running N frames
+  --screenshot N:PATH   write a PNG of frame N
+  --wav PATH            record the audio output
+  --difftest            check every ported routine against the original asm
+  --no-hooks            run everything in the interpreter
+  --trace               print CPU state every frame
+  --break LABEL         print recent instructions whenever LABEL is reached
 ```
+
+Headless runs don't read or write the battery save unless `--sav` is given.
 
 ## Testing
 
@@ -114,5 +129,12 @@ wl3 [options]
 ctest --test-dir port/build --output-on-failure
 ```
 
-This runs the difftest over a scripted playthrough (`tests/difftest.input`).
-It fails if any ported routine behaves differently from the original.
+This runs the difftest over every input script in `tests/inputs/`. It fails if
+any ported routine behaves differently from the original.
+
+```sh
+cmake --build port/build --target progress
+```
+
+prints how much is ported and which routines are ready to port next
+(full report in `port/build/progress.md`).

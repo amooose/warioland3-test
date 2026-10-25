@@ -41,21 +41,22 @@ labels (including data labels). Roughly:
 The game boots and plays through the intro, title screen, prologue and into
 the first level.
 
-## Phase 1: porting infrastructure
+## Phase 1: porting infrastructure (mostly done)
 
 Things that make porting at scale fast and safe:
 
-- [ ] **Input recording**: `--record PATH` writes the input script while you
+- [x] **Input recording**: `--record PATH` writes the input script while you
       play, so building coverage for the difftest is just playing the game.
-- [ ] **Save states**: start the game (and the difftest) from any point
-      instead of replaying from boot. Essential for testing late-game code.
-- [ ] **Constants header**: generate C constants from the asm `DEF ... EQU`
-      and `const` definitions (object IDs, states, sound IDs), so ported code
-      uses the same names as the asm.
-- [ ] **Progress report**: which routines are ported, which are exercised by
-      the test inputs, and the call graph, so work can be ordered callee-first.
-- [ ] **CI**: build and run the difftest on every push (a GitHub Actions
-      workflow is included).
+      Replays are bit-exact, across platforms.
+- [x] **Save states**: start the game (and the difftest) from any point
+      instead of replaying from boot. F5/F7 in game.
+- [x] **Constants header**: every constant in the disassembly, evaluated by
+      rgbasm itself, as C constants with the same names.
+- [x] **Progress report**: what's ported, per directory, and which routines
+      are ready to port next (call graph, callee-first, most-called first).
+- [x] **CI**: build and run the difftests on every push.
+- [ ] **Coverage**: recordings that play through each world, so every
+      ported routine is exercised by the tests.
 
 ## Phase 2: port the code
 

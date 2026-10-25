@@ -2,7 +2,9 @@
 #include "difftest.h"
 #include "gb.h"
 #include "hooks.h"
+#include "input.h"
 #include "png.h"
+#include "savestate.h"
 
 #include <SDL.h>
 #include <stdio.h>
@@ -14,28 +16,37 @@
 #endif
 
 typedef struct {
-	int frame, duration;
-	uint8_t buttons;
-} InputEvent;
-
-typedef struct {
 	int frame;
 	const char *path;
-} Screenshot;
+} FrameFile;
 
 typedef struct {
 	bool headless;
 	bool quit;
+	int quit_wait_frames;
 	bool trace; // print CPU state every frame
 	FILE *wav;
 	uint32_t wav_frames;
-	int max_frames; // headless: stop after this many frames
-	InputEvent *events;
-	int nevents;
-	Screenshot shots[64];
+	int stop_frame; // stop at this frame (0: run until quit)
+
+	InputScript script;
+	bool have_script;
+	const char *record_path;
+	InputRecorder recorder;
+
+	FrameFile shots[64];
 	int nshots;
-	const char *sav_path;
+	FrameFile state_saves[64];
+	int nstate_saves;
+
+	const char *sav_path; // battery save, or NULL to not use one
 	int frames_since_sram_write;
+	const char *state_path; // F5/F7 quick save state
+
+	// Save states can only be taken or loaded between routines, so the
+	// frontend asks for them and the main loop does them when it's safe.
+	const char *pending_save;
+	const char *pending_load;
 
 	SDL_Window *window;
 	SDL_Renderer *renderer;
@@ -45,57 +56,6 @@ typedef struct {
 	bool fast_forward;
 	uint64_t next_frame_time;
 } Frontend;
-
-static uint8_t parse_buttons(char *s)
-{
-	uint8_t b = 0;
-	for (char *tok = strtok(s, " ,+\t\r\n"); tok; tok = strtok(NULL, " ,+\t\r\n")) {
-		if (!strcmp(tok, "a")) b |= BTN_A;
-		else if (!strcmp(tok, "b")) b |= BTN_B;
-		else if (!strcmp(tok, "start")) b |= BTN_START;
-		else if (!strcmp(tok, "select")) b |= BTN_SELECT;
-		else if (!strcmp(tok, "up")) b |= BTN_UP;
-		else if (!strcmp(tok, "down")) b |= BTN_DOWN;
-		else if (!strcmp(tok, "left")) b |= BTN_LEFT;
-		else if (!strcmp(tok, "right")) b |= BTN_RIGHT;
-		else fprintf(stderr, "input: unknown button '%s'\n", tok);
-	}
-	return b;
-}
-
-// Input script: one event per line, "<frame> <duration> <buttons...>".
-// Lines starting with # are comments.
-static bool load_input_script(Frontend *fe, const char *path)
-{
-	FILE *f = fopen(path, "r");
-	if (!f)
-		return false;
-	char line[256];
-	int cap = 0;
-	while (fgets(line, sizeof(line), f)) {
-		int frame, duration, n;
-		if (line[0] == '#' || sscanf(line, "%d %d %n", &frame, &duration, &n) != 2)
-			continue;
-		if (fe->nevents == cap) {
-			cap = cap ? cap * 2 : 64;
-			fe->events = realloc(fe->events, (size_t)cap * sizeof(InputEvent));
-		}
-		fe->events[fe->nevents++] = (InputEvent){frame, duration, parse_buttons(line + n)};
-	}
-	fclose(f);
-	return true;
-}
-
-static uint8_t scripted_buttons(Frontend *fe, int frame)
-{
-	uint8_t b = 0;
-	for (int i = 0; i < fe->nevents; i++) {
-		InputEvent *e = &fe->events[i];
-		if (frame >= e->frame && frame < e->frame + e->duration)
-			b |= e->buttons;
-	}
-	return b;
-}
 
 static uint8_t keyboard_buttons(Frontend *fe)
 {
@@ -144,13 +104,24 @@ static void handle_events(Frontend *fe)
 			fe->quit = true;
 			break;
 		case SDL_KEYDOWN:
-			if (ev.key.keysym.sym == SDLK_ESCAPE)
+			switch (ev.key.keysym.sym) {
+			case SDLK_ESCAPE:
 				fe->quit = true;
-			if (ev.key.keysym.sym == SDLK_TAB)
+				break;
+			case SDLK_TAB:
 				fe->fast_forward = true;
-			if (ev.key.keysym.sym == SDLK_F11) {
+				break;
+			case SDLK_F5:
+				fe->pending_save = fe->state_path;
+				break;
+			case SDLK_F7:
+				fe->pending_load = fe->state_path;
+				break;
+			case SDLK_F11: {
 				Uint32 fs = SDL_GetWindowFlags(fe->window) & SDL_WINDOW_FULLSCREEN_DESKTOP;
 				SDL_SetWindowFullscreen(fe->window, fs ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
+				break;
+			}
 			}
 			break;
 		case SDL_KEYUP:
@@ -188,8 +159,6 @@ static void pace_frame(Frontend *fe, GB *gb)
 		SDL_Delay(1);
 }
 
-// Frames are delivered from deep inside emulation (possibly nested native
-// calls), so quitting exits from here rather than unwinding.
 static void put_le(uint8_t *p, uint32_t v, int n)
 {
 	for (int i = 0; i < n; i++)
@@ -210,17 +179,55 @@ static void wav_header(Frontend *fe)
 	fwrite(h, 1, sizeof(h), fe->wav);
 }
 
+// Frames are delivered from deep inside emulation (possibly nested native
+// calls), so quitting exits from here rather than unwinding.
 static void shutdown(Frontend *fe, GB *gb)
 {
 	if (fe->wav) {
 		wav_header(fe);
 		fclose(fe->wav);
 	}
+	if (fe->record_path) {
+		if (recorder_save(&fe->recorder, fe->record_path))
+			printf("recorded frames %d-%d to %s\n", fe->recorder.start,
+				fe->recorder.start + fe->recorder.len - 1, fe->record_path);
+		else
+			fprintf(stderr, "can't write recording %s\n", fe->record_path);
+	}
 	if (fe->frames_since_sram_write >= 0 && fe->sav_path)
 		gb_save_sram(gb, fe->sav_path);
 	if (!fe->headless)
 		SDL_Quit();
 	exit(0);
+}
+
+static void start_recording(Frontend *fe, GB *gb)
+{
+	// Recordings always start from a full snapshot (including save RAM), so
+	// they replay identically whatever the replaying machine's save file is.
+	size_t len;
+	uint8_t *state = savestate_save(gb, &len);
+	recorder_start(&fe->recorder, (int)gb->frame_count, state, len);
+}
+
+// Runs between instructions when no native routine is in progress.
+static void do_pending(Frontend *fe, GB *gb)
+{
+	if (fe->pending_save) {
+		if (savestate_save_file(gb, fe->pending_save))
+			printf("frame %llu: saved state to %s\n", (unsigned long long)gb->frame_count, fe->pending_save);
+		else
+			fprintf(stderr, "can't write state %s\n", fe->pending_save);
+		fe->pending_save = NULL;
+	}
+	if (fe->pending_load) {
+		if (savestate_load_file(gb, fe->pending_load)) {
+			printf("frame %llu: loaded state from %s\n", (unsigned long long)gb->frame_count, fe->pending_load);
+			if (fe->record_path)
+				start_recording(fe, gb);
+		}
+		fe->pending_load = NULL;
+	}
 }
 
 static void on_frame(GB *gb)
@@ -234,6 +241,9 @@ static void on_frame(GB *gb)
 				printf("frame %d: wrote %s\n", frame, fe->shots[i].path);
 		}
 	}
+	for (int i = 0; i < fe->nstate_saves; i++)
+		if (fe->state_saves[i].frame == frame)
+			fe->pending_save = fe->state_saves[i].path;
 
 	if (gb->sram_dirty)
 		fe->frames_since_sram_write = 0;
@@ -259,23 +269,28 @@ static void on_frame(GB *gb)
 		fe->wav_frames += (uint32_t)gb->apu.buffer_len;
 	}
 
+	uint8_t scripted = fe->have_script ? input_buttons(&fe->script, frame) : 0;
 	if (fe->headless) {
 		gb->apu.buffer_len = 0;
-		gb->joypad = scripted_buttons(fe, frame);
-		if (fe->max_frames && frame >= fe->max_frames)
-			shutdown(fe, gb);
-		return;
+		gb->joypad = scripted;
+	} else {
+		SDL_UpdateTexture(fe->texture, NULL, gb->ppu.framebuffer, GB_SCREEN_W * 4);
+		SDL_RenderClear(fe->renderer);
+		SDL_RenderCopy(fe->renderer, fe->texture, NULL, NULL);
+		SDL_RenderPresent(fe->renderer);
+
+		handle_events(fe);
+		gb->joypad = keyboard_buttons(fe) | scripted;
+		pace_frame(fe, gb);
 	}
+	if (fe->record_path)
+		recorder_frame(&fe->recorder, frame, gb->joypad);
 
-	SDL_UpdateTexture(fe->texture, NULL, gb->ppu.framebuffer, GB_SCREEN_W * 4);
-	SDL_RenderClear(fe->renderer);
-	SDL_RenderCopy(fe->renderer, fe->texture, NULL, NULL);
-	SDL_RenderPresent(fe->renderer);
-
-	handle_events(fe);
-	gb->joypad = keyboard_buttons(fe) | scripted_buttons(fe, frame);
-	pace_frame(fe, gb);
-	if (fe->quit || (fe->max_frames && frame >= fe->max_frames))
+	if (fe->stop_frame && frame >= fe->stop_frame)
+		fe->quit = true;
+	// Normally the main loop quits, between instructions. If native code is
+	// mid-routine and stays there, quit from here instead.
+	if (fe->quit && ++fe->quit_wait_frames > 2)
 		shutdown(fe, gb);
 }
 
@@ -316,22 +331,31 @@ static void usage(const char *argv0)
 {
 	fprintf(stderr,
 		"usage: %s [options]\n"
-		"  --rom PATH          ROM built from the disassembly (default: " WL3_DEFAULT_ROM ")\n"
-		"  --sym PATH          symbol file (default: ROM path with .sym)\n"
-		"  --sav PATH          save file (default: ROM path with .sav)\n"
-		"  --scale N           window scale (default 4)\n"
-		"  --no-hooks          run everything in the interpreter\n"
-		"  --input PATH        scripted input: lines of '<frame> <duration> <buttons>'\n"
-		"  --headless          no window or audio\n"
-		"  --frames N          stop after N frames\n"
-		"  --screenshot N:PATH write a PNG of frame N (repeatable)\n"
-		"  --difftest          check every ported routine against the original asm\n"
-		"  --trace             print CPU state every frame\n"
-		"  --wav PATH          record the audio output\n"
-		"  --break LABEL       print recent instructions whenever LABEL is reached\n"
+		"  --rom PATH            ROM built from the disassembly (default: " WL3_DEFAULT_ROM ")\n"
+		"  --sym PATH            symbol file (default: ROM path with .sym)\n"
+		"  --sav PATH            battery save file (default: ROM path with .sav;\n"
+		"                        headless runs only use one if this is given)\n"
+		"  --scale N             window scale (default 4)\n"
+		"  --no-hooks            run everything in the interpreter\n"
+		"\n"
+		"  --record PATH         record your input to an input script (plus PATH.state)\n"
+		"  --input PATH          play an input script (see src/input.h for the format)\n"
+		"  --load-state PATH     start from a save state\n"
+		"  --save-state N:PATH   save a state at frame N (repeatable)\n"
+		"\n"
+		"  --headless            no window or audio\n"
+		"  --frames N            stop after running N frames\n"
+		"  --screenshot N:PATH   write a PNG of frame N (repeatable)\n"
+		"  --wav PATH            record the audio output\n"
+		"  --difftest            check every ported routine against the original asm\n"
+		"  --trace               print CPU state every frame\n"
+		"  --break LABEL         print recent instructions whenever LABEL is reached\n"
+		"\n"
+		"Frame numbers count from power-on, and carry on from a loaded state.\n"
 		"\n"
 		"keys: arrows, X = A, Z = B, Enter = Start, Backspace = Select,\n"
-		"      Tab = fast forward, F11 = fullscreen, Esc = quit\n",
+		"      Tab = fast forward, F5 = save state, F7 = load state,\n"
+		"      F11 = fullscreen, Esc = quit\n",
 		argv0);
 }
 
@@ -339,7 +363,7 @@ static char *replace_ext(const char *path, const char *ext)
 {
 	size_t n = strlen(path);
 	const char *dot = strrchr(path, '.');
-	if (dot && !strchr(dot, '/'))
+	if (dot && !strchr(dot, '/') && !strchr(dot, '\\'))
 		n = (size_t)(dot - path);
 	char *out = malloc(n + strlen(ext) + 1);
 	memcpy(out, path, n);
@@ -347,43 +371,61 @@ static char *replace_ext(const char *path, const char *ext)
 	return out;
 }
 
+static bool parse_frame_file(char *spec, FrameFile *out)
+{
+	char *colon = strchr(spec, ':');
+	// Allow Windows drive letters in the path: only split at the first colon.
+	if (!colon || colon == spec)
+		return false;
+	*colon = 0;
+	out->frame = atoi(spec);
+	out->path = colon + 1;
+	return true;
+}
+
 int main(int argc, char **argv)
 {
 	const char *rom_path = WL3_DEFAULT_ROM;
-	const char *sym_path = NULL, *sav_path = NULL, *input_path = NULL;
-	int scale = 4;
-	bool no_hooks = false, difftest = false;
+	const char *sym_path = NULL, *sav_path = NULL, *input_path = NULL, *load_state = NULL;
 	const char *break_sym = NULL;
+	int scale = 4, run_frames = 0;
+	bool no_hooks = false, difftest = false;
 	static Frontend fe;
 
 	for (int i = 1; i < argc; i++) {
 		const char *a = argv[i];
 		const char *next = i + 1 < argc ? argv[i + 1] : NULL;
-		if (!strcmp(a, "--rom") && next) rom_path = argv[++i];
+		if (!strcmp(a, "--help") || !strcmp(a, "-h")) {
+			usage(argv[0]);
+			return 0;
+		}
+		else if (!strcmp(a, "--rom") && next) rom_path = argv[++i];
 		else if (!strcmp(a, "--sym") && next) sym_path = argv[++i];
 		else if (!strcmp(a, "--sav") && next) sav_path = argv[++i];
 		else if (!strcmp(a, "--scale") && next) scale = atoi(argv[++i]);
 		else if (!strcmp(a, "--input") && next) input_path = argv[++i];
-		else if (!strcmp(a, "--frames") && next) fe.max_frames = atoi(argv[++i]);
+		else if (!strcmp(a, "--record") && next) fe.record_path = argv[++i];
+		else if (!strcmp(a, "--load-state") && next) load_state = argv[++i];
+		else if (!strcmp(a, "--frames") && next) run_frames = atoi(argv[++i]);
 		else if (!strcmp(a, "--no-hooks")) no_hooks = true;
 		else if (!strcmp(a, "--headless")) fe.headless = true;
 		else if (!strcmp(a, "--difftest")) difftest = true;
 		else if (!strcmp(a, "--trace")) fe.trace = true;
+		else if (!strcmp(a, "--break") && next) break_sym = argv[++i];
 		else if (!strcmp(a, "--wav") && next) {
 			fe.wav = fopen(argv[++i], "wb");
 			if (fe.wav)
 				wav_header(&fe);
-		}
-		else if (!strcmp(a, "--break") && next) break_sym = argv[++i];
-		else if (!strcmp(a, "--screenshot") && next && fe.nshots < 64) {
-			char *spec = argv[++i];
-			char *colon = strchr(spec, ':');
-			if (!colon) {
+		} else if (!strcmp(a, "--screenshot") && next && fe.nshots < 64) {
+			if (!parse_frame_file(argv[++i], &fe.shots[fe.nshots++])) {
 				usage(argv[0]);
 				return 1;
 			}
-			*colon = 0;
-			fe.shots[fe.nshots++] = (Screenshot){atoi(spec), colon + 1};
+		} else if (!strcmp(a, "--save-state") && next && fe.nstate_saves < 64) {
+			if (!parse_frame_file(argv[++i], &fe.state_saves[fe.nstate_saves++])) {
+				usage(argv[0]);
+				return 1;
+			}
 		} else {
 			usage(argv[0]);
 			return 1;
@@ -413,22 +455,52 @@ int main(int argc, char **argv)
 	if (no_hooks)
 		hooks_set_enabled(false);
 
-	if (difftest)
-		return difftest_run(&gb, input_path, fe.max_frames ? fe.max_frames : 3000) ? 0 : 1;
-
-	if (input_path && !load_input_script(&fe, input_path)) {
-		fprintf(stderr, "can't read input script %s\n", input_path);
-		return 1;
+	if (input_path) {
+		if (!input_load(&fe.script, input_path)) {
+			fprintf(stderr, "can't read input script %s\n", input_path);
+			return 1;
+		}
+		fe.have_script = true;
+		if (!load_state)
+			load_state = fe.script.state_path;
 	}
-	fe.sav_path = sav_path ? sav_path : replace_ext(rom_path, ".sav");
-	gb_load_sram(&gb, fe.sav_path);
+
+	if (difftest) {
+		if (load_state && !savestate_load_file(&gb, load_state))
+			return 1;
+		int end = run_frames ? (int)gb.frame_count + run_frames :
+			(fe.have_script ? input_end(&fe.script) : 3000);
+		return difftest_run(&gb, fe.have_script ? &fe.script : NULL, end) ? 0 : 1;
+	}
+
+	// Headless runs are tests and tools: they leave the player's save alone
+	// unless asked otherwise.
+	fe.sav_path = sav_path ? sav_path : (fe.headless ? NULL : replace_ext(rom_path, ".sav"));
+	if (fe.sav_path)
+		gb_load_sram(&gb, fe.sav_path);
 	fe.frames_since_sram_write = -1;
+	fe.state_path = replace_ext(rom_path, ".state");
+
+	if (load_state && !savestate_load_file(&gb, load_state))
+		return 1;
+	if (run_frames)
+		fe.stop_frame = (int)gb.frame_count + run_frames;
+	else if (fe.headless && fe.have_script)
+		fe.stop_frame = input_end(&fe.script);
+	if (fe.record_path)
+		start_recording(&fe, &gb);
 
 	if (!fe.headless && !frontend_init(&fe, scale))
 		return 1;
 	gb.frame_cb = on_frame;
 	gb.user = &fe;
 
-	for (;;)
+	for (;;) {
+		if ((fe.pending_save || fe.pending_load || fe.quit) && gb.call_depth == 0) {
+			do_pending(&fe, &gb);
+			if (fe.quit)
+				shutdown(&fe, &gb);
+		}
 		gb_tick(&gb, cpu_step(&gb));
+	}
 }
