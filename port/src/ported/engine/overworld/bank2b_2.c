@@ -64,34 +64,48 @@ static bool call_ret(GB *gb, uint16_t target, uint16_t ret_addr)
 	return true;
 }
 
-// A jumptable with n entries. handlers[i] is the C version of entry i (it
-// runs like a call of that entry, up to its ret); NULL means the entry is
-// run as is. ret_addr is the return address of the `call` that runs this
-// jumptable as a subroutine, or 0 if the jumptable is the tail of the
-// routine being run.
-// Returns true when done (the subroutine returned, or the tail entry ran up
-// to its ret, which the caller then performs with RET()). Returns false if
-// execution must continue in the asm at pc, with the stack as the asm has
-// it (an entry run as is in tail position, or an index out of range, which
-// jumps to garbage); the caller must stop then.
+// Native subroutines that can be called from other native code take the
+// return address of the asm `call` (ret_addr), or 0 when they run as the
+// hook itself. They keep the stack exactly as the asm has it: enter() is
+// the call, leave() the ret. They return false when execution has to go on
+// in the asm (see dispatch()); every native caller then stops at once.
+static void enter(GB *gb, uint16_t ret_addr)
+{
+	if (ret_addr)
+		gb_push16(gb, ret_addr);
+}
+
+static bool leave(GB *gb, uint16_t ret_addr)
+{
+	if (ret_addr)
+		gb_pop16(gb);
+	else
+		RET();
+	return true;
+}
+
+// A jumptable with n entries, in tail position of a subroutine entered with
+// ret_addr. handlers[i] is the C version of entry i (it runs like a call of
+// that entry, up to its ret; the caller then does leave()); NULL means the
+// entry is run as is. Returns false if execution must continue in the asm
+// at pc, with the stack as the asm has it: an index out of range (which
+// jumps to garbage), an entry run as is from the hook itself, or one that
+// pops past its frame.
 static bool dispatch(GB *gb, uint16_t table, const Handler *handlers, int n, uint16_t ret_addr)
 {
 	uint16_t sp = gb->cpu.sp;
-	if (ret_addr)
-		gb_push16(gb, ret_addr); // call
 	uint16_t t = jumptable(gb, table);
 	int idx = gb->cpu.e >> 1;
 	if (idx < n && handlers[idx]) {
 		handlers[idx](gb);
-		if (ret_addr)
-			gb_pop16(gb); // ret
 		return true;
 	}
 	if (idx < n && ret_addr) {
 		uint16_t pc = gb->cpu.pc;
 		gb->cpu.pc = t;
-		if (!run_until(gb, ret_addr, sp))
+		if (!run_until(gb, ret_addr, (uint16_t)(sp + 2)))
 			return false;
+		gb_push16(gb, ret_addr); // back as it was (same bytes), for leave()
 		gb->cpu.pc = pc;
 		return true;
 	}
@@ -99,7 +113,7 @@ static bool dispatch(GB *gb, uint16_t table, const Handler *handlers, int n, uin
 	return false;
 }
 
-// A routine whose tail is a jumptable (PORT_JUMP).
+// A hook whose tail is a jumptable (PORT_JUMP).
 static void tail_dispatch(GB *gb, uint16_t table, const Handler *handlers, int n)
 {
 	if (dispatch(gb, table, handlers, n, 0))
@@ -637,9 +651,11 @@ static const Handler prologue_cutscene[] = {
 PORT_JUMP(Prologue)
 {
 	// call .PlayCutscene
+	enter(gb, ADDR_Prologue + 3);
 	gb->cpu.a = rd8(gb, w2d013);
 	if (!dispatch(gb, ADDR_Prologue + 17, prologue_cutscene, 39, ADDR_Prologue + 3))
 		return;
+	leave(gb, ADDR_Prologue + 3);
 	if (!call_ret(gb, ADDR_UpdatePrologueSceneObjects, ADDR_Prologue + 6) ||
 		!call_ret(gb, ADDR_UpdateSceneWario, ADDR_Prologue + 9) ||
 		!call_ret(gb, ADDR_Func_ac3fd, ADDR_Prologue + 12))
@@ -744,14 +760,16 @@ static const Handler ae2dd_table[] = {
 
 static bool func_ae2dd(GB *gb, uint16_t ret_addr)
 {
+	enter(gb, ret_addr);
 	gb->cpu.a = rd8(gb, w2d8b0);
-	return dispatch(gb, ADDR_Func_ae2dd + 4, ae2dd_table, 6, ret_addr);
+	if (!dispatch(gb, ADDR_Func_ae2dd + 4, ae2dd_table, 6, ret_addr))
+		return false;
+	return leave(gb, ret_addr);
 }
 
 PORT_JUMP(Func_ae2dd)
 {
-	if (func_ae2dd(gb, 0))
-		RET();
+	func_ae2dd(gb, 0);
 }
 
 static void wario_walk_right(GB *gb)
@@ -1460,4 +1478,779 @@ PORT_JUMP(Func_ae668)
 {
 	inc_w2d891_ld_a_w2d890(gb);
 	tail_dispatch(gb, ADDR_Func_ae668 + 7, ae668_table, 10);
+}
+
+// ---------------------------------------------------------------------------
+// Prologue_WarioFallFromPlane
+
+static void fall_show_wario_fall(GB *gb)
+{
+	// set Wario's coordinates to (240, 60)
+	set_obj_coord(gb, wSceneWarioYCoord, 60, 240);
+	set_wario_state(gb, SCENEWARIO_ON_FIRE);
+	play_sfx(gb, SFX_THROW);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, w2d894, 0);
+	wr8(gb, w2d892, 0);
+	advance_w2d890(gb);
+}
+
+// .asm_ae768 (and .asm_ae7c5's tail)
+static void fall_next_bounce_step(GB *gb)
+{
+	SET_HL(gb, w2d892);
+	wr8(gb, w2d892, alu_inc(gb, rd8(gb, w2d892)));
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, w2d893, 0);
+}
+
+static void fall_play_bump_sfx_and_show_obj(GB *gb, bool show_obj)
+{
+	play_bump_sfx(gb);
+	if (show_obj) {
+		// .asm_ae77f
+		SET_HL(gb, wCurSceneObj);
+		gb->cpu.a = rd8(gb, wSceneWarioYCoord);
+		wr8(gb, wCurSceneObj, gb->cpu.a);
+		SET_HL(gb, wCurSceneObj + 1);
+		gb->cpu.a = rd8(gb, wSceneWarioXCoord);
+		wr8(gb, wCurSceneObj + 1, gb->cpu.a);
+		set_obj_state(gb, wCurSceneObjState, 0x10);
+	}
+	fall_next_bounce_step(gb);
+}
+
+// returns true if Wario's y is 96
+static bool fall_wario_landed(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wSceneWarioYCoord);
+	alu_cp(gb, gb->cpu.a, 96);
+	return gb->cpu.f & FLAG_Z;
+}
+
+// .asm_ae794
+static void fall_wait_4(GB *gb)
+{
+	SET_HL(gb, w2d893);
+	wr8(gb, w2d893, alu_inc(gb, rd8(gb, w2d893)));
+	gb->cpu.a = rd8(gb, w2d893);
+	alu_cp(gb, gb->cpu.a, 0x04);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	fall_next_bounce_step(gb);
+}
+
+static void fall_do_bounce(GB *gb)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d894), rd8(gb, w2d894));
+	if (gb->cpu.a) {
+		gb->cpu.a = alu_and(gb, rd8(gb, w2d891), 0x03);
+		if (gb->cpu.a) {
+			SET_DE(gb, ADDR_Data_aed06);
+			SET_HL(gb, wSceneWario);
+			CALL(ApplyOWMovement);
+			if (gb->cpu.f & FLAG_Z) {
+				gb->cpu.a = 0;
+				gb->cpu.f = FLAG_Z;
+				wr8(gb, w2d894, 0);
+			}
+		}
+	}
+	// .asm_ae740
+	gb->cpu.a = rd8(gb, w2d892);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!gb->cpu.a) {
+		// .asm_ae763
+		gb->cpu.a = 0x01;
+		wr8(gb, w2d894, 0x01);
+		fall_next_bounce_step(gb);
+		return;
+	}
+	int step;
+	for (step = 1; step <= 9; step++) {
+		gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		if (!gb->cpu.a)
+			break;
+	}
+	switch (step) {
+	case 1: // .asm_ae771
+		if (!fall_wario_landed(gb))
+			return;
+		set_wario_state(gb, SCENEWARIO_STUNNED_RIGHT);
+		fall_play_bump_sfx_and_show_obj(gb, true);
+		return;
+	case 2:
+	case 5:
+		fall_wait_4(gb);
+		return;
+	case 3: // .asm_ae79e
+		set_wario_state(gb, SCENEWARIO_CRASH_TUMBLE_END);
+		fall_next_bounce_step(gb);
+		return;
+	case 4: // .asm_ae7a5
+		if (!fall_wario_landed(gb))
+			return;
+		set_wario_state(gb, SCENEWARIO_CRASH_LAND_RIGHT);
+		fall_play_bump_sfx_and_show_obj(gb, true);
+		return;
+	case 6: // .asm_ae7b5
+		if (!fall_wario_landed(gb))
+			return;
+		set_wario_state(gb, SCENEWARIO_CRASH_LAND_RIGHT);
+		fall_play_bump_sfx_and_show_obj(gb, false);
+		return;
+	case 7: // .asm_ae7c5
+		gb->cpu.a = rd8(gb, wSceneWarioState);
+		alu_cp(gb, gb->cpu.a, SCENEWARIO_STUNNED_RIGHT);
+		if (!(gb->cpu.f & FLAG_Z))
+			return;
+		fall_next_bounce_step(gb);
+		return;
+	case 8: // .asm_ae7d4
+		SET_HL(gb, w2d893);
+		wr8(gb, w2d893, alu_inc(gb, rd8(gb, w2d893)));
+		gb->cpu.a = rd8(gb, w2d893);
+		alu_cp(gb, gb->cpu.a, 0x3e);
+		if (gb->cpu.f & FLAG_C)
+			return;
+		set_wario_state(gb, SCENEWARIO_IDLE_RIGHT);
+		play_sfx(gb, SFX_12A);
+		fall_next_bounce_step(gb);
+		return;
+	case 9: // .asm_ae7f2
+		gb->cpu.a = 0x80;
+		wr8(gb, w2d892, 0x80);
+		return;
+	default:
+		return;
+	}
+}
+
+static void fall_wario_bounce(GB *gb)
+{
+	fall_do_bounce(gb);
+	gb->cpu.a = rd8(gb, w2d892);
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	advance_w2d890(gb);
+}
+
+static void fall_wario_turn_right(GB *gb)
+{
+	set_wario_state_and_advance(gb, SCENEWARIO_TURN_BACK_RIGHT);
+}
+
+static void fall_wario_look_around(GB *gb)
+{
+	set_wario_state_and_advance(gb, SCENEWARIO_LOOK_AROUND_THEN_TURN);
+}
+
+static void wait_idle_right(GB *gb)
+{
+	wait_wario_state(gb, SCENEWARIO_IDLE_RIGHT);
+}
+
+static const Handler fall_table[] = {
+	wait74,
+	fall_show_wario_fall,
+	fall_wario_bounce,
+	wait60,
+	fall_wario_turn_right,
+	wait_look_back,
+	wait38,
+	fall_wario_look_around,
+	wait_idle_right,
+	wait46,
+	func_ae1d5,
+};
+
+static bool func_ae8bb(GB *gb, uint16_t ret_addr);
+
+PORT_JUMP(Prologue_WarioFallFromPlane)
+{
+	if (!func_ae8bb(gb, ADDR_Prologue_WarioFallFromPlane + 3))
+		return;
+	inc_w2d891_ld_a_w2d890(gb);
+	tail_dispatch(gb, ADDR_Prologue_WarioFallFromPlane + 10, fall_table, 11);
+}
+
+// ---------------------------------------------------------------------------
+// Prologue_WarioWalkToCaveEntrance
+
+static void walk_wario_move_right_to_120(GB *gb)
+{
+	CALL_2B(ApplySceneWarioMovementRight);
+	alu_cp(gb, gb->cpu.a, 120);
+	if (!(gb->cpu.f & FLAG_Z))
+		return; // if != 120 keep walking
+	wr8(gb, REG_HL(gb), gb->cpu.a);
+	set_wario_state_and_advance(gb, SCENEWARIO_IDLE_RIGHT);
+}
+
+static void walk_wario_look_up(GB *gb)
+{
+	set_wario_state_and_advance(gb, SCENEWARIO_LOOK_UP);
+}
+
+static void walk_wario_move_right_to_208(GB *gb)
+{
+	CALL_2B(ApplySceneWarioMovementRight);
+	alu_cp(gb, gb->cpu.a, 208);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	wr8(gb, REG_HL(gb), gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // SCENEWARIO_NONE
+	CALL_2B(SetSceneWarioState);
+	advance_w2d890(gb);
+}
+
+static const Handler walk_table[] = {
+	wait60,
+	wario_walk_right,
+	walk_wario_move_right_to_120,
+	wait60,
+	walk_wario_look_up,
+	wait_idle_right,
+	show_emote,
+	wait_emote_animation,
+	wait40,
+	wario_walk_right,
+	walk_wario_move_right_to_208,
+	wait40,
+	func_ae1d5,
+};
+
+PORT_JUMP(Prologue_WarioWalkToCaveEntrance)
+{
+	inc_w2d891_ld_a_w2d890(gb);
+	tail_dispatch(gb, ADDR_Prologue_WarioWalkToCaveEntrance + 7, walk_table, 13);
+}
+
+// ---------------------------------------------------------------------------
+// The plane parts (Func_ae8bb)
+
+// hl = counter: xor a / ld [hld], a / inc [hl]
+static void func_ae915(GB *gb)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, hl, 0);
+	hl--;
+	SET_HL(gb, hl);
+	wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+}
+
+PORT(Func_ae915)
+{
+	func_ae915(gb);
+}
+
+// d = y, e = x, c = new state, hl = obj pointer
+static void set_scene_obj_coord_and_state(GB *gb)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = gb->cpu.d;
+	wr8(gb, hl++, gb->cpu.a);
+	gb->cpu.a = gb->cpu.e;
+	wr8(gb, hl++, gb->cpu.a);
+	SET_HL(gb, hl);
+	gb->cpu.l |= 1 << 2; // set 2, l
+	gb->cpu.a = gb->cpu.c;
+	CALL(SetSceneObjState);
+}
+
+PORT(SetSceneObjCoordAndState)
+{
+	set_scene_obj_coord_and_state(gb);
+}
+
+// ld hl, obj / lb de, y, x / ld c, state / call SetSceneObjCoordAndState
+static void set_coord_and_state(GB *gb, uint16_t obj, uint8_t y, uint8_t x, uint8_t state)
+{
+	SET_HL(gb, obj);
+	gb->cpu.d = y;
+	gb->cpu.e = x;
+	gb->cpu.c = state;
+	set_scene_obj_coord_and_state(gb);
+}
+
+// ld de, data / ld hl, obj / call ApplyOWMovement
+static void apply_movement(GB *gb, uint16_t obj, uint16_t data)
+{
+	SET_DE(gb, data);
+	SET_HL(gb, obj);
+	CALL(ApplyOWMovement);
+}
+
+static void part_next(GB *gb, uint16_t counter)
+{
+	SET_HL(gb, counter);
+	func_ae915(gb);
+}
+
+static void part_sfx_next(GB *gb, uint16_t counter)
+{
+	play_sfx(gb, SFX_006);
+	part_next(gb, counter);
+}
+
+// c = number of frames
+static void part_wait(GB *gb, uint16_t counter, uint8_t frames)
+{
+	gb->cpu.c = frames;
+	SET_HL(gb, counter);
+	gb->cpu.a = rd8(gb, counter);
+	alu_cp(gb, gb->cpu.a, gb->cpu.c);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	func_ae915(gb);
+}
+
+static void part_wait_land(GB *gb, uint16_t y_coord, uint16_t action)
+{
+	gb->cpu.a = rd8(gb, y_coord);
+	alu_cp(gb, gb->cpu.a, 0x62);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	play_sfx(gb, SFX_006);
+	SET_HL(gb, action);
+	wr8(gb, action, alu_inc(gb, rd8(gb, action)));
+}
+
+static void part_end(GB *gb, uint16_t action, uint16_t obj_state)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, action, 0);
+	SET_HL(gb, obj_state);
+	CALL(SetSceneObjState);
+}
+
+// copy src's coordinates (y first) to dst and set dst's state to $0f
+static void part_attach(GB *gb, uint16_t src, uint16_t dst, uint16_t dst_state, uint16_t counter)
+{
+	gb->cpu.a = rd8(gb, src);
+	wr8(gb, dst, gb->cpu.a);
+	gb->cpu.a = rd8(gb, src + 1);
+	wr8(gb, dst + 1, gb->cpu.a);
+	set_obj_state(gb, dst_state, 0x0f);
+	part_next(gb, counter);
+}
+
+// copy src's coordinates (x first) to dst; when they land, set dst's state
+// to $10
+static void part_attached_land(GB *gb, uint16_t src, uint16_t dst, uint16_t dst_state, uint16_t action)
+{
+	gb->cpu.a = rd8(gb, src + 1);
+	wr8(gb, dst + 1, gb->cpu.a);
+	gb->cpu.a = rd8(gb, src);
+	wr8(gb, dst, gb->cpu.a);
+	alu_cp(gb, gb->cpu.a, 0x62);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	set_obj_state(gb, dst_state, 0x10);
+	play_sfx(gb, SFX_006);
+	SET_HL(gb, action);
+	wr8(gb, action, alu_inc(gb, rd8(gb, action)));
+}
+
+// Plane part 1: Func_ae924
+
+#define P1C wPlanePart1Counter
+#define P1A wPlanePart1Action
+
+static void func_ae9d0(GB *gb) { apply_movement(gb, wSceneObj3, ADDR_Data_aee09); }
+static void func_ae9da(GB *gb) { apply_movement(gb, wSceneObj3, ADDR_Data_aedba); }
+static void func_ae9e4(GB *gb) { apply_movement(gb, wSceneObj3, ADDR_Data_aed6d); }
+
+PORT(Func_ae9d0) { func_ae9d0(gb); }
+PORT(Func_ae9da) { func_ae9da(gb); }
+PORT(Func_ae9e4) { func_ae9e4(gb); }
+
+static void p1_ae971(GB *gb)
+{
+	set_coord_and_state(gb, wSceneObj3, 46, 240, 0x06);
+	part_next(gb, P1C);
+}
+static void p1_ae97e(GB *gb)
+{
+	func_ae9d0(gb);
+	part_wait_land(gb, wSceneObj3YCoord, P1A);
+}
+static void p1_ae983(GB *gb)
+{
+	func_ae9d0(gb);
+	if (gb->cpu.f & FLAG_Z)
+		part_sfx_next(gb, P1C);
+}
+static void p1_ae989(GB *gb) { part_wait(gb, P1C, 0x08); }
+static void p1_ae98d(GB *gb)
+{
+	set_coord_and_state(gb, wSceneObj3, 77, 224, 0x05);
+	part_next(gb, P1C);
+}
+static void p1_ae99a(GB *gb)
+{
+	func_ae9da(gb);
+	part_wait_land(gb, wSceneObj3YCoord, P1A);
+}
+static void p1_ae99f(GB *gb)
+{
+	func_ae9da(gb);
+	if (gb->cpu.f & FLAG_Z)
+		part_sfx_next(gb, P1C);
+}
+static void p1_ae9a5(GB *gb) { part_wait(gb, P1C, 0x28); }
+static void p1_ae9a9(GB *gb)
+{
+	set_coord_and_state(gb, wSceneObj3, 62, 240, 0x04);
+	part_next(gb, P1C);
+}
+static void p1_ae9b6(GB *gb)
+{
+	func_ae9e4(gb);
+	part_wait_land(gb, wSceneObj3YCoord, P1A);
+}
+static void p1_ae9bb(GB *gb)
+{
+	func_ae9e4(gb);
+	if (gb->cpu.f & FLAG_Z)
+		part_sfx_next(gb, P1C);
+}
+static void p1_ae9c1(GB *gb) { part_wait(gb, P1C, 0x08); }
+static void p1_ae9c5(GB *gb) { part_end(gb, P1A, wSceneObj3State); }
+
+static const Handler p1_table[] = {
+	p1_ae971, p1_ae97e, p1_ae983, p1_ae989, p1_ae98d, p1_ae99a, p1_ae99f,
+	p1_ae9a5, p1_ae9a9, p1_ae9b6, p1_ae9bb, p1_ae9c1, p1_ae9c5,
+};
+
+// ld hl, counter / inc [hl] / dec l / ld a, [hl] / and a / ret z / dec a /
+// jumptable
+static bool plane_part(GB *gb, uint16_t routine, uint16_t counter, const Handler *table, int n,
+	uint16_t ret_addr)
+{
+	enter(gb, ret_addr);
+	SET_HL(gb, counter);
+	wr8(gb, counter, alu_inc(gb, rd8(gb, counter)));
+	gb->cpu.l = alu_dec(gb, gb->cpu.l);
+	gb->cpu.a = rd8(gb, REG_HL(gb)); // action
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!gb->cpu.a)
+		return leave(gb, ret_addr);
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	if (!dispatch(gb, routine + 10, table, n, ret_addr))
+		return false;
+	return leave(gb, ret_addr);
+}
+
+static bool func_ae924(GB *gb, uint16_t ret_addr)
+{
+	return plane_part(gb, ADDR_Func_ae924, P1C, p1_table, 13, ret_addr);
+}
+
+PORT_JUMP(Func_ae924)
+{
+	func_ae924(gb, 0);
+}
+
+// Plane part 2: Func_ae9ee
+
+#define P2C wPlanePart2Counter
+#define P2A wPlanePart2Action
+
+static void p2_aeaef(GB *gb) { apply_movement(gb, wSceneObj4, ADDR_Data_aed6d); }
+static void p2_aeaf9(GB *gb) { apply_movement(gb, wSceneObj4, ADDR_Data_aee09); }
+
+static void p2_attached_land(GB *gb)
+{
+	part_attached_land(gb, wSceneObj4, wSceneObj1, wSceneObj1State, P2A);
+}
+static void p2_attach(GB *gb)
+{
+	part_attach(gb, wSceneObj4, wSceneObj1, wSceneObj1State, P2C);
+}
+
+static void p2_aea40(GB *gb)
+{
+	set_coord_and_state(gb, wSceneObj4, 62, 240, 0x02);
+	clear_obj_state(gb, wSceneObj1State);
+	part_next(gb, P2C);
+}
+static void p2_aea54(GB *gb)
+{
+	p2_aeaef(gb);
+	p2_attached_land(gb);
+}
+static void p2_aea59(GB *gb)
+{
+	p2_aeaef(gb);
+	if (gb->cpu.f & FLAG_Z)
+		part_sfx_next(gb, P2C);
+}
+static void p2_aea5f(GB *gb) { part_wait(gb, P2C, 0x04); }
+static void p2_aea63(GB *gb)
+{
+	set_obj_state(gb, wSceneObj4State, 0x12);
+	part_next(gb, P2C);
+}
+static void p2_aea6d(GB *gb) { part_wait(gb, P2C, 0x28); }
+static void p2_aea71(GB *gb)
+{
+	set_coord_and_state(gb, wSceneObj4, 46, 224, 0x08);
+	p2_attach(gb);
+}
+static void p2_aea92(GB *gb)
+{
+	p2_aeaf9(gb);
+	p2_attached_land(gb);
+}
+static void p2_aeab9(GB *gb)
+{
+	p2_aeaf9(gb);
+	if (gb->cpu.f & FLAG_Z)
+		part_sfx_next(gb, P2C);
+}
+static void p2_aeac0(GB *gb) { part_wait(gb, P2C, 0x08); }
+static void p2_aeac5(GB *gb)
+{
+	set_coord_and_state(gb, wSceneObj4, 46, 244, 0x04);
+	p2_attach(gb);
+}
+static void p2_aead2(GB *gb)
+{
+	p2_aeaf9(gb); // .Func_aeb03
+	part_wait_land(gb, wSceneObj4YCoord, P2A);
+}
+static void p2_aead8(GB *gb)
+{
+	p2_aeaf9(gb); // .Func_aeb03
+	if (gb->cpu.f & FLAG_Z)
+		part_sfx_next(gb, P2C);
+}
+static void p2_aeadf(GB *gb) { part_wait(gb, P2C, 0x08); }
+static void p2_aeae4(GB *gb) { part_end(gb, P2A, wSceneObj4State); }
+
+static const Handler p2_table[] = {
+	p2_aea40, p2_aea54, p2_aea59, p2_aea5f, p2_aea63, p2_aea6d, p2_aea71, p2_aea92,
+	p2_aeab9, p2_aeac0, p2_aeac5, p2_aead2, p2_aead8, p2_aeadf, p2_aeae4,
+};
+
+static bool func_ae9ee(GB *gb, uint16_t ret_addr)
+{
+	return plane_part(gb, ADDR_Func_ae9ee, P2C, p2_table, 15, ret_addr);
+}
+
+PORT_JUMP(Func_ae9ee)
+{
+	func_ae9ee(gb, 0);
+}
+
+// Plane part 3: Func_aeb0d
+
+#define P3C wPlanePart3Counter
+#define P3A wPlanePart3Action
+
+static void p3_aec0b(GB *gb) { apply_movement(gb, wSceneObj5, ADDR_Data_aed6d); }
+static void p3_aec15(GB *gb) { apply_movement(gb, wSceneObj5, ADDR_Data_aee09); }
+static void p3_aec1a(GB *gb) { apply_movement(gb, wSceneObj5, ADDR_Data_aedba); }
+
+static void p3_aeb5f(GB *gb)
+{
+	set_coord_and_state(gb, wSceneObj5, 62, 224, 0x03);
+	part_attach(gb, wSceneObj5, wSceneObj2, wSceneObj2State, P3C);
+}
+static void p3_aeb80(GB *gb)
+{
+	p3_aec0b(gb);
+	part_attached_land(gb, wSceneObj5, wSceneObj2, wSceneObj2State, P3A);
+}
+static void p3_aeba7(GB *gb)
+{
+	p3_aec0b(gb);
+	if (gb->cpu.f & FLAG_Z)
+		part_sfx_next(gb, P3C);
+}
+static void p3_aebad(GB *gb) { part_wait(gb, P3C, 0x08); }
+static void p3_aebb1(GB *gb)
+{
+	set_coord_and_state(gb, wSceneObj5, 46, 240, 0x07);
+	part_next(gb, P3C);
+}
+static void p3_aebbf(GB *gb)
+{
+	p3_aec15(gb);
+	part_wait_land(gb, wSceneObj5YCoord, P3A);
+}
+static void p3_aebc5(GB *gb)
+{
+	p3_aec15(gb);
+	if (gb->cpu.f & FLAG_Z)
+		part_sfx_next(gb, P3C);
+}
+static void p3_aebcc(GB *gb) { part_wait(gb, P3C, 0x04); }
+static void p3_aebd0(GB *gb)
+{
+	set_obj_state(gb, wSceneObj5State, 0x13);
+	part_next(gb, P3C);
+}
+static void p3_aebdb(GB *gb) { part_wait(gb, P3C, 0x28); }
+static void p3_aebe0(GB *gb)
+{
+	set_coord_and_state(gb, wSceneObj5, 77, 248, 0x05);
+	part_next(gb, P3C);
+}
+static void p3_aebee(GB *gb)
+{
+	p3_aec1a(gb);
+	part_wait_land(gb, wSceneObj5YCoord, P3A);
+}
+static void p3_aebf4(GB *gb)
+{
+	p3_aec1a(gb);
+	if (gb->cpu.f & FLAG_Z)
+		part_sfx_next(gb, P3C);
+}
+static void p3_aebfb(GB *gb) { part_wait(gb, P3C, 0x08); }
+static void p3_aec00(GB *gb) { part_end(gb, P3A, wSceneObj5State); }
+
+static const Handler p3_table[] = {
+	p3_aeb5f, p3_aeb80, p3_aeba7, p3_aebad, p3_aebb1, p3_aebbf, p3_aebc5, p3_aebcc,
+	p3_aebd0, p3_aebdb, p3_aebe0, p3_aebee, p3_aebf4, p3_aebfb, p3_aec00,
+};
+
+static bool func_aeb0d(GB *gb, uint16_t ret_addr)
+{
+	return plane_part(gb, ADDR_Func_aeb0d, P3C, p3_table, 15, ret_addr);
+}
+
+PORT_JUMP(Func_aeb0d)
+{
+	func_aeb0d(gb, 0);
+}
+
+// Plane part 4: Func_aec1f
+
+#define P4C wPlanePart4Counter
+#define P4A wPlanePart4Action
+
+static void p4_aecf2(GB *gb) { apply_movement(gb, wSceneObj9, ADDR_Data_aedba); }
+static void p4_aecfc(GB *gb) { apply_movement(gb, wSceneObj9, ADDR_Data_aed6d); }
+
+static void p4_aec69(GB *gb)
+{
+	set_coord_and_state(gb, wSceneObj9, 77, 240, 0x07);
+	part_next(gb, P4C);
+}
+static void p4_aec76(GB *gb)
+{
+	p4_aecf2(gb);
+	part_wait_land(gb, wSceneObj9YCoord, P4A);
+}
+static void p4_aec7b(GB *gb)
+{
+	p4_aecf2(gb);
+	if (gb->cpu.f & FLAG_Z)
+		part_sfx_next(gb, P4C);
+}
+static void p4_aec81(GB *gb) { part_wait(gb, P4C, 0x04); }
+static void p4_aec85(GB *gb)
+{
+	set_obj_state(gb, wSceneObj9State, 0x13);
+	part_next(gb, P4C);
+}
+static void p4_aec8f(GB *gb) { part_wait(gb, P4C, 0x28); }
+static void p4_aec93(GB *gb)
+{
+	set_coord_and_state(gb, wSceneObj9, 62, 240, 0x08);
+	part_attach(gb, wSceneObj9, wSceneObj8, wSceneObj8State, P4C);
+}
+static void p4_aecb4(GB *gb)
+{
+	p4_aecfc(gb);
+	part_attached_land(gb, wSceneObj9, wSceneObj8, wSceneObj8State, P4A);
+}
+static void p4_aecdb(GB *gb)
+{
+	p4_aecfc(gb);
+	if (gb->cpu.f & FLAG_Z)
+		part_sfx_next(gb, P4C);
+}
+static void p4_aece2(GB *gb) { part_wait(gb, P4C, 0x08); }
+static void p4_aece7(GB *gb) { part_end(gb, P4A, wSceneObj9State); }
+
+static const Handler p4_table[] = {
+	p4_aec69, p4_aec76, p4_aec7b, p4_aec81, p4_aec85, p4_aec8f,
+	p4_aec93, p4_aecb4, p4_aecdb, p4_aece2, p4_aece7,
+};
+
+static bool func_aec1f(GB *gb, uint16_t ret_addr)
+{
+	return plane_part(gb, ADDR_Func_aec1f, P4C, p4_table, 11, ret_addr);
+}
+
+PORT_JUMP(Func_aec1f)
+{
+	func_aec1f(gb, 0);
+}
+
+// Func_ae8bb: all four plane parts, then their sequencing
+
+static void ae8bb_start_part(GB *gb, uint16_t part_counter)
+{
+	gb->cpu.a = rd8(gb, w2d8a1);
+	alu_cp(gb, gb->cpu.a, 0x08);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	part_next(gb, part_counter);
+	part_next(gb, w2d8a1); // .asm_ae912
+}
+
+static void ae8bb_ae8d9(GB *gb) { ae8bb_start_part(gb, wPlanePart1Counter); }
+static void ae8bb_ae8e8(GB *gb) { ae8bb_start_part(gb, wPlanePart2Counter); }
+static void ae8bb_ae8f6(GB *gb) { ae8bb_start_part(gb, wPlanePart3Counter); }
+static void ae8bb_ae904(GB *gb) { ae8bb_start_part(gb, wPlanePart4Counter); }
+static void ae8bb_ae8d8(GB *gb) { (void)gb; }
+
+static const Handler ae8bb_table[] = {
+	ae8bb_ae8d9, ae8bb_ae8e8, ae8bb_ae8f6, ae8bb_ae904, ae8bb_ae8d8,
+};
+
+static bool func_ae8bb(GB *gb, uint16_t ret_addr)
+{
+	enter(gb, ret_addr);
+	if (!func_ae924(gb, ADDR_Func_ae8bb + 3) || !func_ae9ee(gb, ADDR_Func_ae8bb + 6) ||
+		!func_aeb0d(gb, ADDR_Func_ae8bb + 9) || !func_aec1f(gb, ADDR_Func_ae8bb + 12))
+		return false;
+
+	SET_HL(gb, w2d8a1);
+	wr8(gb, w2d8a1, alu_inc(gb, rd8(gb, w2d8a1)));
+	gb->cpu.l = alu_dec(gb, gb->cpu.l);
+	gb->cpu.a = rd8(gb, REG_HL(gb)); // w2d8a0
+	if (!dispatch(gb, ADDR_Func_ae8bb + 19, ae8bb_table, 5, ret_addr))
+		return false;
+	return leave(gb, ret_addr);
+}
+
+PORT_JUMP(Func_ae8bb)
+{
+	func_ae8bb(gb, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Epilogue sequencing
+
+PORT(Func_af130)
+{
+	prologue_delay(gb); // same as Prologue_Delay
+}
+
+PORT(Func_af135)
+{
+	prologue_next(gb); // same as Prologue_Next
 }
