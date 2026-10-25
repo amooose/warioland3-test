@@ -1,0 +1,41 @@
+name: PC port
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake libsdl2-dev
+
+      - name: Install RGBDS
+        run: |
+          mkdir -p "$HOME/rgbds"
+          curl -sSL https://github.com/gbdev/rgbds/releases/download/v1.0.0/rgbds-linux-x86_64.tar.xz | tar -xJ -C "$HOME/rgbds"
+          echo "$HOME/rgbds" >> "$GITHUB_PATH"
+
+      - name: Build ROM and check it matches
+        run: make
+
+      - name: Build port
+        run: |
+          cmake -B port/build -S port
+          cmake --build port/build -j"$(nproc)"
+
+      - name: Difftest
+        run: ctest --test-dir port/build --output-on-failure
+
+      - name: Smoke test
+        run: ./port/build/wl3 --headless --frames 2400 --input port/tests/difftest.input --screenshot 2400:smoke.png
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshot
+          path: smoke.png
