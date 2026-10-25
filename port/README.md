@@ -27,10 +27,11 @@ the plan and [docs/PORTING.md](docs/PORTING.md) for how to port routines.
 
 ## Building
 
-You need CMake (3.16+), a C compiler, SDL2 development files and
+You need CMake (3.16+), a C compiler, SDL2 development files, GNU make and
 [RGBDS 1.0+](https://github.com/gbdev/rgbds/releases) (to build the ROM from
-the disassembly). Building the ROM uses the repository's `Makefile`, so on
-Windows use MSYS2 or WSL.
+the disassembly).
+
+### Linux and macOS
 
 ```sh
 # Debian/Ubuntu: sudo apt install cmake gcc make libsdl2-dev
@@ -39,6 +40,31 @@ cmake -B port/build -S port            # add -DRGBDS=/path/to/rgbds/ if not on P
 cmake --build port/build
 ./port/build/wl3
 ```
+
+### Windows
+
+Building the ROM uses the repository's `Makefile` and Unix tools, so build
+from an [MSYS2](https://www.msys2.org/) **UCRT64** shell (not `cmd` or
+PowerShell).
+
+1. Install MSYS2, then open "MSYS2 UCRT64" from the Start menu and run:
+   ```sh
+   pacman -S --needed git make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake \
+       mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-SDL2
+   ```
+2. Download `rgbds-win64.zip` from the
+   [RGBDS 1.0.0 release](https://github.com/gbdev/rgbds/releases/tag/v1.0.0)
+   and extract it, for example to `C:\rgbds`.
+3. Build, from the repository folder (Windows drives are under `/c/`):
+   ```sh
+   cd /c/Users/you/path/to/warioland3-test
+   cmake -B port/build -S port -G Ninja -DRGBDS=/c/rgbds/
+   cmake --build port/build
+   ./port/build/wl3.exe
+   ```
+
+To run `wl3.exe` outside the MSYS2 shell, copy `SDL2.dll` from
+`C:\msys64\ucrt64\bin` next to it.
 
 The build compiles `warioland3.gbc` from the disassembly first, and then
 generates C constants for every label in it (`build/generated/syms.h`), so

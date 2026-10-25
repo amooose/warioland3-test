@@ -19,30 +19,44 @@ set(SYM ${REPO_ROOT}/warioland3.sym)
 set(RGBDS "" CACHE STRING "RGBDS install prefix (with trailing slash), if not on PATH")
 option(WL3_BUILD_ROM "Build the ROM from the disassembly as part of the port build" ON)
 if(WL3_BUILD_ROM)
+	find_program(WL3_MAKE NAMES make gmake)
+	if(NOT WL3_MAKE)
+		message(FATAL_ERROR
+			"Building the ROM needs GNU make (and RGBDS). On Windows, build from an "
+			"MSYS2 UCRT64 shell (see port/README.md), or build warioland3.gbc yourself "
+			"and configure with -DWL3_BUILD_ROM=OFF.")
+	endif()
 	add_custom_target(rom ALL
-		COMMAND make -C ${REPO_ROOT} warioland3.gbc RGBDS=${RGBDS}
+		COMMAND ${WL3_MAKE} -C ${REPO_ROOT} warioland3.gbc RGBDS=${RGBDS}
 		BYPRODUCTS ${ROM} ${SYM}
 		COMMENT "Building warioland3.gbc from the disassembly"
 		USES_TERMINAL)
 endif()
 
 # Code generator: symbol constants and the ported routine table.
-add_executable(wl3_gen tools/gen.c)
+# When cross-compiling, point WL3_GEN at a generator built for the host.
+set(WL3_GEN "" CACHE FILEPATH "Prebuilt tools/gen.c executable (for cross-compiling)")
+if(WL3_GEN)
+	set(GEN_CMD ${WL3_GEN})
+else()
+	add_executable(wl3_gen tools/gen.c)
+	set(GEN_CMD wl3_gen)
+endif()
 
 set(GEN_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
 file(MAKE_DIRECTORY ${GEN_DIR})
 
 add_custom_command(
 	OUTPUT ${GEN_DIR}/syms.h
-	COMMAND wl3_gen syms ${SYM} ${GEN_DIR}/syms.h
-	DEPENDS wl3_gen ${SYM}
+	COMMAND ${GEN_CMD} syms ${SYM} ${GEN_DIR}/syms.h
+	DEPENDS ${GEN_CMD} ${SYM}
 	COMMENT "Generating syms.h from warioland3.sym")
 
 file(GLOB_RECURSE PORTED_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/ported/*.c)
 add_custom_command(
 	OUTPUT ${GEN_DIR}/ported_table.c
-	COMMAND wl3_gen ports ${GEN_DIR}/ported_table.c ${PORTED_SOURCES}
-	DEPENDS wl3_gen ${PORTED_SOURCES}
+	COMMAND ${GEN_CMD} ports ${GEN_DIR}/ported_table.c ${PORTED_SOURCES}
+	DEPENDS ${GEN_CMD} ${PORTED_SOURCES}
 	COMMENT "Generating the ported routine table")
 
 add_executable(wl3
@@ -60,10 +74,11 @@ add_executable(wl3
 	${GEN_DIR}/syms.h
 	${GEN_DIR}/ported_table.c)
 target_include_directories(wl3 PRIVATE src ${GEN_DIR})
-target_link_libraries(wl3 PRIVATE SDL2::SDL2)
+# SDL2main (Windows entry point) must come before SDL2 on the link line.
 if(TARGET SDL2::SDL2main)
 	target_link_libraries(wl3 PRIVATE SDL2::SDL2main)
 endif()
+target_link_libraries(wl3 PRIVATE SDL2::SDL2)
 if(WL3_BUILD_ROM)
 	add_dependencies(wl3 rom)
 endif()
