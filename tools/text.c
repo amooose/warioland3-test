@@ -4,6 +4,36 @@
 
 #include "common.h"
 
+#ifdef _WIN32
+// getline is POSIX-only; Windows' C runtime doesn't have it.
+static ptrdiff_t getline(char **line, size_t *size, FILE *f)
+{
+	size_t len = 0;
+	int c;
+	if (*line == NULL || *size == 0) {
+		*size = 128;
+		*line = realloc(*line, *size);
+		if (*line == NULL)
+			return -1;
+	}
+	while ((c = fgetc(f)) != EOF) {
+		if (len + 2 > *size) {
+			*size *= 2;
+			*line = realloc(*line, *size);
+			if (*line == NULL)
+				return -1;
+		}
+		(*line)[len++] = (char)c;
+		if (c == '\n')
+			break;
+	}
+	if (len == 0)
+		return -1;
+	(*line)[len] = '\0';
+	return (ptrdiff_t)len;
+}
+#endif
+
 #define BUFFER_SIZE 0x400
 #define LINE_LEN 0x10
 
