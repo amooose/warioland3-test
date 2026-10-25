@@ -69,8 +69,9 @@ game). Edit the paths at its top if MSYS2 or RGBDS live somewhere other than
 `C:\msys64` and `C:\rgbds`. From the MSYS2 shell, `port/update.sh` does the
 same.
 
-To run `wl3.exe` outside the MSYS2 shell, copy `SDL2.dll` from
-`C:\msys64\ucrt64\bin` next to it.
+`play.bat` starts the game (double-click it, or pass options:
+`play.bat --record my_run.input`). The build also copies `SDL2.dll` next to
+`wl3.exe`, so it runs from Explorer too.
 
 The build compiles `warioland3.gbc` from the disassembly first, and then
 generates C constants for every label in it (`build/generated/syms.h`), so

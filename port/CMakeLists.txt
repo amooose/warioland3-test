@@ -104,6 +104,17 @@ target_link_libraries(wl3 PRIVATE SDL2::SDL2)
 if(WL3_BUILD_ROM)
 	add_dependencies(wl3 rom)
 endif()
+# On Windows, put the DLLs wl3.exe needs (SDL2.dll) next to it, so it runs
+# from Explorer or a .bat file and not just from the MSYS2 shell. Runs on
+# every build (copying only what changed), so an existing build gets them too.
+if(WIN32 AND NOT CMAKE_VERSION VERSION_LESS 3.21)
+	add_custom_target(wl3_dlls ALL
+		# wl3.exe itself is listed too (copying it onto itself is a no-op) so
+		# the command stays valid when there are no DLLs, e.g. static SDL2.
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:wl3> $<TARGET_FILE:wl3> $<TARGET_FILE_DIR:wl3>
+		COMMAND_EXPAND_LISTS
+		DEPENDS wl3)
+endif()
 
 if(MSVC)
 	target_compile_options(wl3 PRIVATE /W3)
