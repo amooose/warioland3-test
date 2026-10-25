@@ -84,7 +84,9 @@ PORT(UpdateParticleAnimation)
 	}
 
 	wr8(gb, hl + 2, frame);
-	gb->cpu.a = alu_add(gb, offset, 2);
+	// The asm reads the offset again after writing the frame (they can
+	// alias, e.g. through I/O registers that auto-increment).
+	gb->cpu.a = alu_add(gb, rd8(gb, hl + 1), 2);
 	wr8(gb, hl + 1, gb->cpu.a); // frameset offset
 	entry++;
 	gb->cpu.a = rd8(gb, entry);

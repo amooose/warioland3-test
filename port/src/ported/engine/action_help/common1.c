@@ -90,9 +90,22 @@ PORT(ActionHelp_HideBlockDebris)
 static void show_block_debris(GB *gb)
 {
 	play_sfx(gb, SFX_BLOCK_BREAK);
-	uint8_t y = alu_sub(gb, rd8(gb, wMenuObj4YCoord), gb->cpu.b);
-	uint8_t x = alu_sub(gb, rd8(gb, wMenuObj4XCoord), gb->cpu.c);
-	init_menu_obj(gb, REG_HL(gb), y, x, ADDR_Frameset_d49a, ADDR_OAM_d20e, BANK_OAM_d20e);
+	// Each coordinate is read just before it's written, as in the asm: hl
+	// may point at wMenuObj4 itself.
+	uint16_t hl = REG_HL(gb);
+	wr8(gb, hl++, alu_sub(gb, rd8(gb, wMenuObj4YCoord), gb->cpu.b));
+	wr8(gb, hl++, alu_sub(gb, rd8(gb, wMenuObj4XCoord), gb->cpu.c));
+	for (int i = 0; i < 4; i++)
+		wr8(gb, hl++, 0);
+	wr8(gb, hl++, HI(ADDR_Frameset_d49a));
+	wr8(gb, hl++, LO(ADDR_Frameset_d49a));
+	wr8(gb, hl++, HI(ADDR_OAM_d20e));
+	wr8(gb, hl++, LO(ADDR_OAM_d20e));
+	wr8(gb, hl++, BANK_OAM_d20e);
+	wr8(gb, hl, 0);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, hl);
 }
 
 // b = y offset of debris
