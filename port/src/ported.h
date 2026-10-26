@@ -233,6 +233,28 @@ static inline bool alu_bit(GB *gb, uint8_t v, int bit)
 	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_C) | FLAG_H | (set ? 0 : FLAG_Z));
 	return set;
 }
+// daa
+static inline uint8_t alu_daa(GB *gb, uint8_t v)
+{
+	int a = v;
+	bool c = gb->cpu.f & FLAG_C;
+	if (!(gb->cpu.f & FLAG_N)) {
+		if (c || a > 0x99) {
+			a += 0x60;
+			c = true;
+		}
+		if ((gb->cpu.f & FLAG_H) || (a & 0xf) > 9)
+			a += 0x06;
+	} else {
+		if (c)
+			a -= 0x60;
+		if (gb->cpu.f & FLAG_H)
+			a -= 0x06;
+	}
+	uint8_t r = (uint8_t)a;
+	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_N) | (r ? 0 : FLAG_Z) | (c ? FLAG_C : 0));
+	return r;
+}
 // add hl, rr (z unchanged)
 static inline uint16_t alu_add16(GB *gb, uint16_t hl, uint16_t v)
 {

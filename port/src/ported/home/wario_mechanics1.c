@@ -55,3 +55,23 @@ PORT(ApplyJumpVelocity)
 	if (!(gb->cpu.f & FLAG_C))
 		wr8(gb, wJumpVelIndex, MAX_JUMP_VEL_INDEX);
 }
+
+// output: b = walk velocity; advances wWalkVelIndex
+PORT(ApplyWalkVelocity)
+{
+	gb->cpu.a = rd8(gb, wWalkVelIndex);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0x00;
+	uint16_t hl = alu_add16(gb, ADDR_WalkVelTable, REG_DE(gb));
+	gb->cpu.b = rd8(gb, hl);
+	SET_HL(gb, wWalkVelIndex);
+	gb->cpu.a = rd8(gb, wWalkVelIndex);
+	alu_cp(gb, gb->cpu.a, 0x1b);
+	if (gb->cpu.f & FLAG_Z) {
+		// .cap
+		gb->cpu.a = alu_and(gb, gb->cpu.a, 0xfc);
+		wr8(gb, wWalkVelIndex, gb->cpu.a);
+		return;
+	}
+	wr8(gb, wWalkVelIndex, alu_inc(gb, gb->cpu.a));
+}

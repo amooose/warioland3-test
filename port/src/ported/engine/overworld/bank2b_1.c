@@ -23,3 +23,13 @@ PORT(Func_aca6d)
 	SET_HL(gb, w2d014 - 1);
 	wr8(gb, w2d014 - 1, alu_inc(gb, rd8(gb, w2d014 - 1))); // w2d013
 }
+
+// bc = OW obj: updates its animation with the credits OAM
+PORT(Func_ac000)
+{
+	gb->cpu.h = gb->cpu.b;
+	gb->cpu.l = (uint8_t)(gb->cpu.c & ~(1 << 1));
+	gb->cpu.b = BANK_OAM_15e44a; // BANK("Credits OAM")
+	CALL(UpdateOWAnimation);
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+}

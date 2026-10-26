@@ -576,6 +576,14 @@ void gb_call(GB *gb, uint16_t addr)
 		int cycles = cpu_step(gb);
 		if (!gb->no_tick)
 			gb_tick(gb, cycles);
+		// Code that pops past the native caller's frame (a fuzzed jump
+		// table sending a call somewhere that unwinds the stack) can never
+		// come back here; the asm caller would carry on, so it's not a
+		// fair comparison.
+		if (gb->test.active && SP > saved_sp) {
+			gb->test.unrealistic = true;
+			gb->test.crashed = true;
+		}
 	}
 	gb->call_depth--;
 	PC = saved_pc;

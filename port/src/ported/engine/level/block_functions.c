@@ -1,6 +1,9 @@
 // Port of src/engine/level/block_functions.asm
 #include "ported.h"
 
+// Jumps between block functions use JUMP_TO: like the asm, they run whatever
+// bank is mapped.
+
 // processes the block function of wBlockPtrBank:wBlockPtr
 PORT_JUMP(ProcessBlock)
 {
@@ -68,17 +71,17 @@ PORT_JUMP(BlockFunc_Water)
 	gb->cpu.a = rd8(gb, wBlockFuncWarioFlag);
 	alu_and(gb, gb->cpu.a, gb->cpu.a);
 	if (gb->cpu.f & FLAG_Z) {
-		JUMP(BlockFunc_Free);
+		JUMP_TO(ADDR_BlockFunc_Free);
 		return;
 	}
 	gb->cpu.a = rd8(gb, wCollisionPoints);
 	if (!alu_bit(gb, gb->cpu.a, COLLISION_UNK7_F)) {
-		JUMP(BlockFunc_Free);
+		JUMP_TO(ADDR_BlockFunc_Free);
 		return;
 	}
 	gb->cpu.a = SUBMERSIBLE_WATER;
 	wr8(gb, wWaterInteraction, SUBMERSIBLE_WATER);
-	JUMP(BlockFunc_Free);
+	JUMP_TO(ADDR_BlockFunc_Free);
 }
 
 // Sets wWaterCurrent if Wario's in the current, then it's water.
@@ -89,7 +92,7 @@ static void block_func_current(GB *gb, uint8_t current)
 		gb->cpu.a = current;
 		wr8(gb, wWaterCurrent, current);
 	}
-	JUMP(BlockFunc_Water);
+	JUMP_TO(ADDR_BlockFunc_Water);
 }
 
 PORT_JUMP(BlockFunc_RightCurrent) { block_func_current(gb, CURRENT_RIGHT); }
@@ -107,13 +110,13 @@ PORT_JUMP(BlockFunc_Floor)
 		gb->cpu.a = alu_and(gb, gb->cpu.a,
 			COLLISION_UNK3 | COLLISION_UNK4 | COLLISION_UNK5 | COLLISION_UNK7);
 		if (!(gb->cpu.f & FLAG_Z)) {
-			JUMP(BlockFunc_Free);
+			JUMP_TO(ADDR_BlockFunc_Free);
 			return;
 		}
 		gb->cpu.a = alu_and(gb, rd8(gb, hYPosLo), 0x0f);
 		alu_cp(gb, gb->cpu.a, 0x05);
 		if (!(gb->cpu.f & FLAG_C)) {
-			JUMP(BlockFunc_Free);
+			JUMP_TO(ADDR_BlockFunc_Free);
 			return;
 		}
 	}
@@ -121,7 +124,7 @@ PORT_JUMP(BlockFunc_Floor)
 	gb->cpu.a = rd8(gb, wBlockFuncWarioFlag);
 	alu_and(gb, gb->cpu.a, gb->cpu.a);
 	if (gb->cpu.f & FLAG_Z) {
-		JUMP(BlockFunc_Solid);
+		JUMP_TO(ADDR_BlockFunc_Solid);
 		return;
 	}
 	gb->cpu.a = rd8(gb, wWarioState);
@@ -129,8 +132,8 @@ PORT_JUMP(BlockFunc_Floor)
 	if (!(gb->cpu.f & FLAG_Z))
 		alu_cp(gb, gb->cpu.a, WST_ZOMBIE_SLIPPING_THROUGH_FLOOR);
 	if (gb->cpu.f & FLAG_Z) {
-		JUMP(BlockFunc_Free);
+		JUMP_TO(ADDR_BlockFunc_Free);
 		return;
 	}
-	JUMP(BlockFunc_Solid);
+	JUMP_TO(ADDR_BlockFunc_Solid);
 }

@@ -186,3 +186,60 @@ PORT(AddOffsetInPointerTable)
 	gb->cpu.d = gb->cpu.a;
 	SET_HL(gb, alu_add16(gb, REG_HL(gb), REG_DE(gb)));
 }
+
+// b = OAM bank, hl = OAM
+PORT(LoadOWSpriteWithScroll_GotParams)
+{
+	gb->cpu.a = rd8(gb, wROMBank);
+	push_af(gb);
+	gb->cpu.a = gb->cpu.b;
+	bankswitch(gb, gb->cpu.a);
+	CALL(LoadSprite);
+	pop_af(gb);
+	bankswitch(gb, gb->cpu.a);
+}
+
+// ld a, [hli] / ld h, [hl] / ld l, a, with the second register pair
+// written to hi:lo
+static void load_pointer(GB *gb, uint8_t *hi, uint8_t *lo)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = rd8(gb, hl++);
+	*hi = rd8(gb, hl);
+	if (hi != &gb->cpu.h) {
+		gb->cpu.h = (uint8_t)(hl >> 8);
+		gb->cpu.l = (uint8_t)hl;
+	}
+	*lo = gb->cpu.a;
+}
+
+// outputs in hl the pointer corresponding to the index given in register a
+// from the pointer table given in hl
+PORT(GetPointerFromTableHL)
+{
+	CALL(AddOffsetInPointerTable);
+	load_pointer(gb, &gb->cpu.h, &gb->cpu.l);
+}
+
+// same as GetPointerFromTableHL but outputs pointer to de
+PORT(GetPointerFromTableDE)
+{
+	CALL(AddOffsetInPointerTable);
+	load_pointer(gb, &gb->cpu.d, &gb->cpu.e);
+}
+
+// outputs in hl the cth word contained in the ath table entry in the
+// pointer table in hl
+PORT(GetCthWordFromAthTable)
+{
+	CALL(AddOffsetInPointerTable);
+	load_pointer(gb, &gb->cpu.h, &gb->cpu.l);
+	gb->cpu.a = gb->cpu.c;
+	CALL(AddOffsetInPointerTable);
+}
+
+PORT(GetByteFromPointerInHL)
+{
+	load_pointer(gb, &gb->cpu.h, &gb->cpu.l);
+	gb->cpu.a = rd8(gb, REG_HL(gb));
+}
