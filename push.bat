@@ -14,7 +14,14 @@ rem safe.directory: git refuses a repo owned by another user (for example
 rem Administrators) without it.
 rem http.sslBackend: Git for Windows may be set to an OpenSSL backend it
 rem can't load; schannel is the Windows one and always works.
-set "GIT=git -c safe.directory=* -c http.sslBackend=schannel"
+rem They're passed as environment variables (git -c inside for /f would
+rem need every = escaped).
+set "GIT_CONFIG_COUNT=2"
+set "GIT_CONFIG_KEY_0=safe.directory"
+set "GIT_CONFIG_VALUE_0=*"
+set "GIT_CONFIG_KEY_1=http.sslBackend"
+set "GIT_CONFIG_VALUE_1=schannel"
+set "GIT=git"
 
 for /f "delims=" %%b in ('%GIT% rev-parse --abbrev-ref HEAD') do set "BRANCH=%%b"
 if not defined BRANCH goto failed
