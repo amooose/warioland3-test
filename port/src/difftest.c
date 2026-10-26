@@ -680,7 +680,10 @@ static void fuzz_seed(const GB *base, Hook *h, int index, const char *seed_name)
 {
 	FuzzStats *st = &fstats[index];
 	st->seeds++;
-	rng_state = 0x9e3779b97f4a7c15ull ^ ((uint64_t)index << 32) ^ (uint64_t)st->seeds;
+	// Seeded by the routine's own address, not its index among the hooks, so
+	// that porting other routines doesn't change the inputs it gets.
+	rng_state = 0x9e3779b97f4a7c15ull ^ ((uint64_t)h->bank << 48) ^ ((uint64_t)h->addr << 32)
+		^ (uint64_t)st->seeds;
 
 	// First the seed itself, which also shows what memory the routine reads
 	// and how long it normally runs. Fuzzed inputs can make a routine loop

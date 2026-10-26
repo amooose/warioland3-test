@@ -54,6 +54,10 @@ static void test_access(GB *gb, uint16_t addr, bool read)
 		if (a >= gb->test.stack_lo && a < gb->test.stack_hi)
 			gb->test.unrealistic = true;
 	}
+	// A push or pop below the stack's bottom: runaway calls overflowed it into
+	// other WRAM, where the asm's return addresses differ from native code's.
+	if (gb->test.in_stack_op && gb->test.stack_lo && addr >= 0xc000 && addr < gb->test.stack_lo)
+		gb->test.unrealistic = true;
 	if (!read && addr >= 0x2000 && addr < 0x4000 && gb->cpu.pc >= 0x4000 && gb->cpu.pc < 0x8000)
 		gb->test.unrealistic = true;
 	// With time flowing, DIV, TIMA and IF hold a different value at every
