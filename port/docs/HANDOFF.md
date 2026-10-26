@@ -27,15 +27,16 @@ scripting and expansion on top. The approach:
 
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`. All
   work is pushed and the tests are green.
-- **Progress:** 602 / 3491 routines ported (17.2%), 10.7% of the
+- **Progress:** 643 / 3491 routines ported (18.4%), 11.2% of the
   instructions. With hooks on, about half of what the game executes runs as
   C. Run `cmake --build build --target progress` and read
   `build/progress.md` for the per-directory numbers and the "ready to port"
   list.
-- **Fully ported:** `src/audio`. `src/home` is about 41% ported, and about
-  10% of the level engine and the overworld.
-- **Tests:** `ctest --test-dir build -j6` runs 6 tests, a difftest and a
-  fuzz pass for each of the 3 inputs in `tests/inputs/`.
+- **Fully ported:** `src/audio`. `src/home` is about 57% ported (by
+  instructions), and 11-14% of the level engine and the overworld.
+- **Tests:** `ctest --test-dir build -j6` runs a difftest and a fuzz pass
+  for each input in `tests/inputs/` (8 tests with the 4 inputs there now;
+  `action_help2` is a local recording that isn't committed yet).
 
 ## Building
 
@@ -56,11 +57,19 @@ ctest --test-dir build -j6     # ~1 min
 ```
 
 A local Claude Code session on Windows usually runs Git Bash, which lacks
-the MSYS2 toolchain. Run builds through MSYS2 instead:
+the MSYS2 toolchain. Run builds through MSYS2 instead. The login shell
+starts in the MSYS2 home directory, so `cd` to an absolute path:
 
 ```sh
-MSYSTEM=UCRT64 CHERE_INVOKING=1 /c/msys64/usr/bin/bash.exe -lc "cd port && cmake --build build -j8"
+MSYSTEM=UCRT64 /c/msys64/usr/bin/bash.exe -lc "cd /c/Users/<you>/.../warioland3-test/port && cmake --build build -j8"
 ```
+
+- If the game is open, `build/wl3.exe` is locked and the link fails.
+  Build into a second directory instead (`cmake -B <dir> -S . -G Ninja
+  -DRGBDS=C:/rgbds/`), then run `WL3=<dir>/wl3.exe tools/fuzz_batch.sh ...`
+  and `ctest --test-dir <dir>`.
+- Git may refuse the repo ("dubious ownership") when it's owned by
+  Administrators: use `git -c safe.directory=* ...`.
 
 ## The batch workflow
 
@@ -100,14 +109,15 @@ Each step that worked in the cloud session:
   this.
 - **Tail jumps are `PORT_JUMP` + `JUMP` / `JUMP_TO`.** Every exit path of a
   `PORT_JUMP` must set pc (`RET()` on a return path).
-- **Anything that reaches `ProcessBlock` from C.** Block functions can read
-  the stack, and a C `CALL` pushes a sentinel return address instead of the
-  asm's. This is why `CheckAirborneCollision`, `IsOnSlipperyGround`,
-  `Func_198c7`, `Func_19b5c` and the `Func_35xx` / `ProcessBlockOnLeft/Right`
-  homecall wrappers in `home/object_mechanics.asm` are still asm.
-  `collisions.c` gets around it by pushing the asm's own return address and
-  jumping (`call_process_block`). Doing the same for these routines would
-  unlock them, which is a good small infrastructure task.
+- **Anything that reaches `ProcessBlock` from C.** Block functions run
+  whatever the level's table points at, and a plain `CALL` / `gb_call`
+  pushes a sentinel return address instead of the asm's. Use
+  `gb_call_ret(gb, addr, ret)` or `FARCALL_RET(Label, ret)`, which push the
+  asm's own return address (`ret` = the address after the asm's `call`).
+  Get the offset from the ROM rather than by counting bytes: find the
+  `call` opcode (`cd lo hi`) inside the routine. `CheckAirborneCollision`,
+  `CheckCentreCollision`, `IsOnSlipperyGround` and the `Func_35xx`
+  wrappers do this.
 - **`dec l` / `inc e` versus `hld` / `hli`.** The 8-bit ones don't carry into
   the high byte, so model them as 8-bit.
 - **Unmasked arithmetic.** Fade components can wrap below 0 and then spill
@@ -130,7 +140,7 @@ Each step that worked in the cloud session:
 
 ## Open issues
 
-1. **`Prologue_WarioFallFromPlane`** (`src/ported/engine/overworld/bank2b_2.c`,
+1. **`Prologue_WarioFallFromPlane`** (may be stale) (`src/ported/engine/overworld/bank2b_2.c`,
    ported by a parallel agent with `PORT_NESTED` and `dispatch` /
    `run_until`) has a latent mismatch.
    - **How it shows:** it surfaced under certain fuzz inputs. Fuzzing it
@@ -142,15 +152,11 @@ Each step that worked in the cloud session:
      `d8a4..d8a7`). A stack byte just below SP also differs.
    - **Where to look:** probably how `func_ae8bb`'s nested dispatch stops
      (`g_stop`) or resumes.
-2. **Held back until (1) is fixed:** `docs/held_back/bank2b_1.c` holds
-   `ApplySceneWarioMovementLeft`, `SetObjStateIfAnimationIsFinished` and
-   `Func_ac042` to `Func_ac051`. They're ported but not compiled, because at
-   the time they changed the fuzz inputs enough to expose (1) in ctest.
-   - With address seeding they may be fine to add back. Append them to
-     `src/ported/engine/overworld/bank2b_1.c`, fuzz them, and run ctest.
-3. **Two locked agent worktrees** remain in `.claude/worktrees/`. They're
-   leftovers from the parallel agents and are ignored by git. Remove them
-   with `git worktree remove --force <path>` if they're in the way.
+   - **Now:** it passes `--fuzz-variants 600` on `boot_through_n1` and
+     every ctest run. The routines that were held back for it
+     (`ApplySceneWarioMovementLeft`, `SetObjStateIfAnimationIsFinished`,
+     `Func_ac042` to `Func_ac051`) are back in `bank2b_1.c`. The root cause
+     was never found, so it may still be there under other inputs.
 
 ## Good next batches
 
@@ -162,16 +168,16 @@ Each step that worked in the cloud session:
 - **`update_objects.asm`:**
   - `Func_6284f` (376 calls) and `Func_628a7`;
   - `_CountActiveTransientObjects`;
-  - `Func_62d57` and `Func_62e31`.
+  - `Func_62ec3` and `Func_62faa` (about 80 instructions each).
 - **`block_functions.asm`:** `Func_182ec` (1,400 calls), `Func_18064`,
   `EnterDoor`, `EnterPipeUp` and `EnterPipeDown`.
 - **Overworld:**
-  - `FadePalConfig` (136 instructions, 870 calls, `bank21.asm`);
   - `SetSceneWarioState` (94 instructions, the hub of the cutscene state
     changes);
-  - `Func_1d8c2c` (5,000 calls, `bank76.asm`).
-- **Infrastructure:** the `ProcessBlock` call trampoline described above,
-  then the routines it unlocks.
+  - `Func_b507c` (28,000 calls) and `Func_b4e4d`, both 1 instruction;
+  - `VBlank_Overworld` (115 instructions).
+- **Level:** `StartJump_FromInput` (600 calls), `SpawnObject`,
+  `TorchEmberCommonFunc`.
 
 ## Recordings
 
