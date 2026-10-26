@@ -29,3 +29,11 @@ PORT(GetOWSceneParams_GotPtr)
 	}
 	SET_HL(gb, hl);
 }
+
+PORT(LoadCompassSprite)
+{
+	SET_HL(gb, wCompassObj);
+	SET_DE(gb, ADDR_OAM_aa580);
+	gb->cpu.b = BANK_OAM_aa580;
+	CALL(LoadOWSpriteWithScroll);
+}

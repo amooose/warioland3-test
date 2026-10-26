@@ -103,3 +103,23 @@ PORT_JUMP(WaitOWObjState)
 	}
 	JUMP(AdvanceOWFunc); // jr
 }
+
+static void cur_scene_obj_sprite(GB *gb)
+{
+	gb->cpu.b = 0x2a;
+	gb->cpu.l = rd8(gb, wCurSceneObjPtr + 0);
+	gb->cpu.a = rd8(gb, wCurSceneObjPtr + 1);
+	gb->cpu.h = gb->cpu.a;
+}
+
+PORT_JUMP(LoadCurSceneObjSpriteWithScroll)
+{
+	cur_scene_obj_sprite(gb);
+	JUMP(LoadOWSpriteWithScroll);
+}
+
+PORT_JUMP(LoadCurSceneObjSprite)
+{
+	cur_scene_obj_sprite(gb);
+	JUMP(LoadOWSprite);
+}

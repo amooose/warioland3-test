@@ -244,6 +244,11 @@ static int service_interrupts(GB *gb)
 		return 0;
 	for (int i = 0; i < 5; i++) {
 		if (pending & (1 << i)) {
+			// Checking a routine without time: one that enables interrupts
+			// with one pending is interrupted in the asm, at a point native
+			// code (which is atomic) can't match.
+			if (gb->test.active && !gb->test.timed)
+				gb->test.unrealistic = true;
 			gb->io[0x0f] &= (uint8_t)~(1 << i);
 			gb->cpu.ime = false;
 			gb_push16(gb, PC);
