@@ -176,3 +176,13 @@ PORT(IsTreasureCollected)
 	gb->cpu.a = TRUE;
 	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_Z) | FLAG_C); // scf
 }
+
+// hl += a * 2
+PORT(AddOffsetInPointerTable)
+{
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.a = alu_adc(gb, 0, 0);
+	gb->cpu.d = gb->cpu.a;
+	SET_HL(gb, alu_add16(gb, REG_HL(gb), REG_DE(gb)));
+}

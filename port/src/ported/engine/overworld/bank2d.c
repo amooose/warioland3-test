@@ -85,3 +85,21 @@ PORT(EndOWFunc)
 	wr8(gb, wOWFuncCounter + 1, 0); // w2d062
 	SET_HL(gb, wOWFuncCounter + 1);
 }
+
+PORT_JUMP(WaitOWObjDisappear)
+{
+	gb->cpu.b = 0x00;
+	JUMP(WaitOWObjState); // fallthrough
+}
+
+// advances the OW func once the state at hl is b
+PORT_JUMP(WaitOWObjState)
+{
+	gb->cpu.a = rd8(gb, REG_HL(gb));
+	alu_cp(gb, gb->cpu.a, gb->cpu.b);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP(AdvanceOWFunc); // jr
+}

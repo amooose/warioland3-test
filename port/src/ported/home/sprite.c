@@ -119,3 +119,43 @@ PORT_JUMP(Func_e2b)
 	}
 	JUMP(Func_e31); // fallthrough
 }
+
+// draws Wario on screen unless he's invisible
+PORT(DrawWario)
+{
+	gb->cpu.a = rd8(gb, wTransformation);
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_INVISIBLE_WARIO);
+	if (gb->cpu.f & FLAG_Z) {
+		// show Wario if wInvisibleFrame has upper 4 bits set and bit 2 unset
+		SET_HL(gb, wInvisibleFrame);
+		uint8_t frame = alu_inc(gb, rd8(gb, wInvisibleFrame));
+		wr8(gb, wInvisibleFrame, frame);
+		gb->cpu.a = alu_and(gb, frame, 0xf2);
+		alu_cp(gb, gb->cpu.a, 0xf0);
+		if (!(gb->cpu.f & FLAG_Z))
+			return;
+	} else {
+		// .invincible: show Wario if wInvisibleFrame is 0
+		gb->cpu.a = rd8(gb, wInvisibleFrame);
+		alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (!(gb->cpu.f & FLAG_Z))
+			return;
+	}
+
+	gb->cpu.a = rd8(gb, wWarioOAMBank);
+	wr8(gb, wTempBank, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wROMBank);
+	push_af(gb);
+	gb->cpu.a = rd8(gb, wTempBank);
+	bankswitch(gb, gb->cpu.a);
+	gb->cpu.h = rd8(gb, wWarioOAMPtr + 0);
+	gb->cpu.l = rd8(gb, wWarioOAMPtr + 1);
+	wr8(gb, wCurSpriteYCoord, rd8(gb, wWarioScreenYPos));
+	wr8(gb, wCurSpriteXCoord, rd8(gb, wWarioScreenXPos));
+	wr8(gb, wCurSpriteFrame, rd8(gb, wWarioFrame));
+	gb->cpu.a = rd8(gb, wWarioAttributes);
+	wr8(gb, wCurSpriteAttributes, gb->cpu.a);
+	CALL(LoadSprite);
+	pop_af(gb);
+	bankswitch(gb, gb->cpu.a);
+}

@@ -60,3 +60,77 @@ PORT(BlockFunc_Solid)
 	gb->cpu.a = 1;
 	wr8(gb, wUnused_c18d, 1);
 }
+
+PORT_JUMP(BlockFunc_Water)
+{
+	gb->cpu.a = TRUE;
+	wr8(gb, wIsInWaterOrSand, TRUE);
+	gb->cpu.a = rd8(gb, wBlockFuncWarioFlag);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP(BlockFunc_Free);
+		return;
+	}
+	gb->cpu.a = rd8(gb, wCollisionPoints);
+	if (!alu_bit(gb, gb->cpu.a, COLLISION_UNK7_F)) {
+		JUMP(BlockFunc_Free);
+		return;
+	}
+	gb->cpu.a = SUBMERSIBLE_WATER;
+	wr8(gb, wWaterInteraction, SUBMERSIBLE_WATER);
+	JUMP(BlockFunc_Free);
+}
+
+// Sets wWaterCurrent if Wario's in the current, then it's water.
+static void block_func_current(GB *gb, uint8_t current)
+{
+	gb->cpu.a = rd8(gb, wCollisionPoints);
+	if (alu_bit(gb, gb->cpu.a, COLLISION_UNK7_F)) {
+		gb->cpu.a = current;
+		wr8(gb, wWaterCurrent, current);
+	}
+	JUMP(BlockFunc_Water);
+}
+
+PORT_JUMP(BlockFunc_RightCurrent) { block_func_current(gb, CURRENT_RIGHT); }
+PORT_JUMP(BlockFunc_UpCurrent) { block_func_current(gb, CURRENT_UP); }
+PORT_JUMP(BlockFunc_LeftCurrent) { block_func_current(gb, CURRENT_LEFT); }
+PORT_JUMP(BlockFunc_DownCurrent) { block_func_current(gb, CURRENT_DOWN); }
+
+PORT_JUMP(BlockFunc_Floor)
+{
+	gb->cpu.a = TRUE;
+	wr8(gb, wc1ca, TRUE);
+	gb->cpu.a = rd8(gb, wCollisionPoints);
+	bool solid = alu_bit(gb, gb->cpu.a, COLLISION_DOWN_F) || alu_bit(gb, gb->cpu.a, COLLISION_UNK2_F);
+	if (!solid) {
+		gb->cpu.a = alu_and(gb, gb->cpu.a,
+			COLLISION_UNK3 | COLLISION_UNK4 | COLLISION_UNK5 | COLLISION_UNK7);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			JUMP(BlockFunc_Free);
+			return;
+		}
+		gb->cpu.a = alu_and(gb, rd8(gb, hYPosLo), 0x0f);
+		alu_cp(gb, gb->cpu.a, 0x05);
+		if (!(gb->cpu.f & FLAG_C)) {
+			JUMP(BlockFunc_Free);
+			return;
+		}
+	}
+	// .asm_18228
+	gb->cpu.a = rd8(gb, wBlockFuncWarioFlag);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP(BlockFunc_Solid);
+		return;
+	}
+	gb->cpu.a = rd8(gb, wWarioState);
+	alu_cp(gb, gb->cpu.a, WST_ZOMBIE_LANDING);
+	if (!(gb->cpu.f & FLAG_Z))
+		alu_cp(gb, gb->cpu.a, WST_ZOMBIE_SLIPPING_THROUGH_FLOOR);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP(BlockFunc_Free);
+		return;
+	}
+	JUMP(BlockFunc_Solid);
+}

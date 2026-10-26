@@ -111,3 +111,35 @@ PORT_JUMP(FastFadeToWhite)
 	wr8(gb, wFadeSpeed, gb->cpu.a);
 	JUMP(FadeBGToWhite); // fallthrough
 }
+
+// The .Func of VBlank_88d and VBlank_8bf: jp to the VBlank function proper.
+#define VBLANK_88D_FUNC (ADDR_VBlank_88d + 25)
+#define VBLANK_8BF_FUNC (ADDR_VBlank_8bf + 14)
+
+// backs up wVBlankFunc and sets the one that applies the BG and OB pals
+// from wTempBGPals / wTempOBPals
+PORT(VBlank_88d)
+{
+	gb->cpu.ime = false; // di
+	gb->cpu.ime_delay = 0;
+	SET_HL(gb, wVBlankFunc);
+	SET_DE(gb, wBackupVBlankFunc);
+	gb->cpu.b = 3;
+	CALL(CopyHLToDE);
+	SET_HL(gb, VBLANK_88D_FUNC);
+	SET_DE(gb, wVBlankFunc);
+	gb->cpu.b = 3;
+	CALL(CopyHLToDE);
+	gb->cpu.ime = true; // ei
+}
+
+PORT(VBlank_8bf)
+{
+	gb->cpu.ime = false; // di
+	gb->cpu.ime_delay = 0;
+	SET_HL(gb, VBLANK_8BF_FUNC);
+	SET_DE(gb, wVBlankFunc);
+	gb->cpu.b = 3;
+	CALL(CopyHLToDE);
+	gb->cpu.ime = true; // ei
+}
