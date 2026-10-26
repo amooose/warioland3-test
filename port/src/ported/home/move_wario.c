@@ -56,3 +56,12 @@ PORT(MoveWarioUp_WithoutCameraOffset)
 {
 	add_to_pos(gb, wWarioYPos, true);
 }
+
+PORT(ClearParticles)
+{
+	SET_HL(gb, wParticles);
+	gb->cpu.b = PARTICLE_STRUCT_LENGTH * MAX_NUM_PARTICLES + 2;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	CALL(WriteAToHL_BTimes);
+}

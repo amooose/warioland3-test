@@ -158,3 +158,27 @@ pop:
 	CPU->f = FLAG_Z; // xor a
 	wr8(gb, wCurObjFlags, 0);
 }
+
+// a = value to fill wObjects with, c = a bytes (0: 256)
+PORT(ClearObjects)
+{
+	uint16_t hl = wObjects;
+	gb->cpu.c = gb->cpu.a;
+	do {
+		wr8(gb, hl++, gb->cpu.a);
+		gb->cpu.c = alu_dec(gb, gb->cpu.c);
+	} while (gb->cpu.c);
+	SET_HL(gb, hl);
+}
+
+// a = value to fill wObjDataPointers with
+PORT(ClearObjDataPointers)
+{
+	uint16_t hl = wObjDataPointers;
+	gb->cpu.c = wObjDataPointersEnd - wObjDataPointers;
+	do {
+		wr8(gb, hl++, gb->cpu.a);
+		gb->cpu.c = alu_dec(gb, gb->cpu.c);
+	} while (gb->cpu.c);
+	SET_HL(gb, hl);
+}

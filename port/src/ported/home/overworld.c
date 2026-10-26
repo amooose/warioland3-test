@@ -267,3 +267,50 @@ PORT_JUMP(LoadOWSpriteWithScroll)
 	gb->cpu.l = gb->cpu.e;
 	JUMP(LoadOWSpriteWithScroll_GotParams); // fallthrough
 }
+
+// hl = y, x in pixels
+// output: hl = wOWTilemapPtr = their tile in wTilemap
+PORT(GetOWCoordInTilemap)
+{
+	uint16_t hl = REG_HL(gb);
+	uint8_t y = alu_and(gb, rd8(gb, hl++), 0xf8);
+	uint8_t c = (uint8_t)(y << 2 | y >> 6); // rlca / rlca: y / 8 * 32
+	gb->cpu.b = alu_and(gb, c, 0x0f);
+	gb->cpu.c = alu_and(gb, c, 0xf0);
+	uint8_t x = alu_and(gb, rd8(gb, hl), 0xf8);
+	x = (uint8_t)(x << 1 | x >> 7); // rlca
+	x = alu_swap(gb, x); // x / 8
+	gb->cpu.a = alu_add(gb, x, gb->cpu.c);
+	gb->cpu.l = gb->cpu.a;
+	wr8(gb, wOWTilemapPtr + 0, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.b, (uint8_t)(wTilemap >> 8));
+	gb->cpu.h = gb->cpu.a;
+	wr8(gb, wOWTilemapPtr + 1, gb->cpu.a);
+}
+
+// loads source address of tiles
+// with the given level's name for HDMA transfer
+// writes them to v0Tiles2 tile $50
+// b = map side constant (NORTH, ...)
+// d = level index within that map side
+PORT(LoadLevelName)
+{
+	gb->cpu.a = alu_add(gb, BANK_LevelNamesJPGfx, rd8(gb, wLanguage));
+	SET_HL(gb, wLanguage);
+	wr8(gb, wHDMABank, gb->cpu.a);
+	wr8(gb, wHDMA, 0);
+	gb->cpu.c = 0x00;
+	gb->cpu.b = alu_swap(gb, gb->cpu.b); // *$10
+	uint16_t hl = alu_add16(gb, ADDR_LevelNamesJPGfx, REG_BC(gb)); // aka LevelNamesENGfx
+	gb->cpu.d = alu_add(gb, gb->cpu.d, gb->cpu.d); // *2
+	gb->cpu.e = 0x00;
+	hl = alu_add16(gb, hl, REG_DE(gb));
+	SET_HL(gb, hl);
+	wr8(gb, w2d0b5SourceHi, gb->cpu.h);
+	wr8(gb, w2d0b5SourceLo, gb->cpu.l);
+	wr8(gb, w2d0b5DestHi, 0x15);
+	wr8(gb, w2d0b5DestLo, 0);
+	gb->cpu.f = FLAG_Z; // xor a
+	gb->cpu.a = 32 - 1; // 32 dma_tiles
+	wr8(gb, w2d0b5Mode, gb->cpu.a);
+}

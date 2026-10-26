@@ -23,3 +23,47 @@ PORT(GetFloorForYPos)
 	if (gb->cpu.f & FLAG_C)
 		gb->cpu.c = alu_inc(gb, gb->cpu.c); // < $80
 }
+
+PORT(UpdateFloor)
+{
+	CALL(GetFloorForYPos);
+	gb->cpu.a = gb->cpu.c;
+	wr8(gb, wFloor, gb->cpu.a);
+}
+
+// sets off the floor transition, after wFloor and wFloorTransitionTimer
+static void start_floor_transition(GB *gb, uint8_t dir)
+{
+	play_sfx(gb, SFX_PIPE_EXIT);
+	gb->cpu.a = dir;
+	wr8(gb, wFloorTransitionDir, dir);
+	gb->cpu.a = TRUE;
+	wr8(gb, wIsFloorTransition, TRUE);
+}
+
+// c = new floor
+PORT(StartDownwardsFloorTransition)
+{
+	gb->cpu.a = gb->cpu.c;
+	wr8(gb, wFloor, gb->cpu.a);
+	alu_cp(gb, gb->cpu.a, 5);
+	gb->cpu.a = (gb->cpu.f & FLAG_Z) ? 0x68 : 0x80;
+	wr8(gb, wFloorTransitionTimer, gb->cpu.a);
+	start_floor_transition(gb, FLOOR_TRANSITION_UP);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCameraRoomYScrollLimit, 0);
+}
+
+// c = new floor
+PORT(StartUpwardsFloorTransition)
+{
+	gb->cpu.a = gb->cpu.c;
+	wr8(gb, wFloor, gb->cpu.a);
+	start_floor_transition(gb, FLOOR_TRANSITION_DOWN);
+	gb->cpu.a = 0x80;
+	wr8(gb, wFloorTransitionTimer, 0x80);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCameraRoomYScrollLimit, 0);
+}
