@@ -568,12 +568,17 @@ int cpu_step(GB *gb)
 
 void gb_call(GB *gb, uint16_t addr)
 {
+	gb_call_ret(gb, addr, CALL_SENTINEL);
+}
+
+void gb_call_ret(GB *gb, uint16_t addr, uint16_t ret)
+{
 	uint16_t saved_sp = SP;
 	uint16_t saved_pc = PC;
-	gb_push16(gb, CALL_SENTINEL);
+	gb_push16(gb, ret);
 	PC = addr;
 	gb->call_depth++;
-	while (!(PC == CALL_SENTINEL && SP == saved_sp) && !gb->test.crashed) {
+	while (!(PC == ret && SP == saved_sp) && !gb->test.crashed) {
 		// Under test, steps count against the budget too: a halted CPU
 		// makes no memory accesses.
 		if (gb->test.budget && --gb->test.budget == 0)

@@ -74,6 +74,10 @@ static inline void wr16(GB *gb, uint16_t addr, uint16_t v) { gb_write16(gb, addr
 // The hcall macro: call through hCallFunc with whatever bank is already in
 // hCallFuncBank.
 #define HCALL(name) port_hcall(gb, ADDR_##name)
+// FARCALL, pushing ret (where the asm's call hCallFunc returns to) rather
+// than gb_call's sentinel: for callees that may look at the stack, such as
+// block functions.
+#define FARCALL_RET(name, ret) port_farcall_ret(gb, BANK_##name, ADDR_##name, (ret))
 
 // A tail jump: execution continues at the label with the stack exactly as
 // it is, as in the asm. (CALL would push a return address, which a routine
@@ -88,6 +92,7 @@ void port_call(GB *gb, int bank, uint16_t addr, const char *name);
 void port_jump(GB *gb, int bank, uint16_t addr, const char *name);
 void port_farcall(GB *gb, int bank, uint16_t addr);
 void port_hcall(GB *gb, uint16_t addr);
+void port_farcall_ret(GB *gb, int bank, uint16_t addr, uint16_t ret);
 
 // The play_sfx macro: ld a, HIGH(sfx) / ldh [hSFXID], a / ld a, LOW(sfx) /
 // ldh [hSFXID + 1], a

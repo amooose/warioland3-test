@@ -661,7 +661,23 @@ PORT(Func_34fc)
 	homecall(gb, BANK_Func_63209, ADDR_Func_63209);
 }
 
-// Func_3513, Func_352b, Func_3543, ProcessBlockOnLeft, ProcessBlockOnRight,
-// Func_358b and Func_35a3 stay in asm: their callees run ProcessBlock, whose
-// block functions can read the stack, where a CALL's return address differs
-// from the asm's.
+// The wrappers that run ProcessBlock: homecall, then ld a, b. Block
+// functions are whatever the level's table points at, so the call pushes the
+// asm's own return address (the call is $0f bytes in) to keep the stack as
+// the asm has it.
+static void homecall_process_block(GB *gb, uint16_t routine, uint8_t bank, uint16_t addr)
+{
+	homejp(gb, bank);
+	gb_call_ret(gb, addr, (uint16_t)(routine + 0x0f));
+	pop_af(gb);
+	bankswitch(gb, gb->cpu.a);
+	gb->cpu.a = gb->cpu.b;
+}
+
+PORT(Func_3513) { homecall_process_block(gb, ADDR_Func_3513, BANK_Func_19bc3, ADDR_Func_19bc3); }
+PORT(Func_352b) { homecall_process_block(gb, ADDR_Func_352b, BANK_Func_19b7b, ADDR_Func_19b7b); }
+PORT(Func_3543) { homecall_process_block(gb, ADDR_Func_3543, BANK_Func_19b51, ADDR_Func_19b51); }
+PORT(ProcessBlockOnLeft) { homecall_process_block(gb, ADDR_ProcessBlockOnLeft, BANK__ProcessBlockOnLeft, ADDR__ProcessBlockOnLeft); }
+PORT(ProcessBlockOnRight) { homecall_process_block(gb, ADDR_ProcessBlockOnRight, BANK__ProcessBlockOnRight, ADDR__ProcessBlockOnRight); }
+PORT(Func_358b) { homecall_process_block(gb, ADDR_Func_358b, BANK_Func_19b9b, ADDR_Func_19b9b); }
+PORT(Func_35a3) { homecall_process_block(gb, ADDR_Func_35a3, BANK_Func_19b8b, ADDR_Func_19b8b); }

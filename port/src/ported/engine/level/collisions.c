@@ -156,3 +156,112 @@ PORT_JUMP(Func_19b12)
 
 // collision on top
 PORT_JUMP(Func_19b25) { get_pos_with_y_offset(gb, 4); JUMP_TO(ADDR_Func_19b3a); } // fallthrough
+
+// Copies wWarioPos to hPos with x moved to the left or right edge of the
+// collision box, 3 pixels in, as the asm does it: from wWarioXPos + 1 down.
+static void get_pos_at_box_edge(GB *gb, bool left)
+{
+	if (left) {
+		gb->cpu.a = (uint8_t)(~rd8(gb, wCollisionBoxLeft) + 1);
+		gb->cpu.c = alu_sub(gb, gb->cpu.a, 3);
+		gb->cpu.a = alu_sub(gb, rd8(gb, wWarioXPos + 1), gb->cpu.c);
+		wr8(gb, hXPosLo, gb->cpu.a);
+		gb->cpu.a = alu_sbc(gb, rd8(gb, wWarioXPos), 0x00);
+	} else {
+		gb->cpu.c = alu_sub(gb, rd8(gb, wCollisionBoxRight), 3);
+		gb->cpu.a = alu_add(gb, rd8(gb, wWarioXPos + 1), gb->cpu.c);
+		wr8(gb, hXPosLo, gb->cpu.a);
+		gb->cpu.a = alu_adc(gb, rd8(gb, wWarioXPos), 0x00);
+	}
+	wr8(gb, hXPosLo - 1, gb->cpu.a);
+	wr8(gb, hXPosLo - 2, rd8(gb, wWarioYPos + 1));
+	gb->cpu.a = rd8(gb, wWarioYPos);
+	wr8(gb, hXPosLo - 3, gb->cpu.a);
+	SET_HL(gb, wWarioYPos);
+	SET_DE(gb, hXPosLo - 3);
+}
+
+// get_pos
+static void get_pos(GB *gb)
+{
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = rd8(gb, wWarioPos + i);
+		wr8(gb, hPos + i, gb->cpu.a);
+	}
+	SET_HL(gb, wWarioPos + 3);
+	SET_DE(gb, hPos + 3);
+}
+
+// resets wWarioSlopeInteraction
+PORT(Func_198c7)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wWarioSlopeInteraction, 0);
+	get_pos(gb);
+	gb_call_ret(gb, ADDR_Func_19b51, (uint16_t)(ADDR_Func_198c7 + 0x18));
+}
+
+// ld a, [wIsSmashAttacking] / and a / jr z / ld a, TRUE / ld [wBlockFuncBreakFlag], a
+static void break_if_smash_attacking(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wIsSmashAttacking);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	gb->cpu.a = TRUE;
+	wr8(gb, wBlockFuncBreakFlag, TRUE);
+}
+
+// The calls in CheckAirborneCollision, by where they return to
+#define AIRBORNE_RET_FUNC_19A53 (ADDR_CheckAirborneCollision + 0x03)
+#define AIRBORNE_RET_LEFT       (ADDR_CheckAirborneCollision + 0x2f)
+#define AIRBORNE_RET_RIGHT      (ADDR_CheckAirborneCollision + 0x61)
+#define AIRBORNE_RET_CENTRE     (ADDR_CheckAirborneCollision + 0x8d)
+
+PORT(CheckAirborneCollision)
+{
+	// call .Func_19a53, with its return address on the stack as in the asm
+	gb_push16(gb, (uint16_t)AIRBORNE_RET_FUNC_19A53);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wWarioSlopeInteraction, 0);
+	break_if_smash_attacking(gb);
+	get_pos(gb);
+	gb_call_ret(gb, ADDR_Func_19b7b, (uint16_t)AIRBORNE_RET_CENTRE);
+	gb_pop16(gb);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+
+	break_if_smash_attacking(gb);
+	get_pos_at_box_edge(gb, true);
+	gb_call_ret(gb, ADDR_Func_19bfb, (uint16_t)AIRBORNE_RET_LEFT);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = rd8(gb, wIsOnSteppableObject);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		gb->cpu.b = gb->cpu.a;
+		return;
+	}
+
+	break_if_smash_attacking(gb);
+	get_pos_at_box_edge(gb, false);
+	gb_call_ret(gb, ADDR_Func_19bfb, (uint16_t)AIRBORNE_RET_RIGHT);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = rd8(gb, wIsOnSteppableObject);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	gb->cpu.b = gb->cpu.a;
+}
+
+PORT(Func_19b5c)
+{
+	gb_call_ret(gb, ADDR_ProcessBlock, (uint16_t)(ADDR_Func_19b5c + 3));
+	gb->cpu.b = gb->cpu.a;
+}

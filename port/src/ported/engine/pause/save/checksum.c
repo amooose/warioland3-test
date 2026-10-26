@@ -24,6 +24,7 @@ PORT(CalculateChecksum)
 
 // same as CalculateChecksum but for bc bytes; buggy, after the first byte
 // it jumps into CalculateChecksum
+// The jr runs whatever bank is mapped, so it's a JUMP_TO, not a JUMP.
 PORT_JUMP(CalculateChecksumLong)
 {
 	uint16_t hl = REG_HL(gb);
@@ -32,7 +33,7 @@ PORT_JUMP(CalculateChecksumLong)
 	SET_BC(gb, REG_BC(gb) - 1);
 	gb->cpu.a = alu_or(gb, gb->cpu.b, gb->cpu.c);
 	if (!(gb->cpu.f & FLAG_Z)) {
-		JUMP(CalculateChecksum);
+		JUMP_TO(ADDR_CalculateChecksum);
 		return;
 	}
 	RET();

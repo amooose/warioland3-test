@@ -32,19 +32,32 @@ void port_jump(GB *gb, int bank, uint16_t addr, const char *name)
 	gb->cpu.pc = addr;
 }
 
-void port_hcall(GB *gb, uint16_t addr)
+static void hcall_ret(GB *gb, uint16_t addr, uint16_t ret)
 {
 	// Same as the hcall macro: ld a, LOW / ldh / ld a, HIGH / ldh /
 	// call hCallFunc
 	wr8(gb, hCallFuncPointer, (uint8_t)addr);
 	gb->cpu.a = (uint8_t)(addr >> 8);
 	wr8(gb, hCallFuncPointer + 1, gb->cpu.a);
-	gb_call(gb, hCallFunc);
+	if (ret)
+		gb_call_ret(gb, hCallFunc, ret);
+	else
+		gb_call(gb, hCallFunc);
+}
+
+void port_hcall(GB *gb, uint16_t addr)
+{
+	hcall_ret(gb, addr, 0);
 }
 
 void port_farcall(GB *gb, int bank, uint16_t addr)
 {
+	port_farcall_ret(gb, bank, addr, 0);
+}
+
+void port_farcall_ret(GB *gb, int bank, uint16_t addr, uint16_t ret)
+{
 	// Same as the farcall macro: ld a, BANK / ldh [hCallFuncBank], a / hcall
 	wr8(gb, hCallFuncBank, (uint8_t)bank);
-	port_hcall(gb, addr);
+	hcall_ret(gb, addr, ret);
 }
