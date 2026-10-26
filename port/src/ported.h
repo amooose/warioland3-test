@@ -124,6 +124,18 @@ static inline void pop_af(GB *gb)
 	gb->cpu.f = (uint8_t)(v & 0xf0);
 }
 
+// Waiting on the hardware: let emulated time pass, as the asm's polling loop
+// would. A wait loop such as wait_hblank becomes
+//     while (alu_and(gb, rd8(gb, rSTAT), STAT_MODE))
+//         idle(gb, 32);
+// (32 cycles: about one pass of the asm loop.) The difftest checks such
+// routines with time flowing; see docs/PORTING.md.
+static inline void idle(GB *gb, int cycles)
+{
+	if (!gb->no_tick)
+		gb_tick(gb, cycles);
+}
+
 // The flag results of 8-bit arithmetic, exactly as the CPU computes them.
 // Use these where the asm's exit flags have to be reproduced: each returns
 // the result and sets gb->cpu.f the way the instruction would.

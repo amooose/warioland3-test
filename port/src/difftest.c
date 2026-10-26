@@ -53,6 +53,13 @@ static void report(Report *r, const char *fmt, ...)
 		r->len = sizeof(r->buf) - 1;
 }
 
+// Checks normally run with emulated time frozen, so results don't depend on
+// how long the native code takes. A routine that waits on the hardware
+// (polls rLY or rSTAT) can't finish that way; its checks are rerun with
+// time flowing on both sides, and the registers that only reflect the
+// passage of time aren't compared.
+static bool timed;
+
 // Stack memory below SP is dead once a routine returns. Native code pushes
 // different return addresses there than the asm does, so it's not compared.
 static uint16_t stack_bottom, stack_top, dead_stack_end, wrom_bank;
@@ -112,13 +119,27 @@ static int compare(const GB *a, const GB *n, unsigned clobbers, Report *r)
 	for (int b = 0; b < GB_SRAM_BANKS; b++)
 		cmp_mem(r, "sram", a->sram[b], n->sram[b], 0x2000, 0xa000, b);
 	cmp_mem(r, "oam", a->oam, n->oam, sizeof(a->oam), 0xfe00, 0);
-	cmp_mem(r, "io", a->io, n->io, sizeof(a->io), 0xff00, 0);
+	if (timed) {
+		// DIV, TIMA, IF, LY and the HDMA countdown only reflect how much time
+		// passed, which differs between native code and the asm.
+		static const uint8_t timing_regs[] = {0x04, 0x05, 0x0f, 0x44, 0x55};
+		uint8_t ia[sizeof(a->io)], in[sizeof(n->io)];
+		memcpy(ia, a->io, sizeof(ia));
+		memcpy(in, n->io, sizeof(in));
+		for (size_t i = 0; i < sizeof(timing_regs); i++)
+			ia[timing_regs[i]] = in[timing_regs[i]] = 0;
+		cmp_mem(r, "io", ia, in, sizeof(ia), 0xff00, 0);
+	} else {
+		cmp_mem(r, "io", a->io, n->io, sizeof(a->io), 0xff00, 0);
+	}
 	cmp_mem(r, "hram", a->hram, n->hram, sizeof(a->hram), 0xff80, 0);
 	cmp_mem(r, "bgpal", a->bg_pal, n->bg_pal, sizeof(a->bg_pal), 0, 0);
 	cmp_mem(r, "objpal", a->obj_pal, n->obj_pal, sizeof(a->obj_pal), 0, 0);
 	if (a->ie != n->ie && r->diffs++ < MAX_REPORTED_DIFFS)
 		report(r, "    ie: asm=%02x native=%02x\n", a->ie, n->ie);
-	if (memcmp(&a->apu.ch, &n->apu.ch, sizeof(a->apu.ch)) && r->diffs++ < MAX_REPORTED_DIFFS)
+	// (The sound channels' internal state runs on time too; the sound
+	// registers the code writes are compared as I/O above.)
+	if (!timed && memcmp(&a->apu.ch, &n->apu.ch, sizeof(a->apu.ch)) && r->diffs++ < MAX_REPORTED_DIFFS)
 		report(r, "    apu channel state differs\n");
 	return r->diffs;
 }
@@ -163,7 +184,9 @@ static bool run_asm_until(GB *gb, uint16_t pc, uint16_t sp, uint16_t entry_sp, b
 			*left = true;
 		if (at >= 0x4000 && at < 0x8000 && at >= body_start && at < body_end && gb->rom_bank != body_bank)
 			gb->test.unrealistic = true;
-		cpu_step(gb);
+		int cycles = cpu_step(gb);
+		if (timed)
+			gb_tick(gb, cycles);
 	}
 	return false;
 }
@@ -172,7 +195,7 @@ static void prepare(GB *dst, const GB *src)
 {
 	*dst = *src;
 	dst->frame_cb = NULL;
-	dst->no_tick = true;
+	dst->no_tick = !timed;
 	// Interrupts are held off so both runs see the same events; native
 	// routines are atomic anyway.
 	dst->cpu.ime = false;
@@ -181,6 +204,7 @@ static void prepare(GB *dst, const GB *src)
 	dst->test.active = true;
 	dst->test.stack_lo = stack_bottom;
 	dst->test.stack_hi = stack_top;
+	dst->test.timed = timed;
 }
 
 // The end of the routine at h: the next global label in the same region.
@@ -218,10 +242,11 @@ static bool jumps_into_itself(const GB *gb, Hook *h)
 // Runs hook h natively and the asm from base, and compares. Optionally logs
 // what the asm run reads (struct offsets, see GB.test.read_log) and marks
 // the instructions it executes in exec_map.
-static CheckResult check(const GB *base, Hook *h, Report *r, const char **why,
-	uint32_t *read_log, int read_log_cap, int *read_log_len, uint8_t *exec_map)
+static CheckResult check_once(const GB *base, Hook *h, Report *r, const char **why,
+	uint32_t *read_log, int read_log_cap, int *read_log_len, uint8_t *exec_map, bool *waits)
 {
 	*why = NULL;
+	*waits = false;
 	jumps_into_itself(base, h); // makes sure routine_ends is filled in
 	body_bank = h->bank;
 	body_start = h->addr;
@@ -276,15 +301,47 @@ static CheckResult check(const GB *base, Hook *h, Report *r, const char **why,
 			*why = "the native code never finishes, the asm does";
 			return CHECK_FAIL;
 		}
+		*waits = !ref->test.crashed && !ref->test.unrealistic;
 		return CHECK_INCONCLUSIVE;
 	}
 	if (!reached) {
-		if (!left)
+		if (!left) {
+			*waits = true;
 			return CHECK_INCONCLUSIVE;
+		}
 		*why = "the native code exits somewhere other than the asm";
 		return CHECK_FAIL;
 	}
 	return compare(ref, nat, h->clobbers, r) ? CHECK_FAIL : CHECK_PASS;
+}
+
+static bool *needs_time; // per hook: known to wait on the hardware
+
+// Runs hook h natively and the asm from base, and compares: with time
+// frozen, or, for routines that wait on the hardware, with time flowing.
+// Only real calls (real = true: the replay, and the fuzzer's unmodified
+// seeds) can show that a routine waits on the hardware; a fuzzed input that
+// makes it loop forever just isn't comparable.
+static CheckResult check(const GB *base, Hook *h, Report *r, const char **why,
+	uint32_t *read_log, int read_log_cap, int *read_log_len, uint8_t *exec_map, bool real)
+{
+	if (!needs_time)
+		needs_time = calloc((size_t)hook_count(), sizeof(bool));
+	bool *known = &needs_time[h - hook_get(0)];
+	bool waits = false;
+	CheckResult res = CHECK_INCONCLUSIVE;
+	if (!*known) {
+		timed = false;
+		res = check_once(base, h, r, why, read_log, read_log_cap, read_log_len, exec_map, &waits);
+		if (!waits || !real)
+			return res;
+		*known = true;
+	}
+	timed = true;
+	memset(r, 0, sizeof(*r));
+	res = check_once(base, h, r, why, read_log, read_log_cap, read_log_len, exec_map, &waits);
+	timed = false;
+	return res;
 }
 
 static void print_failure(const GB *base, Hook *h, const char *context, Report *r, const char *why)
@@ -361,7 +418,7 @@ bool difftest_run(GB *gb, const InputScript *input, int end_frame)
 				st->tested++;
 				Report r = {0};
 				const char *why;
-				switch (check(gb, h, &r, &why, NULL, 0, NULL, NULL)) {
+				switch (check(gb, h, &r, &why, NULL, 0, NULL, NULL, true)) {
 				case CHECK_PASS:
 					st->passed++;
 					break;
@@ -677,7 +734,7 @@ static void fuzz_seed(const GB *base, Hook *h, int index, const char *seed_name)
 		int nreads = 0;
 		int covered_before = routine_coverage(st);
 		CheckResult res = check(variant, h, &r, &why, read_log, (int)(sizeof(read_log) / sizeof(*read_log)),
-			&nreads, exec_map);
+			&nreads, exec_map, v == 0);
 		readset_add(&readset, read_log, nreads);
 		if (v == 0)
 			seed_reads = readset.n;

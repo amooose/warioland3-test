@@ -117,3 +117,45 @@ PORT(ApplyTempPals2ToOBPals)
 {
 	apply_pals(gb, wTempPals2, rOBPI, OBPI_AUTOINC | 0, rOBPD);
 }
+
+// hl = Wario's palettes (in the "Wario Palettes" bank)
+// Applies them to the first two OB palettes, one palette per HBlank.
+PORT(SetWarioPal)
+{
+	wr8(gb, wWarioPalsPtr + 0, gb->cpu.h);
+	gb->cpu.a = gb->cpu.l;
+	wr8(gb, wWarioPalsPtr + 1, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wROMBank);
+	push_af(gb);
+	gb->cpu.a = BANK_WarioDefaultPal; // BANK("Wario Palettes")
+	bankswitch(gb, gb->cpu.a);
+	gb_push16(gb, REG_HL(gb));
+	SET_DE(gb, wTempPals2);
+	gb->cpu.b = 2 * PAL_SIZE;
+	gb->cpu.a = BANK_WarioDefaultPal;
+	wr8(gb, hCallFuncBank, gb->cpu.a);
+	HCALL(CopyHLToDE_Short);
+	SET_HL(gb, gb_pop16(gb));
+
+	gb->cpu.a = OBPI_AUTOINC | 0;
+	wr8(gb, rOBPI, gb->cpu.a);
+	gb->cpu.b = 2;
+	gb->cpu.c = (uint8_t)rOBPD;
+	uint16_t hl = REG_HL(gb);
+	do {
+		// wait_not_hblank / wait_hblank
+		while (!(gb->cpu.a = alu_and(gb, rd8(gb, rSTAT), STAT_MODE)))
+			idle(gb, 32);
+		while ((gb->cpu.a = alu_and(gb, rd8(gb, rSTAT), STAT_MODE)))
+			idle(gb, 32);
+		for (int i = 0; i < PAL_SIZE; i++) {
+			gb->cpu.a = rd8(gb, hl++);
+			wr8(gb, (uint16_t)(0xff00 + gb->cpu.c), gb->cpu.a);
+		}
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (gb->cpu.b);
+	SET_HL(gb, hl);
+
+	pop_af(gb);
+	bankswitch(gb, gb->cpu.a);
+}

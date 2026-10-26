@@ -182,6 +182,9 @@ typedef struct GB {
 		// asm can't be compared then.
 		bool unrealistic;
 		bool in_stack_op;
+		// Time flows in this check (see difftest.c): reads of the clock
+		// registers then give whatever the moment of the read happens to be.
+		bool timed;
 		uint16_t stack_lo, stack_hi;
 	} test;
 } GB;

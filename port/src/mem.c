@@ -56,6 +56,13 @@ static void test_access(GB *gb, uint16_t addr, bool read)
 	}
 	if (!read && addr >= 0x2000 && addr < 0x4000 && gb->cpu.pc >= 0x4000 && gb->cpu.pc < 0x8000)
 		gb->test.unrealistic = true;
+	// With time flowing, DIV, TIMA and IF hold a different value at every
+	// read; native code and the asm read them at different moments.
+	if (read && gb->test.timed && (addr == 0xff04 || addr == 0xff05 || addr == 0xff0f))
+		gb->test.unrealistic = true;
+	// An HBlank DMA progresses with time, by different amounts in each run.
+	if (!read && gb->test.timed && addr == 0xff55)
+		gb->test.unrealistic = true;
 	if (read && gb->test.read_log_len < gb->test.read_log_cap) {
 		uint8_t *p = gb_ram_byte(gb, addr);
 		if (p)

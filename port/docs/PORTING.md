@@ -119,11 +119,20 @@ helper or a `CALL` to the shared entry point.
 
 ### Things that need care
 
-- **Waiting on hardware.** Loops that poll `rLY`, `rSTAT` or wait for an
-  interrupt (`halt`) depend on emulated time passing. Ported code runs in zero
-  emulated time, so don't port those loops as-is. Leave them in asm for now
-  (call them with `CALL`), or port around them. The difftest reports such
-  routines as `skipped` because they never finish in an isolated run.
+- **Waiting on hardware.** Ported code runs in zero emulated time, so a loop
+  that polls `rLY` or `rSTAT` (`wait_hblank`, `wait_not_hblank`, waiting for a
+  scanline) must let time pass with `idle()`, as the asm loop would:
+  ```c
+  while ((gb->cpu.a = alu_and(gb, rd8(gb, rSTAT), STAT_MODE)))
+  	idle(gb, 32); // wait_hblank
+  ```
+  The difftest sees that such a routine never finishes with time frozen and
+  checks it with time flowing instead, ignoring the registers that only
+  reflect elapsed time (LY, DIV, TIMA, IF, the HDMA countdown, the sound
+  channels' internal timers). `WaitNextHBlank`, `DisableLCD` and
+  `SetWarioPal` are examples. Waiting for an interrupt (`halt`, or a flag an
+  interrupt handler sets) is still unsupported: interrupts are off during
+  checks, so leave those in asm for now.
 - **Interrupt handlers and the main loop** come last, once the routines they
   call are native.
 - **Bank-sensitive code.** `CALL` aborts if a ROMX routine is called while

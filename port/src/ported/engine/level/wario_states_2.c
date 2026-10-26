@@ -527,8 +527,31 @@ PORT_JUMP(UpdateState_WaterTeleporting)
 	teleporting(gb, 0x11, WST_WATER_STUNG);
 }
 
-// SetState_SandFalling stays in asm: it calls SetWarioPal, which waits for
-// hblank (wait_not_hblank / wait_hblank), so it can't run in zero time.
+PORT_JUMP(SetState_SandFalling)
+{
+	xor_a(gb);
+	st(gb, wGrabState, 0);
+	st(gb, wWarioState, WST_SAND_FALLING);
+	st(gb, wCollisionBoxBottom, (uint8_t)-1);
+	st(gb, wCollisionBoxTop, (uint8_t)-27);
+	st(gb, wCollisionBoxLeft, (uint8_t)-9);
+	st(gb, wCollisionBoxRight, 9);
+
+	xor_a(gb);
+	st(gb, wJumpVelIndex, 0);
+	st(gb, wJumpVelTable, 0);
+	st(gb, wWarioStateCounter, 0);
+	st(gb, wWarioStateCycles, 0);
+	st(gb, wIsSmashAttacking, 0);
+	st(gb, wAttackCounter, 0);
+	st(gb, wIsRolling, 0);
+	st(gb, wSwimVelIndex, 0);
+	st(gb, wIsCrouching, 0);
+	st(gb, wc0e0, 0);
+	SET_HL(gb, ADDR_WarioDefaultPal);
+	LCALL(SetWarioPal); // waits for HBlank
+	LJUMP(Func_1a12a); // fallthrough
+}
 
 PORT_JUMP(Func_1a12a)
 {
