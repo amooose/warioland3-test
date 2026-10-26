@@ -62,3 +62,21 @@ PORT(Func_9f0d0)
 	SET_HL(gb, hl);
 	SET_BC(gb, hl);
 }
+
+PORT_JUMP(StartCutsceneDelay)
+{
+	gb->cpu.c = 30;
+	JUMP(WaitCutsceneFunc);
+}
+
+// a = index + 1 into the pointer table at de
+// output: hl = bc - 2, from GetPointerFromTableDE
+PORT(Func_9f0a5)
+{
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	CALL(GetPointerFromTableDE);
+	gb->cpu.c = alu_dec(gb, gb->cpu.c);
+	gb->cpu.c = alu_dec(gb, gb->cpu.c);
+	gb->cpu.l = gb->cpu.c;
+	gb->cpu.h = gb->cpu.b;
+}

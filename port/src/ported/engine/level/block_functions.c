@@ -137,3 +137,15 @@ PORT_JUMP(BlockFunc_Floor)
 	}
 	JUMP_TO(ADDR_BlockFunc_Solid);
 }
+
+// output:
+// - a = $00
+PORT(Func_1808c)
+{
+	sramswitch(gb, 0); // SRAM0
+	wr8(gb, wBlockFuncBreakFlag, FALSE);
+	wr8(gb, wBlockFuncSpecialCollision, 0);
+	wr8(gb, wUnused_c18d, 0);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+}

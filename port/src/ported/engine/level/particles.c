@@ -94,3 +94,50 @@ PORT(UpdateParticleAnimation)
 	SET_BC(gb, entry);
 	SET_HL(gb, hl + 2);
 }
+
+// bc = particle
+// Updates the particle's animation with the frameset in de and loads its
+// sprite: hl is left at the particle's frame by UpdateParticleAnimation.
+static void particle_anim(GB *gb, uint16_t frameset, uint16_t y_dest, uint16_t oam)
+{
+	gb->cpu.h = gb->cpu.b;
+	gb->cpu.l = gb->cpu.c;
+	SET_DE(gb, frameset);
+	gb_call(gb, ADDR_UpdateParticleAnimation); // same bank: whatever is mapped
+	uint16_t hl = REG_HL(gb);
+	wr8(gb, wCurParticleFrame, rd8(gb, hl--));
+	hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl - 2)); // dec l / dec l
+	wr8(gb, wCurParticleXCoord, rd8(gb, hl--));
+	hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl - 1)); // dec l
+	gb->cpu.a = rd8(gb, hl--);
+	wr8(gb, y_dest, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a (after the dec l)
+	wr8(gb, wCurParticleAttributes, 0);
+	SET_HL(gb, oam);
+	JUMP_TO(ADDR_LoadParticleSprite);
+}
+
+// The frameset for Wario's direction: and a sets the flags the call sees.
+static uint16_t frameset_by_direction(GB *gb, uint16_t left, uint16_t right)
+{
+	gb->cpu.a = rd8(gb, wDirection);
+	return alu_and(gb, gb->cpu.a, gb->cpu.a) ? right : left;
+}
+
+PORT_JUMP(ParticleAnim_Bubbles) { particle_anim(gb, frameset_by_direction(gb, ADDR_Frameset_d502, ADDR_Frameset_d50b), wCurParticleYCoord, ADDR_OAM_d20e); }
+PORT_JUMP(ParticleAnim_Magic1) { particle_anim(gb, ADDR_Frameset_d8e7, wCurParticle, ADDR_OAM_d80d); }
+PORT_JUMP(ParticleAnim_Magic2) { particle_anim(gb, ADDR_Frameset_d8f4, wCurParticle, ADDR_OAM_d80d); }
+PORT_JUMP(ParticleAnim_MagicStop) { particle_anim(gb, ADDR_Frameset_d901, wCurParticle, ADDR_OAM_d80d); }
+PORT_JUMP(ParticleAnim_Owl) { particle_anim(gb, ADDR_Frameset_d7b4, wCurParticleYCoord, ADDR_OAM_d763); }
+PORT_JUMP(ParticleAnim_TreasureGlow) { particle_anim(gb, ADDR_Frameset_d75a, wCurParticleYCoord, ADDR_OAM_d716); }
+PORT_JUMP(ParticleAnim_BubbleBurst) { particle_anim(gb, ADDR_Frameset_d622, wCurParticleYCoord, ADDR_OAM_d5ae); }
+PORT_JUMP(ParticleAnim_BouncyJump) { particle_anim(gb, ADDR_Frameset_d591, wCurParticleYCoord, ADDR_OAM_d532); }
+PORT_JUMP(ParticleAnim_Snow) { particle_anim(gb, ADDR_Frameset_d806, wCurParticle, ADDR_OAM_d7bd); }
+PORT_JUMP(ParticleAnim_Ice) { particle_anim(gb, frameset_by_direction(gb, ADDR_Frameset_d6fd, ADDR_Frameset_d6e4), wCurParticleYCoord, ADDR_OAM_d62b); }
+PORT_JUMP(ParticleAnim_Dust) { particle_anim(gb, ADDR_Frameset_d4c5, wCurParticleYCoord, ADDR_OAM_d20e); }
+PORT_JUMP(ParticleAnim_Debris) { particle_anim(gb, ADDR_Frameset_d49a, wCurParticleYCoord, ADDR_OAM_d20e); }
+PORT_JUMP(ParticleAnim_Stars) { particle_anim(gb, ADDR_Frameset_d525, wCurParticleYCoord, ADDR_OAM_d20e); }
+PORT_JUMP(ParticleAnim_SmokeLarge) { particle_anim(gb, ADDR_Frameset_d4f3, wCurParticleYCoord, ADDR_OAM_d20e); }
+PORT_JUMP(ParticleAnim_SmokeSmall) { particle_anim(gb, ADDR_Frameset_d4ea, wCurParticleYCoord, ADDR_OAM_d20e); }
+PORT_JUMP(ParticleAnim_Splash) { particle_anim(gb, ADDR_Frameset_d4ba, wCurParticleYCoord, ADDR_OAM_d20e); }

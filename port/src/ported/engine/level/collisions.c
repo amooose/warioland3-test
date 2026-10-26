@@ -122,3 +122,37 @@ PORT_JUMP(Func_19bd3)
 PORT_JUMP(Func_19beb) { process_block_at_pos(gb, ADDR_Func_19beb, COLLISION_UNK5); }
 PORT_JUMP(Func_19bfb) { process_block_at_pos(gb, ADDR_Func_19bfb, COLLISION_UNK6); }
 PORT_JUMP(Func_19c0b) { process_block_at_pos(gb, ADDR_Func_19c0b, COLLISION_UNK7); }
+
+// Copies wWarioPos to hPos, with y - offset, as the asm does it: from
+// wWarioXPos + 1 down.
+static void get_pos_with_y_offset(GB *gb, uint8_t offset)
+{
+	wr8(gb, hXPosLo, rd8(gb, wWarioXPos + 1));
+	wr8(gb, hXPosLo - 1, rd8(gb, wWarioXPos));
+	gb->cpu.a = alu_sub(gb, rd8(gb, wWarioYPos + 1), offset);
+	wr8(gb, hXPosLo - 2, gb->cpu.a);
+	gb->cpu.a = alu_sbc(gb, rd8(gb, wWarioYPos), 0x00);
+	wr8(gb, hXPosLo - 3, gb->cpu.a);
+	SET_HL(gb, wWarioYPos);
+	SET_DE(gb, hXPosLo - 3);
+}
+
+PORT_JUMP(Func_19acd) { get_pos_with_y_offset(gb, 0x0c); JUMP_TO(ADDR_Func_19b3a); }
+PORT_JUMP(Func_19ae4) { get_pos_with_y_offset(gb, 0x1a); JUMP_TO(ADDR_Func_19b3a); }
+PORT_JUMP(Func_19afb) { get_pos_with_y_offset(gb, 0x18); JUMP_TO(ADDR_Func_19b3a); }
+
+// collision on centre
+PORT_JUMP(Func_19b12)
+{
+	// get_pos
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = rd8(gb, wWarioPos + i);
+		wr8(gb, hPos + i, gb->cpu.a);
+	}
+	SET_HL(gb, wWarioPos + 3);
+	SET_DE(gb, hPos + 3);
+	JUMP_TO(ADDR_Func_19b3a);
+}
+
+// collision on top
+PORT_JUMP(Func_19b25) { get_pos_with_y_offset(gb, 4); JUMP_TO(ADDR_Func_19b3a); } // fallthrough

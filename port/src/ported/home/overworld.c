@@ -243,3 +243,27 @@ PORT(GetByteFromPointerInHL)
 	load_pointer(gb, &gb->cpu.h, &gb->cpu.l);
 	gb->cpu.a = rd8(gb, REG_HL(gb));
 }
+
+// b = sprite bank
+// de = pointer to sprite
+// hl = y, x, frame and attributes (relative to the BG)
+PORT_JUMP(LoadOWSpriteWithScroll)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.c = rd8(gb, wSCY);
+	gb->cpu.a = alu_sub(gb, rd8(gb, hl++), gb->cpu.c);
+	gb->cpu.c = 0x10;
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.c);
+	wr8(gb, wCurSpriteYCoord, gb->cpu.a);
+	gb->cpu.c = rd8(gb, wSCX);
+	gb->cpu.a = alu_sub(gb, rd8(gb, hl++), gb->cpu.c);
+	gb->cpu.c = 0x08;
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.c);
+	wr8(gb, wCurSpriteXCoord, gb->cpu.a);
+	wr8(gb, wCurSpriteFrame, rd8(gb, hl++));
+	gb->cpu.a = rd8(gb, hl);
+	wr8(gb, wCurSpriteAttributes, gb->cpu.a);
+	gb->cpu.h = gb->cpu.d;
+	gb->cpu.l = gb->cpu.e;
+	JUMP(LoadOWSpriteWithScroll_GotParams); // fallthrough
+}
