@@ -388,3 +388,67 @@ PORT(HandleWaterSurfaceFloatingMovement)
 	gb->cpu.b = 1;
 	CALL(MoveWarioUp_WithoutCameraOffset);
 }
+
+PORT_JUMP(StartJump)
+{
+	ld_cp(gb, wPowerUpLevel, HIGH_JUMP_BOOTS);
+	gb->cpu.a = JUMP_VEL_NORMAL;
+	if (!CF) {
+		SET_HL(gb, wJoypadDown);
+		if (alu_bit(gb, rd8(gb, wJoypadDown), B_PAD_UP))
+			gb->cpu.a = JUMP_VEL_HIGH_JUMP;
+	}
+	wr8(gb, wJumpVelTable, gb->cpu.a);
+	LJUMP(SetState_Airborne); // fallthrough
+}
+
+PORT_JUMP(SetState_Walking_ResetWalkVel)
+{
+	xor_a(gb);
+	wr8(gb, wWalkVelIndex, 0);
+	LJUMP(SetState_Walking); // fallthrough
+}
+
+PORT_JUMP(CrouchOrSlide)
+{
+	if (ld_and(gb, wWarioSlopeInteraction)) {
+		LJUMP(SetState_Sliding);
+		return;
+	}
+	collision_box(gb, -1, -15, -9, 9);
+	st(gb, wWarioState, WST_CROUCHING);
+	static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
+		wAttackCounter, wWalkVelIndex, wJumpVelTable, wJumpVelIndex, 0};
+	clear(gb, zero);
+	st(gb, wIsCrouching, TRUE);
+	gb->cpu.a = alu_and(gb, rd8(gb, wJoypadDown), PAD_RIGHT | PAD_LEFT);
+	if (!ZF) {
+		LJUMP(SetState_CrouchWalking);
+		return;
+	}
+	load_gfx(gb, BANK_WarioWalkGfx, ADDR_WarioWalkGfx);
+	set_oam(gb, BANK_OAM_1426c, ADDR_OAM_1426c);
+	xor_a(gb);
+	wr8(gb, wFrameDuration, 0);
+	wr8(gb, wAnimationFrame, 0);
+	ld_cp(gb, wDirection, DIRECTION_RIGHT);
+	set_frameset(gb, ZF ? ADDR_Frameset_14a3b : ADDR_Frameset_14a38);
+	anim(gb, OAM1);
+	RET();
+}
+
+PORT_JUMP(StartCrouchFall)
+{
+	xor_a(gb);
+	wr8(gb, wWalkVelIndex, 0);
+	st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	LJUMP(SetState_CrouchAirborne);
+}
+
+PORT_JUMP(StartCrouchJump)
+{
+	play_sfx(gb, SFX_JUMP);
+	xor_a(gb);
+	wr8(gb, wJumpVelIndex, 0);
+	LJUMP(SetState_CrouchAirborne); // fallthrough
+}

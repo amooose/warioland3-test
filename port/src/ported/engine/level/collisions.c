@@ -265,3 +265,51 @@ PORT(Func_19b5c)
 	gb_call_ret(gb, ADDR_ProcessBlock, (uint16_t)(ADDR_Func_19b5c + 3));
 	gb->cpu.b = gb->cpu.a;
 }
+
+PORT(CheckCentreCollision)
+{
+	// collision in centre
+	gb->cpu.a = 0x01;
+	wr8(gb, wUnused_ced3, 0x01);
+	gb_call_ret(gb, ADDR_Func_198c7, (uint16_t)(ADDR_CheckCentreCollision + 0x08));
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wUnused_ced3, 0);
+
+	// collision on left
+	get_pos_at_box_edge(gb, true);
+	gb_call_ret(gb, ADDR_Func_19b8b, (uint16_t)(ADDR_CheckCentreCollision + 0x2d));
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+
+	// collision on right
+	get_pos_at_box_edge(gb, false);
+	gb_call_ret(gb, ADDR_Func_19b8b, (uint16_t)(ADDR_CheckCentreCollision + 0x4c));
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+
+	gb->cpu.a = rd8(gb, wIsOnSteppableObject);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	gb->cpu.b = gb->cpu.a;
+	// get_pos_y
+	gb->cpu.a = rd8(gb, wWarioYPos);
+	wr8(gb, hYPosHi, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wWarioYPos + 1);
+	wr8(gb, hYPosHi + 1, gb->cpu.a);
+	SET_HL(gb, wWarioYPos + 1);
+	SET_DE(gb, hYPosHi + 1);
+	gb->cpu.a = 0x01;
+}
+
+PORT(Func_19bce)
+{
+	gb_call_ret(gb, ADDR_ProcessBlock, (uint16_t)(ADDR_Func_19bce + 3));
+	gb->cpu.b = gb->cpu.a;
+}

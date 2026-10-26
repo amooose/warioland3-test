@@ -182,3 +182,31 @@ PORT(ClearObjDataPointers)
 	} while (gb->cpu.c);
 	SET_HL(gb, hl);
 }
+
+// Sets the obj state at hl by the y velocity in hffa0: states[0] below 2,
+// states[1] below 3, states[2] below 4, else states[3]; then HomeJumpRet.
+static void set_state_by_y_vel(GB *gb, const uint8_t states[4])
+{
+	gb->cpu.a = rd8(gb, hffa0);
+	int i;
+	for (i = 0; i < 3; i++) {
+		alu_cp(gb, gb->cpu.a, (uint8_t)(2 + i));
+		if (gb->cpu.f & FLAG_C)
+			break;
+	}
+	gb->cpu.a = states[i];
+	wr8(gb, REG_HL(gb), gb->cpu.a);
+	JUMP(HomeJumpRet);
+}
+
+PORT_JUMP(Func_62d57)
+{
+	static const uint8_t states[4] = {OBJSTATE_STUN_LEFT_START, OBJSTATE_20, OBJSTATE_22, OBJSTATE_24};
+	set_state_by_y_vel(gb, states);
+}
+
+PORT_JUMP(Func_62e31)
+{
+	static const uint8_t states[4] = {OBJSTATE_STUN_RIGHT_START, OBJSTATE_21, OBJSTATE_23, OBJSTATE_25};
+	set_state_by_y_vel(gb, states);
+}

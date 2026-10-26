@@ -123,3 +123,51 @@ PORT_JUMP(LoadCurSceneObjSprite)
 	cur_scene_obj_sprite(gb);
 	JUMP(LoadOWSprite);
 }
+
+PORT(Func_b4000) {}
+
+PORT(Func_b791d) {}
+
+PORT_JUMP(Func_b4141)
+{
+	gb->cpu.b = 0x00;
+	JUMP(Func_b4143); // fallthrough
+}
+
+PORT_JUMP(Func_b4143)
+{
+	// sla c / ret nc
+	uint8_t c = gb->cpu.c;
+	gb->cpu.c = (uint8_t)(c << 1);
+	gb->cpu.f = (gb->cpu.c ? 0 : FLAG_Z) | (c & 0x80 ? FLAG_C : 0);
+	if (!(c & 0x80)) {
+		RET();
+		return;
+	}
+	SET_HL(gb, wSceneObj5);
+	SET_DE(gb, ADDR_Func_b4143 + 0x19); // .data_1
+	CALL(InitSceneObjParams);
+	SET_HL(gb, wSceneObj5Attributes);
+	wr8(gb, wSceneObj5Attributes, gb->cpu.b);
+	SET_HL(gb, wSceneObj1);
+	SET_DE(gb, ADDR_Func_b4143 + 0x1c); // .data_2
+	JUMP(InitSceneObjParams);
+}
+
+PORT_JUMP(Func_b4162)
+{
+	gb->cpu.b = 0x00;
+	JUMP(Func_b4143);
+}
+
+PORT_JUMP(Func_b4e50)
+{
+	SET_DE(gb, ADDR_OAM_a884a);
+	JUMP(LoadCurSceneObjSpriteWithScroll);
+}
+
+PORT_JUMP(Func_b507f)
+{
+	SET_DE(gb, ADDR_OAM_a8000);
+	JUMP(LoadCurSceneObjSpriteWithScroll);
+}

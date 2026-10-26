@@ -19,3 +19,21 @@ PORT(SetObjAction)
 	gb->cpu.a = alu_or(gb, alu_and(gb, rd8(gb, hl), 0x0f), gb->cpu.b); // OBJ_UNK_1D
 	wr8(gb, hl, gb->cpu.a);
 }
+
+PORT(Func_20a63)
+{
+	gb->cpu.b = OBJACTION_07;
+	CALL(SetObjAction);
+}
+
+PORT(Func_20a69)
+{
+	gb->cpu.b = OBJACTION_0D;
+	CALL(SetObjAction);
+}
+
+PORT(Func_21cc9)
+{
+	gb->cpu.b = OBJACTION_13;
+	CALL(SetObjAction);
+}

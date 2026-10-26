@@ -75,3 +75,63 @@ PORT(ApplyWalkVelocity)
 	}
 	wr8(gb, wWalkVelIndex, alu_inc(gb, gb->cpu.a));
 }
+
+// ld a, [wCameraConfigFlags] / and CAM_SCROLLING_MASK / cp CAM_TRANSITIONS:
+// true (carry) if the camera doesn't do floor transitions
+static bool no_floor_transitions(GB *gb)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wCameraConfigFlags), CAM_SCROLLING_MASK);
+	alu_cp(gb, gb->cpu.a, CAM_TRANSITIONS);
+	return gb->cpu.f & FLAG_C;
+}
+
+// call GetFloorForYPos / ld a, [wFloor] / sub c
+static void sub_floor_for_y_pos(GB *gb)
+{
+	CALL(GetFloorForYPos);
+	gb->cpu.a = alu_sub(gb, rd8(gb, wFloor), gb->cpu.c);
+}
+
+PORT_JUMP(TriggerDownwardsFloorTransition)
+{
+	if (no_floor_transitions(gb)) {
+		RET();
+		return;
+	}
+	sub_floor_for_y_pos(gb);
+	if (gb->cpu.f & (FLAG_Z | FLAG_C)) {
+		RET();
+		return;
+	}
+	JUMP(StartDownwardsFloorTransition);
+}
+
+static void trigger_floor_transition(GB *gb)
+{
+	if (no_floor_transitions(gb))
+		return;
+	sub_floor_for_y_pos(gb);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	if (gb->cpu.f & FLAG_C)
+		CALL(StartUpwardsFloorTransition);
+	else
+		CALL(StartDownwardsFloorTransition);
+}
+
+PORT(TriggerFloorTransition_SkipUpdateYPos)
+{
+	trigger_floor_transition(gb);
+}
+
+PORT(TriggerFloorTransition)
+{
+	// update_pos_y
+	gb->cpu.a = rd8(gb, hYPosHi);
+	wr8(gb, wWarioYPos, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hYPosHi + 1);
+	wr8(gb, wWarioYPos + 1, gb->cpu.a);
+	SET_HL(gb, hYPosHi + 1);
+	SET_DE(gb, wWarioYPos + 1);
+	trigger_floor_transition(gb); // fallthrough
+}
