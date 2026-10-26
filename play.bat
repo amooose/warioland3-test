@@ -11,7 +11,7 @@ set "PATH=%MSYS2_DIR%\ucrt64\bin;%PATH%"
 
 set "WL3=%~dp0port\build\wl3.exe"
 if not exist "%WL3%" (
-    echo port\build\wl3.exe does not exist yet: run update.bat first.
+    echo port\build\wl3.exe does not exist yet: run build.bat first.
     pause
     exit /b 1
 )

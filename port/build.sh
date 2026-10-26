@@ -1,18 +1,13 @@
 #!/usr/bin/env bash
-# Pull the latest changes and build the PC port.
-# Run from anywhere in an MSYS2 UCRT64 shell (or via update.bat):
-#   port/update.sh          pull and build
-#   port/update.sh run      pull, build and start the game
+# Build the ROM and the PC port.
+# Run from anywhere in an MSYS2 UCRT64 shell (or via build.bat):
+#   port/build.sh          build
+#   port/build.sh run      build and start the game
 # Set RGBDS to the RGBDS folder if it isn't C:\rgbds (only used the first
 # time, when the build is configured).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-
-echo "== Pulling latest changes"
-# Your own commits (e.g. new recordings) are replayed on top of the latest
-# changes; uncommitted edits are set aside and restored.
-git pull --rebase --autostash
 
 if [ ! -f port/build/CMakeCache.txt ]; then
 	echo "== Configuring the build"

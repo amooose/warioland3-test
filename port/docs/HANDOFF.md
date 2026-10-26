@@ -42,11 +42,14 @@ scripting and expansion on top. The approach:
 
 **Windows (MSYS2 UCRT64), what the user runs:**
 
-- `update.bat` at the repo root pulls and builds. `update.bat run` also
-  starts the game.
+- `build.bat` at the repo root builds. `build.bat run` also starts the
+  game. It stops if the game is running, since that locks `wl3.exe`.
 - `play.bat` starts the game. Arguments are passed through, for example
   `play.bat --record port\tests\inputs\x.input`.
-- Both have `MSYS2_DIR` (default `C:\msys64`) and `RGBDS` paths at the top.
+- `push.bat` pushes the current branch to
+  `https://github.com/amooose/warioland3-test` (commits only).
+- `build.bat` and `play.bat` have `MSYS2_DIR` (default `C:\msys64`) at the
+  top; `build.bat` also has `RGBDS`.
 
 **From a shell (MSYS2 UCRT64 or Linux), in `port/`:**
 
