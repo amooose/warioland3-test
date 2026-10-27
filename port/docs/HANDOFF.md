@@ -27,13 +27,13 @@ scripting and expansion on top. The approach:
 
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`. All
   work is pushed and the tests are green.
-- **Progress:** 703 / 3491 routines ported (20.1%), 12.0% of the
+- **Progress:** 751 / 3491 routines ported (21.5%), 13.0% of the
   instructions. With hooks on, about half of what the game executes runs as
   C. Run `cmake --build build --target progress` and read
   `build/progress.md` for the per-directory numbers and the "ready to port"
   list.
 - **Fully ported:** `src/audio`. `src/home` is about 58% ported (by
-  instructions), and 13-16% of the level engine and the overworld.
+  instructions), 19% of the level engine and 13% of the overworld.
 - **Tests:** `ctest --test-dir build -j6` runs a difftest and a fuzz pass
   for each input in `tests/inputs/` (8 tests with the 4 inputs there now;
   `action_help2` is a local recording that isn't committed yet).
@@ -84,8 +84,10 @@ Each step that worked in the cloud session:
    - Grouping by asm file keeps shared helpers in one `.c` file.
 2. **Read the asm.** Write the C in `src/ported/<same path as the asm>.c`,
    matching that file's helpers and conventions.
-   - `engine/level/wario_states_{1,2,3}.c` share small helpers such as
-     `st`, `ld_and`, `load_gfx`, `set_oam`, `set_frameset` and `anim`.
+   - `engine/level/wario_states.h` has the small helpers the Wario state
+     ports share, such as `st`, `ld_and`, `clear`, `load_gfx`, `set_oam`,
+     `frameset_by_dir` and `anim`. Include it for anything that sets
+     Wario's state (`object_interactions.c` does).
    - `home/fade.c` has `fade_begin`, `fade_end` and `unpack_rgb` /
      `pack_cur_rgb`.
 3. **Build.**
@@ -167,18 +169,19 @@ Each step that worked in the cloud session:
 
 ## Good next batches
 
-- **Wario states:** `SetState_ZombieIdling`, `SetState_FatIdling`,
-  `SetState_BlindIdling`, `SetState_Hot`, `SetState_OnFireAirborne`,
-  `SetState_Splitting` (wario_states_3/4). The helpers in
-  `engine/level/wario_states_1.c` carry over.
-- **Objects:** `ChestFunc`, `ClearGateFunc`, `DoughnutFunc_Destroy`; and
-  `_CountActiveTransientObjects`, `Func_6284f`, `Func_628a7` in
-  `update_objects.asm`.
-- **Overworld:**
-  - `VBlank_Overworld` (115 instructions) and `VBlank_OWPalTransition`;
-  - `Func_821a1`, `GoToNextLine`;
-  - `ActionHelp_FlashBInput`, `LoadActionHelpBGPals`.
-- **Other:** `PanIntroBackgroundLayers` (title, timed), `CalculateBackupSRAMChecksum1`.
+- **Object wrappers, now unblocked:** the object init functions that just
+  set a parameter and jump to a ported one: `TorchEmber{Left,Right}{1,2}Func`,
+  `{Grey,Red,Green,Blue}{Treasure,Chest}Func`, `ClearGate{1,2,3}Func`,
+  `ZombieHeadFunc_{Left,Right}`, `BeamFunc_{Left,Right}`, `DoughnutFunc_LeftRight`,
+  `DoughnutFunc_Up`, `StarsFunc_SetFlags`, `DummyObjectFunc`.
+- **Hot paths:** `ApplyWalkVelocity_Right` / `_Left` (40,000 calls between
+  them), `Func_2ae3b` (7,000), `Func_9fb53`, `Func_8212c`.
+- **Wario states:** `Func_29bb9`, `Func_290d6`, `Func_290a1`, `Func_28bd5`
+  in wario_states_3.
+- **Overworld:** `VBlank_Overworld` (115 instructions), `VBlank_OWPalTransition`,
+  `Func_821a1`, `EndCutscene`, `GoToNextLine`.
+- **Bigger objects** once their helpers are in: `WebberProjectileFunc`,
+  `BubbleFunc`, `TorchFunc`.
 - `build/progress.md` lists more under "Ready to port".
 
 ## Recordings

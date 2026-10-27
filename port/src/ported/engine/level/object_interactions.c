@@ -1,5 +1,5 @@
 // Port of src/engine/level/object_interactions.asm
-#include "ported.h"
+#include "wario_states.h"
 
 // b = OBJACTION_* constant
 // Sets the action of the object at wObjPtr, and records which side Wario
@@ -47,4 +47,25 @@ PORT(CollectKey)
 	gb->cpu.a = 0;
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wTimer, 0);
+}
+
+PORT(SetState_OnFire)
+{
+	st(gb, wWarioState, WST_ON_FIRE);
+	static const uint16_t zero[] = {wInvisibleFrame, wSFXLoopCounter, wWarioStateCycles,
+		wGrabState, wAttackCounter, wJumpVelIndex, wJumpVelTable, wIsCrouching, wIsRolling,
+		wIsSmashAttacking, 0};
+	clear(gb, zero);
+	collision_box(gb, -1, -27, -9, 9);
+	if (ld_and(gb, wWarioStateCounter))
+		return;
+	SET_HL(gb, ADDR_WarioOnFirePal);
+	CALL(SetWarioPal);
+	load_gfx(gb, BANK_WarioHotGfx, ADDR_WarioHotGfx);
+	set_oam(gb, BANK_OAM_1673c, ADDR_OAM_1673c);
+	xor_a(gb);
+	wr8(gb, wFrameDuration, 0);
+	wr8(gb, wAnimationFrame, 0);
+	frameset_by_dir(gb, ADDR_Frameset_16b38, ADDR_Frameset_16b49);
+	anim(gb, OAM1);
 }

@@ -358,3 +358,83 @@ static void thrown_object_movement(GB *gb, bool left)
 
 PORT_JUMP(Func_62ec3) { thrown_object_movement(gb, true); }
 PORT_JUMP(Func_62faa) { thrown_object_movement(gb, false); }
+
+// output: e = number of objects with OBJFLAG_ACTIVE and OBJFLAG_TRANSIENT
+PORT(_CountActiveTransientObjects)
+{
+	gb->cpu.e = 0;
+	gb->cpu.d = OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT;
+	for (int n = 0; n < NUM_OBJECTS; n++) {
+		gb->cpu.a = alu_and(gb, rd8(gb, wObj1Flags + n * OBJ_STRUCT_SIZE), gb->cpu.d);
+		alu_cp(gb, gb->cpu.a, gb->cpu.d);
+		if (gb->cpu.f & FLAG_Z)
+			gb->cpu.e = alu_inc(gb, gb->cpu.e);
+	}
+}
+
+// Moves the current object b pixels right (or left), and along the arc in
+// Data_60180 (Data_601a0 if heavy), indexed by OBJ_VAR_3.
+static void move_obj_in_arc(GB *gb, bool right)
+{
+	uint16_t hl = wCurObjXPos;
+	uint8_t x = rd8(gb, hl);
+	gb->cpu.a = right ? alu_add(gb, x, gb->cpu.b) : alu_sub(gb, x, gb->cpu.b);
+	wr8(gb, hl++, gb->cpu.a);
+	if (gb->cpu.f & FLAG_C)
+		wr8(gb, hl, right ? alu_inc(gb, rd8(gb, hl)) : alu_dec(gb, rd8(gb, hl)));
+
+	hl = wCurObjVar3;
+	gb->cpu.b = (uint8_t)(ADDR_Data_60180 >> 8);
+	gb->cpu.a = alu_add(gb, rd8(gb, hl), (uint8_t)ADDR_Data_60180);
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.a = alu_rla(gb, rd8(gb, wCurObjInteractionType));
+	if (gb->cpu.f & FLAG_C) { // heavy
+		gb->cpu.a = alu_add(gb, gb->cpu.c, (uint8_t)(ADDR_Data_601a0 - ADDR_Data_60180));
+		gb->cpu.c = gb->cpu.a;
+	}
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.c = alu_dec(gb, gb->cpu.c);
+		gb->cpu.a = rd8(gb, REG_BC(gb));
+	} else {
+		wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+	}
+
+	wr8(gb, hffa0, gb->cpu.a);
+	hl = (uint16_t)((hl & 0xff00) | OBJ_Y_POS);
+	alu_cp(gb, gb->cpu.a, 0x80);
+	bool negative = !(gb->cpu.f & FLAG_C);
+	gb->cpu.c = rd8(gb, hl);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.c);
+	wr8(gb, hl++, gb->cpu.a);
+	if (negative && !(gb->cpu.f & FLAG_C))
+		wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+	else if (!negative && (gb->cpu.f & FLAG_C))
+		wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+	SET_HL(gb, hl);
+
+	gb->cpu.a = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
+	wr8(gb, wCurObjAction, gb->cpu.a);
+	JUMP(HomeJumpRet);
+}
+
+PORT_JUMP(Func_6284f) { move_obj_in_arc(gb, true); }
+PORT_JUMP(Func_628a7) { move_obj_in_arc(gb, false); }
+
+PORT_JUMP(Func_628ea)
+{
+	uint16_t hl = wCurObjYPos;
+	wr8(gb, hYPosLo, rd8(gb, hl++));
+	wr8(gb, hYPosHi, rd8(gb, hl++));
+	wr8(gb, hXPosLo, rd8(gb, hl++));
+	gb->cpu.a = rd8(gb, hl);
+	wr8(gb, hXPosHi, gb->cpu.a);
+	SET_HL(gb, hl);
+	gb_call_ret(gb, ADDR_Func_3543, ADDR_Func_628ea + 0x12);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.a = OBJSTATE_12;
+		wr8(gb, wCurObjState, OBJSTATE_12);
+	}
+	JUMP(HomeJumpRet);
+}

@@ -1,87 +1,5 @@
 // Port of src/engine/level/wario_states_1.asm
-#include "ported.h"
-
-// The same helpers as wario_states_2.c (see the notes there).
-#define LJUMP(name) JUMP_TO(ADDR_##name)
-
-#define ZF (gb->cpu.f & FLAG_Z)
-#define CF (gb->cpu.f & FLAG_C)
-
-#define OAM1 BANK_OAM_14000   // BANK("Wario OAM 1")
-#define OAM2 BANK_OAM_1fc000  // BANK("Wario OAM 2")
-
-// ld a, v / ld [addr], a
-static void st(GB *gb, uint16_t addr, uint8_t v)
-{
-	gb->cpu.a = v;
-	wr8(gb, addr, v);
-}
-
-// ld a, [addr]
-static uint8_t ld(GB *gb, uint16_t addr)
-{
-	gb->cpu.a = rd8(gb, addr);
-	return gb->cpu.a;
-}
-
-static void xor_a(GB *gb)
-{
-	gb->cpu.a = 0;
-	gb->cpu.f = FLAG_Z;
-}
-
-// ld a, [addr] / and a; true if nz
-static bool ld_and(GB *gb, uint16_t addr)
-{
-	uint8_t v = ld(gb, addr);
-	return alu_and(gb, v, v) != 0;
-}
-
-// ld a, [addr] / bit n, a
-static bool ld_bit(GB *gb, uint16_t addr, int bit)
-{
-	return alu_bit(gb, ld(gb, addr), bit);
-}
-
-// ld a, [addr] / cp v
-static void ld_cp(GB *gb, uint16_t addr, uint8_t v)
-{
-	alu_cp(gb, ld(gb, addr), v);
-}
-
-// wDMASourceBank/Ptr = gfx, call LoadWarioGfx
-static void load_gfx(GB *gb, uint8_t bank, uint16_t ptr)
-{
-	wr8(gb, wDMASourceBank, bank);
-	wr8(gb, wDMASourcePtr + 0, (uint8_t)(ptr >> 8));
-	st(gb, wDMASourcePtr + 1, (uint8_t)ptr);
-	CALL(LoadWarioGfx);
-}
-
-static void set_oam(GB *gb, uint8_t bank, uint16_t ptr)
-{
-	wr8(gb, wWarioOAMBank, bank);
-	wr8(gb, wWarioOAMPtr + 0, (uint8_t)(ptr >> 8));
-	st(gb, wWarioOAMPtr + 1, (uint8_t)ptr);
-}
-
-static void set_frameset(GB *gb, uint16_t ptr)
-{
-	wr8(gb, wWarioFramesetPtr + 0, (uint8_t)(ptr >> 8));
-	st(gb, wWarioFramesetPtr + 1, (uint8_t)ptr);
-}
-
-// ld a, BANK("Wario OAM n") / ldh [hCallFuncBank], a / hcall UpdateWarioAnimation
-static void anim(GB *gb, uint8_t bank)
-{
-	FARCALL_BANK(bank, UpdateWarioAnimation);
-}
-
-// ld a, [wDirection] / and a: true if facing right
-static bool facing_right(GB *gb)
-{
-	return ld_and(gb, wDirection);
-}
+#include "wario_states.h"
 
 PORT(Func_1e6ea)
 {
@@ -145,23 +63,6 @@ PORT(SetState_Attacking)
 	else
 		set_frameset(gb, facing_right(gb) ? ADDR_Frameset_1522d : ADDR_Frameset_1521c);
 	anim(gb, OAM1);
-}
-
-// ld a, v / ld [wCollisionBox...], a, in this order
-static void collision_box(GB *gb, int8_t bottom, int8_t top, int8_t left, int8_t right)
-{
-	st(gb, wCollisionBoxBottom, (uint8_t)bottom);
-	st(gb, wCollisionBoxTop, (uint8_t)top);
-	st(gb, wCollisionBoxLeft, (uint8_t)left);
-	st(gb, wCollisionBoxRight, (uint8_t)right);
-}
-
-// xor a / ld [addr], a for each address, up to a 0
-static void clear(GB *gb, const uint16_t *addrs)
-{
-	xor_a(gb);
-	for (; *addrs; addrs++)
-		wr8(gb, *addrs, 0);
 }
 
 // ld a, [wIsOnSteppableObject] / and a / ret z / ld b, 2 / call MoveWarioUp
@@ -489,4 +390,108 @@ PORT_JUMP(SurfaceFromUnderwater)
 	load_gfx(gb, BANK_WarioSwimGfx, ADDR_WarioSwimGfx);
 	set_oam(gb, BANK_OAM_15254, ADDR_OAM_15254);
 	LJUMP(SetState_WaterSurfaceIdling); // fallthrough
+}
+
+PORT_JUMP(StartFall)
+{
+	xor_a(gb);
+	wr8(gb, wJumpingUpwards, FALSE);
+	LJUMP(StartFall_SkipResetJumpUpwards); // fallthrough
+}
+
+PORT_JUMP(StartJump_FromWaterSurface)
+{
+	play_sfx(gb, SFX_SPLASH);
+	st(gb, wJumpVelIndex, 0x01);
+	st(gb, wJumpingUpwards, TRUE);
+	st(gb, wDoFullJump, TRUE);
+	LJUMP(StartJump); // jr
+}
+
+PORT_JUMP(StartJump_FromSand)
+{
+	xor_a(gb);
+	wr8(gb, wJumpVelIndex, 0);
+	st(gb, wJumpingUpwards, TRUE);
+	st(gb, wDoFullJump, TRUE);
+	ld_cp(gb, wPowerUpLevel, HIGH_JUMP_BOOTS);
+	gb->cpu.a = JUMP_VEL_KNOCK_BACK;
+	if (!CF) {
+		SET_HL(gb, wJoypadDown);
+		if (alu_bit(gb, rd8(gb, wJoypadDown), B_PAD_UP))
+			gb->cpu.a = JUMP_VEL_NORMAL;
+	}
+	wr8(gb, wJumpVelTable, gb->cpu.a);
+	LJUMP(SetState_Airborne); // jr
+}
+
+PORT_JUMP(DiveFromSurface)
+{
+	xor_a(gb);
+	wr8(gb, wGrabState, 0);
+	get_pos(gb);
+	gb->cpu.a = alu_and(gb, rd8(gb, hYPosLo), 0xf0);
+	wr8(gb, hYPosLo, gb->cpu.a);
+	gb->cpu.b = PARTICLE_SPLASH;
+	FARCALL(CreateParticle);
+	play_sfx(gb, SFX_SPLASH);
+	LJUMP(DiveFromSurface_SkipSplash); // fallthrough
+}
+
+PORT(SetState_TryingSubmerge)
+{
+	st(gb, wWarioState, WST_TRYING_SUBMERGE);
+	xor_a(gb);
+	wr8(gb, wWarioStateCounter, 0);
+	wr8(gb, wWarioStateCycles, 0);
+	xor_a(gb);
+	wr8(gb, wFrameDuration, 0);
+	wr8(gb, wAnimationFrame, 0);
+	frameset_by_dir(gb, ADDR_Frameset_155b0, ADDR_Frameset_155b7);
+	anim(gb, OAM1);
+}
+
+PORT_JUMP(UpdateState_TryingSubmerge)
+{
+	if (!ld_bit(gb, wJoypadDown, B_PAD_DOWN)) {
+		LJUMP(SetState_WaterSurfaceIdling);
+		return;
+	}
+	anim(gb, OAM1);
+	RET();
+}
+
+PORT_JUMP(Func_1e1e3)
+{
+	xor_a(gb);
+	wr8(gb, wJumpVelIndex, 0);
+	LJUMP(SetState_RollingAirborne); // jr
+}
+
+PORT_JUMP(HandleInput_Idling)
+{
+	uint8_t pressed = ld(gb, wJoypadPressed);
+	if (alu_bit(gb, pressed, B_PAD_B)) {
+		LJUMP(SetState_Attacking);
+		return;
+	}
+	if (alu_bit(gb, pressed, B_PAD_A)) {
+		LJUMP(StartJump_FromInput);
+		return;
+	}
+	uint8_t down = ld(gb, wJoypadDown);
+	bool right;
+	if (alu_bit(gb, down, B_PAD_RIGHT))
+		right = true;
+	else if (alu_bit(gb, down, B_PAD_LEFT))
+		right = false;
+	else {
+		RET();
+		return;
+	}
+	// walk if already facing that way, else turn
+	if (ld_and(gb, wDirection) == right)
+		LJUMP(SetState_Walking_ResetWalkVel);
+	else
+		LJUMP(SetState_Turning);
 }

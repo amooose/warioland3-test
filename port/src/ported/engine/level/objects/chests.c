@@ -28,3 +28,34 @@ PORT(DeinitChest)
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wCurObjFlags, 0);
 }
+
+// The object's flags and substate as the init functions set them: visible,
+// no collision, update function = update, initialised.
+static uint16_t init_obj(GB *gb, uint16_t update)
+{
+	uint16_t hl = wCurObjFlags;
+	SET_HL(gb, hl);
+	wr8(gb, hl, (uint8_t)((rd8(gb, hl) & ~OBJFLAG_INVISIBLE) | OBJFLAG_NO_COLLISION));
+	hl = (uint16_t)((hl & 0xff00) | (OBJ_UPDATE_FUNCTION + 1));
+	gb->cpu.a = (uint8_t)(update >> 8);
+	wr8(gb, hl--, gb->cpu.a);
+	gb->cpu.a = (uint8_t)update;
+	wr8(gb, hl--, gb->cpu.a);
+	hl = (uint16_t)((hl & 0xff00) | OBJ_SUBSTATE);
+	SET_HL(gb, hl);
+	return hl;
+}
+
+PORT(ChestFunc)
+{
+	uint16_t hl = init_obj(gb, ADDR_ChestFunc + 0x24); // .Update
+	wr8(gb, hl, (uint8_t)((rd8(gb, hl) & ~OBJSUBFLAG_UNINITIALISED) | (1 << OBJSUBFLAG_UNK_4_F)));
+	SET_DE(gb, ADDR_Frameset_68000);
+	CALL(SetObjectFramesetPtr);
+	gb->cpu.l = OBJ_COLLBOX_RIGHT;
+	hl = REG_HL(gb);
+	wr8(gb, hl--, 13);
+	gb->cpu.a = (uint8_t)-14;
+	wr8(gb, hl--, gb->cpu.a); // OBJ_COLLBOX_LEFT
+	SET_HL(gb, hl);
+}
