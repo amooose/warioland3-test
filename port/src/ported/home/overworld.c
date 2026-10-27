@@ -436,3 +436,32 @@ PORT(ApplyPalConfig)
 	} while (gb->cpu.b);
 	SET_HL(gb, hl);
 }
+
+// same as ApplyOWMovement but the x offsets are mirrored
+// hl = OW obj
+// de = relative positions
+PORT_JUMP(ApplyOWMovement_Mirrored)
+{
+	CALL(Func_3c35);
+	gb->cpu.a = alu_sub(gb, gb->cpu.a, gb->cpu.e);
+	JUMP(Func_3c29);
+}
+
+// hl = OW obj
+// de = relative positions
+// returns z if movement has finished
+PORT_JUMP(ApplyOWMovement)
+{
+	CALL(Func_3c35);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.e);
+	JUMP(Func_3c29); // fallthrough
+}
+
+PORT(Func_3c76)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, w2d0c0);
+	SET_BC(gb, 0x10);
+	CALL(WriteAToHL_BCTimes);
+}

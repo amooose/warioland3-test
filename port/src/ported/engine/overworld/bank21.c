@@ -666,3 +666,74 @@ PORT(FadeBGPalConfig)
 	SET_HL(gb, wPalConfig1TotalSteps);
 	gb_call(gb, ADDR_FadePalConfig);
 }
+
+// output: c = TRUE (and carry) while the level name's palette is being set up
+PORT(FadeInLevelName)
+{
+	if (!pal_fade_started(gb, wPalConfig1TotalSteps)) {
+		gb->cpu.a = 0x02;
+		wr8(gb, w2d0e0, gb->cpu.a);
+		copy_bytes(gb, wTempPals1 + 7 * PAL_SIZE, wTempBGPals + 7 * PAL_SIZE, 1 * PAL_SIZE);
+		gb->cpu.a = rd8(gb, w2d0e4);
+		gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			copy_bytes(gb, ADDR_Pals_852dd + 2, wTempPals1 + 7 * PAL_SIZE + 2, 0x6);
+		} else {
+			uint16_t src = ADDR_Pals_84000 + 7 * PAL_SIZE;
+			gb->cpu.a = rd8(gb, w2d011);
+			gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+			if (!(gb->cpu.f & FLAG_Z))
+				src = ADDR_Pals_840c0 + 7 * PAL_SIZE;
+			copy_bytes(gb, src, wTempPals1 + 7 * PAL_SIZE, 1 * PAL_SIZE);
+		}
+		set_pal_config(gb, 1, wTempBGPals + 7 * PAL_SIZE, OBPI_AUTOINC | 7 * PAL_SIZE, 1);
+		inc_total_steps(gb, wPalConfig1TotalSteps);
+		gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_Z) | FLAG_C); // scf
+	} else {
+		gb_call(gb, ADDR_FadeBGPalConfig);
+		if (!(gb->cpu.f & FLAG_C)) {
+			gb->cpu.a = 0;
+			wr8(gb, wPalConfig1TotalSteps, 0);
+			gb->cpu.a = alu_inc(gb, gb->cpu.a);
+			wr8(gb, w2d0e0, gb->cpu.a);
+		}
+	}
+	gb->cpu.c = alu_rl(gb, 0x00);
+}
+
+PORT(Func_852e5)
+{
+	gb->cpu.a = alu_xor(gb, rd8(gb, w2d0e0), 0x03);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = rd8(gb, wBottomBarAction);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	if (!pal_fade_started(gb, wPalConfig1TotalSteps)) {
+		copy_bytes(gb, wTempPals1 + 7 * PAL_SIZE + 2, wTempBGPals + 7 * PAL_SIZE + 2, 0x6);
+		clear_bytes(gb, wTempPals1 + 7 * PAL_SIZE + 2, 0x6);
+		inc_total_steps(gb, wPalConfig1TotalSteps);
+		set_pal_config(gb, 1, wTempBGPals + 7 * PAL_SIZE, OBPI_AUTOINC | 7 * PAL_SIZE, 1);
+		return;
+	}
+	gb_call(gb, ADDR_FadeBGPalConfig);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wPalConfig1TotalSteps, 0);
+	wr8(gb, w2d0e0, 0);
+}
+
+PORT_JUMP(ApplyPalConfig1)
+{
+	SET_HL(gb, wPalConfig1);
+	JUMP_TO(ADDR_ApplyPalConfig_Bank21); // fallthrough
+}
+
+PORT_JUMP(ApplyPalConfig2)
+{
+	SET_HL(gb, wPalConfig2);
+	JUMP_TO(ADDR_ApplyPalConfig_Bank21);
+}
