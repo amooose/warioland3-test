@@ -739,8 +739,17 @@ static void fuzz_seed(const GB *base, Hook *h, int index, const char *seed_name)
 		CheckResult res = check(variant, h, &r, &why, read_log, (int)(sizeof(read_log) / sizeof(*read_log)),
 			&nreads, exec_map, v == 0);
 		readset_add(&readset, read_log, nreads);
-		if (v == 0)
+		if (v == 0) {
 			seed_reads = readset.n;
+			// The seed itself never finished (it waits for hardware that
+			// doesn't run here, e.g. H-Blank with the LCD off): its variants
+			// would each spin 20 times as long for nothing.
+			if (res == CHECK_INCONCLUSIVE && asm_steps_taken >= asm_step_limit) {
+				st->samples++;
+				st->inconclusive++;
+				break;
+			}
+		}
 		if (v > 0 && routine_coverage(st) > covered_before && ncorpus < MAX_CORPUS) {
 			if (!corpus[ncorpus])
 				corpus[ncorpus] = malloc(sizeof(GB));

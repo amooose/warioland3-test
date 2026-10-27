@@ -115,6 +115,7 @@ static int gen_ports(const char *out, int nfiles, char **files)
 			const char *p = line + 4;
 			while (*p == '_' || (*p >= 'A' && *p <= 'Z'))
 				p++;
+			int local = !strncmp(line, "PORT_LOCAL", 10);
 			if (*p++ != '(')
 				continue;
 			size_t len = strcspn(p, ",) \t");
@@ -122,9 +123,20 @@ static int gen_ports(const char *out, int nfiles, char **files)
 				cap = cap ? cap * 2 : 256;
 				names = realloc(names, (size_t)cap * sizeof(char *));
 			}
-			names[n] = malloc(len + 1);
+			// PORT_LOCAL(Parent, local) defines portinfo_Parent__local
+			const char *q = p + len;
+			size_t len2 = 0;
+			if (local) {
+				q += strspn(q, ", \t");
+				len2 = strcspn(q, ",) \t");
+			}
+			names[n] = malloc(len + 2 + len2 + 1);
 			memcpy(names[n], p, len);
 			names[n][len] = 0;
+			if (local) {
+				strcat(names[n], "__");
+				strncat(names[n], q, len2);
+			}
 			n++;
 		}
 		fclose(f);

@@ -243,6 +243,10 @@ static void read_ported(const char *path)
 		// PORT_EX(Name, ...)
 		if (strncmp(line, "PORT", 4))
 			continue;
+		// PORT_LOCAL(Parent, local) ports part of Parent, which counts as
+		// ported once PORT(Parent) exists.
+		if (!strncmp(line, "PORT_LOCAL", 10))
+			continue;
 		const char *p = line + 4;
 		while (*p == '_' || (*p >= 'A' && *p <= 'Z'))
 			p++;

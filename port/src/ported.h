@@ -52,6 +52,16 @@ void port_register(const PortInfo *info);
 // JUMP_TO(), or RET() on paths that return.
 #define PORT_JUMP(name) PORT_EX(name, HOOK_MANUAL_RET, 0)
 
+// A local label of a routine (Parent.local), e.g. an object's .Update code
+// that's reached through its update pointer: PORT_LOCAL(ChestFunc, Update).
+// Its address is ADDR_Parent + offset (local labels aren't in syms.h).
+#define PORT_LOCAL_EX(parent, local, flags, clobbers) \
+	static void port_##parent##__##local(GB *gb); \
+	const PortInfo portinfo_##parent##__##local = {#parent "." #local, port_##parent##__##local, (flags), (clobbers)}; \
+	static void port_##parent##__##local(GB *gb)
+#define PORT_LOCAL(parent, local) PORT_LOCAL_EX(parent, local, 0, 0)
+#define PORT_LOCAL_JUMP(parent, local) PORT_LOCAL_EX(parent, local, HOOK_MANUAL_RET, 0)
+
 // Memory access. Hardware registers are addresses too (rJOYP = $ff00 etc.,
 // from hardware.inc), so ldh [rLCDC], a is wr8(gb, rLCDC, a).
 // Always go through these (not raw arrays) so banking and I/O

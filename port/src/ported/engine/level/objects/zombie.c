@@ -78,3 +78,25 @@ static void zombie_head_func(GB *gb, uint16_t frameset, uint16_t movement)
 
 PORT_JUMP(ZombieHeadFunc_Left) { zombie_head_func(gb, ADDR_Frameset_68dda, ADDR_Data_605a0); }
 PORT_JUMP(ZombieHeadFunc_Right) { zombie_head_func(gb, ADDR_Frameset_68dd5, ADDR_Data_60560); }
+
+// Flickers the head every other frame until its state duration runs out.
+PORT_LOCAL(ZombieHeadFunc, Flicker)
+{
+	gb->cpu.a = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
+	wr8(gb, wCurObjAction, gb->cpu.a);
+	uint8_t d = alu_dec(gb, rd8(gb, wCurObjStateDuration));
+	wr8(gb, wCurObjStateDuration, d);
+	uint16_t hl = (uint16_t)((wCurObjStateDuration & 0xff00) | OBJ_FLAGS);
+	SET_HL(gb, hl);
+	if (!d) {
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, hl, 0);
+		return;
+	}
+	gb->cpu.a = alu_and(gb, rd8(gb, wGlobalCounter), 1);
+	if (gb->cpu.a)
+		return;
+	gb->cpu.a = alu_xor(gb, rd8(gb, hl), OBJFLAG_INVISIBLE);
+	wr8(gb, hl, gb->cpu.a);
+}
