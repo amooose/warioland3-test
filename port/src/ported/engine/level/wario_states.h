@@ -20,6 +20,7 @@
 
 #define OAM1 BANK_OAM_14000   // BANK("Wario OAM 1")
 #define OAM2 BANK_OAM_1fc000  // BANK("Wario OAM 2")
+#define OAM3 BANK_OAM_1dc000  // BANK("Wario OAM 3")
 
 // ld a, v / ld [addr], a
 static inline void st(GB *gb, uint16_t addr, uint8_t v)
@@ -233,6 +234,37 @@ static inline void clear(GB *gb, const uint16_t *addrs)
 	xor_a(gb);
 	for (; *addrs; addrs++)
 		wr8(gb, *addrs, 0);
+}
+
+// xor a / ld [wFrameDuration], a / ld [wAnimationFrame], a
+static inline void reset_anim(GB *gb)
+{
+	xor_a(gb);
+	wr8(gb, wFrameDuration, 0);
+	wr8(gb, wAnimationFrame, 0);
+}
+
+// ld a, t / ld [wTouchState], a / ld a, t / ld [wStingTouchState], a /
+// ld a, ca94 / ld [wca94], a
+static inline void touch_states(GB *gb, uint8_t t, uint8_t ca94)
+{
+	st(gb, wTouchState, t);
+	st(gb, wStingTouchState, t);
+	st(gb, wca94, ca94);
+}
+
+// ld a, [wDirection] / xor $1 / ld [wDirection], a
+static inline void flip_dir(GB *gb)
+{
+	gb->cpu.a = alu_xor(gb, rd8(gb, wDirection), 0x1);
+	wr8(gb, wDirection, gb->cpu.a);
+}
+
+// flip_dir / and a: true if now facing right
+static inline bool flip_dir_and(GB *gb)
+{
+	flip_dir(gb);
+	return alu_and(gb, gb->cpu.a, gb->cpu.a) != 0;
 }
 
 #endif

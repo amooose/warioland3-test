@@ -69,3 +69,20 @@ PORT(IsOnSlipperyGround)
 	gb->cpu.a = rd8(gb, wIsOnSlipperyGround);
 	alu_and(gb, gb->cpu.a, gb->cpu.a);
 }
+
+PORT(ReleaseOwl)
+{
+	// hPos = wWarioPos + (-$18, 0)
+	gb->cpu.a = rd8(gb, wWarioXPos + 1);
+	wr8(gb, hXPosLo, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wWarioXPos + 0);
+	wr8(gb, hXPosLo - 1, gb->cpu.a);
+	gb->cpu.a = alu_sub(gb, rd8(gb, wWarioXPos - 1), 0x18);
+	wr8(gb, hXPosLo - 2, gb->cpu.a);
+	gb->cpu.a = alu_sbc(gb, rd8(gb, wWarioXPos - 2), 0x00);
+	wr8(gb, hXPosLo - 3, gb->cpu.a);
+	SET_HL(gb, wWarioXPos - 2);
+	SET_DE(gb, hXPosLo - 3);
+	gb->cpu.b = PARTICLE_OWL;
+	FARCALL(CreateParticle);
+}

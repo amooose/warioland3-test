@@ -146,3 +146,39 @@ PORT_JUMP(ApplySlopedWalkVelocity)
 	}
 	JUMP(ApplyWalkVelocity);
 }
+
+PORT_JUMP(ApplyWalkVelocity_Right)
+{
+	gb->cpu.a = rd8(gb, wDirection);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z;
+		wr8(gb, wWalkVelIndex, 0);
+		JUMP(ApplyWalkVelocity);
+		return;
+	}
+	gb->cpu.a = rd8(gb, wWarioSlopeInteraction);
+	if (!alu_bit(gb, gb->cpu.a, RIGHT_SLOPE_F)) {
+		JUMP(ApplyWalkVelocity);
+		return;
+	}
+	JUMP(ApplySlopedWalkVelocity); // fallthrough
+}
+
+PORT_JUMP(ApplyWalkVelocity_Left)
+{
+	gb->cpu.a = rd8(gb, wDirection);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z;
+		wr8(gb, wWalkVelIndex, 0);
+		JUMP(ApplyWalkVelocity);
+		return;
+	}
+	gb->cpu.a = rd8(gb, wWarioSlopeInteraction);
+	if (!alu_bit(gb, gb->cpu.a, LEFT_SLOPE_F)) {
+		JUMP(ApplyWalkVelocity);
+		return;
+	}
+	JUMP(ApplySlopedWalkVelocity);
+}

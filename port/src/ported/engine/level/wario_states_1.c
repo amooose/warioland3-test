@@ -495,3 +495,361 @@ PORT_JUMP(HandleInput_Idling)
 	else
 		LJUMP(SetState_Turning);
 }
+
+PORT_JUMP(Func_1e174)
+{
+	st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	LJUMP(SetState_RollingAirborne); // fallthrough
+}
+
+PORT(Func_1f863)
+{
+	uint16_t hl = alu_add16(gb, ADDR_SwimStraightVelTable, REG_DE(gb));
+	SET_HL(gb, hl);
+	gb->cpu.b = rd8(gb, hl);
+	CALL(MoveWarioUp);
+}
+
+PORT(SetState_Throwing)
+{
+	xor_a(gb);
+	wr8(gb, wWarioStateCounter, 0);
+	wr8(gb, wWarioStateCycles, 0);
+	st(gb, wWarioState, WST_THROWING);
+}
+
+PORT(Func_1f3a7)
+{
+	FARCALL(CheckCentreCollision);
+	if (b_and(gb)) {
+		update_pos_y(gb);
+		st(gb, wc0e1, PAD_DOWN);
+		return;
+	}
+	SET_HL(gb, wCurWaterCurrent - 1);
+	gb->cpu.a = alu_or(gb, rd8(gb, wCurWaterCurrent), rd8(gb, wCurWaterCurrent - 1));
+	gb->cpu.a = alu_and(gb, gb->cpu.a, CURRENT_UP | CURRENT_DOWN);
+	if (!ZF)
+		return;
+	gb->cpu.b = 0x01;
+	CALL(MoveWarioDown);
+}
+
+PORT(SetState_SmashAttacking)
+{
+	st(gb, wIsSmashAttacking, 0x81);
+	st(gb, wWarioState, WST_SMASH_ATTACKING);
+	static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wJumpVelIndex,
+		wJumpVelTable, 0};
+	clear(gb, zero);
+	collision_box(gb, -1, -27, -9, 9);
+}
+
+PORT(SetState_LadderShakeStunned)
+{
+	st(gb, wWarioState, WST_LADDER_SHAKE_SLIDING);
+	play_sfx(gb, SFX_SLIDE);
+	static const uint16_t zero[] = {wSFXLoopCounter, wWarioStateCounter, wWarioStateCycles,
+		wIsGettingOffLadder, 0};
+	clear(gb, zero);
+	gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	wr8(gb, wJumpVelTable, gb->cpu.a);
+	reset_anim(gb);
+	set_frameset(gb, ADDR_Frameset_15948);
+	anim(gb, OAM1);
+}
+
+PORT_JUMP(StartDive)
+{
+	reset_anim(gb);
+	frameset_by_dir(gb, ADDR_Frameset_15569, ADDR_Frameset_15573);
+	anim(gb, OAM1);
+	LJUMP(SetState_Diving); // fallthrough
+}
+
+// ld a, [wWarioState] / cp WST_IDLING: true if still idling
+static bool still_idling(GB *gb)
+{
+	ld_cp(gb, wWarioState, WST_IDLING);
+	return ZF;
+}
+
+PORT_JUMP(UpdateState_Idling)
+{
+	FARCALL(CheckCentreCollision);
+	if (!still_idling(gb)) {
+		RET();
+		return;
+	}
+	if (!b_and(gb)) {
+		LJUMP(StartFall);
+		return;
+	}
+	update_pos_y(gb);
+	if (!still_idling(gb)) {
+		RET();
+		return;
+	}
+
+	if (ld_bit(gb, wJoypadDown, B_PAD_DOWN)) {
+		FARCALL(Func_19b12);
+		if (!still_idling(gb)) {
+			RET();
+			return;
+		}
+		ld_cp(gb, wLadderInteraction, LADDER_UNDERNEATH);
+		if (!ZF) {
+			LJUMP(CrouchOrSlide);
+			return;
+		}
+		FARCALL(SetState_LadderClimbing);
+		RET();
+		return;
+	}
+
+	anim(gb, OAM1);
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return;
+	}
+	if (ld_and(gb, wLadderInteraction) && ld_bit(gb, wJoypadDown, B_PAD_UP)) {
+		FARCALL(SetState_LadderClimbing);
+		RET();
+		return;
+	}
+	if (ld_and(gb, wIsNearFence) && ld_bit(gb, wJoypadDown, B_PAD_UP)) {
+		FARCALL(SetState_FenceMovingVertical);
+		RET();
+		return;
+	}
+	if (!still_idling(gb)) {
+		RET();
+		return;
+	}
+	LCALL(HandleInput_Idling);
+	if (!still_idling(gb) || ld_and(gb, wIsOnSteppableObject)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = alu_add(gb, rd8(gb, wWarioStateCounter), 1);
+	wr8(gb, wWarioStateCounter, gb->cpu.a);
+	gb->cpu.a = alu_adc(gb, rd8(gb, wWarioStateCycles), 0);
+	wr8(gb, wWarioStateCycles, gb->cpu.a);
+	alu_cp(gb, gb->cpu.a, NUM_SLEEPING_IDLE_CYCLES);
+	if (!CF)
+		FARCALL(SetState_Sleeping);
+	RET();
+}
+
+PORT(SetState_ThrowingAirborne)
+{
+	st(gb, wWarioState, WST_THROWING_AIRBORNE);
+	gb->cpu.a = alu_or(gb, alu_and(gb, rd8(gb, wGrabState), GRAB_FLAGS_MASK), GRAB_THROW);
+	wr8(gb, wGrabState, gb->cpu.a);
+	static const uint16_t zero[] = {wFrameDuration, wAnimationFrame, wWarioStateCounter,
+		wWarioStateCycles, 0};
+	clear(gb, zero);
+	frameset_by_dir(gb, ADDR_Frameset_15fae, ADDR_Frameset_15fb3);
+	anim(gb, OAM1);
+}
+
+PORT(SetState_WaterSurfaceMoving)
+{
+	st(gb, wWarioState, WST_WATER_SURFACE_MOVING);
+	collision_box(gb, -1, -27, -9, 9);
+	static const uint16_t zero[] = {wFrameDuration, wAnimationFrame, wWarioStateCounter,
+		wWarioStateCycles, wSwimVelIndex, 0};
+	clear(gb, zero);
+	frameset_by_dir(gb, ADDR_Frameset_15554, ADDR_Frameset_1555b);
+	anim(gb, OAM1);
+}
+
+PORT(SetState_Rolling)
+{
+	static const uint16_t zero[] = {wSFXLoopCounter, wJumpVelIndex, wJumpVelTable, 0};
+	clear(gb, zero);
+	st(gb, wWarioState, WST_ROLLING);
+	collision_box(gb, -1, -14, -9, 9);
+	st(gb, wIsRolling, 0x02);
+	reset_anim(gb);
+	frameset_by_dir(gb, ADDR_Frameset_166e6, ADDR_Frameset_166f7);
+	anim(gb, OAM1);
+}
+
+PORT(SetState_SwimKnockBack)
+{
+	play_sfx(gb, SFX_BUMP);
+	st(gb, wWarioState, WST_SWIM_KNOCK_BACK);
+	static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wSwimVelIndex,
+		wSwimmingDirectionInput, wc0e0, 0};
+	clear(gb, zero);
+	load_gfx(gb, BANK_WarioSwimGfx, ADDR_WarioSwimGfx);
+	reset_anim(gb);
+	frameset_by_dir(gb, ADDR_Frameset_15573, ADDR_Frameset_15569);
+	anim(gb, OAM1);
+}
+
+PORT(SetState_ThrowCharging)
+{
+	play_sfx(gb, SFX_02C);
+	static const uint16_t zero[] = {wFrameDuration, wAnimationFrame, wWarioStateCounter,
+		wWarioStateCycles, 0};
+	clear(gb, zero);
+	st(gb, wWarioState, WST_THROW_CHARGING);
+	gb->cpu.a = alu_add(gb, alu_and(gb, rd8(gb, wGrabState), GRAB_FLAGS_MASK), GRAB_CHARGE_THROW);
+	wr8(gb, wGrabState, gb->cpu.a);
+	load_gfx(gb, BANK_WarioThrowGfx, ADDR_WarioThrowGfx);
+	set_oam(gb, BANK_OAM_1606a, ADDR_OAM_1606a);
+	frameset_by_dir(gb, ADDR_Frameset_1642c, ADDR_Frameset_1642f);
+	anim(gb, OAM1);
+}
+
+PORT(SetState_CrouchSliding)
+{
+	xor_a(gb);
+	wr8(gb, wSFXLoopCounter, 0);
+	wr8(gb, wAttackCounter, 0);
+	play_sfx(gb, SFX_SLIDE);
+	st(gb, wWarioState, WST_CROUCH_SLIDING);
+	st(gb, wIsCrouching, TRUE);
+	collision_box(gb, -1, -15, -9, 9);
+	static const uint16_t zero[] = {wFrameDuration, wAnimationFrame, wWarioStateCounter,
+		wWarioStateCycles, 0};
+	clear(gb, zero);
+	load_gfx(gb, BANK_WarioWalkGfx, ADDR_WarioWalkGfx);
+	set_oam(gb, BANK_OAM_1426c, ADDR_OAM_1426c);
+	ld_cp(gb, wDirection, DIRECTION_RIGHT);
+	set_frameset(gb, ZF ? ADDR_Frameset_14a3b : ADDR_Frameset_14a38);
+	anim(gb, OAM1);
+}
+
+PORT_JUMP(UpdateState_PickedUp)
+{
+	bool wiggle;
+	bool right = facing_right(gb);
+	if (!right)
+		wiggle = ld_mask(gb, wJoypadPressed, PAD_A | PAD_B | PAD_RIGHT);
+	else
+		wiggle = ld_mask(gb, wJoypadPressed, PAD_A | PAD_B | PAD_LEFT);
+	if (!wiggle) {
+		anim(gb, OAM1);
+		SET_HL(gb, wPickedUpFrameCounter);
+		wr8(gb, wPickedUpFrameCounter, alu_dec(gb, rd8(gb, wPickedUpFrameCounter))); // dec [hl]
+		if (!ZF) {
+			RET();
+			return;
+		}
+		st(gb, wPickedUpFrameCounter, MAX_PICKEB_PAD_UPRAME_COUNTER);
+		st(gb, wPickedUpWiggleCounter, NUM_WIGGLES_TO_ESCAPE);
+		RET();
+		return;
+	}
+	st(gb, wPickedUpFrameCounter, MAX_PICKEB_PAD_UPRAME_COUNTER);
+	if (!right) {
+		st(gb, wDirection, DIRECTION_RIGHT);
+		set_frameset(gb, ADDR_Frameset_15f7f);
+	} else {
+		st(gb, wDirection, DIRECTION_LEFT);
+		set_frameset(gb, ADDR_Frameset_15f70);
+	}
+	reset_anim(gb);
+	anim(gb, OAM1);
+	st(gb, wPickedUpFrameCounter, MAX_PICKEB_PAD_UPRAME_COUNTER);
+	SET_HL(gb, wPickedUpWiggleCounter);
+	wr8(gb, wPickedUpWiggleCounter, alu_dec(gb, rd8(gb, wPickedUpWiggleCounter))); // dec [hl]
+	if (!ZF) {
+		RET();
+		return;
+	}
+	xor_a(gb);
+	wr8(gb, wAutoMoveState, 0);
+	LJUMP(StartFall);
+}
+
+PORT(SetState_UnderwaterThrusting)
+{
+	st(gb, wWarioState, WST_UNDERWATER_THRUSTING);
+	collision_box(gb, -1, -15, -9, 9);
+	static const uint16_t zero[] = {wSFXLoopCounter, wSwimVelIndex, wWarioStateCycles,
+		wFrameDuration, wAnimationFrame, 0};
+	clear(gb, zero);
+	bool right;
+	if (!ld_and(gb, wSwimmingDirectionInput)) {
+		ld_cp(gb, wDirection, DIRECTION_RIGHT);
+		right = ZF;
+		st(gb, wSwimmingDirectionInput, right ? PAD_RIGHT : PAD_LEFT);
+	} else if (ld_bit(gb, wSwimmingDirectionInput, B_PAD_LEFT)) {
+		right = false;
+	} else if (alu_bit(gb, gb->cpu.a, B_PAD_RIGHT)) {
+		right = true;
+	} else {
+		right = facing_right(gb);
+	}
+	st(gb, wDirection, right ? DIRECTION_RIGHT : DIRECTION_LEFT);
+	ld_cp(gb, wPowerUpLevel, PRINCE_FROGS_GLOVES);
+	if (right)
+		set_frameset(gb, CF ? ADDR_Frameset_155c5 : ADDR_Frameset_1556c);
+	else
+		set_frameset(gb, CF ? ADDR_Frameset_155be : ADDR_Frameset_15562);
+	anim(gb, OAM1);
+}
+
+PORT_JUMP(StartUpwardsUnderwaterThrusting)
+{
+	st(gb, wSwimmingDirectionInput, PAD_UP);
+	LJUMP(SetState_UnderwaterThrusting);
+}
+
+PORT_JUMP(SetState_SwimKnockBack_SwitchDirection)
+{
+	flip_dir(gb);
+	LJUMP(SetState_SwimKnockBack); // fallthrough
+}
+
+PORT_JUMP(StartUnderwaterThrusting)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wJoypadDown), PAD_CTRL_PAD);
+	wr8(gb, wSwimmingDirectionInput, gb->cpu.a);
+	LJUMP(SetState_UnderwaterThrusting); // fallthrough
+}
+
+PORT_JUMP(Func_1de3f)
+{
+	reset_anim(gb);
+	frameset_by_dir(gb, ADDR_Frameset_163fe, ADDR_Frameset_1641e);
+	anim(gb, OAM1);
+	gb->cpu.a = alu_add(gb, alu_and(gb, rd8(gb, wGrabState), GRAB_FLAGS_MASK), GRAB_THROW);
+	wr8(gb, wGrabState, gb->cpu.a);
+	LJUMP(SetState_Throwing); // fallthrough
+}
+
+// airborne gfx and OAM, then a frameset by direction and the animation
+static void airborne_gfx(GB *gb, uint16_t left, uint16_t right)
+{
+	reset_anim(gb);
+	load_gfx(gb, BANK_WarioAirborneGfx, ADDR_WarioAirborneGfx);
+	wr8(gb, wWarioOAMPtr + 0, (uint8_t)(ADDR_OAM_15955 >> 8));
+	st(gb, wWarioOAMPtr + 1, (uint8_t)ADDR_OAM_15955);
+	frameset_by_dir(gb, left, right);
+	anim(gb, OAM1);
+}
+
+PORT_JUMP(DoGroundPound)
+{
+	play_sfx(gb, SFX_GROUND_POUND);
+	airborne_gfx(gb, ADDR_Frameset_15ff2, ADDR_Frameset_16009);
+	LJUMP(SetState_SmashAttacking); // fallthrough
+}
+
+PORT_JUMP(DoWarioGroundShake)
+{
+	if (!ld_and(gb, wGroundShakeCounter)) {
+		st(gb, wGroundShakeCounter, 32);
+		st(gb, wIsWarioGroundShaking, TRUE);
+	}
+	if (!ld_and(gb, wFloorTransitionDir))
+		play_sfx(gb, SFX_GROUND_SHAKE);
+	airborne_gfx(gb, ADDR_Frameset_15fb8, ADDR_Frameset_15fc5);
+	LJUMP(SetState_SmashAttacking);
+}
