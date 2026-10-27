@@ -313,3 +313,13 @@ PORT(Func_19bce)
 	gb_call_ret(gb, ADDR_ProcessBlock, (uint16_t)(ADDR_Func_19bce + 3));
 	gb->cpu.b = gb->cpu.a;
 }
+
+PORT(Func_19823)
+{
+	gb->cpu.a = TRUE;
+	wr8(gb, wBlockFuncBreakFlag, TRUE);
+	gb_call_ret(gb, ADDR_Func_19bd3, ADDR_Func_19823 + 0x08);
+	gb->cpu.a = 0x01;
+	wr8(gb, wUnused_c18d, 0x01);
+	gb->cpu.b = 0x01;
+}

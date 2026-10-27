@@ -135,3 +135,14 @@ PORT(TriggerFloorTransition)
 	SET_DE(gb, wWarioYPos + 1);
 	trigger_floor_transition(gb); // fallthrough
 }
+
+PORT_JUMP(ApplySlopedWalkVelocity)
+{
+	gb->cpu.a = rd8(gb, wWalkVelIndex);
+	alu_cp(gb, gb->cpu.a, 0x08);
+	if (!(gb->cpu.f & FLAG_C)) {
+		gb->cpu.a = 0x04;
+		wr8(gb, wWalkVelIndex, 0x04);
+	}
+	JUMP(ApplyWalkVelocity);
+}

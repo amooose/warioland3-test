@@ -149,3 +149,52 @@ PORT(Func_1808c)
 	gb->cpu.a = 0;
 	gb->cpu.f = FLAG_Z; // xor a
 }
+
+PORT_JUMP(Func_182ec)
+{
+	gb->cpu.a = rd8(gb, wCollisionPoints);
+	if (!alu_bit(gb, gb->cpu.a, COLLISION_UNK7_F)) {
+		JUMP_TO(ADDR_BlockFunc_Floor);
+		return;
+	}
+	gb->cpu.a = LADDER_UNDERNEATH;
+	wr8(gb, wLadderInteraction, gb->cpu.a);
+	JUMP_TO(ADDR_Func_1808c);
+}
+
+// ld a, HIGH(ptr) / ld [addr + 0], a / ld a, LOW(ptr) / ld [addr + 1], a
+static void st_ptr_be(GB *gb, uint16_t addr, uint16_t ptr)
+{
+	wr8(gb, addr + 0, (uint8_t)(ptr >> 8));
+	gb->cpu.a = (uint8_t)ptr;
+	wr8(gb, addr + 1, gb->cpu.a);
+}
+
+PORT_JUMP(EnterDoor)
+{
+	// centre on the door
+	gb->cpu.a = alu_add(gb, alu_and(gb, rd8(gb, wWarioXPos + 1), 0xf0), 0x08);
+	wr8(gb, wWarioXPos + 1, gb->cpu.a);
+	play_sfx(gb, SFX_0E6);
+
+	gb->cpu.a = WST_ENTERING_DOOR;
+	wr8(gb, wWarioState, gb->cpu.a);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	static const uint16_t zero[] = {wSFXLoopCounter, wWarioStateCounter, wGrabState, wAttackCounter,
+		wJumpVelIndex, wJumpVelTable, wIsCrouching, wFrameDuration, wAnimationFrame};
+	for (unsigned i = 0; i < sizeof(zero) / sizeof(zero[0]); i++)
+		wr8(gb, zero[i], 0);
+
+	wr8(gb, wDMASourceBank, BANK_WarioIdleGfx);
+	st_ptr_be(gb, wDMASourcePtr, ADDR_WarioIdleGfx);
+	CALL(LoadWarioGfx);
+	wr8(gb, wWarioOAMBank, BANK_OAM_14a82);
+	st_ptr_be(gb, wWarioOAMPtr, ADDR_OAM_14a82);
+	gb->cpu.a = rd8(gb, wDirection);
+	bool right = alu_and(gb, gb->cpu.a, gb->cpu.a) != 0;
+	st_ptr_be(gb, wWarioFramesetPtr, right ? ADDR_Frameset_14d10 : ADDR_Frameset_14d0b);
+	FARCALL_BANK(BANK_OAM_14000, UpdateWarioAnimation); // BANK("Wario OAM 1")
+	JUMP_TO(ADDR_BlockFunc_Free);
+}

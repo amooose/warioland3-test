@@ -133,3 +133,31 @@ PORT(FadePalConfig)
 	wr8(gb, steps_ptr, gb->cpu.a);
 	alu_cp(gb, gb->cpu.a, 0x20);
 }
+
+// Fades palette config 1 (background) or 2 (objects), slowly.
+static void fade_pal_config_slow(GB *gb, uint16_t reg_addr, uint8_t reg, uint8_t config, uint16_t total_steps)
+{
+	gb->cpu.a = reg;
+	wr8(gb, reg_addr, reg);
+	if (config) {
+		gb->cpu.a = config;
+	} else {
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+	}
+	wr8(gb, wPalConfigToFade, config);
+	gb->cpu.a = 1; // slow fade
+	wr8(gb, wPalFadeRepeat, 1);
+	SET_HL(gb, total_steps);
+	gb_call(gb, ADDR_FadePalConfig);
+}
+
+PORT(Func_851bc)
+{
+	fade_pal_config_slow(gb, wPalConfig1Register, (uint8_t)rBGPI, 0, wPalConfig1TotalSteps);
+}
+
+PORT(Func_851d1)
+{
+	fade_pal_config_slow(gb, wPalConfig2Register, (uint8_t)rOBPI, 1, wPalConfig2TotalSteps);
+}

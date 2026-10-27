@@ -27,13 +27,13 @@ scripting and expansion on top. The approach:
 
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`. All
   work is pushed and the tests are green.
-- **Progress:** 643 / 3491 routines ported (18.4%), 11.2% of the
+- **Progress:** 703 / 3491 routines ported (20.1%), 12.0% of the
   instructions. With hooks on, about half of what the game executes runs as
   C. Run `cmake --build build --target progress` and read
   `build/progress.md` for the per-directory numbers and the "ready to port"
   list.
-- **Fully ported:** `src/audio`. `src/home` is about 57% ported (by
-  instructions), and 11-14% of the level engine and the overworld.
+- **Fully ported:** `src/audio`. `src/home` is about 58% ported (by
+  instructions), and 13-16% of the level engine and the overworld.
 - **Tests:** `ctest --test-dir build -j6` runs a difftest and a fuzz pass
   for each input in `tests/inputs/` (8 tests with the 4 inputs there now;
   `action_help2` is a local recording that isn't committed yet).
@@ -121,6 +121,10 @@ Each step that worked in the cloud session:
   `call` opcode (`cd lo hi`) inside the routine. `CheckAirborneCollision`,
   `CheckCentreCollision`, `IsOnSlipperyGround` and the `Func_35xx`
   wrappers do this.
+- **Local labels** (jumptable targets, data tables after a routine) aren't
+  in `syms.h`; take their offsets from `warioland3.sym`, which has them
+  (`Func_810fc.PathNone`), and write `ADDR_Routine + offset`.
+  `Func_810fc` and `SetSceneWarioState` do this.
 - **`dec l` / `inc e` versus `hld` / `hli`.** The 8-bit ones don't carry into
   the high byte, so model them as 8-bit.
 - **Unmasked arithmetic.** Fade components can wrap below 0 and then spill
@@ -163,24 +167,19 @@ Each step that worked in the cloud session:
 
 ## Good next batches
 
-- **`wario_states_1.asm`:** the biggest unported Wario-state file. More
-  `SetState_*` routines are ready (see progress.md), and
-  `engine/level/wario_states_1.c` already has the helpers.
-- **`wario_states_3.asm` / `wario_states_4.asm`:** the `SetState_Zombie*`,
-  `SetState_Blind*`, `SetState_Bouncy*` and `SetState_Hot` routines.
-- **`update_objects.asm`:**
-  - `Func_6284f` (376 calls) and `Func_628a7`;
-  - `_CountActiveTransientObjects`;
-  - `Func_62ec3` and `Func_62faa` (about 80 instructions each).
-- **`block_functions.asm`:** `Func_182ec` (1,400 calls), `Func_18064`,
-  `EnterDoor`, `EnterPipeUp` and `EnterPipeDown`.
+- **Wario states:** `SetState_ZombieIdling`, `SetState_FatIdling`,
+  `SetState_BlindIdling`, `SetState_Hot`, `SetState_OnFireAirborne`,
+  `SetState_Splitting` (wario_states_3/4). The helpers in
+  `engine/level/wario_states_1.c` carry over.
+- **Objects:** `ChestFunc`, `ClearGateFunc`, `DoughnutFunc_Destroy`; and
+  `_CountActiveTransientObjects`, `Func_6284f`, `Func_628a7` in
+  `update_objects.asm`.
 - **Overworld:**
-  - `SetSceneWarioState` (94 instructions, the hub of the cutscene state
-    changes);
-  - `Func_b507c` (28,000 calls) and `Func_b4e4d`, both 1 instruction;
-  - `VBlank_Overworld` (115 instructions).
-- **Level:** `StartJump_FromInput` (600 calls), `SpawnObject`,
-  `TorchEmberCommonFunc`.
+  - `VBlank_Overworld` (115 instructions) and `VBlank_OWPalTransition`;
+  - `Func_821a1`, `GoToNextLine`;
+  - `ActionHelp_FlashBInput`, `LoadActionHelpBGPals`.
+- **Other:** `PanIntroBackgroundLayers` (title, timed), `CalculateBackupSRAMChecksum1`.
+- `build/progress.md` lists more under "Ready to port".
 
 ## Recordings
 

@@ -210,3 +210,151 @@ PORT_JUMP(Func_62e31)
 	static const uint8_t states[4] = {OBJSTATE_STUN_RIGHT_START, OBJSTATE_21, OBJSTATE_23, OBJSTATE_25};
 	set_state_by_y_vel(gb, states);
 }
+
+// Stores hPos's y in wCurObjYPos, and updates OBJ_VAR_2 by the slope the
+// object is on: set to `set` on the slope `slope_set`, kept on the slope
+// `slope_keep`, else counted down to 0. Then hl = OBJ_STATE, and on to
+// `next`.
+static void store_y_pos_by_slope(GB *gb, uint8_t slope_keep, uint8_t slope_set, bool dec, uint16_t next)
+{
+	wr8(gb, wCurObjYPos + 0, rd8(gb, hYPosLo));
+	gb->cpu.a = rd8(gb, hYPosHi);
+	wr8(gb, wCurObjYPos + 1, gb->cpu.a);
+	SET_HL(gb, wCurObjYPos + 1);
+	gb->cpu.a = alu_and(gb, rd8(gb, wObjSlopeInteraction), 0x0f);
+	alu_cp(gb, gb->cpu.a, slope_keep);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		gb->cpu.l = OBJ_VAR_2;
+		uint16_t hl = REG_HL(gb);
+		alu_cp(gb, gb->cpu.a, slope_set);
+		if (gb->cpu.f & FLAG_Z) {
+			if (dec)
+				gb->cpu.a = alu_dec(gb, gb->cpu.a);
+			wr8(gb, hl, gb->cpu.a);
+		} else {
+			gb->cpu.a = rd8(gb, hl);
+			if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+				wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+		}
+	}
+	gb->cpu.l = OBJ_STATE;
+	JUMP_TO(next); // fallthrough
+}
+
+PORT_JUMP(Func_62d34) { store_y_pos_by_slope(gb, RIGHT_SLOPE, 0x02, true, ADDR_Func_62d57); }
+PORT_JUMP(Func_62e0f) { store_y_pos_by_slope(gb, LEFT_SLOPE, 0x01, false, ADDR_Func_62e31); }
+
+// hPos = wCurObjYPos + (-dy, -dx), with the asm's sub / sbc
+static void set_hpos_sub(GB *gb, uint16_t hl, uint8_t dy)
+{
+	gb->cpu.a = alu_sub(gb, rd8(gb, hl++), dy);
+	wr8(gb, hYPosLo, gb->cpu.a);
+	gb->cpu.a = alu_sbc(gb, rd8(gb, hl++), 0);
+	wr8(gb, hYPosHi, gb->cpu.a);
+	SET_HL(gb, hl);
+}
+
+// ld a, [addr] / cpl / inc a / ld b, a
+static uint8_t neg_into_b(GB *gb, uint16_t addr)
+{
+	gb->cpu.a = alu_inc(gb, alu_cpl(gb, rd8(gb, addr)));
+	gb->cpu.b = gb->cpu.a;
+	return gb->cpu.b;
+}
+
+// An object thrown to the left (Func_62ec3) or right (Func_62faa): bc =
+// table of y movements, indexed by OBJ_VAR_3 (+$10 if heavy).
+static void thrown_object_movement(GB *gb, bool left)
+{
+	uint16_t routine = left ? ADDR_Func_62ec3 : ADDR_Func_62faa;
+	uint16_t hl = wCurObjVar3;
+	SET_HL(gb, hl);
+	gb->cpu.a = alu_add(gb, rd8(gb, hl), gb->cpu.c);
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.a = alu_rla(gb, rd8(gb, wCurObjInteractionType));
+	if (gb->cpu.f & FLAG_C) { // heavy
+		gb->cpu.a = alu_add(gb, gb->cpu.c, 0x10);
+		gb->cpu.c = gb->cpu.a;
+	}
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.c = alu_dec(gb, gb->cpu.c);
+		gb->cpu.a = rd8(gb, REG_BC(gb));
+	} else {
+		wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+	}
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.l = OBJ_Y_POS;
+		hl = REG_HL(gb);
+		gb->cpu.c = rd8(gb, hl);
+		gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.c);
+		wr8(gb, hl++, gb->cpu.a);
+		SET_HL(gb, hl);
+		if (!(gb->cpu.f & FLAG_C))
+			wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+	}
+	if (left)
+		CALL(MoveObjectLeftByVar2);
+	else
+		CALL(MoveObjectRightByVar2);
+
+	gb->cpu.a = alu_add(gb, rd8(gb, wCurObjScreenXPos), 0x28);
+	alu_cp(gb, gb->cpu.a, left ? 0xf0 : 0x10);
+	if (left ? !(gb->cpu.f & FLAG_C) : (gb->cpu.f & FLAG_C)) {
+		gb->cpu.l = OBJ_FLAGS;
+		hl = REG_HL(gb);
+		wr8(gb, hl, (uint8_t)(rd8(gb, hl) & ~(1 << OBJFLAG_GRABBED_F)));
+	}
+
+	uint8_t b = neg_into_b(gb, wCurObjCollBoxTop);
+	set_hpos_sub(gb, wCurObjYPos, b);
+	hl = REG_HL(gb);
+	gb->cpu.a = rd8(gb, hl++);
+	wr8(gb, hXPosLo, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hl++);
+	wr8(gb, hXPosHi, gb->cpu.a);
+	SET_HL(gb, hl);
+	gb_call_ret(gb, ADDR_Func_358b, (uint16_t)(routine + 0x50));
+	gb->cpu.a = alu_and(gb, gb->cpu.a, 0x0f);
+	bool collided = gb->cpu.a != 0;
+	if (!collided) {
+		set_hpos_sub(gb, wCurObjYPos, 8);
+		hl = REG_HL(gb);
+		if (left) {
+			b = neg_into_b(gb, wCurObjCollBoxLeft);
+			gb->cpu.a = alu_sub(gb, rd8(gb, hl++), b);
+			wr8(gb, hXPosLo, gb->cpu.a);
+			gb->cpu.a = alu_sbc(gb, rd8(gb, hl++), 0);
+			wr8(gb, hXPosHi, gb->cpu.a);
+		} else {
+			gb->cpu.a = alu_add(gb, rd8(gb, wCurObjCollBoxRight), rd8(gb, hl));
+			wr8(gb, hXPosLo, gb->cpu.a);
+			hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl + 1)); // inc l
+			gb->cpu.a = alu_adc(gb, rd8(gb, hl), 0);
+			wr8(gb, hXPosHi, gb->cpu.a);
+		}
+		SET_HL(gb, hl);
+		gb_call_ret(gb, ADDR_Func_3513, (uint16_t)(routine + (left ? 0x73 : 0x70)));
+		gb->cpu.a = alu_and(gb, gb->cpu.a, 0x0f);
+		collided = gb->cpu.a != 0;
+	}
+	if (!collided) {
+		SET_HL(gb, wCurObjStateDuration);
+		uint8_t d = alu_dec(gb, rd8(gb, wCurObjStateDuration));
+		wr8(gb, wCurObjStateDuration, d);
+		if (d) {
+			JUMP(HomeJumpRet);
+			return;
+		}
+	}
+	// stops when it lands or hits something, the other way after a hit
+	gb->cpu.a = (collided == left) ? OBJSTATE_27 : OBJSTATE_26;
+	wr8(gb, wCurObjState, gb->cpu.a);
+	SET_HL(gb, wCurObjFlags);
+	wr8(gb, wCurObjFlags, (uint8_t)(rd8(gb, wCurObjFlags) & ~(1 << OBJFLAG_NO_COLLISION_F)));
+	JUMP(HomeJumpRet);
+}
+
+PORT_JUMP(Func_62ec3) { thrown_object_movement(gb, true); }
+PORT_JUMP(Func_62faa) { thrown_object_movement(gb, false); }

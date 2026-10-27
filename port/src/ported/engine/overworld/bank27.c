@@ -80,3 +80,35 @@ PORT(Func_9f0a5)
 	gb->cpu.l = gb->cpu.c;
 	gb->cpu.h = gb->cpu.b;
 }
+
+PORT(LoadCutscenes5Gfx_Vram0)
+{
+	// decompress_tiles0 Cutscenes5Gfx, v0Tiles2
+	wr8(gb, wTempBank, BANK_Cutscenes5Gfx);
+	SET_HL(gb, ADDR_Cutscenes5Gfx);
+	SET_BC(gb, v0Tiles2);
+	gb->cpu.a = rd8(gb, wTempBank);
+	wr8(gb, hCallFuncBank, gb->cpu.a);
+	HCALL(Decompress);
+}
+
+PORT(Func_9cd16)
+{
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+	// stop_sfx
+	wr8(gb, hSFXID + 0, 0xff);
+	gb->cpu.a = 0x00;
+	wr8(gb, hSFXID + 1, 0x00);
+}
+
+PORT(Func_9ce1f) { play_sfx(gb, SFX_112); }
+
+// hl = scene object
+PORT(Func_9fb61)
+{
+	SET_DE(gb, ADDR_OAM_bc000);
+	gb->cpu.a = alu_and(gb, 0xfc, gb->cpu.l);
+	gb->cpu.l = gb->cpu.a;
+	gb_call(gb, ADDR_Func_9f0bc);
+}

@@ -171,3 +171,15 @@ PORT_JUMP(Func_b507f)
 	SET_DE(gb, ADDR_OAM_a8000);
 	JUMP(LoadCurSceneObjSpriteWithScroll);
 }
+
+PORT_JUMP(Func_b4e4d)
+{
+	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
+	JUMP_TO(ADDR_Func_b4e50); // fallthrough
+}
+
+PORT_JUMP(Func_b507c)
+{
+	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
+	JUMP_TO(ADDR_Func_b507f); // fallthrough
+}

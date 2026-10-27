@@ -452,3 +452,41 @@ PORT_JUMP(StartCrouchJump)
 	wr8(gb, wJumpVelIndex, 0);
 	LJUMP(SetState_CrouchAirborne); // fallthrough
 }
+
+PORT_JUMP(StartFall_SkipResetJumpUpwards)
+{
+	st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	LJUMP(StartJump); // jr
+}
+
+PORT_JUMP(StartJump_FromInput)
+{
+	play_sfx(gb, SFX_JUMP);
+	xor_a(gb);
+	wr8(gb, wJumpVelIndex, 0);
+	wr8(gb, wIsSmashAttacking, 0);
+	st(gb, wJumpingUpwards, TRUE);
+	LJUMP(StartJump); // fallthrough
+}
+
+PORT_JUMP(DiveFromSurface_SkipSplash)
+{
+	st(gb, wCollisionBoxTop, (uint8_t)-27);
+	set_oam(gb, BANK_OAM_15254, ADDR_OAM_15254);
+	xor_a(gb);
+	wr8(gb, wFrameDuration, 0);
+	wr8(gb, wAnimationFrame, 0);
+	set_frameset(gb, facing_right(gb) ? ADDR_Frameset_155a3 : ADDR_Frameset_155a0);
+	anim(gb, OAM1);
+	LJUMP(SetState_Diving); // jr
+}
+
+PORT_JUMP(SurfaceFromUnderwater)
+{
+	xor_a(gb);
+	wr8(gb, wSFXLoopCounter, 0);
+	wr8(gb, wWaterSurfaceFloatingCounter, 0);
+	load_gfx(gb, BANK_WarioSwimGfx, ADDR_WarioSwimGfx);
+	set_oam(gb, BANK_OAM_15254, ADDR_OAM_15254);
+	LJUMP(SetState_WaterSurfaceIdling); // fallthrough
+}

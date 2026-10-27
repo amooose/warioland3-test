@@ -37,3 +37,14 @@ PORT(Func_21cc9)
 	gb->cpu.b = OBJACTION_13;
 	CALL(SetObjAction);
 }
+
+PORT(CollectKey)
+{
+	play_sfx(gb, SFX_KEY);
+	gb_call(gb, ADDR_Func_20a63);
+	gb->cpu.a = ST_COLLECT_KEY;
+	wr8(gb, wState, ST_COLLECT_KEY);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wTimer, 0);
+}

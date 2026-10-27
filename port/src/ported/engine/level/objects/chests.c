@@ -21,3 +21,10 @@ PORT_JUMP(TreasureFunc)
 	}
 	JUMP(SetObjectFramesetPtr);
 }
+
+PORT(DeinitChest)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCurObjFlags, 0);
+}

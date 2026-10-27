@@ -231,6 +231,46 @@ static inline uint8_t alu_rla(GB *gb, uint8_t v)
 	gb->cpu.f = (v & 0x80) ? FLAG_C : 0;
 	return r;
 }
+// rra: carry into bit 7, bit 0 into carry, z clear
+static inline uint8_t alu_rra(GB *gb, uint8_t v)
+{
+	uint8_t r = (uint8_t)(v >> 1 | ((gb->cpu.f & FLAG_C) ? 0x80 : 0));
+	gb->cpu.f = (v & 1) ? FLAG_C : 0;
+	return r;
+}
+// rlca: bit 7 into bit 0 and carry, z clear
+static inline uint8_t alu_rlca(GB *gb, uint8_t v)
+{
+	gb->cpu.f = (v & 0x80) ? FLAG_C : 0;
+	return (uint8_t)(v << 1 | v >> 7);
+}
+// rl r (the CB one, which sets z)
+static inline uint8_t alu_rl(GB *gb, uint8_t v)
+{
+	uint8_t r = (uint8_t)(v << 1 | ((gb->cpu.f & FLAG_C) ? 1 : 0));
+	gb->cpu.f = (uint8_t)((r ? 0 : FLAG_Z) | ((v & 0x80) ? FLAG_C : 0));
+	return r;
+}
+// sla r
+static inline uint8_t alu_sla(GB *gb, uint8_t v)
+{
+	uint8_t r = (uint8_t)(v << 1);
+	gb->cpu.f = (uint8_t)((r ? 0 : FLAG_Z) | ((v & 0x80) ? FLAG_C : 0));
+	return r;
+}
+// sra r
+static inline uint8_t alu_sra(GB *gb, uint8_t v)
+{
+	uint8_t r = (uint8_t)(v >> 1 | (v & 0x80));
+	gb->cpu.f = (uint8_t)((r ? 0 : FLAG_Z) | ((v & 1) ? FLAG_C : 0));
+	return r;
+}
+// cpl: n and h set, z and carry unchanged
+static inline uint8_t alu_cpl(GB *gb, uint8_t v)
+{
+	gb->cpu.f |= FLAG_N | FLAG_H;
+	return (uint8_t)~v;
+}
 // bit n, r: z set if the bit is clear, h set, carry unchanged
 static inline bool alu_bit(GB *gb, uint8_t v, int bit)
 {

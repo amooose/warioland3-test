@@ -314,3 +314,21 @@ PORT(LoadLevelName)
 	gb->cpu.a = 32 - 1; // 32 dma_tiles
 	wr8(gb, w2d0b5Mode, gb->cpu.a);
 }
+
+// play_music2: sets hMusicIDBackup and hMusicID
+static void play_music2(GB *gb, uint16_t music)
+{
+	gb->cpu.a = (uint8_t)(music >> 8);
+	wr8(gb, hMusicIDBackup + 0, gb->cpu.a);
+	wr8(gb, hMusicID + 0, gb->cpu.a);
+	gb->cpu.a = (uint8_t)music;
+	wr8(gb, hMusicIDBackup + 1, gb->cpu.a);
+	wr8(gb, hMusicID + 1, gb->cpu.a);
+}
+
+PORT(PlayOverworldMusic)
+{
+	gb->cpu.a = rd8(gb, w2d011);
+	bool night = alu_and(gb, gb->cpu.a, gb->cpu.a) != 0;
+	play_music2(gb, night ? MUSIC_OVERWORLD_NIGHT : MUSIC_OVERWORLD_DAY);
+}
