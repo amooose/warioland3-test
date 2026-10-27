@@ -94,3 +94,195 @@ PORT(LoadActionHelpSprite)
 	SET_HL(gb, ADDR_OAM_1e697c);
 	CALL(LoadSprite);
 }
+
+// Copies b palettes from hl to the palette data register c, one palette
+// per HBlank (wait_not_hblank / wait_hblank).
+static void copy_pals_hblank(GB *gb)
+{
+	uint16_t hl = REG_HL(gb);
+	do {
+		while (!(gb->cpu.a = alu_and(gb, rd8(gb, rSTAT), STAT_MODE)))
+			idle(gb, 32);
+		while ((gb->cpu.a = alu_and(gb, rd8(gb, rSTAT), STAT_MODE)))
+			idle(gb, 32);
+		for (int i = 0; i < PAL_SIZE; i++) {
+			gb->cpu.a = rd8(gb, hl++);
+			wr8(gb, (uint16_t)(0xff00 + gb->cpu.c), gb->cpu.a);
+		}
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (gb->cpu.b);
+	SET_HL(gb, hl);
+}
+
+// push hl / ld de, dst / ld b, n / call CopyHLToDE_Short / pop hl
+static void copy_pals_keep_hl(GB *gb, uint16_t dst, uint8_t n)
+{
+	uint16_t hl = REG_HL(gb);
+	gb_push16(gb, hl);
+	SET_DE(gb, dst);
+	gb->cpu.b = n;
+	CALL(CopyHLToDE_Short);
+	SET_HL(gb, gb_pop16(gb));
+}
+
+static void write_a_to_hl(GB *gb, uint16_t hl, uint8_t n)
+{
+	SET_HL(gb, hl);
+	gb->cpu.b = n;
+	CALL(WriteAToHL_BTimes);
+}
+
+// Returns whether the power-up being demonstrated is a main one; if so,
+// leaves the carry of comparing it with Wario's power-up level.
+static bool cp_power_up_level(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wActionHelpPowerUp);
+	alu_cp(gb, gb->cpu.a, NUM_MAIN_POWER_UPS);
+	if (!(gb->cpu.f & FLAG_C))
+		return false;
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_and(gb, rd8(gb, wPowerUpLevel), POWER_UP_MASK);
+	alu_cp(gb, gb->cpu.a, gb->cpu.b);
+	return true;
+}
+
+PORT(LoadActionHelpOBPals)
+{
+	SET_HL(gb, ADDR_Pals_1e4f2f);
+	if (!cp_power_up_level(gb))
+		return; // special Power-Up
+	if (gb->cpu.f & FLAG_C) {
+		// doesn't have Power-Up, so black out some OB pals
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		write_a_to_hl(gb, wTempPals2, 2 * PAL_SIZE);
+		write_a_to_hl(gb, wTempPals2 + 3 * PAL_SIZE, 5 * PAL_SIZE);
+		SET_HL(gb, wTempPals2);
+	} else {
+		copy_pals_keep_hl(gb, wTempPals2, 8 * PAL_SIZE);
+	}
+	gb->cpu.a = OBPI_AUTOINC | 0;
+	wr8(gb, rOBPI, gb->cpu.a);
+	gb->cpu.b = 8;
+	gb->cpu.c = (uint8_t)rOBPD;
+	copy_pals_hblank(gb);
+}
+
+PORT(Func_1e4a47)
+{
+	SET_HL(gb, ADDR_Pals_1e4f2f + 4 * PAL_SIZE);
+	if (!cp_power_up_level(gb))
+		return;
+	if (gb->cpu.f & FLAG_C) {
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		write_a_to_hl(gb, wTempPals2 + 4 * PAL_SIZE, PAL_SIZE);
+		write_a_to_hl(gb, wTempPals2 + 7 * PAL_SIZE, PAL_SIZE);
+		SET_HL(gb, wTempPals2 + 4 * PAL_SIZE);
+	} else {
+		uint16_t hl = REG_HL(gb);
+		gb_push16(gb, hl);
+		SET_DE(gb, wTempPals2 + 4 * PAL_SIZE);
+		gb->cpu.b = PAL_SIZE;
+		CALL(CopyHLToDE_Short);
+		SET_HL(gb, ADDR_Pals_1e4f2f + 7 * PAL_SIZE);
+		SET_DE(gb, wTempPals2 + 7 * PAL_SIZE);
+		gb->cpu.b = PAL_SIZE;
+		CALL(CopyHLToDE_Short);
+		SET_HL(gb, gb_pop16(gb));
+	}
+	gb->cpu.a = OBPI_AUTOINC | (4 * PAL_SIZE);
+	wr8(gb, rOBPI, gb->cpu.a);
+	gb->cpu.c = (uint8_t)rOBPD;
+	gb->cpu.b = 4;
+	copy_pals_hblank(gb);
+}
+
+// writes a 2x2 block of a at hl (VRAM bank already mapped); de = TILEMAP_WIDTH
+// ld [hli], a / ld [hld], a / add hl, de / ld [hli], a / ld [hl], a
+static uint16_t fill_2x2(GB *gb, uint16_t hl, uint8_t a)
+{
+	wr8(gb, hl++, a);
+	wr8(gb, hl--, a);
+	hl = alu_add16(gb, hl, REG_DE(gb));
+	wr8(gb, hl++, a);
+	wr8(gb, hl, a);
+	return hl;
+}
+
+// .Func_1e499c: draws an empty power-up slot at hl
+static void draw_empty_slot(GB *gb, uint16_t hl)
+{
+	SET_DE(gb, TILEMAP_WIDTH);
+	gb->cpu.a = BANK_v1Tiles0; // BANK("VRAM1")
+	wr8(gb, rVBK, gb->cpu.a);
+	gb->cpu.a = 0x07;
+	fill_2x2(gb, hl, 0x07);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+	wr8(gb, hl++, 0x64);
+	gb->cpu.a = alu_inc(gb, 0x64);
+	wr8(gb, hl--, gb->cpu.a);
+	hl = alu_add16(gb, hl, REG_DE(gb));
+	wr8(gb, hl++, 0x74);
+	gb->cpu.a = alu_inc(gb, 0x74);
+	wr8(gb, hl, gb->cpu.a);
+	SET_HL(gb, hl);
+}
+
+PORT(LoadActionHelpBGMaps)
+{
+	gb->cpu.a = BANK_v1Tiles0; // BANK("VRAM1")
+	wr8(gb, rVBK, gb->cpu.a);
+	SET_HL(gb, ADDR_ActionHelpAttrmap);
+	SET_BC(gb, v1BGMap1);
+	CALL(Decompress);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+	SET_HL(gb, ADDR_ActionHelpTilemap);
+	SET_BC(gb, v0BGMap1);
+	CALL(Decompress);
+
+	gb->cpu.a = alu_and(gb, rd8(gb, wActionHelpPowerUp), POWER_UP_MASK);
+	alu_cp(gb, gb->cpu.a, NUM_MAIN_POWER_UPS);
+	if (!(gb->cpu.f & FLAG_C)) {
+		gb->cpu.b = 0x0a;
+	} else {
+		gb->cpu.a = alu_and(gb, rd8(gb, wPowerUpLevel), POWER_UP_MASK);
+		if (gb->cpu.a) {
+			gb->cpu.c = gb->cpu.a;
+			gb->cpu.a = BANK_v1Tiles0; // BANK("VRAM1")
+			wr8(gb, rVBK, gb->cpu.a);
+			uint16_t hl = v1BGMap1 + 16 * TILEMAP_WIDTH + 0;
+			SET_DE(gb, TILEMAP_WIDTH);
+			gb->cpu.b = 0;
+			do {
+				gb->cpu.a = 0x03;
+				fill_2x2(gb, hl, 0x03);
+				hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl + 2)); // inc l / inc l
+				gb->cpu.b = alu_inc(gb, gb->cpu.b);
+				gb->cpu.a = gb->cpu.b;
+				alu_cp(gb, gb->cpu.a, gb->cpu.c);
+			} while (gb->cpu.f & FLAG_C);
+			SET_HL(gb, hl);
+		}
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, rVBK, 0);
+		gb->cpu.a = alu_and(gb, rd8(gb, wPowerUpLevel), POWER_UP_MASK);
+		gb->cpu.b = gb->cpu.a;
+		gb->cpu.a = alu_sub(gb, 0x09, gb->cpu.b);
+		if (!gb->cpu.a)
+			return;
+		gb->cpu.b = gb->cpu.a;
+	}
+	uint16_t hl = v0BGMap1 + 16 * TILEMAP_WIDTH + 18;
+	do {
+		draw_empty_slot(gb, hl);
+		hl -= 2;
+		SET_HL(gb, hl);
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (gb->cpu.b);
+}

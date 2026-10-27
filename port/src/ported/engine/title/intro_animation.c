@@ -88,3 +88,41 @@ PORT(Func_4d45)
 		move_intro_obj(gb, wMenuObj5XCoord);
 	move_intro_obj(gb, wMenuObj4XCoord);
 }
+
+// waits until rLY reaches ly, letting time pass
+static void wait_ly(GB *gb, uint8_t ly)
+{
+	for (;;) {
+		gb->cpu.a = rd8(gb, rLY);
+		alu_cp(gb, gb->cpu.a, ly);
+		if (!(gb->cpu.f & FLAG_C))
+			break;
+		idle(gb, 32);
+	}
+}
+
+// pans the background of the intro airplane scene
+// each horizontal layer scrolls at different speed
+PORT(PanIntroBackgroundLayers)
+{
+	gb->cpu.a = rd8(gb, wceef);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.a)
+		return;
+	wait_ly(gb, 0x5b); // sky
+	CALL(WaitNextHBlank);
+	gb->cpu.a = rd8(gb, wIntroBGXOffsetFar);
+	wr8(gb, rSCX, gb->cpu.a);
+	wait_ly(gb, 0x63); // far layer
+	CALL(WaitNextHBlank);
+	gb->cpu.a = rd8(gb, wIntroBGXOffsetCentre);
+	wr8(gb, rSCX, gb->cpu.a);
+	wait_ly(gb, 0x73); // centre layer
+	CALL(WaitNextHBlank);
+	gb->cpu.a = rd8(gb, wIntroBGXOffsetNear);
+	wr8(gb, rSCX, gb->cpu.a);
+	wait_ly(gb, 0x83); // near layer
+	CALL(WaitNextHBlank);
+	gb->cpu.a = rd8(gb, wSCX);
+	wr8(gb, rSCX, gb->cpu.a);
+}

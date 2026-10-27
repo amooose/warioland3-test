@@ -63,3 +63,9 @@ PORT(CopyHLToDE_Short)
 	int n = gb->cpu.b ? gb->cpu.b : 256;
 	copy_short(gb, REG_DE(gb), n);
 }
+
+// hl = 4 OB palettes, copied to wTempPals2 palettes 4-7
+PORT(LoadObjPals)
+{
+	copy_short(gb, wTempPals2 + 4 * PAL_SIZE, 4 * PAL_SIZE);
+}

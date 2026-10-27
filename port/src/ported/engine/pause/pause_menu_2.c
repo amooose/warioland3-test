@@ -13,3 +13,13 @@ PORT(LoadPauseMenuSprite)
 	SET_HL(gb, ADDR_OAM_1f156c);
 	CALL(LoadSprite);
 }
+
+PORT(PrintNumberMusicCoins)
+{
+	gb->cpu.a = rd8(gb, wNumMusicalCoins);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, 0xa0);
+	wr8(gb, v0BGMap1 + 15 * TILEMAP_WIDTH + 7, gb->cpu.a);
+	gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	wr8(gb, v0BGMap1 + 16 * TILEMAP_WIDTH + 7, gb->cpu.a);
+}

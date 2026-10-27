@@ -332,3 +332,107 @@ PORT(PlayOverworldMusic)
 	bool night = alu_and(gb, gb->cpu.a, gb->cpu.a) != 0;
 	play_music2(gb, night ? MUSIC_OVERWORLD_NIGHT : MUSIC_OVERWORLD_DAY);
 }
+
+// a = value to write to [bc]
+// if [hl] is $80, also clears [bc | 7]
+PORT(Func_3c29)
+{
+	wr8(gb, REG_BC(gb), gb->cpu.a);
+	gb->cpu.a = rd8(gb, REG_HL(gb));
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = alu_or(gb, 0x07, gb->cpu.c);
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, REG_BC(gb), 0);
+}
+
+// hl = struct, de = table of (add, ?) byte pairs
+// adds the next table entry (indexed by the counter at [hl | 7]) to [hl]
+PORT(Func_3c35)
+{
+	gb->cpu.c = gb->cpu.l;
+	gb->cpu.b = gb->cpu.h;
+	gb->cpu.a = alu_or(gb, 0x07, gb->cpu.l);
+	gb->cpu.l = gb->cpu.a;
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = rd8(gb, hl);
+	wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.l = gb->cpu.a;
+	gb->cpu.a = alu_adc(gb, 0x00, 0x00);
+	gb->cpu.h = gb->cpu.a;
+	hl = alu_add16(gb, REG_HL(gb), REG_DE(gb));
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.d = gb->cpu.a;
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.e = gb->cpu.a;
+	SET_HL(gb, hl);
+	gb->cpu.a = alu_add(gb, rd8(gb, REG_BC(gb)), gb->cpu.d);
+	wr8(gb, REG_BC(gb), gb->cpu.a);
+	gb->cpu.c = alu_inc(gb, gb->cpu.c);
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+}
+
+// starts the HDMA transfer whose parameters are in w2d0b5
+PORT(Func_3c03)
+{
+	gb->cpu.a = BANK_v1Tiles0; // BANK("VRAM1")
+	wr8(gb, rVBK, gb->cpu.a);
+	uint16_t hl = w2d0b5;
+	gb->cpu.c = (uint8_t)rVDMA_SRC_HIGH;
+	for (int i = 0; i < 5; i++) {
+		gb->cpu.a = rd8(gb, hl++);
+		if (i)
+			gb->cpu.c = alu_inc(gb, gb->cpu.c);
+		wr8(gb, (uint16_t)(0xff00 + gb->cpu.c), gb->cpu.a);
+	}
+	SET_HL(gb, hl);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wHDMABank, 0);
+}
+
+// hl = tilemap, b = its bank
+PORT(LoadFarBGMap)
+{
+	gb->cpu.a = rd8(gb, wROMBank);
+	push_af(gb);
+	gb->cpu.a = gb->cpu.b;
+	bankswitch(gb, gb->cpu.a);
+	SET_BC(gb, 18 * TILEMAP_WIDTH);
+	SET_DE(gb, v0BGMap0);
+	CALL(CopyHLToDE_BC);
+	pop_af(gb);
+	bankswitch(gb, gb->cpu.a);
+}
+
+// hl = pal config: register (cleared after reading), index, number of
+// 8-byte blocks, pointer to the colours (big-endian)
+PORT(ApplyPalConfig)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.c = rd8(gb, hl);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hl++, 0);
+	gb->cpu.a = rd8(gb, hl++);
+	wr8(gb, (uint16_t)(0xff00 + gb->cpu.c), gb->cpu.a);
+	gb->cpu.c = alu_inc(gb, gb->cpu.c);
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.l = rd8(gb, hl);
+	gb->cpu.h = gb->cpu.a;
+	hl = REG_HL(gb);
+	do {
+		for (int i = 0; i < 8; i++) {
+			gb->cpu.a = rd8(gb, hl++);
+			wr8(gb, (uint16_t)(0xff00 + gb->cpu.c), gb->cpu.a);
+		}
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (gb->cpu.b);
+	SET_HL(gb, hl);
+}

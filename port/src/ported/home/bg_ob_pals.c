@@ -1,6 +1,6 @@
 // Port of src/home/bg_ob_pals.asm
 // SetWarioPal, LoadCollectedTreasurePal_Level and CopyAndApplyOBPals wait
-// for H-Blank and stay in asm.
+// for H-Blank with idle().
 #include "ported.h"
 
 // Reads all 8 palettes from the palette data register through the index
@@ -158,4 +158,99 @@ PORT(SetWarioPal)
 
 	pop_af(gb);
 	bankswitch(gb, gb->cpu.a);
+}
+
+PORT(LoadCollectedTreasurePal_Level)
+{
+	// push_wram BANK(wLevelTreasurePals)
+	gb->cpu.a = rd8(gb, rWBK);
+	push_af(gb);
+	gb->cpu.a = BANK_wLevelTreasurePals;
+	wr8(gb, rWBK, gb->cpu.a);
+
+	gb->cpu.a = alu_and(gb, rd8(gb, wLevelEndScreen), 0x7f);
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.b = 0;
+	uint16_t hl = alu_add16(gb, wLevelTreasurePals, REG_BC(gb));
+	gb->cpu.a = alu_sub(gb, rd8(gb, hl), OBPAL_TREASURE_YELLOW);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a); // *8
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = gb->cpu.b;
+	SET_HL(gb, alu_add16(gb, ADDR_TreasurePals, REG_DE(gb)));
+
+	gb->cpu.a = rd8(gb, wROMBank);
+	push_af(gb);
+	gb->cpu.a = BANK_TreasurePals;
+	bankswitch(gb, gb->cpu.a);
+	gb_push16(gb, REG_HL(gb));
+	SET_DE(gb, wTempPals2 + 4 * PAL_SIZE);
+	gb->cpu.a = gb->cpu.c;
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a); // *8
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.e);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.b = PAL_SIZE;
+	FARCALL_BANK(BANK_TreasurePals, CopyHLToDE_Short);
+	hl = gb_pop16(gb);
+
+	gb->cpu.a = alu_or(gb, OBPI_AUTOINC | (4 * PAL_SIZE), gb->cpu.c);
+	wr8(gb, rOBPI, gb->cpu.a);
+	gb->cpu.c = (uint8_t)rOBPD;
+	// wait_not_hblank / wait_hblank
+	while (!(gb->cpu.a = alu_and(gb, rd8(gb, rSTAT), STAT_MODE)))
+		idle(gb, 32);
+	while ((gb->cpu.a = alu_and(gb, rd8(gb, rSTAT), STAT_MODE)))
+		idle(gb, 32);
+	for (int i = 0; i < PAL_SIZE; i++) {
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, (uint16_t)(0xff00 + gb->cpu.c), gb->cpu.a);
+	}
+	SET_HL(gb, hl);
+	pop_af(gb);
+	bankswitch(gb, gb->cpu.a);
+
+	// pop_wram
+	pop_af(gb);
+	wr8(gb, rWBK, gb->cpu.a);
+}
+
+// b = number of pals
+// c = OB palette number
+// hl = palette source
+// de = OB pals dest
+PORT(CopyAndApplyOBPals)
+{
+	gb_push16(gb, REG_BC(gb));
+	gb_push16(gb, REG_HL(gb));
+	gb->cpu.b = alu_sla(gb, gb->cpu.b);
+	gb->cpu.b = alu_sla(gb, gb->cpu.b);
+	gb->cpu.b = alu_sla(gb, gb->cpu.b); // *8
+	CALL(CopyHLToDE_Short);
+	uint16_t hl = gb_pop16(gb);
+	SET_BC(gb, gb_pop16(gb));
+	gb->cpu.a = gb->cpu.c;
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a); // *8
+	gb->cpu.a = alu_or(gb, gb->cpu.a, OBPI_AUTOINC);
+	wr8(gb, rOBPI, gb->cpu.a);
+	gb->cpu.c = (uint8_t)rOBPD;
+	do {
+		// wait_not_hblank / wait_hblank
+		while (!(gb->cpu.a = alu_and(gb, rd8(gb, rSTAT), STAT_MODE)))
+			idle(gb, 32);
+		while ((gb->cpu.a = alu_and(gb, rd8(gb, rSTAT), STAT_MODE)))
+			idle(gb, 32);
+		for (int i = 0; i < PAL_SIZE; i++) {
+			gb->cpu.a = rd8(gb, hl++);
+			wr8(gb, (uint16_t)(0xff00 + gb->cpu.c), gb->cpu.a);
+		}
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (gb->cpu.b);
+	SET_HL(gb, hl);
 }

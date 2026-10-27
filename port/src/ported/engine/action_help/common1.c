@@ -192,3 +192,39 @@ PORT(ActionHelp_ShowSingleSolidBlock)
 {
 	SET_HL(gb, set_frameset(gb, wMenuObj4FramesetOffset, ADDR_Frameset_1e6b67) + 1);
 }
+
+PORT(ActionHelp_FlashBInput)
+{
+	gb->cpu.a = TRUE;
+	wr8(gb, wActionHelpFrozen, TRUE);
+	gb->cpu.a = alu_and(gb, rd8(gb, wActionHelpCounter), 0x03);
+	if (gb->cpu.a)
+		return;
+	SET_HL(gb, wTimer);
+	uint8_t timer = alu_inc(gb, rd8(gb, wTimer));
+	wr8(gb, wTimer, timer);
+	if (!alu_bit(gb, timer, 0)) {
+		set_frameset(gb, wMenuObj3FramesetOffset, ADDR_Frameset_1e6b6d); // ActionHelp_ClearButtonsInput
+		return;
+	}
+	play_sfx(gb, SFX_0EC);
+	set_frameset(gb, wMenuObj3FramesetOffset, ADDR_Frameset_1e6b73); // ActionHelp_ShowBInput
+	gb->cpu.a = rd8(gb, wTimer);
+	alu_cp(gb, gb->cpu.a, 0x07);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wTimer, 0);
+	wr8(gb, wActionHelpFrozen, 0);
+	SET_HL(gb, wActionHelpState);
+	wr8(gb, wActionHelpState, alu_inc(gb, rd8(gb, wActionHelpState)));
+}
+
+PORT(VBlank_1fb6b7)
+{
+	SET_HL(gb, ADDR_VBlank_1fb6b7 + 0x0c); // .Func
+	SET_DE(gb, wVBlankFunc);
+	gb->cpu.b = 0x34; // .end - .Func
+	CALL(CopyHLToDE);
+}
