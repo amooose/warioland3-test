@@ -253,3 +253,247 @@ PORT_JUMP(DelayTextThenGoToNextLine)
 	}
 	JUMP_TO(ADDR_GoToNextLine); // fallthrough
 }
+
+// bc = OW obj: updates its animation with the OAM in bank `bank`
+static void update_ow_obj_animation(GB *gb, uint8_t bank)
+{
+	gb->cpu.h = gb->cpu.b;
+	gb->cpu.l = (uint8_t)(gb->cpu.c & ~(1 << 1));
+	gb->cpu.b = bank;
+	CALL(UpdateOWAnimation);
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+}
+
+PORT(Func_ac00b) { update_ow_obj_animation(gb, BANK_OAM_15e44a); } // BANK("Credits OAM")
+PORT(Func_ac016) { update_ow_obj_animation(gb, BANK_OAM_15e44a); } // BANK("Credits OAM")
+PORT(Func_ac021) { update_ow_obj_animation(gb, 0x1a); } // BANK("Object Framesets")
+PORT(Func_ac02c) { update_ow_obj_animation(gb, 0x01); } // BANK("Title Gfx")
+PORT(Func_ac037) { update_ow_obj_animation(gb, 0x2a); } // BANK("Overworld OAM 1")
+
+PORT_JUMP(Func_ac9e4)
+{
+	SET_HL(gb, wPalConfig2);
+	JUMP_TO(ADDR_Func_ac9ec); // jr
+}
+
+PORT_JUMP(Func_ac9e9)
+{
+	SET_HL(gb, wPalConfig1);
+	JUMP_TO(ADDR_Func_ac9ec); // fallthrough
+}
+
+PORT(GoToNextLine)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCurTextLinePos, 0);
+	wr8(gb, wTextDelayCounter, 0);
+	SET_HL(gb, wCurTextLine);
+	wr8(gb, wCurTextLine, alu_inc(gb, rd8(gb, wCurTextLine)));
+}
+
+// ld hl, counter / xor a / ld [hld], a / inc [hl]
+static void reset_and_advance(GB *gb, uint16_t counter)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, counter, 0);
+	SET_HL(gb, counter - 1);
+	wr8(gb, counter - 1, alu_inc(gb, rd8(gb, counter - 1)));
+}
+
+// c = frame to wait for
+static void wait_and_advance(GB *gb, uint16_t counter)
+{
+	gb->cpu.a = rd8(gb, counter);
+	alu_cp(gb, gb->cpu.a, gb->cpu.c);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	reset_and_advance(gb, counter);
+}
+
+PORT(Func_ad330) { wait_and_advance(gb, w2d891); }
+PORT(Func_ad335) { reset_and_advance(gb, w2d891); }
+PORT(Func_ad011) { wait_and_advance(gb, w2d014); }
+PORT(Func_ad016) { reset_and_advance(gb, w2d014); }
+
+// hl = palettes: fills 4 palettes' worth of words with white, twice over
+PORT(Func_aca28)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.c = 4 * PAL_SIZE;
+	do {
+		gb->cpu.a = 0xff; // LOW(PALRGB_WHITE)
+		wr8(gb, hl++, gb->cpu.a);
+		gb->cpu.a = 0x7f; // HIGH(PALRGB_WHITE)
+		wr8(gb, hl++, gb->cpu.a);
+		gb->cpu.c = alu_dec(gb, gb->cpu.c);
+	} while (gb->cpu.c);
+	SET_HL(gb, hl);
+}
+
+PORT(Func_aca63)
+{
+	SET_HL(gb, wOWUIObj1XCoord);
+	wr8(gb, wOWUIObj1XCoord, alu_dec(gb, rd8(gb, wOWUIObj1XCoord)));
+}
+
+PORT(Func_aca68)
+{
+	SET_HL(gb, wOWUIObj1XCoord);
+	wr8(gb, wOWUIObj1XCoord, alu_inc(gb, rd8(gb, wOWUIObj1XCoord)));
+}
+
+// ld hl, src / ld de, dest / ld b, n / call CopyHLToDE
+static void copy_bytes(GB *gb, uint16_t src, uint16_t dest, uint8_t n)
+{
+	SET_HL(gb, src);
+	SET_DE(gb, dest);
+	gb->cpu.b = n;
+	CALL(CopyHLToDE);
+}
+
+PORT(Func_aca09)
+{
+	copy_bytes(gb, wTempPals2, wTempOBPals, 8 * PAL_SIZE);
+	copy_bytes(gb, wTempPals1, wTempBGPals, 8 * PAL_SIZE);
+}
+
+PORT(Func_ac4fa)
+{
+	SET_HL(gb, w2d14c);
+	gb->cpu.a = rd8(gb, w2d14c);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z)
+		play_sfx(gb, SFX_12A);
+	wr8(gb, w2d14c, alu_inc(gb, rd8(gb, w2d14c)));
+	gb->cpu.c = 0x24;
+	gb->cpu.a = rd8(gb, w2d14c);
+	alu_cp(gb, gb->cpu.a, gb->cpu.c);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d14c, 0);
+}
+
+PORT(Func_ac515)
+{
+	SET_HL(gb, w2d14c);
+	wr8(gb, w2d14c, alu_inc(gb, rd8(gb, w2d14c)));
+	gb->cpu.a = rd8(gb, w2d14c);
+	alu_cp(gb, gb->cpu.a, 0x08);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d14c, 0);
+	play_sfx(gb, SFX_137);
+}
+
+PORT(SetFightAgainstAHiddenFigure)
+{
+	// stop_music2
+	gb->cpu.a = 0xff;
+	wr8(gb, hMusicIDBackup + 0, 0xff);
+	wr8(gb, hMusicID + 0, 0xff);
+	gb->cpu.a = 0x00;
+	wr8(gb, hMusicIDBackup + 1, 0x00);
+	wr8(gb, hMusicID + 1, 0x00);
+	// stop_sfx
+	gb->cpu.a = 0xff;
+	wr8(gb, hSFXID + 0, 0xff);
+	gb->cpu.a = 0x00;
+	wr8(gb, hSFXID + 1, 0x00);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSubState, 0);
+	SET_HL(gb, wState);
+	wr8(gb, wState, alu_inc(gb, rd8(gb, wState)));
+	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_Z) | FLAG_C); // scf
+}
+
+// hl = scene obj y coord
+PORT(InitTempleSceneMusicBox)
+{
+	uint16_t hl = REG_HL(gb);
+	wr8(gb, hl, 0x50);
+	hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl + 1)); // inc l
+	wr8(gb, hl, 0x4e);
+	hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl + 1)); // inc l
+	hl |= 0x04; // set 2, l
+	SET_HL(gb, hl);
+	CALL(SetSceneObjState);
+}
+
+// hl = scene obj x coord: moves it up 1 and left 2, returns carry while
+// y is < $2c
+PORT(MoveMusicBoxUpLeft)
+{
+	uint16_t hl = REG_HL(gb);
+	wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+	hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl - 1)); // dec l
+	wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+	wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_cp(gb, gb->cpu.a, 0x2c);
+}
+
+PORT(ClearText)
+{
+	gb->cpu.a = 0x7f; // '@'
+	SET_HL(gb, wText);
+	SET_BC(gb, 4 * TEXT_LINE_LENGTH);
+	CALL(WriteAToHL_BCTimes);
+}
+
+// de = BG map coord (low byte of the row and column)
+PORT(ClearTextboxAtCoord)
+{
+	gb->cpu.b = (uint8_t)(((v0BGMap0 + 0x100) >> 8) - 0x80);
+	gb->cpu.a = rd8(gb, wBGMapToPrintText);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z))
+		gb->cpu.b = (uint8_t)(((v0BGMap1 + 0x100) >> 8) - 0x80);
+	uint16_t hl = wHDMA;
+	gb->cpu.a = (uint8_t)(wClearedTextBuffer >> 8);
+	wr8(gb, hl++, gb->cpu.a);
+	gb->cpu.a = (uint8_t)wClearedTextBuffer;
+	wr8(gb, hl++, gb->cpu.a);
+	gb->cpu.a = gb->cpu.b;
+	wr8(gb, hl++, gb->cpu.a);
+	gb->cpu.a = gb->cpu.d;
+	wr8(gb, hl++, gb->cpu.a);
+	gb->cpu.a = gb->cpu.e;
+	wr8(gb, hl, gb->cpu.a);
+	SET_HL(gb, hl);
+	gb->cpu.a = BANK_ClearTextboxAtCoord;
+	wr8(gb, wHDMABank, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wHDMADestVRAMBank, 0);
+	wr8(gb, wPendingCharDest + 0, 0);
+}
+
+PORT_JUMP(DebugSceneWario)
+{
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = rd8(gb, wDebugSceneWarioState);
+	if (alu_bit(gb, gb->cpu.b, B_PAD_RIGHT)) {
+		alu_cp(gb, gb->cpu.a, NUM_SCENEWARIO_STATES - 1);
+		if (gb->cpu.f & FLAG_C)
+			gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	} else {
+		if (!alu_bit(gb, gb->cpu.b, B_PAD_LEFT)) {
+			RET();
+			return;
+		}
+		uint8_t a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (a)
+			gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	}
+	wr8(gb, wDebugSceneWarioState, gb->cpu.a);
+	JUMP_TO(ADDR_SetSceneWarioState); // fallthrough
+}
