@@ -1282,3 +1282,145 @@ PORT_JUMP(Func_2ad6a)
 	anim(gb, OAM1);
 	JUMP(PlayRecoverySFX);
 }
+
+PORT(SetState_Crazy)
+{
+	play_sfx(gb, SFX_043);
+	st(gb, wWarioState, WST_CRAZY);
+	st(gb, wTouchState, TOUCH_BUMP);
+	st(gb, wStingTouchState, TOUCH_VULNERABLE);
+	st(gb, wca94, 0x01);
+	static const uint16_t zero[] = {wWalkVelIndex, wWarioStateCounter, wWarioStateCycles,
+		wJumpVelTable, wJumpVelIndex, 0};
+	clear(gb, zero);
+	reset_anim(gb);
+	load_gfx(gb, BANK_WarioCrazyGfx, ADDR_WarioCrazyGfx);
+	set_oam(gb, BANK_OAM_1fccd5, ADDR_OAM_1fccd5);
+	frameset_by_dir(gb, ADDR_Frameset_1fcf9f, ADDR_Frameset_1fcf6e);
+	anim(gb, OAM2);
+}
+
+PORT(SetState_CrazySpinning)
+{
+	play_sfx(gb, SFX_042);
+	st(gb, wWarioState, WST_CRAZY_SPINNING);
+	collision_box(gb, -1, -27, -9, 9);
+	static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
+		wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking, 0};
+	clear(gb, zero);
+	if (ld_and(gb, wJumpVelTable))
+		st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	CALL(UpdateLevelMusic);
+	reset_anim(gb);
+	load_gfx(gb, BANK_WarioIdleGfx, ADDR_WarioIdleGfx);
+	set_oam(gb, BANK_OAM_14a82, ADDR_OAM_14a82);
+	gb->cpu.a = rd8(gb, wObjDirection);
+	wr8(gb, wDirection, gb->cpu.a);
+	set_frameset(gb, alu_and(gb, gb->cpu.a, gb->cpu.a) ? ADDR_Frameset_14ce1 : ADDR_Frameset_14ccc);
+	anim(gb, OAM1);
+}
+
+PORT(SetState_PuffyInflating)
+{
+	st(gb, wTransformation, TRANSFORMATION_PUFFY_WARIO);
+	st(gb, wStingTouchState, TOUCH_VULNERABLE);
+	st(gb, wTouchState, TOUCH_BUMP);
+	st(gb, wca94, 0x01);
+	play_sfx(gb, SFX_025);
+	st(gb, wWarioState, WST_PUFFY_INFLATING);
+	collision_box(gb, -1, -27, -9, 9);
+	static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
+		wAttackCounter, wJumpVelIndex, wJumpVelTable, wIsCrouching, wIsRolling,
+		wIsSmashAttacking, wSwimVelIndex, wWaterSurfaceFloatingCounter, wWaterCurrent,
+		wLastWaterCurrent, wCurWaterCurrent, 0};
+	clear(gb, zero);
+	CALL(UpdateLevelMusic);
+	reset_anim(gb);
+	load_gfx(gb, BANK_WarioPuffyGfx, ADDR_WarioPuffyGfx);
+	set_oam(gb, BANK_OAM_1dc93f, ADDR_OAM_1dc93f);
+	frameset_by_dir(gb, ADDR_Frameset_1dccc0, ADDR_Frameset_1dccc9);
+	anim(gb, rd8(gb, wWarioOAMBank));
+}
+
+PORT_JUMP(UpdateState_GettingFlatAirborne)
+{
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return;
+	}
+	if (ld_and(gb, wWaterInteraction)) {
+		LJUMP(SetState_FlatSinking);
+		return;
+	}
+	gb->cpu.b = 0x02;
+	CALL(MoveWarioDown);
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb)) {
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	CALL(TriggerFloorTransition);
+	st(gb, wWarioState, WST_GETTING_FLAT);
+	static const uint16_t zero[] = {wWalkVelIndex, wFrameDuration, wAnimationFrame,
+		wWarioStateCycles, wJumpVelIndex, wJumpVelTable, wAutoMoveState, 0};
+	clear(gb, zero);
+	gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	wr8(gb, wIsIntangible, gb->cpu.a);
+	collision_box(gb, -1, -8, -11, 11);
+	set_frameset(gb, ADDR_Frameset_1715f);
+	anim(gb, OAM1);
+	RET();
+}
+
+PORT(SetState_FlatAirborne)
+{
+	if (ld_bit(gb, wTransformation, TRANSFORMATIONF_PERSISTENT_F))
+		return;
+	ld_cp(gb, wTransformation, TRANSFORMATION_OWL_WARIO);
+	if (ZF)
+		CALL(ReleaseOwl);
+	// push_wram BANK("Level Objects WRAM")
+	gb->cpu.a = rd8(gb, rWBK);
+	push_af(gb);
+	st(gb, rWBK, BANK_wObjects);
+	uint16_t hl = (uint16_t)((rd8(gb, wObjPtr + 0) << 8) | rd8(gb, wObjPtr + 1));
+	SET_DE(gb, OBJ_X_POS);
+	hl = alu_add16(gb, hl, OBJ_X_POS);
+	gb->cpu.b = 0;
+	gb->cpu.a = alu_and(gb, rd8(gb, wObjInteractionType), INTERACTION_MASK);
+	gb->cpu.a = alu_sub(gb, gb->cpu.a, OBJ_INTERACTION_RICHTERTOFFEN);
+	if (ZF) {
+		wr8(gb, wWarioStateCounter, gb->cpu.a);
+	} else {
+		st(gb, wWarioStateCounter, 0x01);
+		gb->cpu.b = 0x8;
+	}
+	gb->cpu.a = alu_sub(gb, rd8(gb, hl), gb->cpu.b);
+	wr8(gb, wWarioXPos + 1, gb->cpu.a);
+	hl++;
+	gb->cpu.a = alu_sbc(gb, rd8(gb, hl), 0x00);
+	wr8(gb, wWarioXPos + 0, gb->cpu.a);
+	SET_HL(gb, hl);
+	pop_af(gb);
+	wr8(gb, rWBK, gb->cpu.a);
+	st(gb, wTransformation, TRANSFORMATION_FLAT_WARIO);
+	play_sfx(gb, SFX_01B);
+	CALL(UpdateLevelMusic);
+	st(gb, wTouchState, TOUCH_BUMP);
+	st(gb, wStingTouchState, TOUCH_BUMP);
+	st(gb, wca94, 0x02);
+	static const uint16_t zero[] = {wFrameDuration, wAnimationFrame, wWarioStateCycles,
+		wGrabState, wAttackCounter, wJumpVelIndex, wIsCrouching, wIsRolling,
+		wIsSmashAttacking, 0};
+	clear(gb, zero);
+	gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	wr8(gb, wAutoMoveState, gb->cpu.a);
+	wr8(gb, wJumpVelTable, gb->cpu.a);
+	st(gb, wWarioState, WST_GETTING_FLAT_AIRBORNE);
+	collision_box(gb, -1, -8, -11, 11);
+	load_gfx(gb, BANK_WarioSlideGfx, ADDR_WarioSlideGfx);
+	set_oam(gb, BANK_OAM_16e9d, ADDR_OAM_16e9d);
+	set_frameset(gb, ADDR_Frameset_171bd);
+	anim(gb, OAM1);
+}

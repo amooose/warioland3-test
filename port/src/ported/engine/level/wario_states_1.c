@@ -853,3 +853,79 @@ PORT_JUMP(DoWarioGroundShake)
 	airborne_gfx(gb, ADDR_Frameset_15fb8, ADDR_Frameset_15fc5);
 	LJUMP(SetState_SmashAttacking);
 }
+
+PORT_JUMP(HandleGroundShake)
+{
+	if (ld_and(gb, wLevelEndScreen)) {
+		RET();
+		return;
+	}
+	SET_HL(gb, wGroundShakeCounter);
+	gb->cpu.a = rd8(gb, wGroundShakeCounter);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		xor_a(gb);
+		wr8(gb, wIsWarioGroundShaking, 0);
+		RET();
+		return;
+	}
+	bool cont = true;
+	alu_cp(gb, gb->cpu.a, 0x10);
+	if (!CF) {
+		static const uint16_t checks[] = {wIsGettingOffLadder, wIsWarioGroundShaking,
+			wJumpVelTable, wWaterInteraction, wTransformation, wRoomTransitionParam,
+			wIsIntangible, wIsOnSteppableObject, 0};
+		const uint16_t *p;
+		for (p = checks; *p; p++)
+			if (ld_and(gb, *p))
+				break;
+		if (!*p) {
+			ld_cp(gb, wWarioState, WST_GROUND_SHAKE_STUNNED);
+			if (!ZF)
+				cont = false;
+		}
+	}
+	if (cont) {
+		gb->cpu.a = alu_dec(gb, rd8(gb, wGroundShakeCounter));
+		wr8(gb, wGroundShakeCounter, gb->cpu.a);
+		gb->cpu.a = alu_and(gb, gb->cpu.a, 0x02);
+		st(gb, wSCYShake, gb->cpu.a ? 2 : 0);
+		if (!gb->cpu.a) {
+			// xor a
+			gb->cpu.f = FLAG_Z;
+		}
+		RET();
+		return;
+	}
+	// .wario_shake_stun
+	gb->cpu.a = rd8(gb, wWarioState);
+	alu_cp(gb, gb->cpu.a, WST_LADDER_CLIMBING);
+	if (!ZF)
+		alu_cp(gb, gb->cpu.a, WST_LADDER_IDLING);
+	if (!ZF)
+		alu_cp(gb, gb->cpu.a, WST_LADDER_SCRATCHING);
+	if (ZF) {
+		LJUMP(SetState_LadderShakeStunned);
+		return;
+	}
+	st(gb, wWarioState, WST_GROUND_SHAKE_STUNNED);
+	static const uint16_t zero[] = {wJumpVelIndex, wJumpVelTable, wAttackCounter,
+		wIsRolling, wGrabState, 0};
+	clear(gb, zero);
+	st(gb, wCollisionBoxTop, (uint8_t)-15);
+	if (!ld_and(gb, wIsCrouching)) {
+		st(gb, wCollisionBoxTop, (uint8_t)-27);
+		st(gb, wJumpVelIndex, 10);
+		st(gb, wJumpVelTable, JUMP_VEL_KNOCK_BACK);
+	}
+	st(gb, wCollisionBoxBottom, (uint8_t)-1);
+	st(gb, wCollisionBoxLeft, (uint8_t)-9);
+	st(gb, wCollisionBoxRight, 9);
+	static const uint16_t zero2[] = {wWarioStateCounter, wWarioStateCycles,
+		wFrameDuration, wAnimationFrame, 0};
+	clear(gb, zero2);
+	load_gfx(gb, BANK_WarioAirborneGfx, ADDR_WarioAirborneGfx);
+	set_oam(gb, BANK_OAM_15955, ADDR_OAM_15955);
+	frameset_by_dir(gb, ADDR_Frameset_15f70, ADDR_Frameset_15f7f);
+	anim(gb, OAM1);
+	RET();
+}
