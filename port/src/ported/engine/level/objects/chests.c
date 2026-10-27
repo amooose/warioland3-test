@@ -101,3 +101,81 @@ PORT_JUMP(BlueTreasureFunc)
 	SET_DE(gb, ADDR_Frameset_681cd);
 	JUMP_TO(ADDR_TreasureFunc); // fallthrough
 }
+
+#define CHEST_UPDATE (ADDR_ChestFunc + 0x24) // .Update
+#define CHEST_RET (ADDR_ChestFunc + 0x42) // .Ret
+#define CHEST_OPEN (ADDR_ChestFunc + 0x43) // .Open
+
+// hl = wCurObjUpdateFunction + 1: stores the update pointer with ld [hld]
+static void set_update(GB *gb, uint16_t update)
+{
+	uint16_t hl = wCurObjUpdateFunction + 1;
+	gb->cpu.a = (uint8_t)(update >> 8);
+	wr8(gb, hl--, gb->cpu.a);
+	gb->cpu.a = (uint8_t)update;
+	wr8(gb, hl--, gb->cpu.a);
+	SET_HL(gb, hl);
+}
+
+// Waits for the chest to be opened (state $18 with no auto-move running).
+PORT_LOCAL(ChestFunc, Update)
+{
+	SET_HL(gb, wCurObjState);
+	gb->cpu.a = rd8(gb, wCurObjState);
+	alu_cp(gb, gb->cpu.a, OBJSTATE_18);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = rd8(gb, wAutoMoveState);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	SET_DE(gb, ADDR_Frameset_68003);
+	CALL(SetObjectFramesetPtr);
+	gb->cpu.a = 86;
+	wr8(gb, REG_HL(gb), 86); // ld [hli], a (hl is reloaded next)
+	set_update(gb, CHEST_OPEN);
+}
+
+PORT_LOCAL(ChestFunc, Ret) {}
+
+// The opening animation, then the treasure appears with its fanfare.
+PORT_LOCAL_JUMP(ChestFunc, Open)
+{
+	uint16_t hl = wCurObjStateDuration;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_cp(gb, gb->cpu.a, 73);
+	if (gb->cpu.f & FLAG_Z)
+		play_sfx(gb, SFX_035);
+	uint8_t d = alu_dec(gb, rd8(gb, hl));
+	wr8(gb, hl, d);
+	if (d) {
+		RET();
+		return;
+	}
+	SET_DE(gb, ADDR_Frameset_68060);
+	CALL(SetObjectFramesetPtr);
+	set_update(gb, CHEST_RET);
+	gb->cpu.a = alu_and(gb, rd8(gb, wCurObjInteractionType), INTERACTION_MASK);
+	uint16_t params;
+	alu_cp(gb, gb->cpu.a, OBJ_INTERACTION_GREY_TREASURE);
+	if (gb->cpu.f & FLAG_Z) {
+		params = ADDR_ObjParams_GreyTreasure;
+	} else {
+		alu_cp(gb, gb->cpu.a, OBJ_INTERACTION_RED_TREASURE);
+		if (gb->cpu.f & FLAG_Z) {
+			params = ADDR_ObjParams_RedTreasure;
+		} else {
+			alu_cp(gb, gb->cpu.a, OBJ_INTERACTION_GREEN_TREASURE);
+			params = (gb->cpu.f & FLAG_Z) ? ADDR_ObjParams_GreenTreasure : ADDR_ObjParams_BlueTreasure;
+		}
+	}
+	SET_BC(gb, params);
+	// play_music2 MUSIC_TREASURE_FANFARE
+	gb->cpu.a = (uint8_t)(MUSIC_TREASURE_FANFARE >> 8);
+	wr8(gb, hMusicIDBackup + 0, gb->cpu.a);
+	wr8(gb, hMusicID + 0, gb->cpu.a);
+	gb->cpu.a = (uint8_t)MUSIC_TREASURE_FANFARE;
+	wr8(gb, hMusicIDBackup + 1, gb->cpu.a);
+	wr8(gb, hMusicID + 1, gb->cpu.a);
+	JUMP(CreateObjectAtRelativePos);
+}

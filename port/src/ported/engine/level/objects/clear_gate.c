@@ -48,3 +48,5 @@ PORT_JUMP(ClearGate1Func)
 	SET_DE(gb, ADDR_Frameset_698a8);
 	JUMP_TO(ADDR_ClearGateFunc); // fallthrough
 }
+
+PORT_LOCAL(ClearGateFunc, Update) {}
