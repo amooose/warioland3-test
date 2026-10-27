@@ -33,3 +33,9 @@ PORT(KobattoFunc)
 	wr8(gb, hl++, gb->cpu.a); // var3
 	SET_HL(gb, hl);
 }
+
+PORT_LOCAL(KobattoFunc, Update)
+{
+	SET_DE(gb, ADDR_Data_60ec9);
+	CALL(ApplyObjSetMovement);
+}

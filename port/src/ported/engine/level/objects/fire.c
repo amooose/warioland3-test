@@ -27,3 +27,5 @@ PORT(FireFunc)
 	SET_HL(gb, hl);
 	// .Update
 }
+
+PORT_LOCAL(FireFunc, Update) {}
