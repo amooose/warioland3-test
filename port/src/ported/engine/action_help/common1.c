@@ -228,3 +228,340 @@ PORT(VBlank_1fb6b7)
 	gb->cpu.b = 0x34; // .end - .Func
 	CALL(CopyHLToDE);
 }
+
+// Flashes an input prompt: alternately clears it and shows it, every 4
+// frames, then moves on to the next state after 7 flashes.
+static void flash_input(GB *gb, uint16_t obj, uint16_t clear_fs, uint16_t show_fs)
+{
+	gb->cpu.a = TRUE;
+	wr8(gb, wActionHelpFrozen, TRUE);
+	gb->cpu.a = alu_and(gb, rd8(gb, wActionHelpCounter), 0x03);
+	if (gb->cpu.a)
+		return;
+	SET_HL(gb, wTimer);
+	uint8_t timer = alu_inc(gb, rd8(gb, wTimer));
+	wr8(gb, wTimer, timer);
+	if (!alu_bit(gb, timer, 0)) {
+		set_frameset(gb, obj, clear_fs);
+		return;
+	}
+	play_sfx(gb, SFX_0EC);
+	set_frameset(gb, obj, show_fs);
+	gb->cpu.a = rd8(gb, wTimer);
+	alu_cp(gb, gb->cpu.a, 0x07);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wTimer, 0);
+	wr8(gb, wActionHelpFrozen, 0);
+	SET_HL(gb, wActionHelpState);
+	wr8(gb, wActionHelpState, alu_inc(gb, rd8(gb, wActionHelpState)));
+}
+
+PORT(ActionHelp_FlashDDownInput)
+{
+	flash_input(gb, wMenuObj2FramesetOffset, ADDR_Frameset_1e6b76, ADDR_Frameset_1e6b7f);
+}
+
+PORT(ActionHelp_FlashDUpInput)
+{
+	flash_input(gb, wMenuObj2FramesetOffset, ADDR_Frameset_1e6b76, ADDR_Frameset_1e6b79);
+}
+
+PORT(ActionHelp_FlashAInput)
+{
+	flash_input(gb, wMenuObj3FramesetOffset, ADDR_Frameset_1e6b6d, ADDR_Frameset_1e6b70);
+}
+
+PORT(ActionHelp_Init)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wAnimatedTilesFrameDuration, 0);
+	wr8(gb, wAnimatedTilesGfx, 0);
+	wr8(gb, wAnimatedTilesFrameCount, 0);
+	wr8(gb, wAnimatedTilesFrame, 0);
+	wr8(gb, wActionHelpFrozen, 0);
+	wr8(gb, wRoomAnimatedTilesEnabled, 0);
+	gb->cpu.a = 0x04;
+	wr8(gb, wSCY, 0x04);
+	FARCALL(Func_1e48bc);
+	FARCALL(Func_1e4a47);
+	set_frameset(gb, wMenuObj2FramesetOffset, ADDR_Frameset_1e6b76); // ActionHelp_ClearDPadInput
+	set_frameset(gb, wMenuObj3FramesetOffset, ADDR_Frameset_1e6b6d); // ActionHelp_ClearButtonsInput
+	gb->cpu.a = 0x60;
+	wr8(gb, wTimer, 0x60);
+	SET_HL(gb, wActionHelpState);
+	wr8(gb, wActionHelpState, alu_inc(gb, rd8(gb, wActionHelpState)));
+}
+
+// writes a 2x2 block of a at hl; de = TILEMAP_WIDTH
+static void fill_2x2(GB *gb, uint16_t hl, uint8_t a)
+{
+	gb->cpu.a = a;
+	wr8(gb, hl++, a);
+	wr8(gb, hl--, a);
+	hl = alu_add16(gb, hl, REG_DE(gb));
+	wr8(gb, hl++, a);
+	wr8(gb, hl, a);
+	SET_HL(gb, hl);
+}
+
+// Moves the power-up selection with the d-pad.
+PORT(Func_1fb6f7)
+{
+	uint16_t hl = wActionHelpPowerUp;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_RIGHT)) {
+		gb->cpu.a = rd8(gb, hl);
+		alu_cp(gb, gb->cpu.a, NUM_MAIN_POWER_UPS - 1);
+		if (gb->cpu.f & FLAG_Z)
+			return;
+		gb->cpu.e = gb->cpu.a;
+		wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wActionHelpState, 0);
+		gb->cpu.a = alu_add(gb, rd8(gb, wMenuObj1XCoord), 0x10);
+		wr8(gb, wMenuObj1XCoord, gb->cpu.a);
+	} else if (alu_bit(gb, gb->cpu.a, B_PAD_LEFT)) {
+		gb->cpu.a = rd8(gb, hl);
+		gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (!gb->cpu.a)
+			return;
+		gb->cpu.e = gb->cpu.a;
+		wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wActionHelpState, 0);
+		gb->cpu.a = alu_sub(gb, rd8(gb, wMenuObj1XCoord), 0x10);
+		wr8(gb, wMenuObj1XCoord, gb->cpu.a);
+	} else {
+		return;
+	}
+	gb->cpu.a = TRUE;
+	wr8(gb, wActionHelpBlackedOut, TRUE);
+	gb->cpu.a = BANK_v1BGMap1; // BANK("VRAM1")
+	wr8(gb, rVBK, gb->cpu.a);
+	gb->cpu.a = alu_and(gb, rd8(gb, wPowerUpLevel), POWER_UP_MASK);
+	alu_cp(gb, gb->cpu.a, gb->cpu.e);
+	if (!(gb->cpu.f & FLAG_C)) {
+		gb->cpu.e = alu_sla(gb, gb->cpu.e);
+		gb->cpu.d = 0;
+		SET_HL(gb, alu_add16(gb, v1BGMap1 + 16 * TILEMAP_WIDTH, REG_DE(gb)));
+		gb->cpu.e = TILEMAP_WIDTH;
+		CALL(WaitNextHBlank);
+		fill_2x2(gb, REG_HL(gb), 0x03);
+	}
+	gb->cpu.a = rd8(gb, wActionHelpPowerUp);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.a = alu_and(gb, rd8(gb, wPowerUpLevel), POWER_UP_MASK);
+	alu_cp(gb, gb->cpu.a, gb->cpu.e);
+	if (!(gb->cpu.f & FLAG_C)) {
+		gb->cpu.d = 0;
+		hl = alu_add16(gb, ADDR_PowerUpOBPals, REG_DE(gb));
+		gb->cpu.b = rd8(gb, hl);
+		gb->cpu.e = alu_sla(gb, gb->cpu.e);
+		SET_HL(gb, alu_add16(gb, v1BGMap1 + 16 * TILEMAP_WIDTH, REG_DE(gb)));
+		gb->cpu.e = TILEMAP_WIDTH;
+		CALL(WaitNextHBlank);
+		fill_2x2(gb, REG_HL(gb), gb->cpu.b);
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+	play_sfx(gb, SFX_0E2);
+}
+
+// ld hl, obj / xor a / ld [hli], a x2 / frameset, the low byte with
+// ld [hli], a
+static void fs_hli(GB *gb, uint16_t obj, uint16_t fs)
+{
+	SET_HL(gb, set_frameset(gb, obj, fs) + 1);
+}
+
+// ... / xor a / ld [wSFXTimer], a
+static void fs_hli_sfx_timer(GB *gb, uint16_t fs)
+{
+	fs_hli(gb, wActionHelpWarioFramesetOffset, fs);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSFXTimer, 0);
+}
+
+PORT(ActionHelp_ShowWarioJumpLeft)
+{
+	play_sfx(gb, SFX_JUMP);
+	queue_wario_gfx(gb, BANK_WarioAirborneGfx, ADDR_WarioAirborneGfx);
+	uint16_t hl = set_frameset(gb, wActionHelpWarioFramesetOffset, ADDR_Frameset_15f94) + 1;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hl, 0);
+	SET_HL(gb, hl);
+	set_wario_oam(gb, ADDR_OAM_15955);
+}
+
+PORT(ActionHelp_ShowWarioSmashAttack)
+{
+	uint16_t hl = wActionHelpWarioFramesetOffset;
+	wr8(gb, hl++, 0);
+	wr8(gb, hl++, 0);
+	gb->cpu.a = rd8(gb, wActionHelpPowerUp);
+	alu_cp(gb, gb->cpu.a, SUPER_JUMP_SLAM_OVERALLS);
+	uint16_t fs = (gb->cpu.f & FLAG_C) ? ADDR_Frameset_15f91 : ADDR_Frameset_16055;
+	wr8(gb, hl++, HI(fs));
+	wr8(gb, hl++, LO(fs));
+	gb->cpu.a = 0x18;
+	wr8(gb, hl, 0x18);
+	SET_HL(gb, hl);
+}
+
+PORT(ActionHelp_ShowWarioGroundPound)
+{
+	play_sfx(gb, SFX_GROUND_POUND);
+	set_frameset(gb, wActionHelpWarioFramesetOffset, ADDR_Frameset_16009);
+}
+
+PORT(ActionHelp_ShowWarioGroundShake)
+{
+	play_sfx(gb, SFX_GROUND_SHAKE);
+	set_frameset(gb, wActionHelpWarioFramesetOffset, ADDR_Frameset_15fc5);
+}
+
+PORT(ActionHelp_ShowWarioLand)
+{
+	play_sfx(gb, SFX_LAND);
+	set_frameset(gb, wActionHelpWarioFramesetOffset, ADDR_Frameset_15fa1);
+}
+
+PORT(ActionHelp_ShowWarioSwim)
+{
+	play_sfx(gb, SFX_SPLASH);
+	queue_wario_gfx(gb, BANK_WarioSwimGfx, ADDR_WarioSwimGfx);
+	fs_hli(gb, wActionHelpWarioFramesetOffset, ADDR_Frameset_1555b);
+	set_wario_oam(gb, ADDR_OAM_15254);
+}
+
+PORT(ActionHelp_ShowWarioSwimLeft) { fs_hli(gb, wActionHelpWarioFramesetOffset, ADDR_Frameset_15554); }
+PORT(ActionHelp_ShowWarioSubmerge) { fs_hli_sfx_timer(gb, ADDR_Frameset_1558b); }
+PORT(ActionHelp_ShowWarioUnderwaterThrust) { fs_hli_sfx_timer(gb, ADDR_Frameset_155c5); }
+PORT(ActionHelp_ShowWarioUnderwaterStopped) { fs_hli(gb, wActionHelpWarioFramesetOffset, ADDR_Frameset_1556c); }
+
+// (play_sfx) / queue Wario gfx / frameset / OAM pointer
+static void show_wario_gfx(GB *gb, uint16_t sfx, uint8_t bank, uint16_t gfx, uint16_t fs, uint16_t oam)
+{
+	if (sfx)
+		play_sfx(gb, sfx);
+	queue_wario_gfx(gb, bank, gfx);
+	fs_hli(gb, wActionHelpWarioFramesetOffset, fs);
+	set_wario_oam(gb, oam);
+}
+
+PORT(ActionHelp_ShowWarioGrab)
+{
+	show_wario_gfx(gb, SFX_GRAB, BANK_WarioThrowGfx, ADDR_WarioThrowGfx, ADDR_Frameset_1640c, ADDR_OAM_1606a);
+}
+
+PORT(ActionHelp_ShowWarioSlowGrab)
+{
+	show_wario_gfx(gb, SFX_GRAB, BANK_WarioThrowGfx, ADDR_WarioThrowGfx, ADDR_Frameset_16415, ADDR_OAM_1606a);
+}
+
+PORT(ActionHelp_ShowWarioBeginGrab)
+{
+	show_wario_gfx(gb, 0, BANK_WarioWalkGfx, ADDR_WarioWalkGfx, ADDR_Frameset_14a23, ADDR_OAM_1426c);
+}
+
+PORT(ActionHelp_ShowWarioBeginThrow)
+{
+	show_wario_gfx(gb, SFX_02C, BANK_WarioThrowGfx, ADDR_WarioThrowGfx, ADDR_Frameset_1642f, ADDR_OAM_1606a);
+}
+
+PORT(ActionHelp_ShowWarioBump)
+{
+	show_wario_gfx(gb, SFX_BUMP, BANK_WarioAirborneGfx, ADDR_WarioAirborneGfx, ADDR_Frameset_15f7f, ADDR_OAM_15955);
+}
+
+PORT(ActionHelp_ShowWarioSlide)
+{
+	show_wario_gfx(gb, 0, BANK_WarioSlideGfx, ADDR_WarioSlideGfx, ADDR_Frameset_1671d, ADDR_OAM_1644a);
+}
+
+PORT(ActionHelp_ShowWarioGrabWalk) { fs_hli(gb, wActionHelpWarioFramesetOffset, ADDR_Frameset_14a0f); }
+PORT(ActionHelp_ShowWarioThrow) { fs_hli(gb, wActionHelpWarioFramesetOffset, ADDR_Frameset_1641e); }
+PORT(ActionHelp_ShowWarioChargeThrow) { fs_hli_sfx_timer(gb, ADDR_Frameset_16435); }
+PORT(ActionHelp_ShowWarioFullyChargedGrab) { fs_hli(gb, wActionHelpWarioFramesetOffset, ADDR_Frameset_16441); }
+PORT(ActionHelp_ShowWarioFullyChargedThrow) { fs_hli(gb, wActionHelpWarioFramesetOffset, ADDR_Frameset_16423); }
+PORT(ActionHelp_ShowWarioRoll) { fs_hli(gb, wActionHelpWarioFramesetOffset, ADDR_Frameset_166f7); }
+PORT(ActionHelp_ShowParaGoomThrown) { fs_hli(gb, wMenuObj4FramesetOffset, ADDR_Frameset_1e6f3f); }
+PORT(ActionHelp_ShowFutamoguAngry) { fs_hli(gb, wMenuObj4FramesetOffset, ADDR_Frameset_1e6f78); }
+PORT(ActionHelp_ShowFutamoguHappy) { fs_hli(gb, wMenuObj4FramesetOffset, ADDR_Frameset_1e6f66); }
+PORT(ActionHelp_ShowCountRichtertoffStun) { fs_hli(gb, wMenuObj4FramesetOffset, ADDR_Frameset_1e6f5e); }
+PORT(ActionHelp_ShowCountRichtertoffThrown) { fs_hli(gb, wMenuObj4FramesetOffset, ADDR_Frameset_1e6f55); }
+
+// hl = menu object's frameset offset
+static void show_enemy_vanish(GB *gb)
+{
+	uint16_t hl = REG_HL(gb);
+	wr8(gb, hl++, 0);
+	wr8(gb, hl++, 0);
+	wr8(gb, hl++, HI(ADDR_Frameset_d4a5));
+	wr8(gb, hl++, LO(ADDR_Frameset_d4a5));
+	wr8(gb, hl++, HI(ADDR_OAM_d20e));
+	wr8(gb, hl++, LO(ADDR_OAM_d20e));
+	wr8(gb, hl, BANK_OAM_d20e);
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, hl);
+	play_sfx(gb, SFX_VANISH);
+}
+
+PORT(ActionHelp_ShowObj4EnemyVanish)
+{
+	SET_HL(gb, wMenuObj4FramesetOffset);
+	show_enemy_vanish(gb); // fallthrough
+}
+
+PORT(ActionHelp_ShowEnemyVanish) { show_enemy_vanish(gb); }
+
+// y / x / 4 zeros / frameset / OAM pointer and bank; the last write
+// increments hl when hli is set
+static void init_obj(GB *gb, uint16_t hl, uint8_t y, uint8_t x, uint16_t fs, uint16_t oam,
+	uint8_t bank, bool hli)
+{
+	wr8(gb, hl++, y);
+	wr8(gb, hl++, x);
+	gb->cpu.f = FLAG_Z; // xor a
+	for (int i = 0; i < 4; i++)
+		wr8(gb, hl++, 0);
+	wr8(gb, hl++, HI(fs));
+	wr8(gb, hl++, LO(fs));
+	wr8(gb, hl++, HI(oam));
+	wr8(gb, hl++, LO(oam));
+	gb->cpu.a = bank;
+	wr8(gb, hl, bank);
+	if (hli)
+		hl++;
+	SET_HL(gb, hl);
+}
+
+PORT(ActionHelp_ShowCountRichtertoffIdle)
+{
+	init_obj(gb, wMenuObj4, 0x40, 0xe8, ADDR_Frameset_1e6f4d, ADDR_OAM_1e6bab, BANK_OAM_1e6bab, true);
+}
+
+PORT(ActionHelp_ShowVerticalBlockPair)
+{
+	init_obj(gb, wMenuObj4, 0x40, 0xe8, ADDR_Frameset_1e6b93, ADDR_OAM_1e697c, BANK_OAM_1e697c, false);
+}
+
+PORT(ActionHelp_ShowSlide)
+{
+	init_obj(gb, wMenuObj4, 0x40, 0xd8, ADDR_Frameset_1e6b88, ADDR_OAM_1e697c, BANK_OAM_1e697c, false);
+}
+
+PORT(ActionHelp_ShowOverheadPillar)
+{
+	init_obj(gb, wMenuObj6, 0x20, 0xe8, ADDR_Frameset_1e6b85, ADDR_OAM_1e697c, BANK_OAM_1e697c, true);
+}
