@@ -41,3 +41,102 @@ PORT(TorchEmberCommonFunc)
 	wr8(gb, hl++, 24); // OBJ_STATE_DURATION
 	SET_HL(gb, hl);
 }
+
+#define LO(hl, x) ((uint16_t)(((hl) & 0xff00) | (x)))
+
+// ld hl, wCurObjUpdateFunction + 1 / ld a, HIGH(f) / ld [hld], a /
+// ld a, LOW(f) / ld [hld], a
+static void set_update_func(GB *gb, uint16_t f)
+{
+	uint16_t hl = wCurObjUpdateFunction + 1;
+	gb->cpu.a = (uint8_t)(f >> 8);
+	wr8(gb, hl--, gb->cpu.a);
+	gb->cpu.a = (uint8_t)f;
+	wr8(gb, hl--, gb->cpu.a);
+	SET_HL(gb, hl);
+}
+
+// TorchFunc.got_frameset
+static void torch_got_frameset(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, REG_HL(gb), 0); // OBJ_STATE_DURATION
+	uint16_t hl = wCurObjFlags;
+	wr8(gb, hl, (uint8_t)((rd8(gb, hl) & ~OBJFLAG_INVISIBLE) | OBJFLAG_NO_COLLISION));
+	hl = LO(hl, OBJ_SUBSTATE);
+	wr8(gb, hl, (uint8_t)(rd8(gb, hl) & ~OBJSUBFLAG_UNINITIALISED));
+	hl = LO(hl, OBJ_COLLBOX_RIGHT);
+	wr8(gb, hl--, 6);
+	wr8(gb, hl--, (uint8_t)-7); // OBJ_COLLBOX_LEFT
+	gb->cpu.a = (uint8_t)-3;
+	wr8(gb, hl, gb->cpu.a); // OBJ_COLLBOX_BOTTOM
+	SET_HL(gb, hl);
+}
+
+// TorchFunc.got_update_func
+static void torch_got_update_func(GB *gb)
+{
+	SET_DE(gb, ADDR_Frameset_68360);
+	CALL(SetObjectFramesetPtr);
+	torch_got_frameset(gb);
+}
+
+PORT(TorchFunc)
+{
+	set_update_func(gb, ADDR_TorchFunc + 0x28); // .Update
+	torch_got_update_func(gb);
+}
+
+PORT(TorchNoEmbersFunc)
+{
+	set_update_func(gb, ADDR_TorchNoEmbersFunc + 0x0b); // .Update
+	torch_got_update_func(gb);
+}
+
+PORT(FlameBlockTorchFunc)
+{
+	set_update_func(gb, ADDR_FlameBlockTorchUpdate);
+	SET_DE(gb, ADDR_Frameset_68369);
+	CALL(SetObjectFramesetPtr);
+	torch_got_frameset(gb);
+}
+
+// unreferenced?
+PORT_JUMP(Func_40c19)
+{
+	gb->cpu.b = alu_add(gb, rd8(gb, wWarioScreenXPos), 0x2a);
+	gb->cpu.a = alu_add(gb, rd8(gb, wCurObjScreenXPos), 0x2a);
+	alu_cp(gb, gb->cpu.a, gb->cpu.b);
+	if (gb->cpu.f & FLAG_C)
+		CALL(MoveObjectRight);
+	else
+		CALL(MoveObjectLeft_Slow);
+	SET_BC(gb, ADDR_Data_60320);
+	CALL(ApplyObjYMovement);
+	JUMP_TO(ADDR_TorchEmberCommonFunc);
+}
+
+PORT_JUMP(TorchEmberLeft1Func)
+{
+	CALL(MoveObjectLeft);
+	JUMP_TO(ADDR_TorchEmberCommonFunc);
+}
+
+PORT_JUMP(TorchEmberRight1Func)
+{
+	CALL(MoveObjectRight);
+	JUMP_TO(ADDR_TorchEmberCommonFunc);
+}
+
+PORT_JUMP(TorchEmberLeft2Func)
+{
+	CALL(MoveObjectLeft_Slow);
+	JUMP_TO(ADDR_TorchEmberCommonFunc);
+}
+
+PORT_JUMP(TorchEmberRight2Func)
+{
+	CALL(MoveObjectRight_Slow);
+	JUMP_TO(ADDR_TorchEmberCommonFunc); // fallthrough
+}

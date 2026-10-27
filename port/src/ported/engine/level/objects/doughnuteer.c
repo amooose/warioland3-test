@@ -24,3 +24,47 @@ PORT(DoughnutFunc)
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wCurObjVar3, 0);
 }
+
+// DoughnutFunc_LeftRight and DoughnutFunc_Up.Update: destroys the doughnut
+// or sends it at Wario depending on its state, else moves it with movement.
+static void doughnut_update(GB *gb, uint16_t movement)
+{
+	gb->cpu.a = rd8(gb, wCurObjState);
+	alu_cp(gb, gb->cpu.a, 0x18);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP_TO(ADDR_DoughnutFunc_Destroy);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x19);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP_TO(ADDR_DoughnutFunc);
+		return;
+	}
+	SET_BC(gb, movement);
+	JUMP(ApplyObjYMovement);
+}
+
+PORT_JUMP(DoughnutFunc_LeftRight)
+{
+	gb->cpu.l = OBJ_FLAGS;
+	uint16_t hl = REG_HL(gb);
+	wr8(gb, hl, (uint8_t)(rd8(gb, hl) | OBJFLAG_NO_COLLISION));
+	doughnut_update(gb, ADDR_Data_60510);
+}
+
+PORT_JUMP(DoughnutFunc_Up)
+{
+	uint16_t update = ADDR_DoughnutFunc_Up + 0x11; // .Update
+	uint16_t hl = wCurObjUpdateFunction + 1;
+	gb->cpu.a = (uint8_t)(update >> 8);
+	wr8(gb, hl--, gb->cpu.a);
+	gb->cpu.a = (uint8_t)update;
+	wr8(gb, hl--, gb->cpu.a);
+	hl = (uint16_t)((hl & 0xff00) | (uint8_t)((hl & 0xff) - 1)); // dec l
+	gb->cpu.a = 0x8f;
+	wr8(gb, hl, 0x8f);
+	hl = (uint16_t)((hl & 0xff00) | OBJ_FLAGS);
+	SET_HL(gb, hl);
+	wr8(gb, hl, (uint8_t)(rd8(gb, hl) | OBJFLAG_NO_COLLISION));
+	doughnut_update(gb, ADDR_Data_60540);
+}

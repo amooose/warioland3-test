@@ -1,0 +1,57 @@
+// Port of src/engine/level/objects/spark.asm
+#include "ported.h"
+
+#define LO(hl, x) ((uint16_t)(((hl) & 0xff00) | (x)))
+
+// ld l, OBJ_UPDATE_FUNCTION + 1 / ld a, HIGH(f) / ld [hld], a /
+// ld a, LOW(f) / ld [hld], a
+static inline uint16_t set_update(GB *gb, uint16_t hl, uint16_t f)
+{
+	hl = LO(hl, OBJ_UPDATE_FUNCTION + 1);
+	gb->cpu.a = (uint8_t)(f >> 8);
+	wr8(gb, hl--, gb->cpu.a);
+	gb->cpu.a = (uint8_t)f;
+	wr8(gb, hl--, gb->cpu.a);
+	return hl;
+}
+
+// res OBJSUBFLAG_UNINITIALISED_F of hl's object
+static inline uint16_t set_initialised(GB *gb, uint16_t hl)
+{
+	hl = LO(hl, OBJ_SUBSTATE);
+	wr8(gb, hl, (uint8_t)(rd8(gb, hl) & ~OBJSUBFLAG_UNINITIALISED));
+	return hl;
+}
+
+// Sets hl's object's collision box (right, left, bottom), a = bottom.
+static inline uint16_t set_collbox(GB *gb, uint16_t hl, uint8_t right, uint8_t left, uint8_t bottom)
+{
+	hl = LO(hl, OBJ_COLLBOX_RIGHT);
+	wr8(gb, hl--, right);
+	wr8(gb, hl--, left);
+	gb->cpu.a = bottom;
+	wr8(gb, hl, bottom);
+	return hl;
+}
+
+// ld hl, wCurObjFlags / res OBJFLAG_INVISIBLE_F, [hl] / set OBJFLAG_NO_COLLISION_F, [hl]
+static inline uint16_t show_no_collision(GB *gb)
+{
+	uint16_t hl = wCurObjFlags;
+	wr8(gb, hl, (uint8_t)((rd8(gb, hl) & ~OBJFLAG_INVISIBLE) | OBJFLAG_NO_COLLISION));
+	return hl;
+}
+
+PORT(SparkFunc)
+{
+	uint16_t hl = show_no_collision(gb);
+	hl = set_update(gb, hl, ADDR_SparkFunc + 0x2b); // .Update
+	SET_HL(gb, set_initialised(gb, hl));
+	SET_DE(gb, ADDR_Frameset_69bd9);
+	CALL(SetObjectFramesetPtr);
+	hl = REG_HL(gb);
+	wr8(gb, hl++, 0x28); // OBJ_STATE_DURATION
+	gb->cpu.a = 0x01;
+	wr8(gb, hl, 0x01);
+	SET_HL(gb, set_collbox(gb, hl, 0x02, 0xfc, 0xfb));
+}

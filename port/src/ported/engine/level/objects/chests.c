@@ -59,3 +59,45 @@ PORT(ChestFunc)
 	wr8(gb, hl--, gb->cpu.a); // OBJ_COLLBOX_LEFT
 	SET_HL(gb, hl);
 }
+
+// Inits the chest unless its treasure was already collected.
+static void chest_func(GB *gb, uint8_t treasure)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wKeyAndTreasureFlags), treasure);
+	if (gb->cpu.f & FLAG_Z)
+		JUMP_TO(ADDR_ChestFunc);
+	else
+		JUMP_TO(ADDR_DeinitChest);
+}
+
+PORT_JUMP(GreyChestFunc) { chest_func(gb, GREY_TREASURE); }
+PORT_JUMP(RedChestFunc) { chest_func(gb, RED_TREASURE); }
+PORT_JUMP(GreenChestFunc) { chest_func(gb, GREEN_TREASURE); }
+PORT_JUMP(BlueChestFunc) { chest_func(gb, BLUE_TREASURE); }
+
+// these framesets use OAM data that point
+// to addresses in VRAM that are loaded
+// with the treasure tiles
+PORT_JUMP(GreyTreasureFunc)
+{
+	SET_DE(gb, ADDR_Frameset_681be);
+	JUMP_TO(ADDR_TreasureFunc);
+}
+
+PORT_JUMP(RedTreasureFunc)
+{
+	SET_DE(gb, ADDR_Frameset_681c3);
+	JUMP_TO(ADDR_TreasureFunc);
+}
+
+PORT_JUMP(GreenTreasureFunc)
+{
+	SET_DE(gb, ADDR_Frameset_681c8);
+	JUMP_TO(ADDR_TreasureFunc);
+}
+
+PORT_JUMP(BlueTreasureFunc)
+{
+	SET_DE(gb, ADDR_Frameset_681cd);
+	JUMP_TO(ADDR_TreasureFunc); // fallthrough
+}

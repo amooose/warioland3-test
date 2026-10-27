@@ -30,3 +30,21 @@ PORT_JUMP(ClearGateFunc)
 	wr8(gb, wCurObjVar2, 32);
 	JUMP(MoveObjectUpByVar2);
 }
+
+PORT_JUMP(ClearGate3Func)
+{
+	SET_DE(gb, ADDR_Frameset_698ae);
+	JUMP_TO(ADDR_ClearGateFunc);
+}
+
+PORT_JUMP(ClearGate2Func)
+{
+	SET_DE(gb, ADDR_Frameset_698ab);
+	JUMP_TO(ADDR_ClearGateFunc);
+}
+
+PORT_JUMP(ClearGate1Func)
+{
+	SET_DE(gb, ADDR_Frameset_698a8);
+	JUMP_TO(ADDR_ClearGateFunc); // fallthrough
+}
