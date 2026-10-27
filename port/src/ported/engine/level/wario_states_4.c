@@ -439,3 +439,260 @@ PORT_JUMP(SetState_SnowmanAirborne_Jump)
 	frameset_by_dir(gb, ADDR_Frameset_1ff60c, ADDR_Frameset_1ff617);
 	LJUMP(SetState_SnowmanAirborne);
 }
+
+PORT(SetState_Swallowed)
+{
+	st(gb, wWarioState, WST_SWALLOWED);
+	static const uint16_t zero[] = {wSFXLoopCounter, wWalkVelIndex, wWarioStateCounter,
+		wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching, wIsRolling,
+		wIsSmashAttacking, wJumpVelTable, wJumpVelIndex, 0};
+	clear(gb, zero);
+	gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	wr8(gb, wIsIntangible, gb->cpu.a);
+	wr8(gb, wAutoMoveState, gb->cpu.a);
+	static const uint16_t zero2[] = {wFrameDuration, wAnimationFrame, wIsTurning, 0};
+	clear(gb, zero2);
+	SET_HL(gb, ADDR_WarioDefaultPal);
+	CALL(SetWarioPal);
+	load_gfx(gb, BANK_WarioLaunchGfx, ADDR_WarioLaunchGfx);
+	set_oam(gb, BANK_OAM_1dc3cd, ADDR_OAM_1dc3cd);
+	gb->cpu.a = rd8(gb, wObjDirection);
+	wr8(gb, wDirection, gb->cpu.a);
+	set_frameset(gb, alu_and(gb, gb->cpu.a, gb->cpu.a) ? ADDR_Frameset_1dc42c : ADDR_Frameset_1dc40f);
+	anim(gb, OAM3);
+}
+
+PORT(SetState_FanStart)
+{
+	st(gb, wWarioState, WST_FAN_START);
+	collision_box(gb, -1, -27, -9, 9);
+	static const uint16_t zero[] = {wSFXLoopCounter, wWarioStateCounter, wWarioStateCycles,
+		wGrabState, wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking,
+		wJumpVelIndex, 0};
+	clear(gb, zero);
+	gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	wr8(gb, wJumpVelTable, gb->cpu.a);
+	CALL(UpdateLevelMusic);
+	reset_anim(gb);
+	load_gfx(gb, BANK_WarioFanGfx, ADDR_WarioFanGfx);
+	set_oam(gb, BANK_OAM_1dc000, ADDR_OAM_1dc000);
+	frameset_by_dir(gb, ADDR_Frameset_1dc37f, ADDR_Frameset_1dc3c3);
+	anim(gb, OAM3);
+}
+
+PORT(SetState_IceSkatinStart)
+{
+	st(gb, wWarioState, WST_ICE_SKATIN_START);
+	collision_box(gb, -1, -27, -9, 9);
+	static const uint16_t zero[] = {wInvisibleFrame, wWarioStateCounter, wWarioStateCycles,
+		wGrabState, wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking,
+		wJumpVelTable, wJumpVelIndex, 0};
+	clear(gb, zero);
+	CALL(UpdateLevelMusic);
+	reset_anim(gb);
+	SET_HL(gb, ADDR_WarioIceSkatinPal);
+	CALL(SetWarioPal);
+	load_gfx(gb, BANK_WarioBubbleGfx, ADDR_WarioBubbleGfx);
+	set_oam(gb, BANK_OAM_1fdb6d, ADDR_OAM_1fdb6d);
+	gb->cpu.a = rd8(gb, wObjDirection);
+	wr8(gb, wDirection, gb->cpu.a);
+	set_frameset(gb, alu_and(gb, gb->cpu.a, gb->cpu.a) ? ADDR_Frameset_1fdd82 : ADDR_Frameset_1fdd8b);
+	anim(gb, OAM2);
+}
+
+PORT(HandleWarioOwlInput)
+{
+	st(gb, wWarioState, WST_OWL_FAST);
+	xor_a(gb);
+	wr8(gb, wSFXLoopCounter, 0);
+	uint8_t joy = ld(gb, wJoypadDown);
+	uint8_t in;
+	if (alu_bit(gb, joy, B_PAD_UP))
+		in = PAD_UP;
+	else if (alu_bit(gb, joy, B_PAD_DOWN))
+		in = PAD_DOWN;
+	else if (alu_bit(gb, joy, B_PAD_RIGHT)) {
+		st(gb, wDirection, DIRECTION_RIGHT);
+		in = PAD_RIGHT;
+	} else {
+		st(gb, wDirection, DIRECTION_LEFT);
+		in = PAD_LEFT;
+	}
+	st(gb, wSwimmingDirectionInput, in);
+	static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, 0};
+	clear(gb, zero);
+	reset_anim(gb);
+	if (ld_mask(gb, wSwimmingDirectionInput, PAD_UP | PAD_DOWN))
+		set_frameset(gb, ADDR_Frameset_1fede5);
+	else
+		frameset_by_dir(gb, ADDR_Frameset_1feda6, ADDR_Frameset_1fedbb);
+	anim(gb, OAM2);
+}
+
+PORT(SetState_SplitHit)
+{
+	st(gb, wWarioState, WST_SPLIT_HIT);
+	collision_box(gb, -1, -27, -9, 9);
+	static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
+		wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking, 0};
+	clear(gb, zero);
+	st(gb, wJumpVelTable, 0x01);
+	st(gb, wJumpVelIndex, 0x0e);
+	CALL(UpdateLevelMusic);
+	reset_anim(gb);
+	SET_HL(gb, ADDR_WarioSplitPal);
+	CALL(SetWarioPal);
+	load_gfx(gb, BANK_WarioSnowballGfx, ADDR_WarioSnowballGfx);
+	set_oam(gb, BANK_OAM_1ffa12, ADDR_OAM_1ffa12);
+	st(gb, wDirection, rd8(gb, wObjDirection));
+	frameset_by_dir(gb, ADDR_Frameset_1ffd16, ADDR_Frameset_1ffd10);
+	anim(gb, OAM2);
+}
+
+PORT(SetState_TurningIntoSnowman)
+{
+	play_sfx(gb, SFX_047);
+	st(gb, wWarioState, WST_SNOWMAN_START);
+	collision_box(gb, -1, -27, -9, 9);
+	static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
+		wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking, wJumpVelIndex, 0};
+	clear(gb, zero);
+	if (ld_and(gb, wJumpVelTable))
+		st(gb, wJumpVelIndex, 0x18);
+	CALL(UpdateLevelMusic);
+	reset_anim(gb);
+	SET_HL(gb, ADDR_WarioSnowmanPal);
+	CALL(SetWarioPal);
+	load_gfx(gb, BANK_WarioSnowmanGfx, ADDR_WarioSnowmanGfx);
+	set_oam(gb, BANK_OAM_1feec7, ADDR_OAM_1feec7);
+	frameset_by_dir(gb, ADDR_Frameset_1ff560, ADDR_Frameset_1ff5a3);
+	anim(gb, OAM2);
+}
+
+PORT(SetState_Launched)
+{
+	xor_a(gb);
+	wr8(gb, wIsIntangible, 0);
+	st(gb, wTransformation, TRANSFORMATION_LAUNCHED);
+	st(gb, wTouchState, TOUCH_VANISH);
+	st(gb, wStingTouchState, TOUCH_VANISH);
+	st(gb, wca94, 0x02);
+	st(gb, wWarioState, WST_LAUNCHED);
+	static const uint16_t zero[] = {wSFXLoopCounter, wWalkVelIndex, wWarioStateCounter,
+		wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching, wIsRolling,
+		wIsSmashAttacking, wJumpVelTable, wJumpVelIndex, 0};
+	clear(gb, zero);
+	collision_box(gb, -1, -15, -9, 9);
+	reset_anim(gb);
+	SET_HL(gb, ADDR_WarioDefaultPal);
+	CALL(SetWarioPal);
+	load_gfx(gb, BANK_WarioLaunchGfx, ADDR_WarioLaunchGfx);
+	set_oam(gb, BANK_OAM_1dc449, ADDR_OAM_1dc449);
+	frameset_by_dir(gb, ADDR_Frameset_1dc904, ADDR_Frameset_1dc8fb);
+	anim(gb, OAM3);
+}
+
+// ld hl, wWarioPos / ld de, hPos / copy 4 bytes (hl ends at wWarioPos + 3)
+static void copy_pos_to_hpos(GB *gb)
+{
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = rd8(gb, wWarioPos + i);
+		wr8(gb, hPos + i, gb->cpu.a);
+	}
+	SET_HL(gb, wWarioPos + 3);
+	SET_DE(gb, hPos + 3);
+}
+
+PORT(SetState_MagicRising)
+{
+	copy_pos_to_hpos(gb);
+	gb->cpu.b = PARTICLE_MAGIC_1;
+	FARCALL(CreateParticle);
+	copy_pos_to_hpos(gb);
+	gb->cpu.b = PARTICLE_MAGIC_2;
+	FARCALL(CreateParticle);
+	st(gb, wWarioState, WST_MAGIC_RISING);
+	collision_box(gb, -1, -27, -9, 9);
+	static const uint16_t zero[] = {wSFXLoopCounter, wWarioStateCounter, wWarioStateCycles,
+		wGrabState, wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking,
+		wJumpVelIndex, 0};
+	clear(gb, zero);
+	gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	wr8(gb, wJumpVelTable, gb->cpu.a);
+	CALL(UpdateLevelMusic);
+	reset_anim(gb);
+	SET_HL(gb, ADDR_WarioMagicPal);
+	CALL(SetWarioPal);
+	load_gfx(gb, BANK_WarioMagicGfx, ADDR_WarioMagicGfx);
+	set_oam(gb, BANK_OAM_1dcd60, ADDR_OAM_1dcd60);
+	set_frameset(gb, ADDR_Frameset_1dcfb0);
+	anim(gb, OAM3);
+}
+
+PORT(UpdateState_BallShot)
+{
+	if (!ld_and(gb, wAutoMoveState)) {
+		st(gb, wDirection, DIRECTION_LEFT);
+		st(gb, wWarioState, WST_BALL_THROWN);
+		static const uint16_t zero[] = {wSFXLoopCounter, wWarioStateCounter,
+			wWarioStateCycles, 0};
+		clear(gb, zero);
+		st(gb, wJumpVelIndex, 0x6);
+		st(gb, wJumpVelTable, JUMP_VEL_HIGH_JUMP);
+		reset_anim(gb);
+		set_frameset(gb, ADDR_Frameset_1dd2ee);
+		anim(gb, OAM3);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, 7)) {
+		gb->cpu.a = alu_and(gb, gb->cpu.a, 0x7f);
+		wr8(gb, wAutoMoveState, gb->cpu.a);
+		gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		if (ZF) {
+			// .phase_3
+			SET_HL(gb, ADDR_WarioBallPal);
+			CALL(SetWarioPal);
+			reset_anim(gb);
+			set_frameset(gb, ADDR_Frameset_1dd26c);
+		} else {
+			gb->cpu.a = alu_dec(gb, gb->cpu.a);
+			if (ZF) {
+				// .phase_1
+				reset_anim(gb);
+				set_frameset(gb, ADDR_Frameset_1dd2d1);
+			} else {
+				gb->cpu.a = alu_dec(gb, gb->cpu.a);
+				if (!ZF)
+					return;
+				// .phase_2
+				SET_HL(gb, ADDR_WarioBallShotPal);
+				CALL(SetWarioPal);
+				reset_anim(gb);
+				set_frameset(gb, ADDR_Frameset_1dd27a);
+			}
+		}
+	}
+	anim(gb, OAM3);
+	ld_cp(gb, wAutoMoveState, 0x02);
+	if (!ZF)
+		return;
+	if (!anim_ended(gb))
+		return;
+	st(gb, wAutoMoveState, 0x03 | (1 << 7));
+}
+
+PORT_JUMP(TurnIntoSmallSnowball)
+{
+	st(gb, wTransformationProgress, 1);
+	xor_a(gb);
+	wr8(gb, wWarioStateCounter, 0);
+	load_gfx(gb, BANK_WarioSnowballGfx, ADDR_WarioSnowballGfx);
+	set_oam(gb, BANK_OAM_1ff64a, ADDR_OAM_1ff64a);
+	reset_anim(gb);
+	gb->cpu.a = alu_and(gb, rd8(gb, wWarioSlopeInteraction), 0x0f);
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	wr8(gb, wDirection, gb->cpu.a);
+	set_frameset(gb, alu_and(gb, gb->cpu.a, gb->cpu.a) ? ADDR_Frameset_1ff92b : ADDR_Frameset_1ff956);
+	anim(gb, OAM2);
+	LJUMP(SetState_SnowballRolling);
+}

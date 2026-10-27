@@ -496,3 +496,95 @@ PORT_JUMP(Func_20899)
 	FARCALL(StartDive);
 	RET();
 }
+
+PORT(SetState_WaterStung)
+{
+	play_sfx(gb, SFX_STING);
+	st(gb, wInvincibleCounter, 0x01);
+	st(gb, wWarioState, WST_WATER_STUNG);
+	static const uint16_t zero[] = {wSwimVelIndex, wJumpVelTable, wWarioStateCounter,
+		wWarioStateCycles, 0};
+	clear(gb, zero);
+	st(gb, wIsIntangible, TRUE);
+	collision_box(gb, -1, -15, -9, 9);
+	load_gfx(gb, BANK_WarioAirborneGfx, ADDR_WarioAirborneGfx);
+	set_oam(gb, BANK_OAM_15955, ADDR_OAM_15955);
+	reset_anim(gb);
+	frameset_by_dir(gb, ADDR_Frameset_15f70, ADDR_Frameset_15f7f);
+	anim(gb, OAM1);
+}
+
+PORT(ObjInteraction_Rail)
+{
+	if (ld_bit(gb, wTransformation, TRANSFORMATIONF_PERSISTENT_F))
+		return;
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_RAIL);
+	if (ZF)
+		return;
+	gb->cpu.b = OBJACTION_06;
+	LCALL(SetObjAction);
+	play_sfx(gb, SFX_HANG_GRAB);
+	st(gb, wTransformation, TRANSFORMATION_RAIL);
+	st(gb, wTouchState, TOUCH_BUMP);
+	st(gb, wStingTouchState, TOUCH_VULNERABLE);
+	st(gb, wca94, 0x01);
+	st(gb, wWarioState, WST_HANGING_RAIL);
+	collision_box(gb, -1, -27, -9, 9);
+	static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
+		wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking, wJumpVelTable,
+		wJumpVelIndex, 0};
+	clear(gb, zero);
+	gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	wr8(gb, wAutoMoveState, gb->cpu.a);
+	CALL(UpdateLevelMusic);
+	reset_anim(gb);
+	load_gfx(gb, BANK_WarioHangGfx, ADDR_WarioHangGfx);
+	set_oam(gb, BANK_OAM_1fee05, ADDR_OAM_1fee05);
+	st(gb, wDirection, rd8(gb, wObjDirection));
+	set_frameset(gb, ADDR_Frameset_1feec4);
+	anim(gb, OAM2);
+}
+
+PORT(GetTreasure)
+{
+	// stop_music
+	wr8(gb, hMusicID + 0, 0xff);
+	st(gb, hMusicID + 1, 0x00);
+	LCALL(Func_20a63);
+	LCALL(TreasureClearObjects);
+	SET_HL(gb, wLevelEndScreen);
+	gb->cpu.a = rd8(gb, wLevelEndScreen);
+	alu_cp(gb, gb->cpu.a, LVLEND_NO_TREASURE);
+	if (ZF)
+		return;
+	wr8(gb, wLevelEndScreen, rd8(gb, wLevelEndScreen) | 0x80);
+	st(gb, wResetDisabled, TRUE);
+	xor_a(gb);
+	wr8(gb, wWalkVelIndex, 0);
+	st(gb, wWarioState, WST_GET_TREASURE_START);
+	static const uint16_t zero[] = {wFrameDuration, wAnimationFrame, wJumpVelIndex,
+		wWarioStateCounter, wWarioStateCycles, wIsSmashAttacking, wIsCrouching,
+		wAttackCounter, 0};
+	clear(gb, zero);
+	gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	wr8(gb, wIsIntangible, gb->cpu.a);
+	wr8(gb, wAutoMoveState, gb->cpu.a);
+	if (ld_and(gb, wJumpVelTable))
+		st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	SET_HL(gb, ADDR_WarioDefaultPal);
+	CALL(SetWarioPal);
+	load_gfx(gb, BANK_WarioIdleGfx, ADDR_WarioIdleGfx);
+	set_oam(gb, BANK_OAM_14000, ADDR_OAM_14000);
+	if (ld_bit(gb, wInteractionSide, INTERACTION_LEFT_F)) {
+		gb->cpu.b = ld(gb, wc1c4);
+		CALL(MoveWarioRight);
+		st(gb, wDirection, DIRECTION_LEFT);
+		set_frameset(gb, ADDR_Frameset_14252);
+	} else {
+		gb->cpu.b = ld(gb, wc1c3);
+		CALL(MoveWarioLeft);
+		st(gb, wDirection, DIRECTION_RIGHT);
+		set_frameset(gb, ADDR_Frameset_1425f);
+	}
+	anim(gb, OAM1);
+}
