@@ -96,3 +96,111 @@ PORT(ElectricLampSparkFunc)
 	SET_HL(gb, hl);
 	play_sfx(gb, SFX_06C);
 }
+
+#define ELECTRIC_LAMP_DISCHARGED (ADDR_ElectricLampFunc + 0x1a) // .Discharged
+#define ELECTRIC_LAMP_CHARGING (ADDR_ElectricLampFunc + 0x36) // .Charging
+
+// ld a, no_actions_for 1 / ld [wCurObjAction], a
+static inline void no_actions_for_1(GB *gb)
+{
+	gb->cpu.a = (1 << NO_ACTIONS_F) | 1;
+	wr8(gb, wCurObjAction, gb->cpu.a);
+}
+
+// Starts charging every 256 frames.
+PORT_LOCAL(ElectricLampFunc, Discharged)
+{
+	no_actions_for_1(gb);
+	gb->cpu.a = rd8(gb, wGlobalCounter);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	SET_DE(gb, ADDR_Frameset_68ccd);
+	CALL(SetObjectFramesetPtr);
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = 30;
+	wr8(gb, hl++, 30); // state duration
+	SET_HL(gb, set_update(gb, hl, ELECTRIC_LAMP_CHARGING));
+}
+
+// Buzzes while charging, then drops a spark.
+PORT_LOCAL_JUMP(ElectricLampFunc, Charging)
+{
+	no_actions_for_1(gb);
+	uint16_t hl = wCurObjStateDuration;
+	SET_HL(gb, hl);
+	gb->cpu.a = alu_and(gb, rd8(gb, hl), 0x03);
+	if (!gb->cpu.a)
+		play_sfx(gb, SFX_06A);
+	uint8_t d = alu_dec(gb, rd8(gb, hl));
+	wr8(gb, hl, d);
+	if (d) {
+		RET();
+		return;
+	}
+	SET_DE(gb, ADDR_Frameset_68cc4);
+	CALL(SetObjectFramesetPtr);
+	SET_HL(gb, set_update(gb, REG_HL(gb), ELECTRIC_LAMP_DISCHARGED));
+	play_sfx(gb, SFX_06B);
+	SET_BC(gb, ADDR_ObjParams_ElectricLampSpark);
+	JUMP(CreateObjectFromCurObjPos);
+}
+
+// ld hl, wCurObjYPos / copy the position to hYPos / hXPos
+static void obj_pos_to_h(GB *gb)
+{
+	uint16_t hl = wCurObjYPos;
+	wr8(gb, hYPosLo, rd8(gb, hl++));
+	wr8(gb, hYPosHi, rd8(gb, hl++));
+	wr8(gb, hXPosLo, rd8(gb, hl++));
+	gb->cpu.a = rd8(gb, hl);
+	wr8(gb, hXPosHi, gb->cpu.a);
+	SET_HL(gb, hl);
+}
+
+// .check_destroy: despawns the spark when it's hit, runs off the ground or
+// into a wall.
+static void spark_check_destroy(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wCurObjState);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		obj_pos_to_h(gb);
+		gb_call_ret(gb, ADDR_Func_3543, ADDR_ElectricLampSparkFunc + 0x88);
+		if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+			uint16_t hl = wCurObjYPos;
+			gb->cpu.a = alu_sub(gb, rd8(gb, hl++), 4);
+			wr8(gb, hYPosLo, gb->cpu.a);
+			gb->cpu.a = alu_sbc(gb, rd8(gb, hl++), 0);
+			wr8(gb, hYPosHi, gb->cpu.a);
+			SET_HL(gb, hl);
+			gb_call_ret(gb, ADDR_Func_3513, ADDR_ElectricLampSparkFunc + 0x9b);
+			if (!alu_and(gb, gb->cpu.a, gb->cpu.a))
+				return;
+		}
+	}
+	// .destroy
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCurObjFlags, 0);
+}
+
+PORT_LOCAL(ElectricLampSparkFunc, GoLeft)
+{
+	uint16_t hl = wCurObjXPos;
+	gb->cpu.a = alu_sub(gb, rd8(gb, hl), 2);
+	wr8(gb, hl++, gb->cpu.a);
+	SET_HL(gb, hl);
+	if (gb->cpu.f & FLAG_C)
+		wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+	spark_check_destroy(gb);
+}
+
+PORT_LOCAL(ElectricLampSparkFunc, GoRight)
+{
+	uint16_t hl = wCurObjXPos;
+	gb->cpu.a = alu_add(gb, rd8(gb, hl), 2);
+	wr8(gb, hl++, gb->cpu.a);
+	SET_HL(gb, hl);
+	if (gb->cpu.f & FLAG_C)
+		wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+	spark_check_destroy(gb);
+}

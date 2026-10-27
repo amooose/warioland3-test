@@ -59,3 +59,40 @@ PORT(FlameBlockFunc)
 	hl = set_initialised(gb, REG_HL(gb));
 	SET_HL(gb, set_collbox(gb, hl, 13, (uint8_t)-14, (uint8_t)-1));
 }
+
+#define FLAME_BLOCK_DETROY (ADDR_FlameBlockFunc + 0x4b) // .Detroy
+
+// Waits for every torch to be lit, then starts breaking up.
+PORT_LOCAL(FlameBlockFunc, Update)
+{
+	gb->cpu.a = rd8(gb, wNumLitTorches);
+	alu_cp(gb, gb->cpu.a, NUM_FLAME_BLOCK_TORCHES);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	wr8(gb, wFlameBlockCleared, gb->cpu.a);
+	SET_DE(gb, ADDR_Frameset_695e7);
+	CALL(SetObjectFramesetPtr);
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = 159;
+	wr8(gb, hl++, 159); // OBJ_STATE_DURATION
+	SET_HL(gb, set_update(gb, hl, FLAME_BLOCK_DETROY));
+}
+
+PORT_LOCAL(FlameBlockFunc, Detroy)
+{
+	uint16_t hl = wCurObjStateDuration;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_cp(gb, gb->cpu.a, 25);
+	if (gb->cpu.f & FLAG_C) {
+		gb->cpu.a = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
+		wr8(gb, wCurObjAction, gb->cpu.a);
+	}
+	uint8_t d = alu_dec(gb, rd8(gb, hl));
+	wr8(gb, hl, d);
+	if (d)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCurObjFlags, 0);
+}
