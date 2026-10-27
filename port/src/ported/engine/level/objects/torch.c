@@ -140,3 +140,143 @@ PORT_JUMP(TorchEmberRight2Func)
 	CALL(MoveObjectRight_Slow);
 	JUMP_TO(ADDR_TorchEmberCommonFunc); // fallthrough
 }
+
+// Lights the torch once it's hit with fire; with all of them lit, plays the
+// jingle.
+PORT(FlameBlockTorchUpdate)
+{
+	uint16_t hl = wCurObjState;
+	gb->cpu.a = rd8(gb, hl);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		SET_HL(gb, hl);
+		return;
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hl--, 0);
+	wr8(gb, hl, (uint8_t)(rd8(gb, hl) | (1 << OBJSUBFLAG_UNK_4_F))); // OBJ_SUBSTATE
+	play_sfx(gb, SFX_073);
+	hl = LO(hl, OBJ_UPDATE_FUNCTION + 1);
+	uint16_t update = ADDR_FlameBlockTorchUpdate + 0x3e; // .Update
+	gb->cpu.a = (uint8_t)(update >> 8);
+	wr8(gb, hl--, gb->cpu.a);
+	gb->cpu.a = (uint8_t)update;
+	wr8(gb, hl--, gb->cpu.a);
+	hl = LO(hl, OBJ_INTERACTION_TYPE);
+	gb->cpu.a = alu_and(gb, rd8(gb, hl), HEAVY_OBJ);
+	gb->cpu.a = alu_or(gb, gb->cpu.a, OBJ_INTERACTION_FIRE);
+	wr8(gb, hl--, gb->cpu.a);
+	SET_HL(gb, hl);
+	SET_DE(gb, ADDR_Frameset_68360);
+	CALL(SetObjectFramesetPtr);
+	hl = REG_HL(gb);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hl++, 0); // OBJ_STATE_DURATION
+	gb->cpu.a = 0x02;
+	wr8(gb, hl, 0x02); // OBJ_VAR_1
+
+	hl = wNumLitTorches;
+	SET_HL(gb, hl);
+	gb->cpu.a = alu_inc(gb, rd8(gb, hl));
+	wr8(gb, hl, gb->cpu.a);
+	alu_cp(gb, gb->cpu.a, NUM_FLAME_BLOCK_TORCHES);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	play_sfx(gb, SFX_0FA);
+}
+
+// Unless every torch is lit, a lit torch goes out after a while.
+PORT_LOCAL(FlameBlockTorchUpdate, Update)
+{
+	gb->cpu.a = rd8(gb, wNumLitTorches);
+	alu_cp(gb, gb->cpu.a, NUM_FLAME_BLOCK_TORCHES);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	uint16_t hl = wCurObjState;
+	gb->cpu.a = rd8(gb, hl);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, hl, 0);
+		hl = LO(hl, OBJ_STATE_DURATION);
+		wr8(gb, hl++, 0);
+		gb->cpu.a = 0x02;
+		wr8(gb, hl, 0x02); // OBJ_VAR_1
+		play_sfx(gb, SFX_073);
+	}
+	// .asm_40b6f
+	hl = LO(hl, OBJ_STATE_DURATION);
+	SET_HL(gb, hl);
+	uint8_t d = alu_dec(gb, rd8(gb, hl));
+	wr8(gb, hl, d);
+	if (d)
+		return;
+	hl++;
+	SET_HL(gb, hl);
+	d = alu_dec(gb, rd8(gb, hl)); // OBJ_VAR_1
+	wr8(gb, hl, d);
+	if (d)
+		return;
+	gb->cpu.l = OBJ_UNK_02;
+	FARCALL(DespawnObject);
+	hl = wNumLitTorches;
+	SET_HL(gb, hl);
+	wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+}
+
+PORT_LOCAL(TorchNoEmbersFunc, Update) {}
+
+// Every 128 frames, creates the next of the torch's embers.
+PORT_LOCAL_JUMP(TorchFunc, Update)
+{
+	gb->cpu.a = rd8(gb, wCurObjStateDuration);
+	uint16_t params;
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.a = alu_and(gb, rd8(gb, wGlobalCounter), 0x7f);
+		if (gb->cpu.a) {
+			RET();
+			return;
+		}
+		gb->cpu.a = 1;
+		params = ADDR_ObjParams_TorchEmberLeft1;
+	} else if (alu_cp(gb, gb->cpu.a, 1), gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = 2;
+		params = ADDR_ObjParams_TorchEmberRight1;
+	} else if (alu_cp(gb, gb->cpu.a, 2), gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = alu_and(gb, rd8(gb, wGlobalCounter), 0x7f);
+		if (gb->cpu.a) {
+			RET();
+			return;
+		}
+		gb->cpu.a = 3;
+		params = ADDR_ObjParams_TorchEmberLeft2;
+	} else {
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		params = ADDR_ObjParams_TorchEmberRight2;
+	}
+	SET_BC(gb, params);
+	// .create_ember
+	wr8(gb, wCurObjStateDuration, gb->cpu.a);
+	SET_HL(gb, wCurObjFlags);
+	if (alu_bit(gb, rd8(gb, wCurObjFlags), OBJFLAG_ON_SCREEN_F))
+		play_sfx(gb, SFX_073);
+	JUMP(CreateObjectFromCurObjPos);
+}
+
+// Despawns the ember once its state duration runs out.
+PORT_LOCAL(TorchEmberCommonFunc, Destroy)
+{
+	gb->cpu.a = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
+	wr8(gb, wCurObjAction, gb->cpu.a);
+	uint16_t hl = wCurObjStateDuration;
+	SET_HL(gb, hl);
+	uint8_t d = alu_dec(gb, rd8(gb, hl));
+	wr8(gb, hl, d);
+	if (d)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCurObjFlags, 0);
+}

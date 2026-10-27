@@ -41,3 +41,19 @@ PORT(Func_4c860)
 	gb->cpu.l = OBJ_UNK_02;
 	FARCALL(DespawnObject);
 }
+
+// Puts the stars at Wario's position, 4 pixels lower.
+PORT_JUMP(StarsFunc_WithYOffset)
+{
+	uint16_t hl = wCurObjYPos;
+	gb->cpu.a = alu_add(gb, rd8(gb, wWarioYPos + 1), 4);
+	wr8(gb, hl++, gb->cpu.a);
+	gb->cpu.a = alu_adc(gb, rd8(gb, wWarioYPos + 0), 0);
+	wr8(gb, hl++, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wWarioXPos + 1);
+	wr8(gb, hl++, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wWarioXPos + 0);
+	wr8(gb, hl++, gb->cpu.a);
+	SET_HL(gb, hl);
+	JUMP_TO(ADDR_StarsFunc_SetFlags); // fallthrough
+}
