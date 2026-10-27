@@ -955,3 +955,57 @@ PORT(GetUnlockedLevelArrows)
 	wr8(gb, w2d076, gb->cpu.a);
 	SET_HL(gb, hl);
 }
+
+// output: c = TRUE and carry if one of the event's treasures is collected
+PORT(CheckIfEventIsUnlocked)
+{
+	gb_call(gb, ADDR_LoadEventTreasures);
+	gb->cpu.c = TRUE;
+	gb->cpu.a = rd8(gb, w2dffd);
+	gb_call(gb, ADDR_CheckEventTreasure);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = rd8(gb, w2dffe);
+	gb_call(gb, ADDR_CheckEventTreasure);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = rd8(gb, w2dfff);
+	gb_call(gb, ADDR_CheckEventTreasure);
+}
+
+PORT_JUMP(LoadSpriteInsideWindow_Low)
+{
+	gb->cpu.b = 0x24;
+	JUMP_TO(ADDR_LoadSpriteInsideWindow); // fallthrough
+}
+
+PORT_JUMP(Func_82a62)
+{
+	gb->cpu.a = rd8(gb, wOWFuncCounter);
+	alu_cp(gb, gb->cpu.a, 16);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	FARCALL(LoadOWStarIndicatorPals);
+	JUMP_TO(ADDR_Func_82a8d);
+}
+
+PORT_JUMP(Func_82a96)
+{
+	gb_call(gb, ADDR_GetUnlockedLevelArrows);
+	JUMP_TO(ADDR_Func_82a8d);
+}
+
+PORT_JUMP(Func_82a79)
+{
+	gb_call(gb, ADDR_GetUnlockedOWLevelData);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWPathShape, 0);
+	wr8(gb, w2d072, 0);
+	SET_HL(gb, wCurSceneObj);
+	SET_BC(gb, 0x8);
+	CALL(WriteAToHL_BCTimes);
+	JUMP_TO(ADDR_Func_82a8d); // fallthrough
+}

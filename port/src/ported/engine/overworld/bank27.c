@@ -612,3 +612,20 @@ PORT(Func_9f821)
 	}
 	scene_obj_sprite(gb, ADDR_OAM_18aba0, ADDR_Func_9f0c1);
 }
+
+PORT(Func_9cd8d)
+{
+	FARCALL(Func_85046);
+}
+
+// hl = compressed BG map, bc = destination
+PORT(LoadCutsceneBGMap)
+{
+	wr8(gb, wTempBank, BANK_Cutscene01Tilemap); // BANK("Cutscene BG Maps")
+	gb->cpu.a = rd8(gb, wTempBank);
+	wr8(gb, hCallFuncBank, gb->cpu.a);
+	HCALL(Decompress);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+}
