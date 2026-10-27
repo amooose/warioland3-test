@@ -73,14 +73,14 @@ PORT(Func_1f0b5b)
 {
 	SET_DE(gb, 0);
 	gb->cpu.b = 0xca;
-	CALL(CalculateChecksum);
+	gb_call(gb, ADDR_CalculateChecksum); // in-bank: runs whatever is mapped
 	push_wram(gb, 0x02);
 	gb->cpu.b = 0x11;
-	CALL(CalculateChecksum);
+	gb_call(gb, ADDR_CalculateChecksum); // in-bank: runs whatever is mapped
 	pop_wram(gb);
 	push_wram(gb, BANK_wObjects);
 	SET_BC(gb, SIZEOF_LEVEL_OBJECTS_WRAM);
-	CALL(CalculateChecksumLong);
+	gb_call(gb, ADDR_CalculateChecksumLong); // in-bank: runs whatever is mapped
 	pop_wram(gb);
 }
 
@@ -89,16 +89,16 @@ PORT(CalculateWRAMDataChecksum)
 	SET_DE(gb, 0);
 	SET_HL(gb, 0xca00); // STARTOF("Progress WRAM")
 	gb->cpu.b = SIZEOF_PROGRESS_LEVEL_WRAM;
-	CALL(CalculateChecksum);
+	gb_call(gb, ADDR_CalculateChecksum); // in-bank: runs whatever is mapped
 	push_wram(gb, BANK_wTreasuresCollected);
 	SET_HL(gb, wTreasuresCollected);
 	gb->cpu.b = (uint8_t)((wOWLevel - wTreasuresCollected) + 2);
-	CALL(CalculateChecksum);
+	gb_call(gb, ADDR_CalculateChecksum); // in-bank: runs whatever is mapped
 	pop_wram(gb);
 	push_wram(gb, BANK_wObjects);
 	SET_HL(gb, wObjects);
 	SET_BC(gb, SIZEOF_LEVEL_OBJECTS_WRAM);
-	CALL(CalculateChecksumLong);
+	gb_call(gb, ADDR_CalculateChecksumLong); // in-bank: runs whatever is mapped
 	pop_wram(gb);
 }
 

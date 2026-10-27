@@ -36,7 +36,7 @@ PORT(CalculateGameDataChecksum)
 	SET_DE(gb, 0);
 	SET_HL(gb, 0xca00); // STARTOF("Progress WRAM")
 	gb->cpu.b = 0x5b;   // SIZEOF("Progress WRAM")
-	CALL(CalculateChecksum);
+	gb_call(gb, ADDR_CalculateChecksum); // in-bank: runs whatever is mapped
 	// push_wram BANK("WRAM2")
 	gb->cpu.a = rd8(gb, rWBK);
 	push_af(gb);
@@ -44,7 +44,7 @@ PORT(CalculateGameDataChecksum)
 	wr8(gb, rWBK, gb->cpu.a);
 	SET_HL(gb, wTreasuresCollected);
 	gb->cpu.b = (uint8_t)((wOWLevel - wTreasuresCollected) + 2);
-	CALL(CalculateChecksum);
+	gb_call(gb, ADDR_CalculateChecksum); // in-bank: runs whatever is mapped
 	// pop_wram
 	pop_af(gb);
 	wr8(gb, rWBK, gb->cpu.a);

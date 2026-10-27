@@ -23,19 +23,19 @@ PORT(SetObjAction)
 PORT(Func_20a63)
 {
 	gb->cpu.b = OBJACTION_07;
-	CALL(SetObjAction);
+	gb_call(gb, ADDR_SetObjAction);
 }
 
 PORT(Func_20a69)
 {
 	gb->cpu.b = OBJACTION_0D;
-	CALL(SetObjAction);
+	gb_call(gb, ADDR_SetObjAction);
 }
 
 PORT(Func_21cc9)
 {
 	gb->cpu.b = OBJACTION_13;
-	CALL(SetObjAction);
+	gb_call(gb, ADDR_SetObjAction);
 }
 
 PORT(CollectKey)

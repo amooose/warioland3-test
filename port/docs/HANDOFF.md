@@ -27,14 +27,16 @@ scripting and expansion on top. The approach:
 
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`. All
   work is pushed and the tests are green.
-- **Progress:** 751 / 3491 routines ported (21.5%), 13.0% of the
+- **Progress:** 1263 / 3491 routines ported (36.2%), 21.9% of the
   instructions. With hooks on, about half of what the game executes runs as
   C. Run `cmake --build build --target progress` and read
   `build/progress.md` for the per-directory numbers and the "ready to port"
   list.
-- **Fully ported:** `src/audio`. `src/home` is about 58% ported (by
-  instructions), 19% of the level engine and 13% of the overworld.
-- **Tests:** `ctest --test-dir build -j6` runs a difftest and a fuzz pass
+- **Fully ported:** `src/audio`. `src/home` is about 72% ported (by
+  instructions), 29% of the level engine (8% of the objects), 22% of the
+  overworld, and 25-35% of the title, pause, clear and action help code.
+- **Tests:** `ctest --test-dir build -j6` (about 16 minutes now; the
+  fuzz passes grow with every port) runs a difftest and a fuzz pass
   for each input in `tests/inputs/` (8 tests with the 4 inputs there now;
   `action_help2` is a local recording that isn't committed yet).
 
@@ -102,6 +104,26 @@ Each step that worked in the cloud session:
 7. **Commit and push.** Each commit message lists the routines and the
    verification.
 
+### Porting in parallel with agents
+
+Four agents ported 512 routines at once this way:
+
+- Make a git worktree per agent by hand (`git -c safe.directory=* worktree
+  add -b port/<area> ../wl3-wt-<area> HEAD`). The Agent tool's own worktree
+  isolation refuses this repo (the ownership check fails).
+- Give each agent a disjoint set of files (objects; Wario states and
+  mechanics; overworld; everything else), and forbid edits to `ported.h`
+  and the docs, so the commits cherry-pick cleanly.
+- Limit each agent to `cmake --build -j2`, `JOBS=1` fuzzing and `ctest -j1`:
+  four agents at full parallelism peg the machine.
+- Verify after merging with the full ctest here: the worktrees lack the
+  local `action_help2` recording, which caught a bug the agents' runs
+  missed.
+- Before committing, scan for `CALL(X)` / `JUMP(X)` to a routine in the
+  caller's own ROMX bank (they abort when a fuzzed bank is mapped; use
+  `gb_call` / `JUMP_TO`). A short script over `warioland3.sym` and the
+  `PORT(...)` blocks finds them.
+
 ### Pitfalls that bit before
 
 - **`xor a` / `and a` / `cp` flags.** The flags have to be exact even when the
@@ -167,22 +189,40 @@ Each step that worked in the cloud session:
      `Func_ac042` to `Func_ac051`) are back in `bank2b_1.c`. The root cause
      was never found, so it may still be there under other inputs.
 
+2. **The fuzzer's step budget.** When the routine never runs on an input,
+   the fuzzer makes up a call from the final state; if that call hangs (a
+   wait for H-Blank with the LCD off), the seed hits `MAX_STEPS` and every
+   variant then gets 20 times that, so one routine runs for minutes. This
+   keeps `LoadActionHelpBGPals` and its callers
+   (`LoadActionHelpPalsWithWater`, `LoadActionHelpPalsWithoutWater`,
+   `Func_1e48bc`) in asm. Fix: cap the variants' budget when the seed hit
+   `MAX_STEPS` (difftest.c).
+3. **Coverage gaps.** `UpdateRoomAnimatedPals` (60/104: the palette copy
+   loop only runs in levels with palette cycling), `MizzouProjectileFunc`
+   (54/59), `SilkPlatformsFunc` (18/26), `TransitionAfterSave` (18/32),
+   `Func_850ff` (24/30). Most transformation states (snowman, ball, fan,
+   owl, vampire, puffy, crazy, bouncy) are only checked with synthetic
+   calls: recordings of those would help most.
+
 ## Good next batches
 
-- **Object wrappers, now unblocked:** the object init functions that just
-  set a parameter and jump to a ported one: `TorchEmber{Left,Right}{1,2}Func`,
-  `{Grey,Red,Green,Blue}{Treasure,Chest}Func`, `ClearGate{1,2,3}Func`,
-  `ZombieHeadFunc_{Left,Right}`, `BeamFunc_{Left,Right}`, `DoughnutFunc_LeftRight`,
-  `DoughnutFunc_Up`, `StarsFunc_SetFlags`, `DummyObjectFunc`.
-- **Hot paths:** `ApplyWalkVelocity_Right` / `_Left` (40,000 calls between
-  them), `Func_2ae3b` (7,000), `Func_9fb53`, `Func_8212c`.
-- **Wario states:** `Func_29bb9`, `Func_290d6`, `Func_290a1`, `Func_28bd5`
-  in wario_states_3.
-- **Overworld:** `VBlank_Overworld` (115 instructions), `VBlank_OWPalTransition`,
-  `Func_821a1`, `EndCutscene`, `GoToNextLine`.
-- **Bigger objects** once their helpers are in: `WebberProjectileFunc`,
-  `BubbleFunc`, `TorchFunc`.
-- `build/progress.md` lists more under "Ready to port".
+- **Wario states left by the last batch:** `SetState_Crazy`,
+  `SetState_CrazySpinning`, `SetState_WaterStung`, `SetState_Swallowed`,
+  `SetState_FanStart`, `SetState_IceSkatinStart`, `HandleWarioOwlInput`,
+  `SetState_SplitHit`, `SetState_TurningIntoSnowman`, `SetState_Launched`,
+  `SetState_PuffyInflating`, `SetState_MagicRising`, `UpdateState_BallShot`,
+  `ObjInteraction_Rail`, `TurnIntoSmallSnowball`,
+  `UpdateState_GettingFlatAirborne`, `SetState_FlatAirborne`, `GetTreasure`,
+  `HandleGroundShake`.
+- **Objects:** only the entry points of most object functions are ported;
+  their local `.Update` code (reached through the update pointer) and the
+  big enemies (`FlameBlockTorchUpdate`, `InkFunc`, `DollBoyHammerFunc`,
+  `SpearheadFunc`, `ParaGoomFunc`, ...) are next.
+- **Action help:** `action_help/power_ups` (316 routines) is barely started
+  (`none.c`).
+- Not portable as is: `EnableDoubleSpeed` (`stop`), `Func_81feb` (its
+  `debug_nop` path loops forever).
+- `build/progress.md` lists the rest under "Ready to port".
 
 ## Recordings
 

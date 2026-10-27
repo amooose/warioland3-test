@@ -19,7 +19,7 @@ PORT_JUMP(WaitCutsceneFunc)
 		RET();
 		return;
 	}
-	JUMP(AdvanceCutsceneFunc); // jr
+	JUMP_TO(ADDR_AdvanceCutsceneFunc); // jr
 }
 
 static void update_ow_animation_b(GB *gb, uint8_t b)
@@ -66,7 +66,7 @@ PORT(Func_9f0d0)
 PORT_JUMP(StartCutsceneDelay)
 {
 	gb->cpu.c = 30;
-	JUMP(WaitCutsceneFunc);
+	JUMP_TO(ADDR_WaitCutsceneFunc);
 }
 
 // a = index + 1 into the pointer table at de

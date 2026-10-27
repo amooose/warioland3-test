@@ -89,7 +89,7 @@ PORT(EndOWFunc)
 PORT_JUMP(WaitOWObjDisappear)
 {
 	gb->cpu.b = 0x00;
-	JUMP(WaitOWObjState); // fallthrough
+	JUMP_TO(ADDR_WaitOWObjState); // fallthrough
 }
 
 // advances the OW func once the state at hl is b
@@ -101,7 +101,7 @@ PORT_JUMP(WaitOWObjState)
 		RET();
 		return;
 	}
-	JUMP(AdvanceOWFunc); // jr
+	JUMP_TO(ADDR_AdvanceOWFunc); // jr
 }
 
 static void cur_scene_obj_sprite(GB *gb)
@@ -131,7 +131,7 @@ PORT(Func_b791d) {}
 PORT_JUMP(Func_b4141)
 {
 	gb->cpu.b = 0x00;
-	JUMP(Func_b4143); // fallthrough
+	JUMP_TO(ADDR_Func_b4143); // fallthrough
 }
 
 PORT_JUMP(Func_b4143)
@@ -146,30 +146,30 @@ PORT_JUMP(Func_b4143)
 	}
 	SET_HL(gb, wSceneObj5);
 	SET_DE(gb, ADDR_Func_b4143 + 0x19); // .data_1
-	CALL(InitSceneObjParams);
+	gb_call(gb, ADDR_InitSceneObjParams);
 	SET_HL(gb, wSceneObj5Attributes);
 	wr8(gb, wSceneObj5Attributes, gb->cpu.b);
 	SET_HL(gb, wSceneObj1);
 	SET_DE(gb, ADDR_Func_b4143 + 0x1c); // .data_2
-	JUMP(InitSceneObjParams);
+	JUMP_TO(ADDR_InitSceneObjParams);
 }
 
 PORT_JUMP(Func_b4162)
 {
 	gb->cpu.b = 0x00;
-	JUMP(Func_b4143);
+	JUMP_TO(ADDR_Func_b4143);
 }
 
 PORT_JUMP(Func_b4e50)
 {
 	SET_DE(gb, ADDR_OAM_a884a);
-	JUMP(LoadCurSceneObjSpriteWithScroll);
+	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
 }
 
 PORT_JUMP(Func_b507f)
 {
 	SET_DE(gb, ADDR_OAM_a8000);
-	JUMP(LoadCurSceneObjSpriteWithScroll);
+	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
 }
 
 PORT_JUMP(Func_b4e4d)
