@@ -1893,6 +1893,16 @@ PORT(Func_80fd6)
 	inc_2d013(gb);
 }
 
+PORT(Func_80fb8)
+{
+	gb_call(gb, ADDR_Func_81055);
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d0e0), rd8(gb, w2d0e0));
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb_call(gb, ADDR_LoadLevelNameIfValid);
+	inc_2d013(gb);
+}
+
 // a = level arrow directions
 PORT(Func_81034)
 {

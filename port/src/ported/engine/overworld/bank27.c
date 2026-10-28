@@ -769,6 +769,93 @@ PORT_JUMP(Cutscene02Func)
 	JUMP_TO(ADDR_OWCutTree);
 }
 
+PORT_LOCAL_JUMP(Cutscene02Func, PlayCutscene)
+{
+	gb->cpu.a = rd8(gb, w2d013);
+	JUMP_TO(jumptable(gb, ADDR_Cutscene02Func + 0xa));
+}
+
+// ld hl, wSceneObj2 / ld a, y / ld [hli], a / ld [hl], x /
+// ld a, state / ld hl, wSceneObj2State / call SetSceneObjState
+static void place_scene_obj2(GB *gb, uint8_t y, uint8_t x, uint8_t state)
+{
+	gb->cpu.a = y;
+	wr8(gb, wSceneObj2 + 0, y);
+	wr8(gb, wSceneObj2 + 1, x);
+	gb->cpu.a = state;
+	SET_HL(gb, wSceneObj2State);
+	CALL(SetSceneObjState);
+}
+
+PORT_LOCAL_JUMP(Cutscene02Func, ShowAxe)
+{
+	place_scene_obj2(gb, SCREEN_HEIGHT_PX, 0x6c, 0x01);
+	gb->cpu.a = 0x03;
+	wr8(gb, wSceneObj1YCoord, gb->cpu.a);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene02Func, RaiseAxe)
+{
+	wr8(gb, wSceneObj2 + 0, alu_dec(gb, rd8(gb, wSceneObj2 + 0)));
+	gb->cpu.a = rd8(gb, wSceneObj2 + 0);
+	SET_HL(gb, wSceneObj2 + 1);
+	wr8(gb, wSceneObj2 + 1, alu_dec(gb, rd8(gb, wSceneObj2 + 1)));
+	alu_cp(gb, gb->cpu.a, 0x86);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP_TO(ADDR_Func_9ce1f);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x60);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene02Func, Wait30) { gb->cpu.c = 30; JUMP_TO(ADDR_WaitCutsceneFunc); }
+PORT_LOCAL_JUMP(Cutscene02Func, Wait60) { gb->cpu.c = 60; JUMP_TO(ADDR_WaitCutsceneFunc); }
+PORT_LOCAL_JUMP(Cutscene02Func, Wait16) { gb->cpu.c = 16; JUMP_TO(ADDR_WaitCutsceneFunc); }
+
+PORT_LOCAL_JUMP(Cutscene02Func, ShowSpeedLines)
+{
+	gb->cpu.a = LCDC_BG_MAP;
+	wr8(gb, wLCDCFlagsToFlip, gb->cpu.a);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene02Func, HideAxe)
+{
+	gb->cpu.a = LCDC_BG_MAP;
+	wr8(gb, wLCDCFlagsToFlip, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, wSceneObj2State);
+	CALL(SetSceneObjState);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSceneObj1YCoord, 0);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene02Func, ShowCut)
+{
+	place_scene_obj2(gb, 96, 66, 0x02);
+	play_sfx(gb, SFX_101);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene02Func, WaitCutAnimation)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wSceneObj2State), rd8(gb, wSceneObj2State));
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
 PORT_JUMP(InitCutscene02)
 {
 	gb->cpu.b = BANK_Pals_b8200;
@@ -806,4 +893,176 @@ static void load_cutscene_bg_maps(GB *gb, uint16_t attrmap, uint16_t load_attrma
 PORT(LoadCutsceneBGMaps01)
 {
 	load_cutscene_bg_maps(gb, ADDR_Cutscene01Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene01Tilemap, ADDR_LoadCutsceneTilemap0);
+}
+
+PORT(LoadCutsceneBGMaps02)
+{
+	load_cutscene_bg_maps(gb, ADDR_Cutscene02Attrmap, ADDR_LoadCutsceneAttrmap1, ADDR_Cutscene02Tilemap, ADDR_LoadCutsceneTilemap1);
+}
+
+PORT(LoadCutsceneBGMaps07)
+{
+	load_cutscene_bg_maps(gb, ADDR_Cutscene07Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene07Tilemap, ADDR_LoadCutsceneTilemap0);
+}
+
+PORT_JUMP(LoadCutsceneAttrmap0)
+{
+	gb->cpu.a = 1; // BANK("VRAM1")
+	wr8(gb, rVBK, 1);
+	JUMP_TO(ADDR_LoadCutsceneTilemap0); // fallthrough
+}
+
+PORT_JUMP(LoadCutsceneAttrmap1)
+{
+	gb->cpu.a = 1; // BANK("VRAM1")
+	wr8(gb, rVBK, 1);
+	JUMP_TO(ADDR_LoadCutsceneTilemap1); // fallthrough
+}
+
+PORT_JUMP(Cutscene03Func)
+{
+	gb_call(gb, ADDR_Cutscene03Func + 0x6); // .PlayCutscene
+	JUMP_TO(ADDR_Func_9f0e0);
+}
+
+PORT_LOCAL_JUMP(Cutscene03Func, PlayCutscene)
+{
+	gb->cpu.a = rd8(gb, w2d013);
+	JUMP_TO(jumptable(gb, ADDR_Cutscene03Func + 0xa));
+}
+
+// ld hl, obj / ld a, y / ld [hli], a / ld [hl], x / ld a, state /
+// ld hl, obj state / call SetSceneObjState
+static void place_scene_obj(GB *gb, uint16_t obj, uint8_t y, uint8_t x, uint8_t state, uint16_t obj_state)
+{
+	gb->cpu.a = y;
+	wr8(gb, obj + 0, y);
+	wr8(gb, obj + 1, x);
+	gb->cpu.a = state;
+	SET_HL(gb, obj_state);
+	CALL(SetSceneObjState);
+}
+
+PORT_LOCAL_JUMP(Cutscene03Func, Func_9cf36)
+{
+	place_scene_obj(gb, wSceneObj2, 59, 40, 0x01, wSceneObj2State);
+	place_scene_obj(gb, wSceneObj3, 59, 120, 0x02, wSceneObj3State);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+// bc = frame counter
+PORT_LOCAL_JUMP(Cutscene03Func, Func_9cf59)
+{
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	if (alu_bit(gb, gb->cpu.a, 0)) {
+		RET();
+		return;
+	}
+	wr8(gb, wSceneObj3XCoord, alu_dec(gb, rd8(gb, wSceneObj3XCoord)));
+	SET_HL(gb, wSceneObj2XCoord);
+	wr8(gb, wSceneObj2XCoord, alu_inc(gb, rd8(gb, wSceneObj2XCoord)));
+	gb->cpu.a = rd8(gb, wSceneObj2XCoord);
+	alu_cp(gb, gb->cpu.a, 79);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene03Func, Wait30_1) { gb->cpu.c = 30; JUMP_TO(ADDR_WaitCutsceneFunc); }
+PORT_LOCAL_JUMP(Cutscene03Func, Wait30_2) { gb->cpu.c = 30; JUMP_TO(ADDR_WaitCutsceneFunc); }
+PORT_LOCAL_JUMP(Cutscene03Func, Wait30_3) { gb->cpu.c = 30; JUMP_TO(ADDR_WaitCutsceneFunc); }
+PORT_LOCAL_JUMP(Cutscene03Func, Wait30_4) { gb->cpu.c = 30; JUMP_TO(ADDR_WaitCutsceneFunc); }
+PORT_LOCAL_JUMP(Cutscene03Func, Wait60_1) { gb->cpu.c = 60; JUMP_TO(ADDR_WaitCutsceneFunc); }
+PORT_LOCAL_JUMP(Cutscene03Func, Wait60_2) { gb->cpu.c = 60; JUMP_TO(ADDR_WaitCutsceneFunc); }
+
+PORT_LOCAL_JUMP(Cutscene03Func, Func_9cf71)
+{
+	gb->cpu.a = 0x03;
+	SET_HL(gb, wSceneObj2State);
+	CALL(SetSceneObjState);
+	gb->cpu.a = 80;
+	wr8(gb, wSceneObj2XCoord, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSceneObj3State, 0);
+	play_sfx(gb, SFX_CLICK);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene03Func, Func_9cf92)
+{
+	place_scene_obj(gb, wSceneObj3YCoord, 59, 80, 0x05, wSceneObj3State);
+	play_sfx(gb, SFX_106);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene03Func, Func_9cfad)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wSceneObj3State), rd8(gb, wSceneObj3State));
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+// bc = frame counter
+PORT_LOCAL_JUMP(Cutscene03Func, Func_9cfba)
+{
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	if (!alu_bit(gb, gb->cpu.a, 0)) {
+		RET();
+		return;
+	}
+	SET_HL(gb, wSceneObj2YCoord);
+	wr8(gb, wSceneObj2YCoord, alu_inc(gb, rd8(gb, wSceneObj2YCoord)));
+	gb->cpu.a = rd8(gb, wSceneObj2YCoord);
+	alu_cp(gb, gb->cpu.a, 0x54);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene03Func, Func_9cfce)
+{
+	gb->cpu.a = 0x04;
+	SET_HL(gb, wSceneObj2State);
+	CALL(SetSceneObjState);
+	SET_HL(gb, wSceneObj2XCoord);
+	wr8(gb, wSceneObj2XCoord, alu_inc(gb, rd8(gb, wSceneObj2XCoord)));
+	play_sfx(gb, SFX_CLICK);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene03Func, Func_9cfea)
+{
+	gb->cpu.a = rd8(gb, wSceneObj2YCoord);
+	wr8(gb, wSceneObj3YCoord, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wSceneObj2XCoord);
+	wr8(gb, wSceneObj3XCoord, gb->cpu.a);
+	gb->cpu.a = 0x06;
+	SET_HL(gb, wSceneObj3State);
+	CALL(SetSceneObjState);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene03Func, Func_9d001)
+{
+	gb->cpu.a = rd8(gb, wSceneObj3State);
+	alu_cp(gb, gb->cpu.a, 0x07);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene03Func, Func_9d00a)
+{
+	play_sfx(gb, SFX_10C);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
 }

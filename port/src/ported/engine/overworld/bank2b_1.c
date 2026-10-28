@@ -945,8 +945,895 @@ PORT(VBlank_PrologueEpilogue)
 	CALL(CopyHLToDE);
 }
 
+PORT_JUMP(Func_acacd)
+{
+	gb->cpu.a = 1;
+	SET_HL(gb, wCurTextBufferPage);
+	alu_cp(gb, gb->cpu.a, rd8(gb, wCurTextBufferPage));
+	if (!(gb->cpu.f & FLAG_Z)) {
+		gb->cpu.a = rd8(gb, wJoypadPressed);
+		if (!alu_bit(gb, gb->cpu.a, B_PAD_A)) {
+			RET();
+			return;
+		}
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		SET_HL(gb, wSceneObj1State);
+		CALL(SetSceneObjState);
+	}
+	// .clear
+	gb_call(gb, ADDR_ClearTextboxExceptHeader);
+	JUMP_TO(ADDR_Func_aca6d);
+}
+
+// prints the line in wCurTextLine, lines[] = the PrintText_Line* for each
+static void print_text_lines(GB *gb, const uint16_t *lines, int n)
+{
+	SET_HL(gb, wTextDelayCounter);
+	wr8(gb, wTextDelayCounter, alu_inc(gb, rd8(gb, wTextDelayCounter)));
+	gb->cpu.a = alu_and(gb, rd8(gb, wCurTextLine), rd8(gb, wCurTextLine));
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP_TO(ADDR_DelayTextThenGoToNextLine);
+		return;
+	}
+	for (int i = 0; i < n; i++) {
+		gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z) {
+			JUMP_TO(lines[i]);
+			return;
+		}
+	}
+	gb->cpu.a = 0x80;
+	wr8(gb, wCurTextLine, gb->cpu.a);
+	RET();
+}
+
+PORT_JUMP(PrintTextWithoutHeader)
+{
+	static const uint16_t lines[] = {ADDR_PrintText_Line2, ADDR_PrintText_Line3, ADDR_PrintText_Line4};
+	print_text_lines(gb, lines, 3);
+}
+
+PORT_JUMP(PrintTextWithHeader)
+{
+	static const uint16_t lines[] = {ADDR_PrintText_Line1, ADDR_PrintText_Line2, ADDR_PrintText_Line3, ADDR_PrintText_Line4};
+	print_text_lines(gb, lines, 4);
+}
+
+// bc = obj state: animates the temple scene obj (Credits OAM framesets)
+PORT_JUMP(UpdateTempleSceneObjAnimation)
+{
+	for (;;) {
+		gb->cpu.a = rd8(gb, REG_BC(gb));
+		uint8_t state = gb->cpu.a;
+		uint16_t target = jumptable(gb, ADDR_UpdateTempleSceneObjAnimation + 2);
+		static const uint16_t framesets[] = {
+			0, 0, ADDR_Frameset_15e796, ADDR_Frameset_15e89c, ADDR_Frameset_15e89f,
+			ADDR_Frameset_15e8a2, ADDR_Frameset_15e8a5, ADDR_Frameset_15e8a8,
+			ADDR_Frameset_15e88d, ADDR_Frameset_15e896, ADDR_Frameset_15e893,
+			ADDR_Frameset_15e890, ADDR_Frameset_15e899, ADDR_Frameset_15e8ab,
+			ADDR_Frameset_15e8b0, ADDR_Frameset_15e8b0, ADDR_Frameset_15e8ab,
+			ADDR_Frameset_15e932, ADDR_Frameset_15e95c,
+		};
+		if (state == 0) { // .Func_ac358
+			RET();
+			return;
+		}
+		if (state >= sizeof(framesets) / sizeof(framesets[0]) || state == 1) {
+			JUMP_TO(target); // Func_ac056, or out of the table
+			return;
+		}
+		SET_DE(gb, framesets[state]);
+		if (state == 2) {
+			// .Func_ac337
+			gb_call(gb, ADDR_Func_ac000);
+			gb->cpu.e = 0x00;
+			gb_call(gb, ADDR_SetObjStateIfAnimationIsFinished);
+			if (gb->cpu.f & FLAG_Z)
+				continue;
+			// .Func_ac331
+			SET_DE(gb, ADDR_OAM_1644a);
+			JUMP_TO(ADDR_Func_ac042);
+			return;
+		}
+		if (state <= 8) {
+			// .Func_ac343
+			gb_call(gb, ADDR_Func_ac00b);
+			SET_DE(gb, ADDR_OAM_15e813);
+			JUMP_TO(ADDR_Func_ac047);
+			return;
+		}
+		if (state <= 12) {
+			// .Func_ac38e
+			gb_call(gb, ADDR_Func_ac00b);
+			SET_DE(gb, ADDR_OAM_15e813);
+			gb->cpu.b = BANK_OAM_15e813;
+			JUMP(LoadOWSprite);
+			return;
+		}
+		gb_call(gb, ADDR_Func_ac00b);
+		if (state == 15 || state == 16) {
+			gb->cpu.e = state == 15 ? 0x0d : 0x0e;
+			// .Func_ac3d1
+			gb_call(gb, ADDR_SetObjStateIfAnimationIsFinished);
+			if (gb->cpu.f & FLAG_Z)
+				continue;
+		}
+		// .asm_ac3c4
+		SET_DE(gb, ADDR_OAM_18c88a);
+		gb->cpu.b = BANK_OAM_18c88a;
+		JUMP(LoadOWSpriteWithScroll);
+		return;
+	}
+}
+
+// bc = obj state: animates the obj (Credits OAM framesets)
+PORT_JUMP(Func_ac409)
+{
+	for (;;) {
+		gb->cpu.a = rd8(gb, REG_BC(gb));
+		uint8_t state = gb->cpu.a;
+		uint16_t target = jumptable(gb, ADDR_Func_ac409 + 2);
+		static const uint16_t framesets[] = {
+			0, 0, ADDR_Frameset_15e741, ADDR_Frameset_15e748, ADDR_Frameset_15e74b,
+			ADDR_Frameset_15e774, ADDR_Frameset_15e77d, ADDR_Frameset_15e780,
+			ADDR_Frameset_15e793, ADDR_Frameset_15e7a3, ADDR_Frameset_15e7a6,
+			ADDR_Frameset_15e7b7, ADDR_Frameset_15e7c4, ADDR_Frameset_15e7ed,
+			ADDR_Frameset_15e7b7, ADDR_Frameset_15e783, ADDR_Frameset_15e78a,
+			ADDR_Frameset_15e796, ADDR_Frameset_15e7f0, ADDR_Frameset_15e7f5,
+			ADDR_Frameset_aad0b, ADDR_Frameset_15e7fa, ADDR_Frameset_15e801,
+			ADDR_Frameset_15e80a,
+		};
+		if (state == 0) { // .Func_ac450
+			RET();
+			return;
+		}
+		if (state >= sizeof(framesets) / sizeof(framesets[0]) || state == 1) {
+			JUMP_TO(target); // Func_ac056, or out of the table
+			return;
+		}
+		SET_DE(gb, framesets[state]);
+		if (state == 20) {
+			// .Func_ac4cd
+			gb_call(gb, ADDR_Func_ac037);
+			gb->cpu.e = 0x00;
+			gb_call(gb, ADDR_SetObjStateIfAnimationIsFinished);
+			if (gb->cpu.f & FLAG_Z)
+				continue;
+			SET_DE(gb, ADDR_OAM_aab5c);
+			gb->cpu.b = BANK_OAM_aab5c;
+			JUMP(LoadOWSpriteWithScroll);
+			return;
+		}
+		gb_call(gb, ADDR_Func_ac000);
+		if (state == 14 || state == 16 || state == 17 || state == 21) {
+			// .Func_ac444
+			gb->cpu.e = state == 21 ? 0x16 : 0x00;
+			// .set_new_state_if_finished
+			gb_call(gb, ADDR_SetObjStateIfAnimationIsFinished);
+			if (gb->cpu.f & FLAG_Z)
+				continue;
+		}
+		// .Func_ac43e
+		SET_DE(gb, ADDR_OAM_15e44a);
+		if (state == 10 || state == 12) {
+			gb_call(gb, ADDR_Func_ac042);
+			gb->cpu.a = rd8(gb, wOWAnimationFinished);
+			alu_cp(gb, gb->cpu.a, 0xff);
+			if (gb->cpu.f & FLAG_Z)
+				play_sfx(gb, state == 10 ? SFX_0F3 : SFX_0F4);
+			RET();
+			return;
+		}
+		JUMP_TO(ADDR_Func_ac042);
+		return;
+	}
+}
+
+PORT_JUMP(LoadNextObjectiveText)
+{
+	SET_DE(gb, wTextLine1);
+	SET_HL(gb, wTextBuffer);
+	gb->cpu.b = TEXT_LINE_LENGTH;
+	CALL(CopyHLToDE);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wIsNextObjectiveTheTemple, 0);
+	FARCALL(GetMapSideAndLevelForNextTreasure);
+	gb->cpu.a = gb->cpu.b;
+	SET_HL(gb, 0x20);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) {
+		// .check_the_temple
+		gb->cpu.a = alu_and(gb, gb->cpu.d, gb->cpu.d);
+		if (gb->cpu.f & FLAG_Z) {
+			gb->cpu.a = TRUE;
+			wr8(gb, wIsNextObjectiveTheTemple, gb->cpu.a);
+		}
+	} else {
+		static const uint16_t offsets[] = {0x120, 0x200, 0x2e0};
+		int i;
+		for (i = 0; i < 3; i++) {
+			SET_HL(gb, offsets[i]);
+			gb->cpu.a = alu_dec(gb, gb->cpu.a);
+			if (gb->cpu.f & FLAG_Z)
+				break;
+		}
+		if (i == 3) {
+			JUMP_TO(ADDR_LoadNextObjectiveText + 0x3a - 3); // debug_nop
+			return;
+		}
+	}
+	// .not_temple
+	SET_BC(gb, wTextBuffer);
+	uint16_t hl = alu_add16(gb, REG_HL(gb), wTextBuffer);
+	gb->cpu.a = alu_swap(gb, gb->cpu.d);
+	gb->cpu.a = alu_rlca(gb, gb->cpu.a);
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.b = 0x00;
+	hl = alu_add16(gb, hl, REG_BC(gb));
+	SET_HL(gb, hl);
+	gb->cpu.a = alu_and(gb, rd8(gb, wLanguage), rd8(gb, wLanguage));
+	if (!(gb->cpu.f & FLAG_Z)) {
+		// .english
+		SET_DE(gb, wTextLine3);
+		gb->cpu.b = 2 * TEXT_LINE_LENGTH;
+		CALL(CopyHLToDE);
+		SET_DE(gb, wTextLine2);
+		SET_HL(gb, wTextBuffer + TEXT_LINE_LENGTH);
+		gb->cpu.b = TEXT_LINE_LENGTH;
+		CALL(CopyHLToDE);
+		RET();
+		return;
+	}
+	SET_DE(gb, wTextLine2);
+	gb->cpu.b = TEXT_LINE_LENGTH;
+	CALL(CopyHLToDE);
+	SET_DE(gb, wTextLine3);
+	SET_HL(gb, wTextBuffer + TEXT_LINE_LENGTH);
+	gb->cpu.b = TEXT_LINE_LENGTH;
+	CALL(CopyHLToDE);
+	gb->cpu.a = 0x7f; // '@'
+	SET_HL(gb, wTextLine4);
+	SET_BC(gb, TEXT_LINE_LENGTH);
+	CALL(WriteAToHL_BCTimes);
+	RET();
+}
+
+// calls `func` with bc = each of the n obj states, the last one a tail jump
+static void for_each_obj_state(GB *gb, uint16_t func, const uint16_t *states, int n)
+{
+	for (int i = 0; i < n - 1; i++) {
+		SET_BC(gb, states[i]);
+		gb_call(gb, func);
+	}
+	SET_BC(gb, states[n - 1]);
+	JUMP_TO(func);
+}
+
+PORT_JUMP(Func_ac3fd)
+{
+	static const uint16_t states[] = {wSceneObj8State, wSceneObj9State};
+	for_each_obj_state(gb, ADDR_Func_ac409, states, 2);
+}
+
+PORT_JUMP(UpdatePrologueSceneObjects)
+{
+	static const uint16_t states[] = {
+		wCurSceneObjState, wSceneObj1State, wSceneObj2State,
+		wSceneObj3State, wSceneObj4State, wSceneObj5State,
+	};
+	for_each_obj_state(gb, ADDR_Func_ac409, states, 6);
+}
+
+PORT_JUMP(Func_ac2b2)
+{
+	static const uint16_t states[] = {wCurSceneObjState, wSceneObj1State, wSceneObj2State};
+	for_each_obj_state(gb, ADDR_UpdateTempleSceneObjAnimation, states, 3);
+}
+
+PORT_JUMP(UpdateTempleSceneObjs)
+{
+	static const uint16_t states[] = {
+		wSceneObj3State, wSceneObj4State, wSceneObj7State, wSceneObj8State,
+		wSceneObj9State, wSceneObj10State, wSceneObj11State, wSceneObj12State,
+		wSceneObj13State, wSceneObj14State, wSceneObj15State,
+	};
+	for_each_obj_state(gb, ADDR_UpdateTempleSceneObjAnimation, states, 11);
+}
+
+PORT_JUMP(Func_acae7)
+{
+	gb_call(gb, ADDR_PrintTextWithoutHeader);
+	gb->cpu.a = rd8(gb, wCurTextLine);
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_Func_aca6d);
+}
+
+PORT(PrologueFade)
+{
+	FARCALL(_PrologueFade);
+}
+
+PORT_JUMP(Func_aca9e)
+{
+	gb_call(gb, ADDR_PrintTextWithHeader);
+	gb->cpu.a = rd8(gb, wCurTextLine);
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	SET_HL(gb, wCurTextBufferPage);
+	wr8(gb, wCurTextBufferPage, alu_inc(gb, rd8(gb, wCurTextBufferPage)));
+	JUMP_TO(ADDR_Func_aca6d);
+}
+
+PORT(_UpdateTempleScene)
+{
+	gb_call(gb, ADDR__UpdateTempleScene + 0x17); // .UpdateScene
+	gb_call(gb, ADDR_Func_ac2b2);
+	gb_call(gb, ADDR_UpdateSceneWario);
+	gb_call(gb, ADDR_UpdateTempleSceneObjs);
+	CALL(ClearUnusedVirtualOAM);
+}
+
+// _UpdateTempleScene.NextState
+static void temple_scene_next_state(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wTempleSceneCounter, 0);
+	SET_HL(gb, wTempleSceneCounter - 1);
+	wr8(gb, wTempleSceneCounter - 1, alu_inc(gb, rd8(gb, wTempleSceneCounter - 1))); // w2da04
+}
+
+PORT_LOCAL(_UpdateTempleScene, NextState) { temple_scene_next_state(gb); }
+
+PORT_LOCAL_JUMP(_UpdateTempleScene, UpdateScene)
+{
+	SET_HL(gb, wTempleSceneCounter);
+	wr8(gb, wTempleSceneCounter, alu_inc(gb, rd8(gb, wTempleSceneCounter)));
+	SET_BC(gb, wTempleSceneCounter);
+	gb->cpu.a = rd8(gb, wTempleScene);
+	JUMP_TO(jumptable(gb, ADDR__UpdateTempleScene + 0x21));
+}
+
+// a = scene Wario state: call SetSceneWarioState / jr .NextState
+static void set_state_next(GB *gb, uint8_t state)
+{
+	gb->cpu.a = state;
+	gb_call(gb, ADDR_SetSceneWarioState);
+	temple_scene_next_state(gb);
+}
+
+// ld a, [wTempleSceneCounter] / cp n: returns true on the ret c
+static bool temple_counter_below(GB *gb, uint8_t n)
+{
+	gb->cpu.a = rd8(gb, wTempleSceneCounter);
+	alu_cp(gb, gb->cpu.a, n);
+	return gb->cpu.f & FLAG_C;
+}
+
+// ld a, [wSceneWarioState] / cp state: returns true on the ret nz
+static bool scene_wario_state_isnt(GB *gb, uint8_t state)
+{
+	gb->cpu.a = rd8(gb, wSceneWarioState);
+	alu_cp(gb, gb->cpu.a, state);
+	return !(gb->cpu.f & FLAG_Z);
+}
+
+// ld hl, wTempleSceneCounter / xor a / ld [hld], a / ld [hl], a
+static void reset_temple_scene_counters(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wTempleSceneCounter, 0);
+	wr8(gb, wTempleSceneCounter - 1, 0); // w2da04
+	SET_HL(gb, wTempleSceneCounter - 1);
+}
+
+// ld a, [w2da04] / and a / jr z / dec a / jr z ...: the substate, or -1
+static int temple_substate(GB *gb, int n)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, w2da04), rd8(gb, w2da04));
+	for (int i = 0; i < n; i++) {
+		if (i)
+			gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z)
+			return i;
+	}
+	return -1;
+}
+
+PORT_LOCAL(_UpdateTempleScene, Entering)
+{
+	switch (temple_substate(gb, 5)) {
+	case 0: // .start
+		set_state_next(gb, SCENEWARIO_WALK_RIGHT);
+		return;
+	case 1: // .walk_right
+		gb_call(gb, ADDR_ApplySceneWarioMovementRight);
+		alu_cp(gb, gb->cpu.a, 0x50);
+		if (!(gb->cpu.f & FLAG_Z))
+			return;
+		wr8(gb, REG_HL(gb), gb->cpu.a);
+		set_state_next(gb, SCENEWARIO_IDLE_RIGHT);
+		return;
+	case 2: // .turn
+		if (temple_counter_below(gb, 8))
+			return;
+		set_state_next(gb, SCENEWARIO_TURN_BACK_RIGHT);
+		return;
+	case 3: // .look_back
+		if (scene_wario_state_isnt(gb, SCENEWARIO_LOOK_BACK))
+			return;
+		temple_scene_next_state(gb);
+		return;
+	case 4: // .nod
+		if (temple_counter_below(gb, 50))
+			return;
+		gb->cpu.a = SCENEWARIO_NOD;
+		gb_call(gb, ADDR_SetSceneWarioState);
+		reset_temple_scene_counters(gb);
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wCurTextLine, 0);
+		wr8(gb, wTextDelayCounter, 0);
+		SET_HL(gb, wTempleScene);
+		wr8(gb, wTempleScene, TEMPLE_SCENE_TALKING);
+		return;
+	}
+}
+
+PORT_LOCAL(_UpdateTempleScene, TalkToHiddenFigure)
+{
+	gb_call(gb, ADDR__UpdateTempleScene + 0x105); // .DelayAndPlayTempleMusic
+	gb->cpu.a = alu_and(gb, rd8(gb, wIsNextObjectiveTheTemple), rd8(gb, wIsNextObjectiveTheTemple));
+	if (gb->cpu.f & FLAG_Z)
+		gb_call(gb, ADDR_PrintTextWithHeader);
+	gb->cpu.a = alu_and(gb, rd8(gb, wJoypadPressed), PAD_B | PAD_LEFT);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	// .start_exit
+	reset_temple_scene_counters(gb);
+	gb_call(gb, ADDR_ClearTextbox);
+	SET_HL(gb, wTempleScene);
+	wr8(gb, wTempleScene, TEMPLE_SCENE_EXITING);
+}
+
+PORT_LOCAL(_UpdateTempleScene, Exiting)
+{
+	switch (temple_substate(gb, 5)) {
+	case 0: // .turn_left
+		set_state_next(gb, SCENEWARIO_TURN_BACK_TO_LEFT);
+		return;
+	case 1: // .idle_left
+		if (scene_wario_state_isnt(gb, SCENEWARIO_IDLE_LEFT))
+			return;
+		temple_scene_next_state(gb);
+		return;
+	case 2: // .start_walk
+		if (temple_counter_below(gb, 4))
+			return;
+		set_state_next(gb, SCENEWARIO_WALK_LEFT);
+		return;
+	case 3: // .walk_left
+		gb->cpu.a = rd8(gb, wJoypadPressed);
+		if (!alu_bit(gb, gb->cpu.a, B_PAD_B)) {
+			gb_call(gb, ADDR_ApplySceneWarioMovementLeft);
+			alu_cp(gb, gb->cpu.a, 0xf0);
+			if (!(gb->cpu.f & FLAG_Z))
+				return;
+			set_state_next(gb, SCENEWARIO_NONE);
+			return;
+		}
+		break; // .exit
+	case 4: // .outside
+		if (temple_counter_below(gb, 0x0a))
+			return;
+		break; // .exit
+	default:
+		return;
+	}
+	// .exit
+	wr8(gb, hSFXID + 0, 0xff); // stop_sfx
+	gb->cpu.a = 0x00;
+	wr8(gb, hSFXID + 1, 0x00);
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d14c, gb->cpu.a);
+	gb->cpu.a = SST_OVERWORLD_08;
+	wr8(gb, wSubState, gb->cpu.a);
+	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_Z) | FLAG_C); // scf
+}
+
 // Func_adbfe (the golf building scene) uses wPalFade6Colour2Green* as its
 // state (Current), substate (Target) and frame counter (Sign)
 #define GOLF_STATE wPalFade6Colour2GreenCurrent
 #define GOLF_SUBSTATE wPalFade6Colour2GreenTarget
 #define GOLF_COUNTER wPalFade6Colour2GreenSign
+
+// Func_adbfe.exit
+static void golf_building_exit(GB *gb)
+{
+	wr8(gb, hSFXID + 0, 0xff); // stop_sfx
+	gb->cpu.a = 0x00;
+	wr8(gb, hSFXID + 1, 0x00);
+	gb->cpu.a = 0x01;
+	wr8(gb, wOWUIObj2Duration, gb->cpu.a);
+	gb->cpu.a = 0x08;
+	wr8(gb, wSubState, gb->cpu.a);
+	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_Z) | FLAG_C); // scf
+}
+
+PORT(Func_adbfe)
+{
+	// .Func_adc0b
+	bool exit = false;
+	gb->cpu.a = rd8(gb, GOLF_STATE);
+	alu_cp(gb, gb->cpu.a, 0x04);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		gb->cpu.a = rd8(gb, wJoypadPressed);
+		exit = alu_bit(gb, gb->cpu.a, B_PAD_B);
+	}
+	if (exit) {
+		golf_building_exit(gb);
+	} else {
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		gb_call(gb, ADDR_Func_adbfe + 0x31); // .Func_adc2f
+	}
+	gb_call(gb, ADDR_UpdateSceneWario);
+	CALL(ClearUnusedVirtualOAM);
+}
+
+PORT_LOCAL_JUMP(Func_adbfe, Func_adc2f)
+{
+	SET_HL(gb, GOLF_COUNTER);
+	wr8(gb, GOLF_COUNTER, alu_inc(gb, rd8(gb, GOLF_COUNTER)));
+	SET_BC(gb, GOLF_COUNTER);
+	gb->cpu.a = rd8(gb, GOLF_STATE);
+	JUMP_TO(jumptable(gb, ADDR_Func_adbfe + 0x3b));
+}
+
+// Func_adbfe.asm_adc43: next substate
+static void golf_next_substate(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, GOLF_COUNTER, 0);
+	SET_HL(gb, GOLF_SUBSTATE);
+	wr8(gb, GOLF_SUBSTATE, alu_inc(gb, rd8(gb, GOLF_SUBSTATE)));
+}
+
+// Func_adbfe.asm_adc4a: a = next state
+static void golf_set_state(GB *gb)
+{
+	wr8(gb, GOLF_STATE, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, GOLF_COUNTER, 0);
+	wr8(gb, GOLF_SUBSTATE, 0);
+	SET_HL(gb, GOLF_SUBSTATE);
+}
+
+// ld a, [GOLF_SUBSTATE] / and a / jr z / dec a / jr z ...: the substate,
+// or -1 after n checks
+static int golf_substate(GB *gb, int n)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, GOLF_SUBSTATE), rd8(gb, GOLF_SUBSTATE));
+	for (int i = 0; i < n; i++) {
+		if (i)
+			gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z)
+			return i;
+	}
+	return -1;
+}
+
+// ld a, [bc] / cp n: returns true on the ret c
+static bool golf_counter_below(GB *gb, uint8_t n)
+{
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	alu_cp(gb, gb->cpu.a, n);
+	return gb->cpu.f & FLAG_C;
+}
+
+// ld a, state / call SetSceneWarioState
+static void golf_wario_state(GB *gb, uint8_t state)
+{
+	gb->cpu.a = state;
+	gb_call(gb, ADDR_SetSceneWarioState);
+}
+
+// walks scene Wario until his x is end_x: returns true once there
+static bool golf_walk(GB *gb, bool right, uint8_t end_x)
+{
+	gb_call(gb, right ? ADDR_ApplySceneWarioMovementRight : ADDR_ApplySceneWarioMovementLeft);
+	alu_cp(gb, gb->cpu.a, end_x);
+	return gb->cpu.f & FLAG_Z;
+}
+
+// .Func_adc54 / .Func_adc7e: walk out of the building and leave
+static void golf_walk_out(GB *gb, uint8_t walk_state, bool right, uint8_t end_x)
+{
+	switch (golf_substate(gb, 4)) {
+	case 0:
+		golf_wario_state(gb, walk_state);
+		golf_next_substate(gb);
+		return;
+	case 1:
+		if (!golf_walk(gb, right, end_x))
+			return;
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		gb_call(gb, ADDR_SetSceneWarioState);
+		golf_next_substate(gb);
+		return;
+	case 2:
+		if (golf_counter_below(gb, 0x14))
+			return;
+		golf_next_substate(gb);
+		return;
+	case 3:
+		golf_building_exit(gb);
+		return;
+	}
+}
+
+PORT_LOCAL(Func_adbfe, Func_adc54) { golf_walk_out(gb, SCENEWARIO_WALK_RIGHT, true, 0x90); }
+PORT_LOCAL(Func_adbfe, Func_adc7e) { golf_walk_out(gb, SCENEWARIO_WALK_LEFT, false, 0x10); }
+
+// .Func_adca9 / .Func_adcda: walk to the counter and turn to the front
+static void golf_walk_in(GB *gb, uint8_t walk_state, bool right, uint8_t idle_state, uint8_t turn_state)
+{
+	switch (golf_substate(gb, 3)) {
+	case 0:
+		golf_wario_state(gb, walk_state);
+		golf_next_substate(gb);
+		return;
+	case 1:
+		if (!golf_walk(gb, right, 0x50))
+			return;
+		golf_wario_state(gb, idle_state);
+		golf_next_substate(gb);
+		return;
+	case 2:
+		if (golf_counter_below(gb, 0x08))
+			return;
+		golf_wario_state(gb, turn_state);
+		gb->cpu.a = 0x04;
+		golf_set_state(gb);
+		return;
+	}
+}
+
+PORT_LOCAL(Func_adbfe, Func_adca9) { golf_walk_in(gb, 0x08, true, 0x0d, 0x34); }
+PORT_LOCAL(Func_adbfe, Func_adcda) { golf_walk_in(gb, 0x07, false, 0x0c, 0x35); }
+
+PORT_LOCAL_JUMP(Func_adbfe, Func_add0b)
+{
+	gb->cpu.a = rd8(gb, GOLF_SUBSTATE);
+	JUMP_TO(jumptable(gb, ADDR_Func_adbfe + 0x111));
+}
+
+// ld a, [wOWUIObj1State] / cp state / ret nz / jp .asm_adc43
+static void golf_wait_ui_obj_state(GB *gb, uint8_t state)
+{
+	gb->cpu.a = rd8(gb, wOWUIObj1State);
+	alu_cp(gb, gb->cpu.a, state);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	golf_next_substate(gb);
+}
+
+PORT_LOCAL(Func_adbfe, Func_add21) { golf_wait_ui_obj_state(gb, 0x01); }
+PORT_LOCAL(Func_adbfe, Func_add8a) { golf_wait_ui_obj_state(gb, 0x02); }
+PORT_LOCAL(Func_adbfe, Func_adda5) { golf_wait_ui_obj_state(gb, 0x0c); }
+PORT_LOCAL(Func_adbfe, Func_addb7) { golf_wait_ui_obj_state(gb, 0x0d); }
+
+PORT_LOCAL(Func_adbfe, Func_add2a)
+{
+	if (golf_counter_below(gb, 0x10))
+		return;
+	golf_wario_state(gb, 0x3c);
+	golf_next_substate(gb);
+}
+
+// chooses where to go: d_right, d_left, or a/up to play
+PORT_LOCAL(Func_adbfe, Func_add36)
+{
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	bool right = alu_bit(gb, gb->cpu.a, B_PAD_RIGHT);
+	if (right || alu_bit(gb, gb->cpu.a, B_PAD_LEFT)) {
+		gb->cpu.a = right ? WEST : NORTH;
+		wr8(gb, wNextMapSide, gb->cpu.a);
+		gb->cpu.a = right ? OW_EXIT_LEFT : OW_EXIT_RIGHT;
+		wr8(gb, wMapSideLevelID, gb->cpu.a);
+		wr8(gb, w2d068, gb->cpu.a);
+		golf_wario_state(gb, right ? 0x37 : 0x36);
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, GOLF_COUNTER, 0);
+		SET_HL(gb, GOLF_SUBSTATE);
+		wr8(gb, GOLF_SUBSTATE, right ? 0x07 : 0x05);
+		return;
+	}
+	gb->cpu.a = alu_and(gb, gb->cpu.a, PAD_A | PAD_UP);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	// .a_btn_or_d_up
+	golf_wario_state(gb, 0x30);
+	play_sfx(gb, SFX_12A);
+	golf_next_substate(gb);
+}
+
+PORT_LOCAL(Func_adbfe, Func_add93)
+{
+	if (golf_counter_below(gb, 0x14))
+		return;
+	gb->cpu.a = LEVEL_GOLF_BUILDING;
+	wr8(gb, wOWLevel, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSubState, 0);
+	SET_HL(gb, wState);
+	wr8(gb, wState, alu_inc(gb, rd8(gb, wState)));
+}
+
+PORT_LOCAL(Func_adbfe, Func_addae)
+{
+	if (golf_counter_below(gb, 0x04))
+		return;
+	gb->cpu.a = 0x01;
+	golf_set_state(gb);
+}
+
+PORT_LOCAL(Func_adbfe, Func_addc0)
+{
+	if (golf_counter_below(gb, 0x04))
+		return;
+	gb->cpu.a = 0x00;
+	golf_set_state(gb);
+}
+
+// decompress_tilemap / decompress_tiles0: decompresses src (in bank) to dest
+static void decompress(GB *gb, uint8_t bank, uint16_t src, uint16_t dest)
+{
+	gb->cpu.a = bank;
+	wr8(gb, wTempBank, bank);
+	SET_HL(gb, src);
+	SET_BC(gb, dest);
+	gb->cpu.a = rd8(gb, wTempBank);
+	wr8(gb, hCallFuncBank, gb->cpu.a);
+	HCALL(Decompress);
+}
+
+// decompress_attrmap / decompress_tiles1: the same, into VRAM bank 1
+static void decompress_vram1(GB *gb, uint8_t bank, uint16_t src, uint16_t dest)
+{
+	gb->cpu.a = 1; // BANK("VRAM1")
+	wr8(gb, rVBK, 1);
+	decompress(gb, bank, src, dest);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+}
+
+// decompresses the Japanese or English text (same bank) to wTextBuffer
+static void decompress_text(GB *gb, uint16_t jp, uint16_t en, uint8_t bank)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wLanguage), rd8(gb, wLanguage));
+	SET_HL(gb, (gb->cpu.f & FLAG_Z) ? jp : en);
+	gb->cpu.a = bank;
+	wr8(gb, wTempBank, bank);
+	SET_BC(gb, wTextBuffer);
+	gb->cpu.a = rd8(gb, wTempBank);
+	wr8(gb, hCallFuncBank, gb->cpu.a);
+	HCALL(Decompress);
+}
+
+PORT(_InitTempleScene)
+{
+	CALL(DisableLCD);
+	CALL(FillBGMap0_With7f);
+	CALL(ClearVirtualOAM);
+	// stop_music2
+	gb->cpu.a = 0xff;
+	wr8(gb, hMusicIDBackup + 0, 0xff);
+	wr8(gb, hMusicID + 0, 0xff);
+	gb->cpu.a = 0x00;
+	wr8(gb, hMusicIDBackup + 1, 0x00);
+	wr8(gb, hMusicID + 1, 0x00);
+
+	gb->cpu.a = 2; // BANK("WRAM2")
+	wr8(gb, rWBK, 2);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rSCX, 0);
+	wr8(gb, wSCX, 0);
+	wr8(gb, rSCY, 0);
+	wr8(gb, wSCY, 0);
+
+	gb_call(gb, ADDR_VBlank_PrologueEpilogue);
+	gb_call(gb, ADDR_ClearGeneralSceneRAM);
+	gb_call(gb, ADDR_ClearSceneObjsRAM);
+
+	SET_HL(gb, ADDR_Pals_86a4d);
+	gb->cpu.b = BANK_Pals_86a4d;
+	CALL(LoadFarPalsToTempPals1);
+	decompress_vram1(gb, BANK_FontGfx, ADDR_FontGfx, v1Tiles0);
+	SET_HL(gb, ADDR_TempleGfx);
+	gb->cpu.b = BANK_TempleGfx;
+	CALL(LoadFarTiles);
+	SET_HL(gb, ADDR_TempleTilemap);
+	gb->cpu.b = BANK_TempleTilemap;
+	CALL(LoadFarBGMap);
+	gb->cpu.a = 1; // BANK("VRAM1")
+	wr8(gb, rVBK, 1);
+	SET_HL(gb, ADDR_TempleAttrmap);
+	gb->cpu.b = BANK_TempleAttrmap;
+	CALL(LoadFarBGMap);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+	gb_call(gb, ADDR_FillClearedTextBuffer);
+
+	gb->cpu.a = GOLD_MUSIC_BOX;
+	CALL(IsTreasureCollected);
+	bool regular = gb->cpu.f & FLAG_Z; // not collected
+	gb->cpu.a = TEMPLE_SCENE_ENTERING;
+	if (!regular) {
+		SET_HL(gb, wGameModeFlags);
+		if (alu_bit(gb, rd8(gb, wGameModeFlags), MODE_GAME_CLEARED_F))
+			regular = !alu_bit(gb, rd8(gb, wGameModeFlags), MODE_TIME_ATTACK_F);
+	}
+	if (!regular) {
+		// .set_hidden_figure_reveal_scene
+		gb->cpu.a = TEMPLE_SCENE_HIDDEN_FIGURE_REVEAL;
+		wr8(gb, wTempleScene, gb->cpu.a);
+		decompress_vram1(gb, BANK_TempleMusicBoxSceneGfx, ADDR_TempleMusicBoxSceneGfx, v1Tiles0);
+		decompress(gb, BANK_HiddenFigureCutsceneTilemap, ADDR_HiddenFigureCutsceneTilemap, v0BGMap1);
+		decompress_vram1(gb, BANK_HiddenFigureCutsceneAttrmap, ADDR_HiddenFigureCutsceneAttrmap, v1BGMap1);
+		decompress_text(gb, ADDR_TextJP_HiddenFigureReplenishPower, ADDR_TextEN_HiddenFigureReplenishPower, BANK_TextJP_HiddenFigureReplenishPower);
+	} else {
+		// .set_regular_temple_scene
+		wr8(gb, wTempleScene, gb->cpu.a);
+		decompress_text(gb, ADDR_TextJP_HiddenFigureHeadFor, ADDR_TextEN_HiddenFigureHeadFor, BANK_TextJP_HiddenFigureHeadFor);
+		gb_call(gb, ADDR_LoadNextObjectiveText);
+	}
+
+	// .asm_acc68
+	gb->cpu.a = 0x60;
+	wr8(gb, w1d140, gb->cpu.a);
+	gb->cpu.a = 0xe8;
+	wr8(gb, wDollBoyNoFlashingBarrel, gb->cpu.a);
+	gb->cpu.a = SCENEWARIO_GROUP_NONE;
+	wr8(gb, wSceneWarioStateGroup, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a (SCENEWARIO_NONE)
+	gb_call(gb, ADDR_SetSceneWarioState);
+	gb_call(gb, ADDR_UpdateSceneWario);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d013, 0);
+	wr8(gb, w2d014, 0);
+	gb->cpu.a = rd8(gb, wLCDCFlagsToFlip);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = LCDC_BG_ON | LCDC_OBJ_ON | LCDC_OBJ_16 | LCDC_WIN_9C00 | LCDC_ON;
+	if (!(gb->cpu.f & FLAG_Z))
+		gb->cpu.a = alu_xor(gb, gb->cpu.a, gb->cpu.b);
+	wr8(gb, rLCDC, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wLCDCFlagsToFlip, 0);
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}
