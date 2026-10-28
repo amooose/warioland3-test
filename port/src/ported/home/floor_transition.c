@@ -67,3 +67,46 @@ PORT(StartUpwardsFloorTransition)
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wCameraRoomYScrollLimit, 0);
 }
+
+// The floor check: CAM_TRANSITIONS and Wario on another floor; a = wFloor - c
+static bool floor_changed(GB *gb)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wCameraConfigFlags), CAM_SCROLLING_MASK);
+	alu_cp(gb, gb->cpu.a, CAM_TRANSITIONS);
+	if (gb->cpu.f & FLAG_C)
+		return false;
+	CALL(GetFloorForYPos);
+	gb->cpu.a = alu_sub(gb, rd8(gb, wFloor), gb->cpu.c);
+	return true;
+}
+
+PORT_JUMP(HandleDownwardsFloorTransition)
+{
+	if (floor_changed(gb) && !(gb->cpu.f & (FLAG_Z | FLAG_C))) {
+		JUMP(StartDownwardsFloorTransition);
+		return;
+	}
+	RET();
+}
+
+// unreferenced?
+PORT_JUMP(Func_1180)
+{
+	if (floor_changed(gb) && !(gb->cpu.f & FLAG_Z)) {
+		if (gb->cpu.f & FLAG_C)
+			JUMP(StartUpwardsFloorTransition);
+		else
+			JUMP(StartDownwardsFloorTransition);
+		return;
+	}
+	RET();
+}
+
+PORT_JUMP(HandleUpwardsFloorTransition)
+{
+	if (floor_changed(gb) && (gb->cpu.f & FLAG_C)) {
+		JUMP(StartUpwardsFloorTransition);
+		return;
+	}
+	RET();
+}
