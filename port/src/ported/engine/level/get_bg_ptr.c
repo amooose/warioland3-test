@@ -26,3 +26,35 @@ PORT(GetBlockBGPtr)
 	gb->cpu.a = gb->cpu.l;
 	wr8(gb, wBGPtr + 1, gb->cpu.a);
 }
+
+// input:
+// - wWarioXPos = x position
+// - wWarioYPos = y position
+// output:
+// - hl and wBGPtr = pointer to BGMap
+PORT(GetWarioBGPtr)
+{
+	// hl = ypos - 24
+	gb->cpu.a = alu_sub(gb, rd8(gb, wWarioYPos + 1), 0x18);
+	gb->cpu.l = gb->cpu.a;
+	gb->cpu.a = alu_sbc(gb, rd8(gb, wWarioYPos + 0), 0x00);
+	gb->cpu.h = gb->cpu.a;
+	// hl = hl / TILE_SIZE * TILEMAP_WIDTH (the shifts' flags are all
+	// overwritten below)
+	uint16_t y = REG_HL(gb);
+	y = (uint16_t)((y >> 3) << 5);
+	gb->cpu.a = alu_and(gb, (uint8_t)(y >> 8), (TILEMAP_WIDTH * TILEMAP_HEIGHT - 1) >> 8);
+	gb->cpu.d = gb->cpu.a;
+	gb->cpu.e = (uint8_t)y;
+
+	uint16_t x = (uint16_t)(rd8(gb, wWarioXPos + 0) << 8 | rd8(gb, wWarioXPos + 1));
+	x >>= 3;
+	gb->cpu.a = alu_and(gb, (uint8_t)x, TILEMAP_WIDTH - 1);
+	uint16_t hl = (uint16_t)((v0BGMap0 & 0xff00) | gb->cpu.a);
+	hl = alu_add16(gb, hl, REG_DE(gb));
+	SET_HL(gb, hl);
+	wr8(gb, wBGPtr + 0, gb->cpu.h);
+	gb->cpu.a = gb->cpu.l;
+	wr8(gb, wBGPtr + 1, gb->cpu.a);
+}
+

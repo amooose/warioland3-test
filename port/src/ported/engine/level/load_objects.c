@@ -94,3 +94,152 @@ PORT(SpawnObject)
 	gb->cpu.e = e;
 	SET_HL(gb, data);
 }
+
+// --- creating objects ---
+
+// hl = the object slot's flags + 1 (a = written there first),
+// bc = object creation data
+static void create_object_got_pos(GB *gb)
+{
+	uint16_t hl = REG_HL(gb);
+	wr8(gb, hl++, gb->cpu.a);
+	gb->cpu.e = (uint8_t)hl;
+	gb->cpu.d = (uint8_t)(hl >> 8);
+	uint16_t bc = REG_BC(gb);
+	hl = bc;
+	// [de] = [hli] / inc e
+#define COPY() do { gb->cpu.a = rd8(gb, hl++); wr8(gb, REG_DE(gb), gb->cpu.a); } while (0)
+#define INC_E() (gb->cpu.e = alu_inc(gb, gb->cpu.e))
+	for (int i = 0; i < 6; i++) { // OBJ_ID .. OBJ_COLLBOX_RIGHT
+		COPY();
+		INC_E();
+	}
+	INC_E();
+	INC_E();
+	INC_E();
+	for (int i = 0; i < 4; i++) { // OBJ_OAM_PTR, OBJ_FRAMESET_PTR
+		COPY();
+		INC_E();
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, REG_DE(gb), 0); // OBJ_FRAME_DURATION
+	INC_E();
+	wr8(gb, REG_DE(gb), gb->cpu.a); // OBJ_FRAMESET_OFFSET
+	INC_E();
+	for (int i = 0; i < 6; i++) { // OBJ_STATE_DURATION .. OBJ_STATE
+		COPY();
+		INC_E();
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a (OBJACTION_NONE)
+	wr8(gb, REG_DE(gb), 0); // OBJ_ACTION
+	INC_E();
+	INC_E();
+	COPY(); // OBJ_UPDATE_FUNCTION
+	INC_E();
+	COPY();
+#undef COPY
+#undef INC_E
+	gb->cpu.a = alu_sub(gb, gb->cpu.e, (OBJ_UPDATE_FUNCTION + 1) - OBJ_FLAGS);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.a = alu_or(gb, rd8(gb, hl), OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT); // OBJ_FLAGS
+	wr8(gb, REG_DE(gb), gb->cpu.a);
+	SET_HL(gb, hl);
+}
+
+PORT(CreateObject_GotPos) { create_object_got_pos(gb); }
+
+// Finds a free object slot: hl = its flags, or false if there's none
+static bool free_obj_slot(GB *gb)
+{
+	gb->cpu.h = (uint8_t)(wObj1Flags >> 8);
+	for (int n = 0; n < NUM_OBJECTS; n++) {
+		gb->cpu.l = (uint8_t)(wObj1Flags + n * OBJ_STRUCT_LENGTH);
+		gb->cpu.a = alu_rra(gb, rd8(gb, REG_HL(gb)));
+		if (!(gb->cpu.f & FLAG_C))
+			return true; // OBJFLAG_ACTIVE not set
+	}
+	return false;
+}
+
+// ld a, v / ld [hli], a
+static void put_hli(GB *gb, uint8_t v)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = v;
+	wr8(gb, hl++, v);
+	SET_HL(gb, hl);
+}
+
+// bc = object creation data
+PORT(_CreateObjectFromCurObjPos)
+{
+	if (!free_obj_slot(gb))
+		return;
+	put_hli(gb, OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT);
+	put_hli(gb, rd8(gb, wCurObjUnk01));
+	put_hli(gb, rd8(gb, wCurObjUnk02));
+	put_hli(gb, rd8(gb, wCurObjYPos + 0));
+	put_hli(gb, rd8(gb, wCurObjYPos + 1));
+	put_hli(gb, rd8(gb, wCurObjXPos + 0));
+	gb->cpu.a = rd8(gb, wCurObjXPos + 1);
+	create_object_got_pos(gb);
+}
+
+// [hli] = [pos] + the signed offset at [bc], then a = [pos + 1] adjusted
+static void add_offset(GB *gb, uint16_t pos)
+{
+	gb->cpu.e = rd8(gb, pos);
+	gb->cpu.a = alu_rla(gb, rd8(gb, REG_BC(gb)));
+	bool negative = gb->cpu.f & FLAG_C;
+	gb->cpu.a = alu_rra(gb, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.e);
+	put_hli(gb, gb->cpu.a);
+	bool carry = gb->cpu.f & FLAG_C;
+	gb->cpu.a = rd8(gb, pos + 1);
+	if (negative && !carry)
+		gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	else if (!negative && carry)
+		gb->cpu.a = alu_inc(gb, gb->cpu.a);
+}
+
+// bc = object creation data, after the y and x offsets
+PORT(_CreateObjectAtRelativePos)
+{
+	if (!free_obj_slot(gb))
+		return;
+	put_hli(gb, OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT);
+	put_hli(gb, rd8(gb, wCurObjUnk01));
+	put_hli(gb, rd8(gb, wCurObjUnk02));
+	add_offset(gb, wCurObjYPos);
+	put_hli(gb, gb->cpu.a);
+	SET_BC(gb, REG_BC(gb) + 1);
+	add_offset(gb, wCurObjXPos);
+	SET_BC(gb, REG_BC(gb) + 1);
+	create_object_got_pos(gb);
+}
+
+PORT(DespawnAllObjects)
+{
+	gb->cpu.h = (uint8_t)(wObjects >> 8);
+	for (int n = 0; n < NUM_OBJECTS; n++) {
+		gb->cpu.l = (uint8_t)(wObjects + OBJ_STRUCT_LENGTH * n);
+		gb->cpu.a = alu_rra(gb, rd8(gb, REG_HL(gb))); // OBJ_FLAGS
+		if (!(gb->cpu.f & FLAG_C))
+			continue; // skip if OBJFLAG_ACTIVE not set
+		gb->cpu.a = alu_rla(gb, gb->cpu.a);
+		gb->cpu.a = alu_rla(gb, gb->cpu.a);
+		gb->cpu.a = alu_rla(gb, gb->cpu.a);
+		if (gb->cpu.f & FLAG_C) {
+			// transient
+			gb->cpu.a = 0;
+			gb->cpu.f = FLAG_Z; // xor a
+			wr8(gb, REG_HL(gb), 0);
+			continue;
+		}
+		gb->cpu.l = alu_inc(gb, gb->cpu.l);
+		gb->cpu.l = alu_inc(gb, gb->cpu.l);
+		FARCALL(DespawnObject);
+	}
+}

@@ -1,5 +1,5 @@
 // Port of src/engine/level/particles.asm
-#include "ported.h"
+#include "wario_states.h"
 
 // b = PARTICLE_* constant
 // Creates a particle at hYPos/hXPos, in the next of the 4 particle slots.
@@ -141,3 +141,181 @@ PORT_JUMP(ParticleAnim_Stars) { particle_anim(gb, ADDR_Frameset_d525, wCurPartic
 PORT_JUMP(ParticleAnim_SmokeLarge) { particle_anim(gb, ADDR_Frameset_d4f3, wCurParticleYCoord, ADDR_OAM_d20e); }
 PORT_JUMP(ParticleAnim_SmokeSmall) { particle_anim(gb, ADDR_Frameset_d4ea, wCurParticleYCoord, ADDR_OAM_d20e); }
 PORT_JUMP(ParticleAnim_Splash) { particle_anim(gb, ADDR_Frameset_d4ba, wCurParticleYCoord, ADDR_OAM_d20e); }
+
+// --- particle functions (bc = particle) ---
+
+static void inc_c(GB *gb, int n)
+{
+	while (n--)
+		gb->cpu.c = alu_inc(gb, gb->cpu.c);
+}
+
+// xor a / ld [bc], a / ld hl, wNumParticles / dec [hl]
+static void particle_deinit(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+	wr8(gb, REG_BC(gb), 0);
+	SET_HL(gb, wNumParticles);
+	wr8(gb, wNumParticles, alu_dec(gb, rd8(gb, wNumParticles)));
+}
+
+// inc c / ldh a, [hPos + i] / ld [bc], a for the 4 bytes of hPos, inc c
+static void hpos_to_particle(GB *gb)
+{
+	for (int i = 0; i < 4; i++) {
+		inc_c(gb, 1);
+		gb->cpu.a = rd8(gb, hYPosHi + i);
+		wr8(gb, REG_BC(gb), gb->cpu.a);
+	}
+	inc_c(gb, 1);
+}
+
+enum { PRE_NONE, PRE_BOUNCY, PRE_MAGIC };
+enum { INIT_NONE, INIT_WARIO_POS, INIT_SLIDE_RIGHT, INIT_SLIDE_LEFT, INIT_OWL };
+enum { END_ANIM, END_NONE, END_SLIDING, END_OWL };
+
+static void particle_func(GB *gb, int pre, int init, uint16_t anim, int end, uint16_t sfx)
+{
+	if (pre != PRE_NONE) {
+		ld_cp(gb, wWarioState, pre == PRE_BOUNCY ? WST_BOUNCY_AIRBORNE : WST_MAGIC_STOPPING);
+		if (pre == PRE_BOUNCY ? !ZF : ZF) {
+			particle_deinit(gb);
+			return;
+		}
+	}
+	gb_push16(gb, REG_BC(gb));
+	inc_c(gb, 1);
+	gb->cpu.a = rd8(gb, REG_BC(gb)); // PARTICLE_STRUCT_INITIALISED
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.a = alu_inc(gb, gb->cpu.a);
+		wr8(gb, REG_BC(gb), gb->cpu.a);
+		inc_c(gb, 5);
+		xor_a(gb);
+		wr8(gb, REG_BC(gb), 0); // PARTICLE_STRUCT_DURATION
+		inc_c(gb, 1);
+		wr8(gb, REG_BC(gb), 0); // PARTICLE_STRUCT_FRAMESET_OFFSET
+		if (sfx)
+			play_sfx(gb, sfx);
+		gb->cpu.c = alu_dec(gb, gb->cpu.c);
+	} else {
+		uint16_t hl, de;
+		switch (init) {
+		case INIT_NONE:
+			inc_c(gb, 5);
+			break;
+		case INIT_WARIO_POS:
+			hl = wWarioPos;
+			de = hYPosHi;
+			for (int i = 0; i < 4; i++) {
+				gb->cpu.a = rd8(gb, hl);
+				wr8(gb, de, gb->cpu.a);
+				if (i < 3) {
+					hl++;
+					de++;
+				}
+			}
+			SET_HL(gb, hl);
+			SET_DE(gb, de);
+			hpos_to_particle(gb);
+			break;
+		case INIT_SLIDE_RIGHT:
+		case INIT_SLIDE_LEFT:
+			hl = wWarioXPos + 1;
+			de = hXPosLo;
+			if (init == INIT_SLIDE_RIGHT) {
+				gb->cpu.a = alu_sub(gb, rd8(gb, hl--), 0x0c);
+				wr8(gb, de--, gb->cpu.a);
+				gb->cpu.a = alu_sbc(gb, rd8(gb, hl--), 0x00);
+			} else {
+				gb->cpu.a = alu_add(gb, rd8(gb, hl--), 0x0c);
+				wr8(gb, de--, gb->cpu.a);
+				gb->cpu.a = alu_adc(gb, rd8(gb, hl--), 0x00);
+			}
+			wr8(gb, de--, gb->cpu.a);
+			gb->cpu.a = alu_sub(gb, rd8(gb, hl--), 0x0c);
+			wr8(gb, de--, gb->cpu.a);
+			gb->cpu.a = alu_sbc(gb, rd8(gb, hl), 0x00);
+			wr8(gb, de, gb->cpu.a);
+			SET_HL(gb, hl);
+			SET_DE(gb, de);
+			hpos_to_particle(gb);
+			break;
+		case INIT_OWL:
+			inc_c(gb, 2);
+			gb->cpu.a = alu_sub(gb, rd8(gb, REG_BC(gb)), 0x02);
+			wr8(gb, REG_BC(gb), gb->cpu.a);
+			gb->cpu.c = alu_dec(gb, gb->cpu.c);
+			gb->cpu.a = alu_sbc(gb, rd8(gb, REG_BC(gb)), 0x00);
+			wr8(gb, REG_BC(gb), gb->cpu.a);
+			inc_c(gb, 4);
+			break;
+		}
+	}
+	gb_call(gb, anim);
+	SET_BC(gb, gb_pop16(gb));
+	switch (end) {
+	case END_NONE:
+		return;
+	case END_ANIM:
+		if (!ld_and(gb, wCurParticleAnimEnded))
+			return;
+		break;
+	case END_SLIDING:
+		ld_cp(gb, wWarioState, WST_SLIDING);
+		if (ZF)
+			return;
+		break;
+	case END_OWL:
+		ld_cp(gb, wCurSpriteYCoord, 0xc0);
+		if (CF)
+			return;
+		break;
+	}
+	particle_deinit(gb);
+}
+
+PORT(ParticleFunc_None) {}
+PORT(ParticleFunc_Debris) { particle_func(gb, PRE_NONE, INIT_NONE, ADDR_ParticleAnim_Debris, END_ANIM, SFX_BLOCK_BREAK); }
+PORT(ParticleFunc_Stars) { particle_func(gb, PRE_NONE, INIT_NONE, ADDR_ParticleAnim_Stars, END_ANIM, 0); }
+PORT(ParticleFunc_Splash) { particle_func(gb, PRE_NONE, INIT_NONE, ADDR_ParticleAnim_Splash, END_ANIM, 0); }
+PORT(ParticleFunc_Dust) { particle_func(gb, PRE_NONE, INIT_NONE, ADDR_ParticleAnim_Dust, END_ANIM, 0); }
+PORT(ParticleFunc_SlideDustRight) { particle_func(gb, PRE_NONE, INIT_SLIDE_RIGHT, ADDR_ParticleAnim_Dust, END_SLIDING, 0); }
+PORT(ParticleFunc_SlideDustLeft) { particle_func(gb, PRE_NONE, INIT_SLIDE_LEFT, ADDR_ParticleAnim_Dust, END_SLIDING, 0); }
+PORT(ParticleFunc_SmokeLarge) { particle_func(gb, PRE_NONE, INIT_NONE, ADDR_ParticleAnim_SmokeLarge, END_ANIM, 0); }
+PORT(ParticleFunc_SmokeSmall) { particle_func(gb, PRE_NONE, INIT_NONE, ADDR_ParticleAnim_SmokeSmall, END_ANIM, 0); }
+PORT(ParticleFunc_Bubbles) { particle_func(gb, PRE_NONE, INIT_NONE, ADDR_ParticleAnim_Bubbles, END_ANIM, 0); }
+PORT(ParticleFunc_BouncyJump) { particle_func(gb, PRE_BOUNCY, INIT_WARIO_POS, ADDR_ParticleAnim_BouncyJump, END_ANIM, 0); }
+PORT(ParticleFunc_BubbleBurst) { particle_func(gb, PRE_NONE, INIT_NONE, ADDR_ParticleAnim_BubbleBurst, END_ANIM, 0); }
+PORT(ParticleFunc_Ice) { particle_func(gb, PRE_NONE, INIT_NONE, ADDR_ParticleAnim_Ice, END_ANIM, 0); }
+PORT(ParticleFunc_TreasureGlow) { particle_func(gb, PRE_NONE, INIT_NONE, ADDR_ParticleAnim_TreasureGlow, END_NONE, 0); }
+PORT(ParticleFunc_Owl) { particle_func(gb, PRE_NONE, INIT_OWL, ADDR_ParticleAnim_Owl, END_OWL, 0); }
+PORT(ParticleFunc_Snow) { particle_func(gb, PRE_NONE, INIT_NONE, ADDR_ParticleAnim_Snow, END_ANIM, 0); }
+PORT(ParticleFunc_Magic1) { particle_func(gb, PRE_MAGIC, INIT_WARIO_POS, ADDR_ParticleAnim_Magic1, END_NONE, 0); }
+PORT(ParticleFunc_Magic2) { particle_func(gb, PRE_MAGIC, INIT_WARIO_POS, ADDR_ParticleAnim_Magic2, END_NONE, 0); }
+PORT(ParticleFunc_MagicStop) { particle_func(gb, PRE_NONE, INIT_WARIO_POS, ADDR_ParticleAnim_MagicStop, END_ANIM, 0); }
+
+// hl = block pointer: hPos = the block's position
+PORT(Func_ce3e)
+{
+	gb->cpu.a = alu_sub(gb, gb->cpu.h, 0xa0);
+	gb->cpu.h = gb->cpu.a;
+	gb->cpu.a = alu_swap(gb, alu_and(gb, gb->cpu.a, 0xf0));
+	gb->cpu.d = gb->cpu.a;
+	gb->cpu.a = alu_dec(gb, rd8(gb, wBlockPtrBank));
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.d);
+	wr8(gb, hYPosHi, gb->cpu.a);
+	gb->cpu.a = alu_swap(gb, alu_and(gb, gb->cpu.h, 0x0f));
+	gb->cpu.a = alu_add(gb, gb->cpu.a, 0x10);
+	wr8(gb, hYPosLo, gb->cpu.a);
+	gb->cpu.a = alu_adc(gb, rd8(gb, hYPosHi), 0x00);
+	wr8(gb, hYPosHi, gb->cpu.a);
+	gb->cpu.a = alu_swap(gb, alu_and(gb, gb->cpu.l, 0xf0));
+	wr8(gb, hXPosHi, gb->cpu.a);
+	gb->cpu.a = alu_swap(gb, alu_and(gb, gb->cpu.l, 0x0f));
+	gb->cpu.a = alu_add(gb, gb->cpu.a, 0x08);
+	wr8(gb, hXPosLo, gb->cpu.a);
+	gb->cpu.a = alu_adc(gb, rd8(gb, hXPosHi), 0x00);
+	wr8(gb, hXPosHi, gb->cpu.a);
+}
