@@ -27,8 +27,10 @@ scripting and expansion on top. The approach:
 
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`. All
   work is pushed and the tests are green.
-- **Progress:** 1263 / 3491 routines ported (36.2%), 21.9% of the
-  instructions. With hooks on, about half of what the game executes runs as
+- **Progress:** before this session's last merges, 1371 / 3491 routines
+  (39.3%) and 33.8% of the instructions were ported. More was merged after
+  that (see "Good next batches"); rerun the progress target for current
+  numbers. With hooks on, about half of what the game executes runs as
   C. Run `cmake --build build --target progress` and read
   `build/progress.md` for the per-directory numbers and the "ready to port"
   list.
@@ -105,6 +107,18 @@ Each step that worked in the cloud session:
    verification.
 
 ### Porting in parallel with agents
+
+- **Local labels:** `PORT_LOCAL(Parent, local)` / `PORT_LOCAL_JUMP` hook
+  `Parent.local`, for example an object's `.Update` states reached through
+  its update pointer. Fuzz them as `--fuzz-routine Parent.local`.
+- **Stashes:** `git stash` is shared by every worktree, so an agent can pop
+  another agent's stash. Have agents commit WIP to their own branch instead.
+- **Fuzz results:** when a script generates the routine names, make sure they
+  have no trailing `
+`. A name that matches no hook still prints
+  `fuzz: PASS`.
+- **Commit early:** agents must commit verified work often. A session that
+  hits the usage limit leaves everything uncommitted stranded.
 
 Four agents ported 512 routines at once this way:
 
@@ -206,22 +220,34 @@ Four agents ported 512 routines at once this way:
 
 ## Good next batches
 
-- **Wario states left by the last batch:** `SetState_Crazy`,
-  `SetState_CrazySpinning`, `SetState_WaterStung`, `SetState_Swallowed`,
-  `SetState_FanStart`, `SetState_IceSkatinStart`, `HandleWarioOwlInput`,
-  `SetState_SplitHit`, `SetState_TurningIntoSnowman`, `SetState_Launched`,
-  `SetState_PuffyInflating`, `SetState_MagicRising`, `UpdateState_BallShot`,
-  `ObjInteraction_Rail`, `TurnIntoSmallSnowball`,
-  `UpdateState_GettingFlatAirborne`, `SetState_FlatAirborne`, `GetTreasure`,
-  `HandleGroundShake`.
-- **Objects:** only the entry points of most object functions are ported;
-  their local `.Update` code (reached through the update pointer) and the
-  big enemies (`FlameBlockTorchUpdate`, `InkFunc`, `DollBoyHammerFunc`,
-  `SpearheadFunc`, `ParaGoomFunc`, ...) are next.
-- **Action help:** `action_help/power_ups` (316 routines) is barely started
-  (`none.c`).
-- Not portable as is: `EnableDoubleSpeed` (`stop`), `Func_81feb` (its
-  `debug_nop` path loops forever).
+**Where the last session left off (2026-10-27):** six parallel agents
+(objects A-D / E-O / P-Z, overworld, level, misc) ported a lot more than got
+verified before the usage limit. Verified work is merged here. The rest is
+pushed as `wip/*` branches on the remote. Each branch is a verified commit
+plus one "WIP (unverified)" commit on top:
+
+| Branch | WIP commit | What's unverified |
+| --- | --- | --- |
+| `wip/obj2` | `030aaae` | hand, haridama, hebarii, mad_scienstein, nobiiru, octohon, muddee, jamano, omodonmeka, hidden_figure (`HandFunc.Func_477f3` is known to FAIL: wCurObjVar1 02 vs 01) |
+| `wip/obj3` | `436b991` | pesce, prince_froggy, scowler, shoot, snake, webber, wormwould, yellow_belly, tadpole, unused_flower, water_drop, wolfenboss, stove, rock, zip_line, part of robo_mouse/spear_bot (about 250 of 600 fuzz runs done, all PASS) |
+| `wip/misc` | `19e472e` | grab_gloves and 9 more action_help power-up files |
+| `wip/level` | `b0c181a` | the rest of the level engine batch. Its two "verified" commits (`71d9565` scroll/spawn edge, `2b331df` 152 level routines) also aren't merged: the full ctest failed `fuzz_n1_full_clear` on `Func_19741` (call 512, variant 169: the asm leaves ime=1 and bank 6, and changes `wBlockFunctionTable`). That looks like a rare path in the shared bottom-collision code. |
+| `wip/overworld` | (see branch) | about 250 overworld routines (UpdateTopBar, HandleBottomBar, DayNightTransition, temple/prologue/cutscene scenes); their earlier fuzz runs were void (CRLF in routine names) |
+
+To finish one: cherry-pick its WIP commit, fuzz every PORT in its diff on
+all inputs, fix the FAILs, drop what still fails, run the full ctest.
+
+- **Not portable as is:** `EnableDoubleSpeed` (`stop`), `Func_81feb` (its
+  `debug_nop` path loops forever), and `ZombieFunc.OnUnderground` (its bank 6
+  collision callees sit inside its own address range, so every fuzz check is
+  inconclusive).
+- **Coverage gaps:** `CoinFunc.Update` real seeds are all inconclusive. The
+  big state dispatchers (`AnonsterFunc.Func_5041d`, `DollBoyBarrelFunc.Main`)
+  only reach about half their code with 200 variants. `--fuzz-variants 2000`
+  reaches more, and those runs pass.
+- **Progress:** the progress tool counts an object as one routine, so its
+  `PORT_LOCAL` update states don't raise the routine count. Use the
+  instruction percentage instead.
 - `build/progress.md` lists the rest under "Ready to port".
 
 ## Recordings
