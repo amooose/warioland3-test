@@ -737,3 +737,504 @@ PORT_JUMP(ApplyPalConfig2)
 	SET_HL(gb, wPalConfig2);
 	JUMP_TO(ADDR_ApplyPalConfig_Bank21);
 }
+
+// rst JumpTable, with the table at `table` (right after the rst): leaves every
+// register as JumpTable does and returns the target (= hl).
+static uint16_t jumptable(GB *gb, uint16_t table)
+{
+	gb_push16(gb, table); // rst JumpTable
+	uint16_t hl = gb_pop16(gb); // pop hl
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0;
+	hl = alu_add16(gb, hl, gb->cpu.e);
+	gb->cpu.a = rd8(gb, hl);
+	gb->cpu.h = rd8(gb, (uint16_t)(hl + 1));
+	gb->cpu.l = gb->cpu.a;
+	return REG_HL(gb);
+}
+
+PORT_JUMP(OWGreyTransition)
+{
+	SET_HL(gb, wOWPalTransitionCounter);
+	wr8(gb, wOWPalTransitionCounter, alu_inc(gb, rd8(gb, wOWPalTransitionCounter)));
+	gb->cpu.a = rd8(gb, wOWPalTransitionState);
+	JUMP_TO(jumptable(gb, ADDR_OWGreyTransition + 8));
+}
+
+PORT_LOCAL_JUMP(OWGreyTransition, Start)
+{
+	SET_DE(gb, wTempPals1 + COLOURFADESTRUCT_BASE);
+	SET_HL(gb, wFadePals);
+	gb_call(gb, ADDR_CopyPalToColourFadeStructs);
+	copy_bytes(gb, wTempPals1, wTempBGPals, 8 * PAL_SIZE);
+	gb_call(gb, ADDR_LoadGreyOWPals);
+	SET_HL(gb, wFadePals + COLOURFADESTRUCT_TARGET);
+	SET_DE(gb, wTempPals1);
+	gb_call(gb, ADDR_CopyPalToColourFadeStructs);
+	gb_call(gb, ADDR_InitColourFadeStructs);
+	gb->cpu.a = DAYNIGHT_TRANSITION_STEPS;
+	wr8(gb, wDayNightTransistionSteps, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d809, 0);
+	gb->cpu.ime = false; // di
+	gb_call(gb, ADDR_VBlank_OWPalTransition);
+	gb->cpu.ime = true; // ei
+	gb->cpu.ime_delay = 0;
+	JUMP_TO(ADDR_DayNightTransition + 0x47); // .AdvanceTable
+}
+
+PORT_LOCAL(OWGreyTransition, Finish)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d0e3, 0);
+	wr8(gb, wOWPalTransitionState, 0);
+	wr8(gb, wOWPalTransitionCounter, 0);
+}
+
+// packs the current colours of the colour fade structs into wTempBGPals
+PORT(ApplyPalFadeColours)
+{
+	uint16_t hl = wFadePals + COLOURFADESTRUCT_CURRENT;
+	uint16_t de = wTempBGPals;
+	gb->cpu.a = 8 * PAL_COLORS;
+	wr8(gb, w2d807, gb->cpu.a);
+	for (;;) {
+		gb->cpu.a = rd8(gb, hl);
+		hl = alu_add16(gb, hl, COLOURFADESTRUCT_LENGTH);
+		gb->cpu.b = gb->cpu.a;
+		gb->cpu.a = rd8(gb, hl);
+		gb->cpu.c = gb->cpu.a;
+		gb->cpu.a = rrca(gb, gb->cpu.a);
+		gb->cpu.a = rrca(gb, gb->cpu.a);
+		gb->cpu.a = rrca(gb, gb->cpu.a);
+		gb->cpu.a = alu_and(gb, gb->cpu.a, 0b11100000);
+		gb->cpu.a = alu_or(gb, gb->cpu.a, gb->cpu.b);
+		wr8(gb, de++, gb->cpu.a);
+		gb->cpu.a = gb->cpu.c;
+		hl = alu_add16(gb, hl, COLOURFADESTRUCT_LENGTH);
+		gb->cpu.a = rlca(gb, gb->cpu.a);
+		gb->cpu.a = rlca(gb, gb->cpu.a);
+		gb->cpu.a = rlca(gb, gb->cpu.a);
+		gb->cpu.c = gb->cpu.a;
+		gb->cpu.a = rd8(gb, hl);
+		gb->cpu.c = alu_sla(gb, gb->cpu.c);
+		gb->cpu.a = alu_rla(gb, gb->cpu.a);
+		gb->cpu.c = alu_sla(gb, gb->cpu.c);
+		gb->cpu.a = alu_rla(gb, gb->cpu.a);
+		gb->cpu.a = alu_and(gb, gb->cpu.a, 0b1111111);
+		wr8(gb, de, gb->cpu.a);
+		gb->cpu.a = alu_dec(gb, rd8(gb, w2d807));
+		wr8(gb, w2d807, gb->cpu.a);
+		gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z)
+			break;
+		de++;
+		hl = alu_add16(gb, hl, COLOURFADESTRUCT_LENGTH);
+	}
+	gb->cpu.b = 0; // HIGH(COLOURFADESTRUCT_LENGTH)
+	SET_HL(gb, hl);
+	SET_DE(gb, de);
+}
+
+PORT(_LoadMapSidePals)
+{
+	gb_call(gb, ADDR_GetMapSidePalGroup1);
+	// .UpdatePalsIfGotAllCrayons
+	gb->cpu.a = alu_and(gb, rd8(gb, wCrayonFlags), ALL_CRAYONS);
+	alu_cp(gb, gb->cpu.a, ALL_CRAYONS);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = alu_and(gb, rd8(gb, wCurMapSide), rd8(gb, wCurMapSide));
+		if (gb->cpu.f & FLAG_Z) {
+			SET_HL(gb, ADDR_Pals_84500);
+		} else {
+			gb->cpu.a = alu_dec(gb, gb->cpu.a);
+			if (gb->cpu.f & FLAG_Z)
+				SET_HL(gb, ADDR_Pals_84640);
+		}
+	}
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d011), rd8(gb, w2d011));
+	if (!(gb->cpu.f & FLAG_Z)) {
+		SET_DE(gb, 24 * PAL_SIZE);
+		SET_HL(gb, alu_add16(gb, REG_HL(gb), 24 * PAL_SIZE));
+	}
+	CALL(LoadPalsToTempPals1);
+	gb_call(gb, ADDR_GetMapSidePalGroup2);
+	CALL(LoadPalsToTempPals2);
+}
+
+PORT(LoadBaseAndTargetOWPals)
+{
+	gb_call(gb, ADDR_GetOWPals);
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.d = gb->cpu.a;
+	gb_push16(gb, REG_DE(gb));
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.d = rd8(gb, hl);
+	gb->cpu.e = gb->cpu.a;
+	SET_HL(gb, wFadePals + COLOURFADESTRUCT_TARGET);
+	gb_call(gb, ADDR_CopyPalToColourFadeStructs);
+	SET_DE(gb, gb_pop16(gb));
+	gb_push16(gb, REG_DE(gb));
+	SET_HL(gb, wFadePals + COLOURFADESTRUCT_BASE);
+	gb_call(gb, ADDR_CopyPalToColourFadeStructs);
+	gb_call(gb, ADDR_InitColourFadeStructs);
+	SET_HL(gb, gb_pop16(gb));
+	SET_DE(gb, wTempBGPals);
+	gb->cpu.b = 8 * PAL_SIZE;
+	CALL(CopyHLToDE);
+	gb->cpu.a = DAYNIGHT_TRANSITION_STEPS;
+	wr8(gb, wDayNightTransistionSteps, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d809, 0);
+}
+
+PORT(_LoadPalsForOWScene)
+{
+	gb_call(gb, ADDR_GetMapSidePalGroup1);
+	// .GetCrayonPal
+	gb->cpu.a = alu_and(gb, rd8(gb, wCrayonFlags), ALL_CRAYONS);
+	alu_cp(gb, gb->cpu.a, ALL_CRAYONS);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = alu_and(gb, rd8(gb, wCurMapSide), rd8(gb, wCurMapSide));
+		if (gb->cpu.f & FLAG_Z) {
+			// .north
+			gb->cpu.a = rd8(gb, wLastTransitionParam);
+			alu_cp(gb, gb->cpu.a, CRAYON_RED_T);
+			bool crayon = false;
+			if (!(gb->cpu.f & FLAG_C)) {
+				alu_cp(gb, gb->cpu.a, CRAYON_PINK_T + 1);
+				crayon = gb->cpu.f & FLAG_C;
+			}
+			if (!crayon)
+				SET_HL(gb, ADDR_Pals_84500);
+		} else {
+			gb->cpu.a = alu_dec(gb, gb->cpu.a);
+			if (gb->cpu.f & FLAG_Z)
+				SET_HL(gb, ADDR_Pals_84640); // .west
+		}
+	}
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d011), rd8(gb, w2d011));
+	if (!(gb->cpu.f & FLAG_Z)) {
+		SET_DE(gb, 24 * PAL_SIZE);
+		SET_HL(gb, alu_add16(gb, REG_HL(gb), 24 * PAL_SIZE));
+	}
+	CALL(LoadPalsToTempPals1);
+	gb_call(gb, ADDR_GetMapSidePalGroup2);
+	CALL(LoadPalsToTempPals2);
+	gb->cpu.a = alu_and(gb, rd8(gb, wOWExitUnlocked), rd8(gb, wOWExitUnlocked));
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	gb_call(gb, ADDR_LoadGreyOWPals);
+}
+
+// _PrologueFade.CopyPalsToBGAndOBPals
+static void copy_pals_to_bg_and_ob_pals(GB *gb)
+{
+	copy_bytes(gb, wTempPals1, wTempBGPals, 8 * PAL_SIZE);
+	copy_bytes(gb, wTempPals2, wTempOBPals, 8 * PAL_SIZE);
+}
+
+// ld hl, src / ld de, dest / ld c, n / ld b, BANK(src) / call CopyFarBytes
+static void copy_far_bytes(GB *gb, uint8_t bank, uint16_t src, uint16_t dest, uint8_t n)
+{
+	SET_HL(gb, src);
+	SET_DE(gb, dest);
+	gb->cpu.c = n;
+	gb->cpu.b = bank;
+	CALL(CopyFarBytes);
+}
+
+PORT(_PrologueFade)
+{
+	if (pal_fade_started(gb, wPalConfig1TotalSteps)) {
+		// .do_fade
+		if (!fade_step(gb, true, true))
+			return;
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wPalConfig1TotalSteps, 0);
+		wr8(gb, wPalConfig2TotalSteps, 0);
+		wr8(gb, w2d014, 0);
+		SET_HL(gb, w2d014 - 1);
+		wr8(gb, w2d014 - 1, alu_inc(gb, rd8(gb, w2d014 - 1)));
+		return;
+	}
+	// init fade
+	int step;
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d880), rd8(gb, w2d880));
+	for (step = 0; step < 7; step++) {
+		if (step)
+			gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z)
+			break;
+	}
+	if (step < 7)
+		copy_pals_to_bg_and_ob_pals(gb);
+	switch (step) {
+	case 0: // .zero
+		gb_call(gb, ADDR_ClearTempPals_Bank21);
+		break;
+	case 1: // .one
+	case 6: // .six
+		copy_bytes(gb, ADDR_Pals_869cd, wTempPals1, 8 * PAL_SIZE);
+		copy_bytes(gb, ADDR_Pals_86a8d, wTempPals2, 8 * PAL_SIZE);
+		if (step == 6)
+			copy_bytes(gb, ADDR_Pals_86acd, wTempPals2, 1 * PAL_SIZE);
+		break;
+	case 2: // .two
+		copy_bytes(gb, ADDR_Pals_86a4d, wTempPals1, 8 * PAL_SIZE);
+		copy_bytes(gb, ADDR_Pals_86a8d, wTempPals2, 8 * PAL_SIZE);
+		copy_bytes(gb, ADDR_Pals_86ad5, wTempPals2, 1 * PAL_SIZE);
+		break;
+	case 3: // .three
+		clear_bytes(gb, wTempPals1, 6 * PAL_SIZE);
+		clear_bytes(gb, wTempPals2 + 1 * PAL_SIZE, 7 * PAL_SIZE);
+		break;
+	case 4: // .four
+		copy_far_bytes(gb, BANK_Pals_db000, ADDR_Pals_db000, wTempPals1, 8 * PAL_SIZE);
+		copy_far_bytes(gb, BANK_Pals_db040, ADDR_Pals_db040, wTempPals2 + 3 * PAL_SIZE, 5 * PAL_SIZE);
+		break;
+	case 5: // .five
+		copy_bytes(gb, ADDR_Pals_86a4d + 6 * PAL_SIZE, wTempPals1 + 6 * PAL_SIZE, 2 * PAL_SIZE);
+		copy_bytes(gb, ADDR_Pals_86a8d, wTempPals2, 8 * PAL_SIZE);
+		copy_bytes(gb, ADDR_Pals_86ad5, wTempPals2, 1 * PAL_SIZE);
+		break;
+	}
+	// .set_pal_configs
+	set_pal_config(gb, 1, wTempBGPals, BGPI_AUTOINC | 0, 8);
+	set_pal_config(gb, 2, wTempOBPals, OBPI_AUTOINC | 0, 8);
+	inc_total_steps(gb, wPalConfig1TotalSteps);
+}
+
+PORT_JUMP(DayNightTransition)
+{
+	SET_HL(gb, wOWPalTransitionCounter);
+	wr8(gb, wOWPalTransitionCounter, alu_inc(gb, rd8(gb, wOWPalTransitionCounter)));
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d011), rd8(gb, w2d011));
+	if (!(gb->cpu.f & FLAG_Z)) {
+		JUMP_TO(ADDR_DayNightTransition + 0x11a); // .NightToDayTable
+		return;
+	}
+	// Day to Night table
+	gb->cpu.a = rd8(gb, wOWPalTransitionState);
+	JUMP_TO(jumptable(gb, ADDR_DayNightTransition + 0xf));
+}
+
+// DayNightTransition.AdvanceTable
+static void day_night_advance_table(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWPalTransitionCounter, 0);
+	SET_HL(gb, wOWPalTransitionState);
+	wr8(gb, wOWPalTransitionState, alu_inc(gb, rd8(gb, wOWPalTransitionState)));
+}
+
+PORT_LOCAL(DayNightTransition, AdvanceTable) { day_night_advance_table(gb); }
+
+// DayNightTransition.LoadBaseAndTargetPals
+static void day_night_load_base_and_target_pals(GB *gb)
+{
+	gb->cpu.ime = false; // di
+	gb_call(gb, ADDR_VBlank_OWPalTransition);
+	gb->cpu.ime = true; // ei
+	gb->cpu.ime_delay = 0;
+
+	// load the very last pal to buffer
+	gb->cpu.a = 0x03;
+	gb_call(gb, ADDR_GetOWPals);
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = rd8(gb, hl);
+	gb->cpu.h = rd8(gb, (uint16_t)(hl + 1));
+	gb->cpu.l = gb->cpu.a;
+	SET_DE(gb, wTempPals1);
+	gb->cpu.b = 8 * PAL_SIZE;
+	CALL(CopyHLToDE);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	gb_call(gb, ADDR_LoadBaseAndTargetOWPals);
+	day_night_advance_table(gb);
+}
+
+PORT_LOCAL(DayNightTransition, LoadBaseAndTargetPals) { day_night_load_base_and_target_pals(gb); }
+
+PORT_LOCAL(DayNightTransition, InitDayToNight)
+{
+	day_night_load_base_and_target_pals(gb);
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d07c, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d07d, 0);
+	wr8(gb, w2d809, 0);
+}
+
+PORT_LOCAL(DayNightTransition, InitNightToDay)
+{
+	day_night_load_base_and_target_pals(gb);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d07c, 0);
+	wr8(gb, w2d07d, 0);
+	wr8(gb, w2d809, 0);
+}
+
+// steps every colour of the colour fade structs towards its target
+PORT_LOCAL_JUMP(DayNightTransition, FadeColours)
+{
+	gb->cpu.a = rd8(gb, wSubState);
+	alu_cp(gb, gb->cpu.a, SST_OVERWORLD_0B);
+	if (gb->cpu.f & FLAG_Z) {
+		// if B button is pressed or any of the allowed D-pad directions
+		// then skip the day/night transition
+		gb->cpu.a = rd8(gb, wJoypadPressed);
+		gb->cpu.b = gb->cpu.a;
+		if (alu_bit(gb, gb->cpu.b, B_PAD_B)) {
+			JUMP_TO(ADDR_SkipDayNightTransition);
+			return;
+		}
+		gb->cpu.a = alu_and(gb, rd8(gb, wOWAllowedDPadInput), gb->cpu.b);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			JUMP_TO(ADDR_SkipDayNightTransition);
+			return;
+		}
+	}
+	// .no_skip
+	SET_HL(gb, w2d809);
+	gb->cpu.a = rd8(gb, wOWPalTransitionCounter);
+	alu_cp(gb, gb->cpu.a, rd8(gb, w2d809));
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWPalTransitionCounter, 0);
+	gb->cpu.a = 8 * PAL_COLORS * 3;
+	wr8(gb, w2d807, gb->cpu.a);
+	uint16_t hl = wFadePals + COLOURFADESTRUCT_SIGN;
+	do {
+		// .loop
+		gb->cpu.a = alu_and(gb, rd8(gb, hl), rd8(gb, hl)); // COLOURFADESTRUCT_SIGN
+		hl++;
+		if (gb->cpu.f & FLAG_Z) {
+			// .skip
+			SET_BC(gb, (COLOURFADESTRUCT_LENGTH + COLOURFADESTRUCT_SIGN) - COLOURFADESTRUCT_DIFF);
+			hl = alu_add16(gb, hl, REG_BC(gb));
+		} else {
+			gb->cpu.b = 1;
+			gb->cpu.a = alu_dec(gb, gb->cpu.a);
+			if (!(gb->cpu.f & FLAG_Z)) {
+				gb->cpu.b = (uint8_t)-1;
+				gb->cpu.a = alu_dec(gb, gb->cpu.a);
+				if (!(gb->cpu.f & FLAG_Z)) {
+					SET_HL(gb, hl);
+					JUMP_TO(ADDR_DayNightTransition + 0x93 - 3); // debug_nop
+					return;
+				}
+			}
+			// .got_step: add diff to the accumulator; once it exceeds
+			// DAYNIGHT_TRANSITION_STEPS, apply the step to the current value
+			gb->cpu.a = gb->cpu.b;
+			wr8(gb, wColourFadeStep, gb->cpu.a);
+			gb->cpu.a = rd8(gb, hl++); // COLOURFADESTRUCT_DIFF
+			wr8(gb, wColourFadeDiff, gb->cpu.a);
+			gb->cpu.b = gb->cpu.a;
+			gb->cpu.a = rd8(gb, hl); // COLOURFADESTRUCT_ACCUMULATOR
+			wr8(gb, wColourFadeAccumulator, gb->cpu.a);
+			gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.b);
+			alu_cp(gb, gb->cpu.a, DAYNIGHT_TRANSITION_STEPS);
+			if (!(gb->cpu.f & FLAG_C)) {
+				gb->cpu.a = alu_sub(gb, gb->cpu.a, DAYNIGHT_TRANSITION_STEPS);
+				wr8(gb, hl, gb->cpu.a); // COLOURFADESTRUCT_ACCUMULATOR
+				hl = (uint16_t)((hl & 0xff00) | alu_inc(gb, (uint8_t)hl)); // inc l
+				gb->cpu.a = alu_add(gb, rd8(gb, wColourFadeStep), rd8(gb, hl)); // COLOURFADESTRUCT_CURRENT
+				wr8(gb, hl, gb->cpu.a);
+				SET_BC(gb, (COLOURFADESTRUCT_LENGTH + COLOURFADESTRUCT_SIGN) - COLOURFADESTRUCT_CURRENT);
+			} else {
+				// .dont_apply_step
+				wr8(gb, hl, gb->cpu.a); // COLOURFADESTRUCT_ACCUMULATOR
+				SET_BC(gb, (COLOURFADESTRUCT_LENGTH + COLOURFADESTRUCT_SIGN) - COLOURFADESTRUCT_ACCUMULATOR);
+			}
+			hl = alu_add16(gb, hl, REG_BC(gb));
+		}
+		// .next
+		gb->cpu.a = alu_dec(gb, rd8(gb, w2d807));
+		wr8(gb, w2d807, gb->cpu.a);
+		gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	} while (!(gb->cpu.f & FLAG_Z));
+	SET_HL(gb, hl);
+
+	gb_call(gb, ADDR_ApplyPalFadeColours);
+
+	gb->cpu.a = alu_dec(gb, rd8(gb, wDayNightTransistionSteps));
+	wr8(gb, wDayNightTransistionSteps, gb->cpu.a);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	day_night_advance_table(gb);
+	RET();
+}
+
+// DayNightTransition.LoadPal1 / .LoadPal2
+static void day_night_load_pal(GB *gb, uint8_t pal)
+{
+	gb->cpu.a = pal;
+	gb_call(gb, ADDR_LoadBaseAndTargetOWPals);
+	day_night_advance_table(gb);
+}
+
+PORT_LOCAL(DayNightTransition, LoadPal1_Day) { day_night_load_pal(gb, 0x01); }
+PORT_LOCAL(DayNightTransition, LoadPal1) { day_night_load_pal(gb, 0x01); }
+PORT_LOCAL(DayNightTransition, LoadPal1_Night) { day_night_load_pal(gb, 0x01); }
+PORT_LOCAL(DayNightTransition, LoadPal2) { day_night_load_pal(gb, 0x02); }
+
+// call .FadeColours, then w2d809 = 0 once wDayNightTransistionSteps is `steps`
+static void day_night_fade_until(GB *gb, uint8_t steps)
+{
+	gb_call(gb, ADDR_DayNightTransition + 0x57); // .FadeColours
+	gb->cpu.a = rd8(gb, wDayNightTransistionSteps);
+	alu_cp(gb, gb->cpu.a, steps);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d809, 0);
+}
+
+PORT_LOCAL(DayNightTransition, FadePal1ToPal2_Day) { day_night_fade_until(gb, 12); }
+PORT_LOCAL(DayNightTransition, FadeDayToPal1) { day_night_fade_until(gb, 10); }
+PORT_LOCAL(DayNightTransition, FadePal1ToPal2_Night) { day_night_fade_until(gb, 0x16); }
+
+PORT_LOCAL(DayNightTransition, SwitchDayNight)
+{
+	gb->cpu.a = alu_xor(gb, rd8(gb, w2d011), 0x1);
+	wr8(gb, w2d011, gb->cpu.a);
+	SET_HL(gb, wDayNight);
+	wr8(gb, wDayNight, alu_srl(gb, rd8(gb, wDayNight)));
+	gb->cpu.a = alu_rra(gb, gb->cpu.a);
+	wr8(gb, wDayNight, alu_rl(gb, rd8(gb, wDayNight)));
+	wr8(gb, wDayNight, (uint8_t)(rd8(gb, wDayNight) & ~(1 << 7)));
+	CALL(PlayOverworldMusic);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d0e3, 0);
+	wr8(gb, wOWPalTransitionState, 0);
+	wr8(gb, wOWPalTransitionCounter, 0);
+}
+
+PORT_LOCAL_JUMP(DayNightTransition, NightToDayTable)
+{
+	gb->cpu.a = rd8(gb, wOWPalTransitionState);
+	JUMP_TO(jumptable(gb, ADDR_DayNightTransition + 0x11e));
+}

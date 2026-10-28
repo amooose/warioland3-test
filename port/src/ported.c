@@ -39,10 +39,18 @@ static void hcall_ret(GB *gb, uint16_t addr, uint16_t ret)
 	wr8(gb, hCallFuncPointer, (uint8_t)addr);
 	gb->cpu.a = (uint8_t)(addr >> 8);
 	wr8(gb, hCallFuncPointer + 1, gb->cpu.a);
+	uint8_t entry_bank = rd8(gb, wROMBank);
 	if (ret)
 		gb_call_ret(gb, hCallFunc, ret);
 	else
 		gb_call(gb, hCallFunc);
+	// hCallFunc always maps the entry bank back before it returns. Coming
+	// back with another bank mapped means the callee unwound hCallFunc's
+	// own frame (a fuzzed jump table landing mid-routine on a pop), so the
+	// asm caller goes on to run code from the wrong bank, which C code
+	// can't follow.
+	if (gb->test.active && gb->rom_bank != entry_bank)
+		gb->test.unrealistic = true;
 }
 
 void port_hcall(GB *gb, uint16_t addr)
