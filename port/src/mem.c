@@ -64,6 +64,13 @@ static void test_access(GB *gb, uint16_t addr, bool read)
 	// read; native code and the asm read them at different moments.
 	if (read && gb->test.timed && (addr == 0xff04 || addr == 0xff05 || addr == 0xff0f))
 		gb->test.unrealistic = true;
+	// So do STAT and LY, but routines that wait on the hardware read them on
+	// purpose (ldh a, [rLY]...), at moments that match. A fuzzed input can
+	// make the asm read them as data instead (say a sprite pointer into I/O,
+	// copied with ld a, [hli]), at moments native code doesn't match.
+	if (read && gb->test.timed && gb->test.fuzzed && (addr == 0xff41 || addr == 0xff44) &&
+		gb->test.op != 0xf0 && gb->test.op != 0xf2 && gb->test.op != 0xfa)
+		gb->test.unrealistic = true;
 	// An HBlank DMA progresses with time, by different amounts in each run.
 	if (!read && gb->test.timed && addr == 0xff55)
 		gb->test.unrealistic = true;

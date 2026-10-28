@@ -262,6 +262,7 @@ static int service_interrupts(GB *gb)
 static int exec(GB *gb)
 {
 	uint8_t op = fetch8(gb);
+	gb->test.op = op;
 	uint8_t v8;
 	uint16_t v16;
 	int r;

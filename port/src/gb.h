@@ -185,6 +185,10 @@ typedef struct GB {
 		// Time flows in this check (see difftest.c): reads of the clock
 		// registers then give whatever the moment of the read happens to be.
 		bool timed;
+		// The input is a fuzzed variant, not a real call (set for the asm
+		// run only, where op, the opcode being executed, is meaningful).
+		bool fuzzed;
+		uint8_t op;
 		uint16_t stack_lo, stack_hi;
 	} test;
 } GB;

@@ -59,6 +59,7 @@ static void report(Report *r, const char *fmt, ...)
 // time flowing on both sides, and the registers that only reflect the
 // passage of time aren't compared.
 static bool timed;
+static bool fuzzed;
 
 // Stack memory below SP is dead once a routine returns. Native code pushes
 // different return addresses there than the asm does, so it's not compared.
@@ -205,6 +206,7 @@ static void prepare(GB *dst, const GB *src)
 	dst->test.stack_lo = stack_bottom;
 	dst->test.stack_hi = stack_top;
 	dst->test.timed = timed;
+	dst->test.fuzzed = fuzzed;
 }
 
 // The end of the routine at h: the next global label in the same region.
@@ -254,6 +256,7 @@ static CheckResult check_once(const GB *base, Hook *h, Report *r, const char **w
 
 	// Native run.
 	prepare(nat, base);
+	nat->test.fuzzed = false;
 	uint16_t entry_sp = nat->cpu.sp;
 	nat->test.budget = native_budget;
 	nat->test.out_of_budget = native_out_of_budget;
@@ -330,17 +333,21 @@ static CheckResult check(const GB *base, Hook *h, Report *r, const char **why,
 	bool *known = &needs_time[h - hook_get(0)];
 	bool waits = false;
 	CheckResult res = CHECK_INCONCLUSIVE;
+	fuzzed = !real;
 	if (!*known) {
 		timed = false;
 		res = check_once(base, h, r, why, read_log, read_log_cap, read_log_len, exec_map, &waits);
-		if (!waits || !real)
+		if (!waits || !real) {
+			fuzzed = false;
 			return res;
+		}
 		*known = true;
 	}
 	timed = true;
 	memset(r, 0, sizeof(*r));
 	res = check_once(base, h, r, why, read_log, read_log_cap, read_log_len, exec_map, &waits);
 	timed = false;
+	fuzzed = false;
 	return res;
 }
 
