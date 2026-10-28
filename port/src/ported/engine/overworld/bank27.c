@@ -629,3 +629,181 @@ PORT(LoadCutsceneBGMap)
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, rVBK, 0);
 }
+
+PORT(PrologueFunc)
+{
+	FARCALL(Prologue);
+}
+
+PORT_JUMP(LoadCutsceneTilemap0)
+{
+	SET_BC(gb, v0BGMap0);
+	JUMP_TO(ADDR_LoadCutsceneBGMap); // fallthrough
+}
+
+PORT_JUMP(LoadCutsceneTilemap1)
+{
+	SET_BC(gb, v0BGMap1);
+	JUMP_TO(ADDR_LoadCutsceneBGMap);
+}
+
+// Func_9f0e0.asm_9f0e9: bc = scene obj state
+static void func_9f0e9(GB *gb)
+{
+	for (;;) {
+		gb->cpu.a = alu_and(gb, rd8(gb, REG_BC(gb)), rd8(gb, REG_BC(gb)));
+		if (gb->cpu.f & FLAG_Z)
+			return;
+		SET_HL(gb, ADDR_Func_9f0e0 + 0x30); // .framesets
+		gb_call(gb, ADDR_Func_9f0a5);
+		gb_call(gb, ADDR_Func_9f0ae);
+		alu_cp(gb, gb->cpu.a, 0x05);
+		if (gb->cpu.f & FLAG_Z) {
+			gb->cpu.b = 0x00;
+		} else {
+			alu_cp(gb, gb->cpu.a, 0x06);
+			if (!(gb->cpu.f & FLAG_Z))
+				break;
+			gb->cpu.b = 0x07;
+		}
+		gb_call(gb, ADDR_Func_9f0d0);
+		if (!(gb->cpu.f & FLAG_Z))
+			break;
+	}
+	// .asm_9f0fd
+	SET_DE(gb, ADDR_OAM_bd1fd);
+	gb_call(gb, ADDR_Func_9f0bc);
+}
+
+PORT(Func_9f0e0)
+{
+	SET_BC(gb, wSceneObj3State);
+	func_9f0e9(gb);
+	SET_BC(gb, wSceneObj2State);
+	func_9f0e9(gb);
+}
+
+PORT_JUMP(OWCutTree)
+{
+	for (;;) {
+		SET_DE(gb, wSceneObj2);
+		gb_call(gb, ADDR_Func_9fb97);
+		gb->cpu.a = rd8(gb, wSceneObj2State);
+		uint16_t hl = wSceneObj2State - 1;
+		gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z) {
+			SET_HL(gb, hl);
+			RET();
+			return;
+		}
+		gb->cpu.l = alu_dec(gb, (uint8_t)hl);
+		gb->cpu.h = (uint8_t)(hl >> 8);
+		gb->cpu.b = BANK_OAM_bc122; // BANK("Overworld OAM 2")
+		gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z) {
+			// .one
+			SET_DE(gb, ADDR_Frameset_bc1f3);
+			CALL(UpdateOWAnimation);
+			break;
+		}
+		gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			JUMP_TO(ADDR_OWCutTree + 0x18 - 3); // debug_nop
+			return;
+		}
+		// .two
+		SET_DE(gb, ADDR_Frameset_bc1e8);
+		CALL(UpdateOWAnimation);
+		gb->cpu.b = 0x00;
+		gb_call(gb, ADDR_Func_9f0d0);
+		if (!(gb->cpu.f & FLAG_Z))
+			break;
+	}
+	// .asm_9fc85
+	SET_DE(gb, ADDR_OAM_bc122);
+	JUMP_TO(ADDR_Func_9f0bc);
+}
+
+PORT(VBlank_Cutscene)
+{
+	SET_HL(gb, ADDR_VBlank_Cutscene + 0x0c); // .Func
+	SET_DE(gb, wVBlankFunc);
+	gb->cpu.b = 0x51; // .end - .Func
+	CALL(CopyHLToDE);
+}
+
+// rst JumpTable, with the table at `table` (right after the rst): leaves every
+// register as JumpTable does and returns the target (= hl).
+static uint16_t jumptable(GB *gb, uint16_t table)
+{
+	gb_push16(gb, table); // rst JumpTable
+	uint16_t hl = gb_pop16(gb); // pop hl
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0;
+	hl = alu_add16(gb, hl, gb->cpu.e);
+	gb->cpu.a = rd8(gb, hl);
+	gb->cpu.h = rd8(gb, (uint16_t)(hl + 1));
+	gb->cpu.l = gb->cpu.a;
+	return REG_HL(gb);
+}
+
+PORT_JUMP(DoCutsceneFunc)
+{
+	CALL(ProcessDPadRepeat);
+	SET_HL(gb, w2d014);
+	wr8(gb, w2d014, alu_inc(gb, rd8(gb, w2d014)));
+	SET_BC(gb, w2d014);
+	gb->cpu.a = rd8(gb, wEventWithCutscene);
+	alu_cp(gb, gb->cpu.a, NUM_EVENTS);
+	if (!(gb->cpu.f & FLAG_C)) {
+		JUMP_TO(ADDR_DoCutsceneFunc + 0xc8); // .OutOfBoundsCutscene
+		return;
+	}
+	JUMP_TO(jumptable(gb, ADDR_DoCutsceneFunc + 0x12));
+}
+
+PORT_JUMP(Cutscene02Func)
+{
+	gb_call(gb, ADDR_Cutscene02Func + 0x6); // .PlayCutscene
+	JUMP_TO(ADDR_OWCutTree);
+}
+
+PORT_JUMP(InitCutscene02)
+{
+	gb->cpu.b = BANK_Pals_b8200;
+	SET_HL(gb, ADDR_Pals_b8200);
+	CALL(LoadFarPalsToTempPals1);
+	gb->cpu.b = BANK_Pals_b8c00;
+	SET_HL(gb, ADDR_Pals_b8c00);
+	CALL(LoadFarPalsToTempPals2);
+	gb_call(gb, ADDR_LoadCutscenes1Gfx_Vram0);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps01);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps02);
+}
+
+PORT_JUMP(InitCutscene03)
+{
+	gb->cpu.b = BANK_Pals_b8240;
+	SET_HL(gb, ADDR_Pals_b8240);
+	CALL(LoadFarPalsToTempPals1);
+	gb->cpu.b = BANK_Pals_b88c0;
+	SET_HL(gb, ADDR_Pals_b88c0);
+	CALL(LoadFarPalsToTempPals2);
+	gb_call(gb, ADDR_LoadCutscenes3Gfx);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps07);
+}
+
+// loads the attrmap at `attrmap` and the tilemap at `tilemap`
+static void load_cutscene_bg_maps(GB *gb, uint16_t attrmap, uint16_t load_attrmap, uint16_t tilemap, uint16_t load_tilemap)
+{
+	SET_HL(gb, attrmap);
+	gb_call(gb, load_attrmap);
+	SET_HL(gb, tilemap);
+	gb_call(gb, load_tilemap);
+}
+
+PORT(LoadCutsceneBGMaps01)
+{
+	load_cutscene_bg_maps(gb, ADDR_Cutscene01Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene01Tilemap, ADDR_LoadCutsceneTilemap0);
+}
