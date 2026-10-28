@@ -71,3 +71,48 @@ PORT(PalmTreeSpawnerFunc)
 	gb->cpu.a = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
 	wr8(gb, wCurObjAction, gb->cpu.a);
 }
+
+#define PALM_TREE_UPDATE (ADDR_PalmTreeFunc + 0x16) // .Update
+
+PORT_JUMP(PalmTreeFunc)
+{
+	uint16_t hl = wCurObjUpdateFunction + 1;
+	gb->cpu.a = (uint8_t)(PALM_TREE_UPDATE >> 8);
+	wr8(gb, hl--, gb->cpu.a);
+	gb->cpu.a = (uint8_t)PALM_TREE_UPDATE;
+	wr8(gb, hl--, gb->cpu.a);
+	SET_HL(gb, ADDR_PalmTreePals);
+	SET_DE(gb, wTempPals2 + PAL_SIZE * 7);
+	gb->cpu.c = 7;
+	gb->cpu.b = 1;
+	JUMP(CopyAndApplyOBPals);
+}
+
+// Rises while var1 counts down, then (with var2 left) keeps still.
+PORT_LOCAL(PalmTreeFunc, Update)
+{
+	CALL(SetOneWayPlatformAction);
+	uint16_t hl = wCurObjVar1;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		wr8(gb, hl, alu_dec(gb, gb->cpu.a));
+		CALL(MoveObjectUp);
+		gb->cpu.a = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
+		wr8(gb, wCurObjAction, gb->cpu.a);
+	} else {
+		// .open
+		gb->cpu.l = alu_inc(gb, gb->cpu.l);
+		hl = REG_HL(gb);
+		gb->cpu.a = rd8(gb, hl);
+		if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+			wr8(gb, hl, alu_dec(gb, gb->cpu.a));
+			gb->cpu.a = (1 << NO_ACTIONS_F) | 1;
+			wr8(gb, wCurObjAction, gb->cpu.a);
+			return;
+		}
+	}
+	// .set_frame_duration
+	gb->cpu.a = 10;
+	wr8(gb, wCurObjFrameDuration, 10);
+}
