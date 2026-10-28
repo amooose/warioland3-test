@@ -2600,28 +2600,21 @@ PORT(DrawUnlockedLevels)
 	wr8(gb, wOWPathShape, 0);
 }
 
-// Func_81dce.PrepareScene: runs the init functions of the scene of the event
-// in wTempEvent that are on the current map side
-static void prepare_ow_scene(GB *gb)
+// call addr, pushing the asm's own return address `ret` (in Func_81dce).
+// A fuzzed callee can come back with another bank mapped; the asm then goes
+// on running whatever that bank holds at `ret`, so this jumps there too and
+// returns true (the caller must stop).
+static bool call_81dce(GB *gb, uint16_t addr, uint16_t ret)
 {
-	gb->cpu.a = rd8(gb, wTempEvent);
-	gb_call(gb, ADDR_GetOWSceneParams);
-	while (!(gb->cpu.f & FLAG_Z)) {
-		gb->cpu.a = rd8(gb, wOWSceneMapSide);
-		gb->cpu.b = gb->cpu.a;
-		gb->cpu.a = rd8(gb, wCurMapSide);
-		alu_cp(gb, gb->cpu.a, gb->cpu.b);
-		if (gb->cpu.f & FLAG_Z)
-			gb_call(gb, ADDR_Func_81dce + 0x68); // .DoInitFunc
-		// .diff_side
-		SET_HL(gb, wOWSceneParamsPtr);
-		CALL(GetByteFromPointerInHL);
-		gb_call(gb, ADDR_GetOWSceneParams_GotPtr);
-	}
+	gb_call_ret(gb, addr, ADDR_Func_81dce + ret);
+	if (gb->rom_bank == BANK_Func_81dce)
+		return false;
+	JUMP_TO(ADDR_Func_81dce + ret);
+	return true;
 }
 
 // sets up the OW scenes of all the unlocked events
-PORT(Func_81dce)
+PORT_JUMP(Func_81dce)
 {
 	gb->cpu.a = EVENT_PROLOGUE;
 	wr8(gb, wTempEvent, gb->cpu.a);
@@ -2648,7 +2641,8 @@ PORT(Func_81dce)
 		gb->cpu.f = FLAG_Z; // xor a
 		wr8(gb, w2d078, 0);
 		gb->cpu.a = rd8(gb, wTempEvent);
-		gb_call(gb, ADDR_CheckIfEventIsUnlocked);
+		if (call_81dce(gb, ADDR_CheckIfEventIsUnlocked, 0x21))
+			return;
 		wr8(gb, w2d065, gb->cpu.a);
 		gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
 		if (!(gb->cpu.f & FLAG_Z)) {
@@ -2659,7 +2653,8 @@ PORT(Func_81dce)
 			}
 		}
 		// .asm_81dfd
-		prepare_ow_scene(gb);
+		if (call_81dce(gb, ADDR_Func_81dce + 0x48, 0x32)) // .PrepareScene
+			return;
 		gb->cpu.a = alu_inc(gb, rd8(gb, wTempEvent));
 		alu_cp(gb, gb->cpu.a, NUM_EVENTS);
 		if (gb->cpu.f & FLAG_Z)
@@ -2668,9 +2663,36 @@ PORT(Func_81dce)
 	}
 	// .break
 	gb->cpu.a = alu_inc(gb, rd8(gb, wLastTransitionParam));
-	if (!(gb->cpu.f & FLAG_Z))
+	if (gb->cpu.f & FLAG_Z)
+		wr8(gb, wLastTransitionParam, gb->cpu.a);
+	RET();
+}
+
+// runs the init functions of the scene of the event in wTempEvent that are
+// on the current map side
+PORT_LOCAL_JUMP(Func_81dce, PrepareScene)
+{
+	gb->cpu.a = rd8(gb, wTempEvent);
+	if (call_81dce(gb, ADDR_GetOWSceneParams, 0x4e))
 		return;
-	wr8(gb, wLastTransitionParam, gb->cpu.a);
+	while (!(gb->cpu.f & FLAG_Z)) {
+		// .loop
+		gb->cpu.a = rd8(gb, wOWSceneMapSide);
+		gb->cpu.b = gb->cpu.a;
+		gb->cpu.a = rd8(gb, wCurMapSide);
+		alu_cp(gb, gb->cpu.a, gb->cpu.b);
+		if (gb->cpu.f & FLAG_Z) {
+			if (call_81dce(gb, ADDR_Func_81dce + 0x68, 0x5c)) // .DoInitFunc
+				return;
+		}
+		// .diff_side
+		SET_HL(gb, wOWSceneParamsPtr);
+		if (call_81dce(gb, ADDR_GetByteFromPointerInHL, 0x62))
+			return;
+		if (call_81dce(gb, ADDR_GetOWSceneParams_GotPtr, 0x65))
+			return;
+	}
+	RET();
 }
 
 PORT_LOCAL_JUMP(Func_81dce, DoInitFunc)

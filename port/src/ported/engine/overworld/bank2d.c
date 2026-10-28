@@ -666,11 +666,21 @@ PORT_JUMP(InitOWObjects_West)
 }
 
 // calls `func` with bc = each of the n obj states, the last one a tail jump
-static void for_each_obj_state(GB *gb, uint16_t func, const uint16_t *states, int n)
+// `ld bc, state` / `call func` pairs (6 bytes each) from `start`, ending
+// in `ld bc, state` / `jp func`. Calls push the asm's own return address:
+// a fuzzed callee can come back with another bank mapped, and then the asm
+// goes on running whatever that bank holds there, so this does too.
+static void for_each_obj_state(GB *gb, uint16_t start, uint16_t func, const uint16_t *states, int n)
 {
+	int bank = gb->rom_bank;
 	for (int i = 0; i < n - 1; i++) {
 		SET_BC(gb, states[i]);
-		gb_call(gb, func);
+		uint16_t ret = (uint16_t)(start + 6 * (i + 1));
+		gb_call_ret(gb, func, ret);
+		if (gb->rom_bank != bank) {
+			JUMP_TO(ret);
+			return;
+		}
 	}
 	SET_BC(gb, states[n - 1]);
 	JUMP_TO(func);
@@ -687,22 +697,22 @@ PORT_LOCAL_JUMP(UpdateMapSideOWAnimations, North)
 		wSceneObj2State, wSceneObj3State, wSceneObj6State,
 		wSceneObj7State, wSceneObj14State, wSceneObj15State,
 	};
-	for_each_obj_state(gb, ADDR_Func_b7984, states, 6);
+	for_each_obj_state(gb, ADDR_UpdateMapSideOWAnimations + 0xc, ADDR_Func_b7984, states, 6);
 }
 PORT_LOCAL_JUMP(UpdateMapSideOWAnimations, West)
 {
 	static const uint16_t states[] = {wSceneObj1State, wSceneObj7State, wSceneObj8State, wSceneObj5State};
-	for_each_obj_state(gb, ADDR_Func_b7a6d, states, 4);
+	for_each_obj_state(gb, ADDR_UpdateMapSideOWAnimations + 0x30, ADDR_Func_b7a6d, states, 4);
 }
 PORT_LOCAL_JUMP(UpdateMapSideOWAnimations, South)
 {
 	static const uint16_t states[] = {wSceneObj7State, wSceneObj14State, wSceneObj15State};
-	for_each_obj_state(gb, ADDR_Func_b7c18, states, 3);
+	for_each_obj_state(gb, ADDR_UpdateMapSideOWAnimations + 0x48, ADDR_Func_b7c18, states, 3);
 }
 PORT_LOCAL_JUMP(UpdateMapSideOWAnimations, East)
 {
 	static const uint16_t states[] = {wSceneObj5State, wSceneObj7State};
-	for_each_obj_state(gb, ADDR_Func_b7b61, states, 2);
+	for_each_obj_state(gb, ADDR_UpdateMapSideOWAnimations + 0x5a, ADDR_Func_b7b61, states, 2);
 }
 
 static const uint16_t scene_objs_1_to_4[] = {wSceneObj1State, wSceneObj2State, wSceneObj3State, wSceneObj4State};
@@ -712,10 +722,10 @@ PORT_JUMP(Func_b4a3d)
 	gb->cpu.a = rd8(gb, wCurMapSide);
 	JUMP_TO(jumptable(gb, ADDR_Func_b4a3d + 4));
 }
-PORT_LOCAL_JUMP(Func_b4a3d, North) { for_each_obj_state(gb, ADDR_Func_b4fa2, scene_objs_1_to_4, 4); }
-PORT_LOCAL_JUMP(Func_b4a3d, West) { for_each_obj_state(gb, ADDR_Func_b4dfb, scene_objs_1_to_4, 4); }
-PORT_LOCAL_JUMP(Func_b4a3d, South) { for_each_obj_state(gb, ADDR_Func_b4cc2, scene_objs_1_to_4, 4); }
-PORT_LOCAL_JUMP(Func_b4a3d, East) { for_each_obj_state(gb, ADDR_Func_b4b99, scene_objs_1_to_4, 4); }
+PORT_LOCAL_JUMP(Func_b4a3d, North) { for_each_obj_state(gb, ADDR_Func_b4a3d + 0xc, ADDR_Func_b4fa2, scene_objs_1_to_4, 4); }
+PORT_LOCAL_JUMP(Func_b4a3d, West) { for_each_obj_state(gb, ADDR_Func_b4a3d + 0x24, ADDR_Func_b4dfb, scene_objs_1_to_4, 4); }
+PORT_LOCAL_JUMP(Func_b4a3d, South) { for_each_obj_state(gb, ADDR_Func_b4a3d + 0x3c, ADDR_Func_b4cc2, scene_objs_1_to_4, 4); }
+PORT_LOCAL_JUMP(Func_b4a3d, East) { for_each_obj_state(gb, ADDR_Func_b4a3d + 0x54, ADDR_Func_b4b99, scene_objs_1_to_4, 4); }
 
 PORT_JUMP(Func_b4aa9)
 {
@@ -728,7 +738,7 @@ PORT_LOCAL_JUMP(Func_b4aa9, North)
 		wSceneObj5State, wSceneObj6State, wSceneObj7State, wSceneObj8State, wSceneObj9State,
 		wSceneObj10State, wSceneObj13State, wSceneObj14State, wSceneObj15State,
 	};
-	for_each_obj_state(gb, ADDR_Func_b4fa2, states, 9);
+	for_each_obj_state(gb, ADDR_Func_b4aa9 + 0xc, ADDR_Func_b4fa2, states, 9);
 }
 PORT_LOCAL_JUMP(Func_b4aa9, West)
 {
@@ -736,7 +746,7 @@ PORT_LOCAL_JUMP(Func_b4aa9, West)
 		wSceneObj5State, wSceneObj6State, wSceneObj7State, wSceneObj8State, wSceneObj10State,
 		wSceneObj11State, wSceneObj12State, wSceneObj13State, wSceneObj14State, wSceneObj15State,
 	};
-	for_each_obj_state(gb, ADDR_Func_b4dfb, states, 10);
+	for_each_obj_state(gb, ADDR_Func_b4aa9 + 0x42, ADDR_Func_b4dfb, states, 10);
 }
 PORT_LOCAL_JUMP(Func_b4aa9, South)
 {
@@ -744,7 +754,7 @@ PORT_LOCAL_JUMP(Func_b4aa9, South)
 		wSceneObj5State, wSceneObj6State, wSceneObj7State, wSceneObj8State,
 		wSceneObj9State, wSceneObj10State, wSceneObj14State, wSceneObj15State,
 	};
-	for_each_obj_state(gb, ADDR_Func_b4cc2, states, 8);
+	for_each_obj_state(gb, ADDR_Func_b4aa9 + 0x7e, ADDR_Func_b4cc2, states, 8);
 }
 PORT_LOCAL_JUMP(Func_b4aa9, East)
 {
@@ -753,7 +763,7 @@ PORT_LOCAL_JUMP(Func_b4aa9, East)
 		wSceneObj9State, wSceneObj10State, wSceneObj11State, wSceneObj12State,
 		wSceneObj13State, wSceneObj14State, wSceneObj15State,
 	};
-	for_each_obj_state(gb, ADDR_Func_b4b99, states, 11);
+	for_each_obj_state(gb, ADDR_Func_b4aa9 + 0xae, ADDR_Func_b4b99, states, 11);
 }
 
 // bc = scene obj state
