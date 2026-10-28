@@ -686,3 +686,60 @@ PORT_JUMP(BlockFunc_Fence)
 	JUMP_TO(ADDR_Func_1808c);
 }
 
+PORT_JUMP(BlockFunc_AirCurrent)
+{
+	if (!wario_flag(gb))
+		GOTO(FREE);
+	if (!coll_bit(gb, COLLISION_UNK7_F))
+		GOTO(FREE);
+	if (ld_and(gb, wInvincibleCounter))
+		GOTO(FREE);
+	st(gb, wIsInAirCurrent, TRUE);
+	if (ld_and(gb, wTransformation))
+		GOTO(FREE);
+	st(gb, wTransformation, TRANSFORMATION_FAN);
+	st(gb, wTouchState, TOUCH_BUMP);
+	st(gb, wStingTouchState, TOUCH_VULNERABLE);
+	st(gb, wca94, 0x01);
+	FARCALL(SetState_FanStart);
+	JUMP_TO(FREE);
+}
+
+static void slippery(GB *gb, uint16_t next)
+{
+	if (!wario_flag(gb))
+		GOTO(next);
+	if (!ld_mask(gb, wCollisionPoints, COLLISION_DOWN))
+		GOTO(next);
+	st(gb, wIsOnSlipperyGround, TRUE);
+	JUMP_TO(next);
+}
+
+PORT_JUMP(BlockFunc_SlipperySolid) { slippery(gb, SOLID); }
+PORT_JUMP(BlockFunc_SlipperyFloor) { slippery(gb, FLOOR); }
+
+PORT_JUMP(BlockFunc_CloudPlatform1)
+{
+	gb->cpu.a = rd8(gb, wRoomPalCycleIndex);
+	alu_cp(gb, gb->cpu.a, 0x07);
+	if (!ZF) {
+		alu_cp(gb, gb->cpu.a, 0x04);
+		if (!CF)
+			GOTO(FREE);
+	}
+	JUMP_TO(FLOOR);
+}
+
+PORT_JUMP(BlockFunc_CloudPlatform2)
+{
+	ld_cp(gb, wRoomPalCycleIndex, 0x03);
+	JUMP_TO(CF ? FREE : FLOOR);
+}
+
+PORT_JUMP(BlockFunc_SmallGap)
+{
+	if (!wario_flag(gb))
+		GOTO(FREE);
+	ld_cp(gb, wTransformation, TRANSFORMATION_FLAT_WARIO);
+	JUMP_TO(ZF ? FREE : SOLID);
+}

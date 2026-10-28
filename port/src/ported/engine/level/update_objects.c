@@ -31,6 +31,7 @@ PORT(DrawObjects_WithPriority)
 	draw_objects(gb, OBJFLAG_ACTIVE | OBJFLAG_ON_SCREEN);
 }
 
+
 #define CPU (&gb->cpu)
 
 // One of CheckObjectOnScreen's range checks of the position hi:lo against
@@ -728,6 +729,24 @@ PORT_JUMP(Func_63050)
 		return;
 	}
 	st(gb, wCurObjState, OBJSTATE_STANDING_FALL_START);
+	JUMP(HomeJumpRet);
+}
+
+PORT_JUMP(Func_6305f)
+{
+	gb->cpu.a = alu_rra(gb, rd8(gb, rDIV));
+	gb->cpu.a = CF ? OBJSTATE_WOBBLE_LEFT : OBJSTATE_WOBBLE_RIGHT;
+	uint16_t hl = wCurObjState;
+	wr8(gb, hl--, gb->cpu.a);
+	hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl - 1)); // dec l
+	xor_a(gb);
+	wr8(gb, hl--, 0); // OBJ_VAR_3
+	gb->cpu.a = 0x01;
+	wr8(gb, hl--, 0x01); // OBJ_VAR_2
+	hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl - 1)); // dec l
+	gb->cpu.a = 0x04;
+	wr8(gb, hl++, 0x04); // OBJ_STATE_DURATION
+	SET_HL(gb, hl);
 	JUMP(HomeJumpRet);
 }
 

@@ -81,3 +81,12 @@ PORT(InitGameState)
 	wr8(gb, wState, 0);
 	wr8(gb, wSubState, 0);
 }
+
+PORT(SetPerfectState)
+{
+	SET_HL(gb, wState);
+	wr8(gb, wState, ST_PERFECT);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSubState, 0);
+}

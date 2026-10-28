@@ -65,3 +65,16 @@ PORT(ClearParticles)
 	gb->cpu.f = FLAG_Z; // xor a
 	CALL(WriteAToHL_BTimes);
 }
+
+// b = ground shake counter
+PORT(DoGroundShake)
+{
+	gb->cpu.a = rd8(gb, wGroundShakeCounter);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	gb->cpu.a = gb->cpu.b;
+	wr8(gb, wGroundShakeCounter, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wIsWarioGroundShaking, 0);
+}

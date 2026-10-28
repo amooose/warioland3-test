@@ -58,3 +58,15 @@ PORT(GetWarioBGPtr)
 	wr8(gb, wBGPtr + 1, gb->cpu.a);
 }
 
+// unreferenced
+PORT(Func_8eac)
+{
+	gb->cpu.l = alu_srl(gb, gb->cpu.l);
+	bool odd = gb->cpu.f & FLAG_C;
+	gb->cpu.a = alu_add(gb, gb->cpu.l, 0xb0);
+	gb->cpu.l = gb->cpu.a;
+	gb->cpu.a = rd8(gb, REG_HL(gb));
+	if (!odd)
+		gb->cpu.a = alu_swap(gb, gb->cpu.a);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, 0x0f);
+}

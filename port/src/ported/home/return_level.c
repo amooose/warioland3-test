@@ -15,3 +15,10 @@ PORT(ReturnToMap)
 	wr8(gb, wTransitionParam, TRANSITION_RETURN_TO_MAP);
 	FARCALL(StartOverworldState);
 }
+
+PORT_JUMP(ReturnToMapFromLevel)
+{
+	SET_HL(gb, wDayNight);
+	wr8(gb, wDayNight, (uint8_t)(rd8(gb, wDayNight) | 0x80));
+	JUMP(ReturnToMap); // fallthrough
+}
