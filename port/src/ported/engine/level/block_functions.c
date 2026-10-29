@@ -972,7 +972,28 @@ PORT_JUMP(DoughnutBlockCollision)
 	GOTO(SOLID);
 }
 
-PORT_JUMP(CrackedBlockWithColourCoinCollision)
+// The robo mouse breaks (Func_19423) or passes through cracked blocks.
+// Returns whether it jumped.
+static bool robo_mouse(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wBlockFuncSpecialCollision);
+	alu_cp(gb, gb->cpu.a, COLLISION_ROBO_MOUSE_BREAK);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP_TO(ADDR_Func_19423);
+		return true;
+	}
+	alu_cp(gb, gb->cpu.a, COLLISION_ROBO_MOUSE_FREE);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP_TO(FREE);
+		return true;
+	}
+	return false;
+}
+
+// CrackedBlockCollision / CrackedBlockWithColourCoinCollision: b = the block
+// that replaces it. Broken by an attack, a roll, a head smash (with the
+// helmet) or a ground pound, through break_func.
+static void cracked_block(GB *gb, uint16_t break_func)
 {
 	if (!ld_and(gb, wBlockFuncBreakFlag))
 		GOTO(SOLID);
@@ -992,6 +1013,94 @@ PORT_JUMP(CrackedBlockWithColourCoinCollision)
 	if (!brk)
 		GOTO(SOLID);
 	replace_block(gb, false);
-	gb_call(gb, ADDR_BreakBlockWithColourCoin); // same bank: whatever is mapped
+	gb_call(gb, break_func); // same bank: whatever is mapped
 	free_if_strong(gb);
 }
+
+PORT_JUMP(CrackedBlockWithColourCoinCollision) { cracked_block(gb, ADDR_BreakBlockWithColourCoin); }
+
+PORT_JUMP(CrackedBlockCollision)
+{
+	if (robo_mouse(gb))
+		return;
+	cracked_block(gb, ADDR_BreakBlock);
+}
+
+// Breaks with garlic and an attack, a roll, a head smash (with the helmet)
+// or a ground pound (with the super jump slam overalls), or as Fat Wario
+// with a ground pound
+PORT_JUMP(NonCrackedBlockCollision)
+{
+	if (robo_mouse(gb))
+		return;
+	if (!ld_and(gb, wBlockFuncBreakFlag))
+		GOTO(SOLID);
+	gb->cpu.a = rd8(gb, wTransformation);
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_FAT_WARIO);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = alu_and(gb, rd8(gb, wCollisionPoints), COLLISION_UNK1 | COLLISION_UNK6);
+		GOTO((gb->cpu.f & FLAG_Z) ? SOLID : ADDR_Func_18df1);
+	}
+	gb->cpu.a = rd8(gb, wPowerUpLevel);
+	alu_cp(gb, gb->cpu.a, GARLIC);
+	if (gb->cpu.f & FLAG_C)
+		GOTO(SOLID);
+	bool brk;
+	if (coll_bit(gb, COLLISION_UNK4_F)) {
+		brk = ld_and(gb, wAttackCounter) || ld_and(gb, wIsRolling);
+	} else if (coll_bit(gb, COLLISION_UNK5_F) || coll_bit(gb, COLLISION_UNK3_F)) {
+		gb->cpu.a = rd8(gb, wPowerUpLevel);
+		alu_cp(gb, gb->cpu.a, HEAD_SMASH_HELMET);
+		if (gb->cpu.f & FLAG_C)
+			GOTO(SOLID);
+		brk = ld_and(gb, wJumpVelTable) || ld_and(gb, wSwimVelIndex);
+	} else {
+		gb->cpu.a = alu_and(gb, gb->cpu.a, COLLISION_UNK1 | COLLISION_UNK6);
+		if (gb->cpu.f & FLAG_Z)
+			GOTO(SOLID);
+		gb->cpu.a = rd8(gb, wPowerUpLevel);
+		alu_cp(gb, gb->cpu.a, SUPER_JUMP_SLAM_OVERALLS);
+		brk = !(gb->cpu.f & FLAG_C);
+	}
+	GOTO(brk ? ADDR_Func_18df1 : SOLID);
+}
+
+// Broken by a thrown object
+PORT_JUMP(EnemyBlockCollision)
+{
+	gb->cpu.a = rd8(gb, wBlockFuncSpecialCollision);
+	alu_cp(gb, gb->cpu.a, COLLISION_THROWN_OBJ);
+	GOTO((gb->cpu.f & FLAG_Z) ? ADDR_Func_19423 : SOLID);
+}
+
+// Burnt by Hot Wario once engulfed in flames
+PORT_JUMP(BonfireBlockCollision)
+{
+	if (!wario_flag(gb))
+		GOTO(SOLID);
+	gb->cpu.a = rd8(gb, wTransformation);
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_HOT_WARIO);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = rd8(gb, wTransformationProgress);
+		alu_cp(gb, gb->cpu.a, 2);
+		if (!(gb->cpu.f & FLAG_C))
+			GOTO(ADDR_Func_19481); // engulfed in flames
+	}
+	GOTO(SOLID);
+}
+
+// ld b, block / jr CrackedBlockWithColourCoinCollision
+static void cracked_colour_coin(GB *gb, uint8_t block)
+{
+	gb->cpu.b = block;
+	JUMP_TO(ADDR_CrackedBlockWithColourCoinCollision);
+}
+
+PORT_JUMP(BlockFunc_CrackedBlockWithColourCoin_78) { cracked_colour_coin(gb, 0x78); }
+PORT_JUMP(BlockFunc_CrackedBlockWithColourCoin_79) { cracked_colour_coin(gb, 0x79); }
+PORT_JUMP(BlockFunc_CrackedBlockWithColourCoin_7a) { cracked_colour_coin(gb, 0x7a); }
+PORT_JUMP(BlockFunc_CrackedBlockWithColourCoin_7b) { cracked_colour_coin(gb, 0x7b); }
+PORT_JUMP(BlockFunc_CrackedBlockWithColourCoin_7c) { cracked_colour_coin(gb, 0x7c); }
+PORT_JUMP(Func_18a0f) { cracked_colour_coin(gb, 0x7d); }
+PORT_JUMP(BlockFunc_CrackedBlockWithColourCoin_7e) { cracked_colour_coin(gb, 0x7e); }
+PORT_JUMP(Func_18a17) { cracked_colour_coin(gb, 0x7f); } // fallthrough
