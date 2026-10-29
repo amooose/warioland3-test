@@ -1286,3 +1286,130 @@ PORT(HandleInvincibility)
 	gb->cpu.a = alu_xor(gb, rd8(gb, wInvisibleFrame), 0x1);
 	wr8(gb, wInvisibleFrame, gb->cpu.a);
 }
+
+PORT_JUMP(DoSoftLand)
+{
+	CALL(TriggerFloorTransition_SkipUpdateYPos);
+	xor_a(gb);
+	wr8(gb, wJumpVelIndex, 0);
+	wr8(gb, wJumpVelTable, 0);
+	if (ld_and(gb, wIsSmashAttacking)) {
+		ld_cp(gb, wPowerUpLevel, SUPER_JUMP_SLAM_OVERALLS);
+		if (CF)
+			LJUMP(DoGroundPound);
+		else
+			LJUMP(DoWarioGroundShake);
+		return;
+	}
+	gb->cpu.a = alu_and(gb, rd8(gb, wJoypadDown), PAD_DOWN);
+	if (gb->cpu.a) {
+		LJUMP(CrouchOrSlide);
+		return;
+	}
+	st(gb, wCollisionBoxTop, (uint8_t)-27);
+	FARCALL(CheckUpCollision);
+	if (b_and(gb)) {
+		LJUMP(CrouchOrSlide);
+		return;
+	}
+	gb->cpu.a = alu_and(gb, rd8(gb, wJoypadDown), PAD_RIGHT | PAD_LEFT);
+	if (gb->cpu.a)
+		LJUMP(SetState_Walking);
+	else
+		LJUMP(SetState_Idling);
+}
+
+PORT_JUMP(WalkRight)
+{
+	xor_a(gb);
+	wr8(gb, wIsTurning, 0);
+	if (!facing_right(gb)) {
+		st(gb, wDirection, DIRECTION_RIGHT);
+		st(gb, wIsTurning, TRUE);
+	}
+	LJUMP(WalkIfPossible_Right);
+}
+
+PORT_JUMP(WalkLeft)
+{
+	xor_a(gb);
+	wr8(gb, wIsTurning, 0);
+	if (facing_right(gb)) {
+		st(gb, wDirection, DIRECTION_LEFT);
+		st(gb, wIsTurning, TRUE);
+	}
+	LJUMP(WalkIfPossible_Left);
+}
+
+PORT_JUMP(DoBumpOrJumpingBump)
+{
+	play_sfx(gb, SFX_BUMP);
+	st(gb, wJumpVelIndex, ld_and(gb, wJumpVelTable) ? FALLING_JUMP_VEL_INDEX : 10);
+	LJUMP(SetState_Bumping);
+}
+
+PORT_JUMP(DoJumpingBump_NoSFX)
+{
+	st(gb, wJumpVelIndex, 10);
+	LJUMP(SetState_Bumping); // fallthrough
+}
+
+PORT_JUMP(UpdateState_Turning)
+{
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_A)) {
+		LJUMP(StartJump_FromInput);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, B_PAD_B)) {
+		LJUMP(SetState_Attacking);
+		return;
+	}
+	anim(gb, OAM1);
+	if (!anim_ended(gb)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = alu_and(gb, rd8(gb, wJoypadDown), PAD_RIGHT | PAD_LEFT);
+	if (gb->cpu.a)
+		LJUMP(SetState_Walking_ResetWalkVel);
+	else
+		LJUMP(SetState_Idling);
+}
+
+PORT_JUMP(Func_1eb46)
+{
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_A)) {
+		LJUMP(Func_1ec19);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, B_PAD_B)) {
+		LJUMP(Func_1ec4b);
+		return;
+	}
+	if (!ld_bit(gb, wJoypadDown, B_PAD_DOWN)) {
+		st(gb, wCollisionBoxTop, (uint8_t)-27);
+		FARCALL(CheckUpCollision);
+		ld_cp(gb, wWarioState, WST_CROUCHING);
+		if (!ZF) {
+			RET();
+			return;
+		}
+		if (!b_and(gb)) {
+			LJUMP(SetState_Idling);
+			return;
+		}
+	}
+	st(gb, wCollisionBoxTop, (uint8_t)-15);
+	gb->cpu.a = alu_and(gb, rd8(gb, wJoypadDown), PAD_RIGHT | PAD_LEFT);
+	if (!gb->cpu.a) {
+		RET();
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, B_PAD_RIGHT))
+		st(gb, wDirection, DIRECTION_RIGHT);
+	else
+		st(gb, wDirection, DIRECTION_LEFT);
+	LJUMP(SetState_CrouchWalking);
+}

@@ -1620,3 +1620,15 @@ PORT(SetState_BouncyStart)
 	gb->cpu.b = 2;
 	CALL(MoveWarioRight);
 }
+
+PORT(UpdateState_TurningInvisible)
+{
+	anim(gb, OAM1);
+	if (!anim_ended(gb))
+		return;
+	xor_a(gb);
+	wr8(gb, wIsIntangible, 0);
+	st(gb, wTransformation, TRANSFORMATION_INVISIBLE_WARIO);
+	CALL(UpdateLevelMusic);
+	FARCALL(SetState_Idling);
+}

@@ -648,3 +648,13 @@ PORT(SetState_Stung)
 	frameset_by_dir(gb, ADDR_Frameset_15f7f, ADDR_Frameset_15f70);
 	anim(gb, OAM1);
 }
+
+PORT_JUMP(Func_206eb)
+{
+	ld_cp(gb, wTransformation, TRANSFORMATION_OWL_WARIO);
+	if (ZF)
+		CALL(ReleaseOwl);
+	CALL(ClearTransformationValues);
+	CALL(UpdateLevelMusic);
+	LJUMP(SetState_Stung); // fallthrough
+}
