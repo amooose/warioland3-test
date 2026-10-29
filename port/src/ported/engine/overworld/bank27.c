@@ -1066,3 +1066,130 @@ PORT_LOCAL_JUMP(Cutscene03Func, Func_9d00a)
 	play_sfx(gb, SFX_10C);
 	JUMP_TO(ADDR_AdvanceCutsceneFunc);
 }
+
+// --- Cutscene 04 and small helpers ---
+
+PORT_JUMP(InitCutscene04)
+{
+	gb->cpu.b = BANK_Pals_b8200;
+	SET_HL(gb, ADDR_Pals_b8200);
+	CALL(LoadFarPalsToTempPals1);
+	gb->cpu.b = BANK_Pals_b8ec0;
+	SET_HL(gb, ADDR_Pals_b8ec0);
+	CALL(LoadFarPalsToTempPals2);
+	gb_call(gb, ADDR_LoadCutscenes8Gfx_Vram0);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps01);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps02);
+}
+
+PORT(LoadCutsceneBGMaps03)
+{
+	load_cutscene_bg_maps(gb, ADDR_Cutscene03Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene03Tilemap, ADDR_LoadCutsceneTilemap0);
+}
+
+PORT_JUMP(SetBGPriorityOnTopRows_Vram1)
+{
+	gb->cpu.d = BG_BANK1 | BG_PRIO;
+	JUMP_TO(ADDR_SetBGPriorityOnTopRows);
+}
+
+PORT_JUMP(SetBGPriorityOnTopRows_Vram0)
+{
+	gb->cpu.d = BG_BANK0 | BG_PRIO;
+	JUMP_TO(ADDR_SetBGPriorityOnTopRows); // fallthrough
+}
+
+PORT(Func_9cd9d) { FARCALL(Func_850b9); }
+PORT(Func_9cdad) { FARCALL(Func_850ff); }
+PORT(Func_9cdbd) { FARCALL(Func_84fff); }
+
+PORT_JUMP(Cutscene04Func)
+{
+	gb_call(gb, ADDR_Cutscene04Func + 0x6); // .Func_9db09
+	JUMP_TO(ADDR_Func_9f3cd);
+}
+
+PORT_LOCAL_JUMP(Cutscene04Func, Func_9db09)
+{
+	gb->cpu.a = rd8(gb, w2d013);
+	JUMP_TO(jumptable(gb, ADDR_Cutscene04Func + 0xa));
+}
+
+// bc = frame counter
+PORT_LOCAL_JUMP(Cutscene04Func, Func_9db1b)
+{
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	alu_cp(gb, gb->cpu.a, 0x14);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	place_scene_obj(gb, wSceneObj2YCoord, 128, 80, 0x02, wSceneObj2State);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+// dec [hl] / ld a, [hl]
+static void dec_hl_ld_a(GB *gb)
+{
+	uint16_t hl = REG_HL(gb);
+	wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+	gb->cpu.a = rd8(gb, hl);
+}
+
+PORT_LOCAL_JUMP(Cutscene04Func, Func_9db32)
+{
+	SET_HL(gb, wSceneObj2);
+	dec_hl_ld_a(gb); // call .Func_9db43
+	alu_cp(gb, gb->cpu.a, 0x70);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP_TO(ADDR_Func_9ce1f);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x4a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL(Cutscene04Func, Func_9db43) { dec_hl_ld_a(gb); }
+
+// bc = frame counter
+PORT_LOCAL_JUMP(Cutscene04Func, Func_9db46)
+{
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	alu_cp(gb, gb->cpu.a, 0x32);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	place_scene_obj(gb, wSceneObj3YCoord, 128, 80, 0x03, wSceneObj3State);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene04Func, Func_9db5d)
+{
+	SET_HL(gb, wSceneObj3);
+	dec_hl_ld_a(gb); // call .Func_9db43
+	alu_cp(gb, gb->cpu.a, 0x4a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	play_sfx(gb, SFX_113);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
+
+PORT_LOCAL_JUMP(Cutscene04Func, Func_9db71)
+{
+	gb->cpu.a = 0x01;
+	SET_HL(gb, wSceneObj2State);
+	CALL(SetSceneObjState);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSceneObj3State, 0);
+	gb->cpu.a = 0x08;
+	wr8(gb, wCollectionRow, 0x08);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}

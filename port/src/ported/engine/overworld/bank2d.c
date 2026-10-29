@@ -1034,3 +1034,273 @@ PORT_JUMP(Func_b4474)
 	wr8(gb, wSceneObj6YCoord, alu_inc(gb, rd8(gb, wSceneObj6YCoord)));
 	RET();
 }
+
+// --- WOWFunc_ClearTornado and the OW scene helpers ---
+
+PORT_JUMP(WOWFunc_ClearTornado)
+{
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, ADDR_WOWFunc_ClearTornado + 4));
+}
+
+PORT_LOCAL_JUMP(WOWFunc_ClearTornado, Wait1)
+{
+	gb->cpu.a = 20;
+	JUMP_TO(ADDR_WaitOWFunc);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_ClearTornado, ShowTornado)
+{
+	gb_call(gb, ADDR_UpdateOWTornado);
+	gb->cpu.a = rd8(gb, wSceneObj1Unk7);
+	alu_cp(gb, gb->cpu.a, 0x01);
+	if (gb->cpu.f & FLAG_Z) {
+		play_sfx(gb, SFX_11D);
+		RET();
+		return;
+	}
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_ClearTornado, ClearTornado)
+{
+	SET_DE(gb, ADDR_Data_b6478);
+	SET_HL(gb, wSceneObj1);
+	CALL(ApplyOWMovement);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_ClearTornado, HideTornado)
+{
+	gb->cpu.a = 0x00;
+	SET_HL(gb, wSceneObj1State);
+	CALL(SetSceneObjState);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+PORT_JUMP(LoadOWSceneLevelName)
+{
+	gb->cpu.a = rd8(gb, wCurMapSide);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0x00;
+	uint16_t hl = alu_add16(gb, ADDR_LoadOWSceneLevelName + 0x25, REG_DE(gb)); // .MapSidePointers
+	gb->cpu.a = rd8(gb, hl);
+	hl++;
+	gb->cpu.h = rd8(gb, hl);
+	gb->cpu.l = gb->cpu.a;
+	gb->cpu.a = rd8(gb, wOWSceneActionParam);
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	hl = alu_add16(gb, REG_HL(gb), REG_DE(gb));
+	SET_HL(gb, hl);
+	gb->cpu.d = rd8(gb, hl);
+	gb->cpu.a = alu_and(gb, gb->cpu.b, gb->cpu.b);
+	if (!(gb->cpu.f & FLAG_Z))
+		gb->cpu.d = alu_dec(gb, gb->cpu.d);
+	CALL(LoadLevelName);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wPalConfig1TotalSteps, 0);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+PORT_JUMP(WaitOWSceneLevelNameFadeIn)
+{
+	FARCALL(FadeInLevelName);
+	uint8_t c = gb->cpu.c;
+	gb->cpu.c = alu_srl(gb, c);
+	if (c & 1) {
+		RET(); // not done
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+PORT_JUMP(WaitOWScene16Frames)
+{
+	gb->cpu.a = 16;
+	JUMP_TO(ADDR_WaitOWFunc);
+}
+
+PORT_JUMP(Func_b5868)
+{
+	gb->cpu.a = TRUE;
+	wr8(gb, wOWPendingTileUpdate, TRUE);
+	JUMP_TO(ADDR_Func_b586d); // fallthrough
+}
+
+PORT(Func_b587d) { FARCALL(Func_8518c); }
+PORT(Func_b588d) { FARCALL(Func_85145); }
+
+PORT(GetSceneFallingYOffset)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = rd8(gb, hl);
+	alu_cp(gb, gb->cpu.a, 100); // .yoffsets_end - .yoffsets
+	if (!(gb->cpu.f & FLAG_C)) {
+		gb->cpu.a = 100 - 4;
+		wr8(gb, hl, gb->cpu.a);
+	}
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0x00;
+	hl = alu_add16(gb, ADDR_GetSceneFallingYOffset + 0x11, REG_DE(gb)); // .yoffsets
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+}
+
+PORT_JUMP(Func_b4e5b)
+{
+	gb_call(gb, ADDR_Func_b4a0d);
+	if (gb->cpu.f & FLAG_Z)
+		JUMP_TO(ADDR_Func_b4e04);
+	else
+		JUMP_TO(ADDR_Func_b4e50);
+}
+
+PORT_JUMP(Func_b4e65)
+{
+	SET_DE(gb, ADDR_OAM_a8f57);
+	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
+}
+
+PORT_JUMP(Func_b4c5a)
+{
+	SET_DE(gb, ADDR_OAM_a980c);
+	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
+}
+
+PORT_JUMP(Func_b4da3)
+{
+	SET_DE(gb, ADDR_OAM_a9161);
+	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
+}
+
+PORT(Func_b4dd4) { play_sfx(gb, SFX_12F); }
+
+PORT(Func_b4873) {}
+
+PORT_JUMP(Func_b4874)
+{
+	SET_HL(gb, ADDR_Func_b4874 + 0xb); // .pal
+	SET_DE(gb, wTempPals1 + 4 * PAL_SIZE);
+	gb->cpu.b = 1 * PAL_SIZE;
+	JUMP(CopyHLToDE);
+}
+
+// sets the priority bit of b bytes
+// starting from hl in BGMap
+PORT(SetBGMapBytesPriority)
+{
+	uint16_t hl = REG_HL(gb);
+	do {
+		wr8(gb, hl, rd8(gb, hl) | BG_PRIO);
+		hl++;
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (!(gb->cpu.f & FLAG_Z));
+	SET_HL(gb, hl);
+}
+
+// decompress_tiles0: ld a, BANK(gfx) / ld [wTempBank], a / ld hl, gfx /
+// ld bc, dest / ld a, [wTempBank] / ldh [hCallFuncBank], a / hcall Decompress
+static void decompress_tiles0(GB *gb, uint8_t bank, uint16_t gfx, uint16_t dest)
+{
+	gb->cpu.a = bank;
+	wr8(gb, wTempBank, bank);
+	SET_HL(gb, gfx);
+	SET_BC(gb, dest);
+	gb->cpu.a = rd8(gb, wTempBank);
+	wr8(gb, hCallFuncBank, gb->cpu.a);
+	HCALL(Decompress);
+}
+
+PORT(LoadOverworld3Gfx) { decompress_tiles0(gb, BANK_Overworld3Gfx, ADDR_Overworld3Gfx, v0Tiles0 + 0x00 * TILE_SIZE); }
+PORT(LoadOverworld4Gfx) { decompress_tiles0(gb, BANK_Overworld4Gfx, ADDR_Overworld4Gfx, v0Tiles0 + 0x00 * TILE_SIZE); }
+PORT(LoadOverworldRocksGfx) { decompress_tiles0(gb, BANK_OverworldRocksGfx, ADDR_OverworldRocksGfx, v0Tiles0 + 0x58 * TILE_SIZE); }
+PORT(LoadOverworldTowerGfx) { decompress_tiles0(gb, BANK_OverworldTowerGfx, ADDR_OverworldTowerGfx, v0Tiles0 + 0x60 * TILE_SIZE); }
+PORT(LoadOverworldFanGfx) { decompress_tiles0(gb, BANK_OverworldFanGfx, ADDR_OverworldFanGfx, v0Tiles0 + 0x60 * TILE_SIZE); }
+PORT(LoadOverworldExplosion1Gfx) { decompress_tiles0(gb, BANK_OverworldExplosion1Gfx, ADDR_OverworldExplosion1Gfx, v0Tiles0 + 0x00 * TILE_SIZE); }
+PORT(LoadOverworldThunderGfx) { decompress_tiles0(gb, BANK_OverworldThunderGfx, ADDR_OverworldThunderGfx, v0Tiles0 + 0x00 * TILE_SIZE); }
+PORT(LoadOverworldExplosion2Gfx) { decompress_tiles0(gb, BANK_OverworldExplosion2Gfx, ADDR_OverworldExplosion2Gfx, v0Tiles0 + 0x00 * TILE_SIZE); }
+PORT(LoadOverworldTorchGfx) { decompress_tiles0(gb, BANK_OverworldTorchGfx, ADDR_OverworldTorchGfx, v0Tiles0 + 0x40 * TILE_SIZE); }
+PORT(LoadOverworldFireGfx) { decompress_tiles0(gb, BANK_OverworldFireGfx, ADDR_OverworldFireGfx, v0Tiles0 + 0x00 * TILE_SIZE); }
+PORT(LoadOverworldExplosion3Gfx) { decompress_tiles0(gb, BANK_OverworldExplosion3Gfx, ADDR_OverworldExplosion3Gfx, v0Tiles0 + 0x00 * TILE_SIZE); }
+PORT(LoadOverworldSmokeGfx) { decompress_tiles0(gb, BANK_OverworldSmokeGfx, ADDR_OverworldSmokeGfx, v0Tiles0 + 0x32 * TILE_SIZE); }
+
+// --- more scene object animation states ---
+
+PORT(Func_b4f58)
+{
+	uint16_t hl = wTempPals1 + 5 * PAL_SIZE;
+	gb->cpu.a = rd8(gb, wSceneObj11Frame);
+	alu_cp(gb, gb->cpu.a, 0x57);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		gb->cpu.a = rd8(gb, wSceneObj11State);
+		gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (!(gb->cpu.f & FLAG_Z))
+			hl = ADDR_Func_b4f58 + 0x22; // .pal
+	}
+	SET_HL(gb, hl);
+	SET_DE(gb, wTempBGPals + 5 * PAL_SIZE);
+	gb->cpu.b = 1 * PAL_SIZE;
+	CALL(CopyHLToDE);
+	SET_HL(gb, wPalConfig1);
+	gb->cpu.a = (uint8_t)rBGPI;
+	wr8(gb, wPalConfig1, gb->cpu.a);
+}
+
+PORT_JUMP(Func_b50e1)
+{
+	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
+	SET_DE(gb, ADDR_OAM_aa580);
+	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
+}
+
+PORT_JUMP(Func_b50ea)
+{
+	SET_DE(gb, ADDR_Frameset_aa252);
+	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
+	SET_DE(gb, ADDR_OAM_aa0cf);
+	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
+}
+
+PORT_JUMP(Func_b5114)
+{
+	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
+	SET_DE(gb, ADDR_OAM_a9fe2); // .asm_b5117
+	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
+}
+
+PORT_JUMP(Func_b50fb) { anim_b_jump(gb, ADDR_Frameset_aa0c1, 0x27, ADDR_Func_b5114 + 0xe); } // .asm_b5122
+PORT_JUMP(Func_b510a) { anim_b_jump(gb, ADDR_Frameset_aa0bc, 0x25, ADDR_Func_b5114 + 0xe); } // .asm_b5122
+
+PORT_JUMP(Func_b5136)
+{
+	SET_DE(gb, ADDR_Frameset_a883b);
+	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
+	gb->cpu.b = 0x00;
+	gb_call(gb, ADDR_Func_b4a0d);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP_TO(ADDR_Func_b4fab);
+		return;
+	}
+	SET_DE(gb, ADDR_OAM_a87fa);
+	JUMP_TO(ADDR_LoadCurSceneObjSprite);
+}
+
+PORT_JUMP(Func_b5027) { anim_b_jump(gb, ADDR_Frameset_a8639, 0x09, ADDR_Func_b508a); }
+PORT_JUMP(Func_b5036) { anim_b_jump(gb, ADDR_Frameset_a8646, 0x0b, ADDR_Func_b508a); }
+PORT_JUMP(Func_b5045) { anim_b_jump(gb, ADDR_Frameset_a867f, 0x0e, ADDR_Func_b508a); }
+PORT_JUMP(Func_b504f) { anim_b_jump(gb, ADDR_Frameset_a86da, 0x0e, ADDR_Func_b508a); }
+PORT_JUMP(Func_b50b6) { anim_b_jump(gb, ADDR_Frameset_a873d, 0x0e, ADDR_Func_b508a); }
+PORT_JUMP(Func_b50c0) { anim_b_jump(gb, ADDR_Frameset_a87d2, 0x20, ADDR_Func_b508a); }
