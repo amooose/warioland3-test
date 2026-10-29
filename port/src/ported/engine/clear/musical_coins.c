@@ -151,3 +151,63 @@ PORT_JUMP(ExitClearScreen)
 	FARCALL(Func_4628);
 	RET();
 }
+
+PORT(InitMusicalCoinScreen)
+{
+	CALL(DisableLCD);
+	CALL(ClearBGMap0);
+	CALL(ClearVirtualOAM);
+
+	gb_call(gb, ADDR_Func_d464e);
+	gb_call(gb, ADDR_Func_d465b);
+	gb_call(gb, ADDR_Func_d4668);
+	gb_call(gb, ADDR_Func_d47f1);
+
+	gb->cpu.a = 0xff;
+	wr8(gb, wAllMusicalCoinsLevel, 0xff);
+	gb->cpu.a = rd8(gb, wNumMusicalCoins);
+	alu_cp(gb, gb->cpu.a, NUM_LEVEL_MUSICAL_COINS);
+	if (gb->cpu.f & FLAG_Z)
+		gb_call(gb, ADDR_SetMusicalCoinFlag);
+
+	gb_call(gb, ADDR_VBlank_MusicalCoinsScreen);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSCX, 0);
+	wr8(gb, rSCX, 0);
+	wr8(gb, wSCY, 0);
+	wr8(gb, rSCY, 0);
+
+	wr8(gb, wMenuObj3 + 0, 0x38); // y
+	wr8(gb, wMenuObj3 + 1, 0x40); // x
+	for (int i = 2; i < 6; i++)
+		wr8(gb, wMenuObj3 + i, 0);
+	wr8(gb, wMenuObj3 + 6, ADDR_Frameset_1f1cd4 >> 8);
+	gb->cpu.a = ADDR_Frameset_1f1cd4 & 0xff;
+	wr8(gb, wMenuObj3 + 7, gb->cpu.a);
+	SET_HL(gb, wMenuObj3 + 7);
+	FARCALL_BANK(0x7c, UpdateObjAnim);
+	SET_HL(gb, wMenuObj3);
+	FARCALL(LoadPauseMenuSprite);
+
+	gb->cpu.a = 8;
+	wr8(gb, wAnimatedTilesFrameDuration, 8);
+	gb->cpu.a = ANIMATED_TILES_GFX_15;
+	wr8(gb, wAnimatedTilesGfx, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wAnimatedTilesFrameCount, 0);
+	wr8(gb, wAnimatedTilesFrame, 0);
+	gb->cpu.a = alu_inc(gb, gb->cpu.a); // TRUE
+	wr8(gb, wRoomAnimatedTilesEnabled, gb->cpu.a);
+	gb->cpu.a = LCDC_DEFAULT;
+	wr8(gb, rLCDC, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wMusicalCoinVisualCounter, 0);
+	gb->cpu.a = 60;
+	wr8(gb, wTimer, 60);
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}

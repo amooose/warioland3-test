@@ -394,3 +394,134 @@ PORT_JUMP(EndIntroSequence)
 	}
 	JUMP_TO(ADDR_StartTitleScreen);
 }
+
+// ld hl, obj / y, x, xor a, 4 zeros, then the frameset pointer
+// (big-endian); hl ends on the frameset pointer's low byte
+static void init_intro_obj(GB *gb, uint16_t obj, uint8_t y, uint8_t x, uint16_t fs)
+{
+	wr8(gb, obj + 0, y);
+	gb->cpu.a = x;
+	wr8(gb, obj + 1, x);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	for (int i = 2; i < 6; i++)
+		wr8(gb, obj + i, 0);
+	wr8(gb, obj + 6, (uint8_t)(fs >> 8));
+	gb->cpu.a = (uint8_t)fs;
+	wr8(gb, obj + 7, gb->cpu.a);
+	SET_HL(gb, obj + 7);
+}
+
+// the plane: init_intro_obj, then xor a / ld [hld], a (state) / ld [wSFXTimer], a
+static void init_plane(GB *gb, uint8_t y, uint8_t x, uint16_t fs)
+{
+	init_intro_obj(gb, wPlaneWario, y, x, fs);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wPlaneWario + 8, 0); // state
+	wr8(gb, wSFXTimer, 0);
+}
+
+PORT(InitIntroSequence)
+{
+	CALL(DisableLCD);
+	CALL(FillBGMap0_With7f);
+	CALL(ClearVirtualOAM);
+	gb_call(gb, ADDR_LoadTitleScreenPals);
+	gb_call(gb, ADDR_LoadTitleScreenTiles);
+	gb_call(gb, ADDR_LoadTitleScreenTileMap);
+	gb_call(gb, ADDR_VBlank_Title);
+
+	gb->cpu.a = 0x04;
+	wr8(gb, wSCY, 0x04);
+	wr8(gb, rSCY, 0x04);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSCX, 0);
+	wr8(gb, rSCX, 0);
+	gb->cpu.a = alu_and(gb, rd8(gb, wceef), rd8(gb, wceef));
+	if (!gb->cpu.a) {
+		init_plane(gb, 64, 208, ADDR_Frameset_712c);
+		CALL(UpdateObjAnim);
+		init_intro_obj(gb, wMenuObj1, 128, 80, ADDR_Frameset_6ce6);
+		CALL(UpdateObjAnim);
+		init_intro_obj(gb, wMenuObj4, 16, 0, ADDR_Frameset_71a1);
+		CALL(UpdateObjAnim);
+		init_intro_obj(gb, wMenuObj5, 8, 32, ADDR_Frameset_71a4);
+		CALL(UpdateObjAnim);
+		load_intro_sprite(gb, wMenuObj4);
+		load_intro_sprite(gb, wMenuObj5);
+		gb->cpu.a = STARTMENU_NEW_GAME;
+		wr8(gb, wStartMenuSelection, gb->cpu.a);
+	} else {
+		// .no_intro
+		init_plane(gb, 108, 128, ADDR_Frameset_7198);
+
+		// set priority flag to hide the menu options behind scenery
+		gb->cpu.a = BANK_v1Tiles0; // BANK("VRAM1")
+		wr8(gb, rVBK, gb->cpu.a);
+		uint16_t hl = v0BGMap0 + 12 * TILEMAP_WIDTH + 4;
+		SET_DE(gb, TILEMAP_WIDTH);
+		gb->cpu.c = 2;
+		do {
+			for (int row = 0; row < 2; row++) {
+				gb_push16(gb, hl);
+				gb->cpu.b = 11;
+				do {
+					gb->cpu.a = alu_or(gb, rd8(gb, hl), 0x80);
+					wr8(gb, hl++, gb->cpu.a);
+					gb->cpu.b = alu_dec(gb, gb->cpu.b);
+				} while (gb->cpu.b);
+				hl = gb_pop16(gb);
+				hl = alu_add16(gb, hl, REG_DE(gb));
+			}
+			hl = alu_add16(gb, hl, REG_DE(gb));
+			hl = alu_add16(gb, hl, REG_DE(gb));
+			gb->cpu.c = alu_dec(gb, gb->cpu.c);
+		} while (gb->cpu.c);
+
+		// get darker tone behind menu options
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a (VRAM0)
+		wr8(gb, rVBK, 0);
+		SET_HL(gb, ADDR_TitleScreenBoxTilemap);
+		SET_DE(gb, v0BGMap0 + 14 * TILEMAP_WIDTH + 4);
+		gb_push16(gb, REG_DE(gb));
+		gb->cpu.b = 12;
+		CALL(CopyHLToDE);
+		SET_DE(gb, gb_pop16(gb));
+		gb->cpu.e = gb->cpu.a = alu_add(gb, gb->cpu.e, TILEMAP_WIDTH);
+		gb->cpu.d = gb->cpu.a = alu_adc(gb, gb->cpu.d, 0);
+		gb->cpu.b = 12;
+		CALL(CopyHLToDE);
+
+		gb->cpu.a = rd8(gb, wGameModeFlags);
+		bool ta = alu_bit(gb, gb->cpu.a, MODE_TIME_ATTACK_F);
+		init_intro_obj(gb, wMenuObj1, 0x82, 0x50, ta ? ADDR_Frameset_6d1e : ADDR_Frameset_6ce9);
+		// (the flags are those of the bit test)
+		gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_C) | FLAG_H | (ta ? 0 : FLAG_Z));
+		CALL(UpdateObjAnim);
+
+		wr8(gb, wMenuObj2 + 0, 0x86); // y
+		gb->cpu.a = rd8(gb, wGameModeFlags);
+		ta = alu_bit(gb, gb->cpu.a, MODE_TIME_ATTACK_F);
+		init_intro_obj(gb, wMenuObj2, 0x86, ta ? 0x40 : 0x44, ADDR_Frameset_6d1b);
+		CALL(UpdateObjAnim);
+
+		gb->cpu.a = STARTMENU_CONTINUE;
+		wr8(gb, wStartMenuSelection, gb->cpu.a);
+	}
+
+	// .asm_41a8
+	init_intro_obj(gb, wMenuObj3, 36, 104, ADDR_Frameset_6d18);
+	CALL(UpdateObjAnim);
+
+	gb->cpu.a = LCDC_DEFAULT;
+	wr8(gb, rLCDC, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wTimer, 0);
+	wr8(gb, wGlobalCounter, 0);
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}
