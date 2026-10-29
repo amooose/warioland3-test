@@ -658,3 +658,153 @@ PORT_JUMP(Func_206eb)
 	CALL(UpdateLevelMusic);
 	LJUMP(SetState_Stung); // fallthrough
 }
+
+PORT_JUMP(Func_207ed)
+{
+	if (ld_and(gb, wInvincibleCounter) || !ld_and(gb, wWaterInteraction)) {
+		RET();
+		return;
+	}
+	if (ld_and(gb, wStingTouchState)) {
+		alu_cp(gb, gb->cpu.a, TOUCH_BUMP);
+		if (ZF) {
+			JUMP_TO(ADDR_Func_208f2 + 0x08); // Func_208f2.start
+			return;
+		}
+		alu_cp(gb, gb->cpu.a, TOUCH_VANISH);
+		if (ZF) {
+			LJUMP(Func_2092d);
+			return;
+		}
+		RET();
+		return;
+	}
+	gb->cpu.b = OBJACTION_06;
+	gb_call(gb, ADDR_SetObjAction);
+	LJUMP(SetState_WaterStung); // fallthrough
+}
+
+// stop_sfx
+static void stop_sfx(GB *gb)
+{
+	wr8(gb, hSFXID + 0, 0xff);
+	gb->cpu.a = 0x00;
+	wr8(gb, hSFXID + 1, 0x00);
+}
+
+// the shared body of ObjInteraction_WaterTeleporting/Jamano
+static void teleport(GB *gb, uint16_t stung, uint8_t state)
+{
+	st(gb, wRoomTransitionParam, ROOMTRANSITION_TELEPORT | ROOMTRANSITIONF_DOOR | ROOMTRANSITIONF_RELOAD_OBJECTS | ROOMTRANSITIONF_DELAY);
+	gb_call(gb, stung);
+	stop_sfx(gb);
+	st(gb, wWarioState, state);
+	gb->cpu.b = OBJACTION_TELEPORT;
+	LJUMP(SetObjAction);
+}
+
+PORT_JUMP(ObjInteraction_WaterTeleporting) { teleport(gb, ADDR_SetState_WaterStung, WST_WATER_TELEPORTING); }
+PORT_JUMP(ObjInteraction_Jamano) { teleport(gb, ADDR_Func_206eb, WST_TELEPORTING); }
+
+PORT_JUMP(Func_21e8a)
+{
+	FARCALL(SetState_BallShot);
+	LJUMP(Func_21cc9);
+}
+
+PORT_JUMP(Func_20d81)
+{
+	if (ld_mask(gb, wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
+		LJUMP(Func_20899);
+		return;
+	}
+	LJUMP(Func_208f2);
+}
+
+PORT(Func_2168b)
+{
+	ld_cp(gb, wWarioState, WST_FLAT_SQUISHED);
+	if (ZF) {
+		FARCALL(SetState_FlatSquishedLifting);
+		return;
+	}
+	ld_cp(gb, wc1c2, 0x10);
+	if (!CF)
+		gb->cpu.a = 0x0c;
+	gb->cpu.b = gb->cpu.a;
+	CALL(MoveWarioDown);
+	FARCALL(Func_19b25);
+	if (ld_and(gb, wWaterInteraction)) {
+		FARCALL(DiveFromSurface_SkipSplash);
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	bool ground = b_and(gb);
+	if (ground)
+		update_pos_y(gb);
+	ld_cp(gb, wInvincibleCounter, 0x01);
+	if (ZF)
+		return;
+	ld_cp(gb, wTransformation, TRANSFORMATION_FLAT_WARIO);
+	if (ZF) {
+		if (!ground) {
+			FARCALL(SetState_FlatFalling);
+			return;
+		}
+		ld_cp(gb, wWarioState, WST_FLAT_SQUISHED);
+		if (ZF)
+			return;
+		FARCALL(SetState_FlatIdling);
+		return;
+	}
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	if (ground) {
+		xor_a(gb);
+		wr8(gb, wGrabState, 0);
+		FARCALL(SetState_Idling);
+		return;
+	}
+	if (ld_and(gb, wIsCrouching)) {
+		FARCALL(StartCrouchFall);
+		return;
+	}
+	xor_a(gb);
+	wr8(gb, wGrabState, 0);
+	FARCALL(StartFall);
+}
+
+PORT_JUMP(ObjInteraction_Snow)
+{
+	if (ld_and(gb, wInvincibleCounter) || ld_bit(gb, wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
+		LJUMP(Func_20a69);
+		return;
+	}
+	LCALL(Func_20a63);
+	st(gb, wTransformation, TRANSFORMATION_SNOWMAN_WARIO);
+	xor_a(gb);
+	wr8(gb, wTransformationProgress, 0);
+	touch_states(gb, TOUCH_ATTACK, 0x02);
+	FARCALL(SetState_TurningIntoSnowman);
+	RET();
+}
+
+PORT(ObjInteraction_Ice)
+{
+	if (ld_and(gb, wInvincibleCounter) || ld_bit(gb, wTransformation, TRANSFORMATIONF_PERSISTENT_F))
+		return;
+	if (ld_and(gb, wIsCrouching)) {
+		st(gb, wCollisionBoxTop, (uint8_t)-27);
+		FARCALL(CheckUpCollision);
+		if (b_and(gb)) {
+			st(gb, wCollisionBoxTop, (uint8_t)-15);
+			return;
+		}
+	}
+	gb->cpu.b = OBJACTION_07;
+	LCALL(SetObjAction);
+	play_sfx(gb, SFX_028);
+	st(gb, wTransformation, TRANSFORMATION_ICE_SKATIN);
+	touch_states(gb, TOUCH_ATTACK, 0x02);
+	FARCALL(SetState_IceSkatinStart);
+}

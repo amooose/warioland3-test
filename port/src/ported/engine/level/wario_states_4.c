@@ -696,3 +696,336 @@ PORT_JUMP(TurnIntoSmallSnowball)
 	anim(gb, OAM2);
 	LJUMP(SetState_SnowballRolling);
 }
+
+PORT_JUMP(Func_1ec215)
+{
+	gb->cpu.b = 3;
+	if (facing_right(gb))
+		CALL(MoveWarioLeft);
+	else
+		CALL(MoveWarioRight);
+	LJUMP(SetState_IceSkatinCrash);
+}
+
+PORT_JUMP(HandleSnowmanInput)
+{
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		LJUMP(SetState_SnowmanAirborne_Jump);
+		return;
+	}
+	if (ld_mask(gb, wJoypadDown, PAD_RIGHT | PAD_LEFT)) {
+		LJUMP(SetState_SnowmanWalking);
+		return;
+	}
+	RET();
+}
+
+PORT_JUMP(Func_1ede96)
+{
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		LJUMP(SetState_SnowmanAirborne_Jump);
+		return;
+	}
+	gb->cpu.a = rd8(gb, wJoypadDown);
+	bool turn;
+	if (alu_bit(gb, gb->cpu.a, B_PAD_RIGHT)) {
+		turn = !ld_and(gb, wDirection);
+		if (!turn)
+			FARCALL(WalkIfPossible_Right);
+		else
+			st(gb, wDirection, DIRECTION_RIGHT);
+	} else if (alu_bit(gb, gb->cpu.a, B_PAD_LEFT)) {
+		ld_cp(gb, wDirection, DIRECTION_LEFT);
+		turn = !ZF;
+		if (!turn)
+			FARCALL(WalkIfPossible_Left);
+		else
+			st(gb, wDirection, DIRECTION_LEFT);
+	} else {
+		LJUMP(SetState_SnowmanIdle);
+		return;
+	}
+	if (turn) {
+		LJUMP(SetState_SnowmanTurning);
+		return;
+	}
+	ld_cp(gb, wWalkVelIndex, 0x08);
+	if (!CF)
+		st(gb, wWalkVelIndex, 0x04);
+	RET();
+}
+
+PORT_JUMP(Func_1edf47)
+{
+	bool right = facing_right(gb);
+	gb->cpu.a = rd8(gb, wJoypadDown);
+	if (alu_bit(gb, gb->cpu.a, right ? B_PAD_LEFT : B_PAD_RIGHT)) {
+		LJUMP(SetState_FanTurning);
+		return;
+	}
+	if (!alu_bit(gb, gb->cpu.a, right ? B_PAD_RIGHT : B_PAD_LEFT)) {
+		RET();
+		return;
+	}
+	port_farcall(gb, right ? BANK_Func_19741 : BANK_Func_197b1, right ? ADDR_Func_19741 : ADDR_Func_197b1);
+	if (b_and(gb)) {
+		RET();
+		return;
+	}
+	gb->cpu.b = 1;
+	if (right)
+		CALL(MoveWarioRight);
+	else
+		CALL(MoveWarioLeft);
+	RET();
+}
+
+PORT_JUMP(UpdateState_MagicStopping)
+{
+	gb->cpu.a = inc_counter(gb);
+	alu_cp(gb, gb->cpu.a, 0x20);
+	if (CF) {
+		RET();
+		return;
+	}
+	JUMP(RecoverFromTransformation); // fallthrough to UpdateState_MagicRecovering
+}
+
+// UpdateWarioAnimation in OAM bank `bank`, then true once it has ended
+// (ret z otherwise)
+static bool anim_and_ended(GB *gb, uint8_t bank)
+{
+	anim(gb, bank);
+	if (!anim_ended(gb)) {
+		RET();
+		return false;
+	}
+	return true;
+}
+
+PORT_JUMP(UpdateState_SnowmanBumped)
+{
+	if (anim_and_ended(gb, OAM2))
+		LJUMP(SetState_SnowmanIdle);
+}
+
+PORT_JUMP(UpdateState_LaunchCrash)
+{
+	if (anim_and_ended(gb, OAM3)) {
+		FARCALL(Func_2ad6a);
+		RET();
+	}
+}
+
+PORT_JUMP(UpdateState_GrabbingOwl)
+{
+	if (!anim_and_ended(gb, OAM2))
+		return;
+	if (ld_mask(gb, wJoypadDown, PAD_CTRL_PAD)) {
+		LJUMP(HandleWarioOwlInput);
+		return;
+	}
+	LJUMP(UpdateWarioOwlDirection); // fallthrough
+}
+
+PORT_JUMP(UpdateState_BallStart)
+{
+	CALL(ApplyJumpVelocity);
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb)) {
+		RET();
+		return;
+	}
+	update_pos_y(gb);
+	LJUMP(Func_1edaca); // fallthrough
+}
+
+PORT_JUMP(UpdateStart_FanTurning)
+{
+	LCALL(Func_1edf2b);
+	ld_cp(gb, wWarioState, WST_FAN_TURNING);
+	if (!ZF) {
+		RET();
+		return;
+	}
+	sfx_loop(gb, 0x0c, SFX_07D);
+	if (anim_and_ended(gb, OAM3))
+		LJUMP(SetState_FanLifting);
+}
+
+PORT_JUMP(UpdateState_Swallowed)
+{
+	if (ld_and(gb, wIsTurning)) {
+		xor_a(gb);
+		wr8(gb, wIsTurning, 0);
+		wr8(gb, wFrameDuration, 0);
+		wr8(gb, wAnimationFrame, 0);
+		set_frameset(gb, flip_dir_and(gb) ? ADDR_Frameset_1dc42c : ADDR_Frameset_1dc40f);
+	}
+	anim(gb, OAM3);
+	if (ld_and(gb, wAutoMoveState)) {
+		RET();
+		return;
+	}
+	st(gb, wDirection, DIRECTION_LEFT);
+	LJUMP(SetState_Launched); // fallthrough
+}
+
+PORT_JUMP(UpdateState_BallSentUpwards)
+{
+	anim(gb, OAM3);
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (CF) {
+		gb->cpu.b = 3;
+		CALL(MoveWarioUp);
+		FARCALL(CheckUpCollision);
+		if (!b_and(gb)) {
+			JUMP(HandleUpwardsFloorTransition);
+			return;
+		}
+		st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+		st(gb, wJumpVelTable, JUMP_VEL_NORMAL);
+		RET();
+		return;
+	}
+	CALL(ApplyJumpVelocity);
+	FARCALL(CheckAirborneCollision);
+	if (b_and(gb)) {
+		update_pos_y(gb);
+		xor_a(gb);
+		wr8(gb, wIsIntangible, 0);
+		wr8(gb, wJumpVelIndex, 0);
+		wr8(gb, wJumpVelTable, 0);
+		FARCALL(Func_206eb);
+	}
+	RET();
+}
+
+PORT(UpdateState_MagicRising)
+{
+	FARCALL(Func_19b25);
+	FARCALL(CheckUpCollision);
+	if (b_and(gb)) {
+		get_pos(gb);
+		gb->cpu.b = PARTICLE_MAGIC_STOP;
+		FARCALL(CreateParticle);
+		st(gb, wWarioState, WST_MAGIC_STOPPING);
+		xor_a(gb);
+		wr8(gb, wWarioStateCounter, 0);
+		wr8(gb, wFrameDuration, 0);
+		wr8(gb, wAnimationFrame, 0);
+		anim(gb, 0x77);
+		return;
+	}
+	sfx_loop(gb, 0x0c, SFX_07D);
+	anim(gb, 0x77);
+	gb->cpu.b = 1;
+	CALL(MoveWarioUp);
+	gb->cpu.a = alu_and(gb, rd8(gb, wCameraConfigFlags), CAM_SCROLLING_MASK);
+	alu_cp(gb, gb->cpu.a, CAM_TRANSITIONS);
+	if (CF)
+		return;
+	CALL(GetFloorForYPos);
+	gb->cpu.a = alu_sub(gb, rd8(gb, wFloor), gb->cpu.c);
+	if (CF)
+		CALL(StartUpwardsFloorTransition);
+}
+
+PORT_JUMP(UpdateState_Launched)
+{
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return;
+	}
+	sfx_loop(gb, 0x86, SFX_04C);
+	anim(gb, OAM3);
+	FARCALL(CheckFrontCollision);
+	if (!b_and(gb)) {
+		gb->cpu.b = 2;
+		move_by_dir(gb);
+		RET();
+		return;
+	}
+	play_sfx(gb, SFX_048);
+	st(gb, wWarioState, WST_LAUCH_CRASH);
+	reset_anim(gb);
+	frameset_by_dir(gb, ADDR_Frameset_1dc926, ADDR_Frameset_1dc90d);
+	anim(gb, OAM3);
+	RET();
+}
+
+PORT(UpdateState_BallThrown)
+{
+	anim(gb, OAM3);
+	CALL(ApplyJumpVelocity);
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (CF) {
+		gb->cpu.b = 3;
+		CALL(MoveWarioLeft);
+		return;
+	}
+	gb->cpu.b = 2;
+	CALL(MoveWarioLeft);
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb))
+		return;
+	update_pos_y(gb);
+	xor_a(gb);
+	wr8(gb, wIsIntangible, 0);
+	wr8(gb, wJumpVelIndex, 0);
+	wr8(gb, wJumpVelTable, 0);
+	// push_wram BANK(wShootGoals)
+	gb->cpu.a = rd8(gb, rWBK);
+	push_af(gb);
+	st(gb, rWBK, BANK_wShootGoals);
+	ld_cp(gb, wShootGoals, 3);
+	if (!ZF) {
+		pop_af(gb);
+		wr8(gb, rWBK, gb->cpu.a);
+		FARCALL(Func_206eb);
+		return;
+	}
+	pop_af(gb);
+	wr8(gb, rWBK, gb->cpu.a);
+	st(gb, wWarioState, WST_BALL_SENT_UPWARDS);
+	play_sfx(gb, SFX_066);
+	xor_a(gb);
+	wr8(gb, wSFXLoopCounter, 0);
+	wr8(gb, wWarioStateCounter, 0);
+	wr8(gb, wWarioStateCycles, 0);
+	wr8(gb, wJumpVelIndex, 0);
+	gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	wr8(gb, wIsIntangible, gb->cpu.a);
+	reset_anim(gb);
+	set_frameset(gb, ADDR_Frameset_1dd2ee);
+	anim(gb, OAM3);
+}
+
+PORT_JUMP(SetState_BallStart)
+{
+	CALL(UpdateLevelMusic);
+	collision_box(gb, -1, -20, -9, 9);
+	static const uint16_t clr[] = {
+		wGrabState, wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking, 0,
+	};
+	clear(gb, clr);
+	SET_HL(gb, ADDR_WarioBallPal);
+	CALL(SetWarioPal);
+	load_gfx(gb, BANK_WarioBallGfx, ADDR_WarioBallGfx);
+	set_oam(gb, BANK_OAM_1dcff1, ADDR_OAM_1dcff1);
+	if (!ld_and(gb, wJumpVelTable)) {
+		LJUMP(Func_1edaca);
+		return;
+	}
+	st(gb, wWarioState, WST_BALL_START);
+	xor_a(gb);
+	wr8(gb, wSFXLoopCounter, 0);
+	wr8(gb, wWarioStateCounter, 0);
+	wr8(gb, wWarioStateCycles, 0);
+	st(gb, wJumpVelIndex, 0x18);
+	reset_anim(gb);
+	set_frameset(gb, ADDR_Frameset_1dd313);
+	anim(gb, OAM3);
+	RET();
+}
