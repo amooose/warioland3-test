@@ -40,3 +40,12 @@ PORT(SetTileQueueProcessingFunctions)
 	wr8(gb, hl, gb->cpu.a);
 	SET_HL(gb, hl);
 }
+
+// Copies .Func (jp LevelVBlankFunc) to wVBlankFunc.
+PORT(VBlank_Level)
+{
+	SET_HL(gb, ADDR_VBlank_Level + 0x0c); // .Func
+	SET_DE(gb, wVBlankFunc);
+	gb->cpu.b = 0x03; // .end - .Func
+	CALL(CopyHLToDE);
+}

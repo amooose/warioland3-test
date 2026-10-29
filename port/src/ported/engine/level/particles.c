@@ -319,3 +319,47 @@ PORT(Func_ce3e)
 	gb->cpu.a = alu_adc(gb, rd8(gb, hXPosHi), 0x00);
 	wr8(gb, hXPosHi, gb->cpu.a);
 }
+
+// b = PARTICLE_* constant, hl = block
+PORT_JUMP(CreateParticleInBlock)
+{
+	gb_call(gb, ADDR_Func_ce3e); // same bank: whatever is mapped
+	JUMP_TO(ADDR_CreateParticle); // fallthrough
+}
+
+// Runs the function of every particle slot that's in use.
+PORT(UpdateParticles)
+{
+	gb->cpu.a = rd8(gb, wNumParticles);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	static const uint16_t rets[MAX_NUM_PARTICLES] = {
+		ADDR_UpdateParticles + 0x0f, ADDR_UpdateParticles + 0x19,
+		ADDR_UpdateParticles + 0x23, ADDR_UpdateParticles + 0x2d,
+	};
+	for (int n = 0; n < MAX_NUM_PARTICLES; n++) {
+		uint16_t hl = (uint16_t)(wParticle0 + n * (wParticle1 - wParticle0));
+		SET_HL(gb, hl);
+		gb->cpu.a = rd8(gb, hl);
+		alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z)
+			continue;
+		// call .DoParticleFunc: ld b, h / ld c, l / ld a, [hl] / jumptable
+		gb->cpu.b = gb->cpu.h;
+		gb->cpu.c = gb->cpu.l;
+		gb->cpu.a = rd8(gb, hl);
+		gb_push16(gb, rets[n]); // call .DoParticleFunc
+		gb_push16(gb, ADDR_UpdateParticles + 0x32); // rst JumpTable: .table (after the $ef)
+		uint16_t t = gb_pop16(gb); // pop hl
+		gb_pop16(gb); // gb_call_ret pushes the return address again
+		gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+		gb->cpu.e = gb->cpu.a;
+		gb->cpu.d = 0;
+		t = alu_add16(gb, t, gb->cpu.e);
+		gb->cpu.a = rd8(gb, t);
+		gb->cpu.h = rd8(gb, (uint16_t)(t + 1));
+		gb->cpu.l = gb->cpu.a;
+		gb_call_ret(gb, REG_HL(gb), rets[n]);
+	}
+}

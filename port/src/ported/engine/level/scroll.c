@@ -93,3 +93,66 @@ PORT(Func_a2aa) { queue_column(gb, wBGMapTileVRAM0Queue, wcce7, wRoomBlockTiles,
 PORT(Func_a79e) { queue_column(gb, wBGMapTileVRAM1Queue, wc0b3, wRoomBlockAttributes, 1, true); }
 PORT(Func_aca6) { queue_column(gb, wBGMapTileVRAM0Queue, wcce7, wRoomBlockTiles, 0, false); }
 PORT(Func_b182) { queue_column(gb, wBGMapTileVRAM1Queue, wc0b3, wRoomBlockAttributes, 0, true); }
+
+// hl = Wario's position
+// wLevelRoomID = XPosHi + 10 * YPosHi
+PORT(GetNextLevelRoomID)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = rd8(gb, hl++); // hi y
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) {
+		hl++;
+		gb->cpu.a = rd8(gb, hl); // hi x
+	} else {
+		gb->cpu.b = gb->cpu.a;
+		hl++;
+		gb->cpu.a = rd8(gb, hl); // hi x
+		gb->cpu.c = 10;
+		do {
+			gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.c);
+			gb->cpu.b = alu_dec(gb, gb->cpu.b);
+		} while (gb->cpu.b);
+	}
+	SET_HL(gb, hl);
+	wr8(gb, wLevelRoomID, gb->cpu.a);
+}
+
+// Queues a column of 23 BG map addresses and the block tiles and attributes
+// to draw there.
+PORT(Func_a0e2)
+{
+	gb_call(gb, ADDR_GetBlockBGPtr); // same bank: whatever is mapped
+	gb->cpu.a = rd8(gb, wBGMapAddressQueueSize);
+	gb->cpu.b = gb->cpu.a;
+	SET_DE(gb, wBGMapAddressQueue);
+	gb->cpu.a = alu_add(gb, gb->cpu.e, gb->cpu.b);
+	gb->cpu.e = gb->cpu.a;
+	uint16_t hl = REG_HL(gb);
+	for (int i = 0; i < 23; i++) {
+		wr8(gb, REG_DE(gb), (uint8_t)(hl >> 8));
+		gb->cpu.e++;
+		wr8(gb, REG_DE(gb), (uint8_t)hl);
+		gb->cpu.e++;
+		gb_push16(gb, REG_DE(gb));
+		hl = alu_add16(gb, hl, TILEMAP_WIDTH);
+		gb_pop16(gb);
+		gb->cpu.a = alu_and(gb, (uint8_t)(hl >> 8), 0xfb);
+		hl = (uint16_t)(gb->cpu.a << 8 | (hl & 0xff));
+	}
+	gb->cpu.a = alu_add(gb, rd8(gb, wBGMapAddressQueueSize), 2 * 23);
+	wr8(gb, wBGMapAddressQueueSize, gb->cpu.a);
+
+	SET_HL(gb, wBlockPos);
+	CALL(GetBlockPtr);
+	sramswitch(gb, gb->cpu.a = rd8(gb, wBlockPtrBank));
+	gb->cpu.a = alu_and(gb, rd8(gb, wBlockXPos + 1), 0x08);
+	bool odd = !(gb->cpu.f & FLAG_Z);
+	gb_push16(gb, REG_HL(gb));
+	gb_call(gb, odd ? ADDR_Func_a2aa : ADDR_Func_aca6);
+	SET_HL(gb, gb_pop16(gb));
+	sramswitch(gb, gb->cpu.a = rd8(gb, wBlockPtrBank));
+	gb_call(gb, odd ? ADDR_Func_a79e : ADDR_Func_b182);
+	gb->cpu.a = alu_add(gb, rd8(gb, wBGMapTileQueueSize), 23);
+	wr8(gb, wBGMapTileQueueSize, gb->cpu.a);
+}
