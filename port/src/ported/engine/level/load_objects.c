@@ -273,3 +273,107 @@ PORT(LoadHiddenFigureData)
 			return;
 	}
 }
+
+// Loads the current object group: the object data pointers (the dummy
+// object in every unused slot), the chest/key/musical coin pointers and
+// palette, and the 4 enemy graphics slots, then the object palettes.
+PORT_JUMP(LoadObjectGroupData)
+{
+	uint16_t hl = wObjDataPointers;
+	SET_BC(gb, ADDR_DummyObjectData);
+	gb->cpu.e = 0x10;
+	do {
+		gb->cpu.a = gb->cpu.c;
+		wr8(gb, hl++, gb->cpu.a);
+		gb->cpu.a = gb->cpu.b;
+		wr8(gb, hl++, gb->cpu.a);
+		gb->cpu.e = alu_dec(gb, gb->cpu.e);
+	} while (gb->cpu.e);
+	SET_HL(gb, hl);
+
+	gb->cpu.a = rd8(gb, wObjectGroup);
+	alu_cp(gb, gb->cpu.a, OBJECT_GROUP_HIDDEN_FIGURE);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP_TO(ADDR_LoadHiddenFigureData); // same bank
+		return;
+	}
+
+	gb->cpu.d = 0x00;
+	gb->cpu.e = gb->cpu.a;
+	for (int i = 0; i < 2; i++) {
+		gb->cpu.e = alu_sla(gb, gb->cpu.e);
+		gb->cpu.d = alu_rl(gb, gb->cpu.d);
+	}
+	hl = alu_add16(gb, ADDR_ObjectGroups, REG_DE(gb));
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.a = rd8(gb, hl++);
+	gb_push16(gb, hl);
+	hl = (uint16_t)(gb->cpu.a << 8 | gb->cpu.c);
+	SET_DE(gb, wChestObjDataPtr);
+	for (int i = 0; i < 6; i++) {
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		if (i < 5)
+			gb->cpu.e = alu_inc(gb, gb->cpu.e);
+	}
+	SET_HL(gb, hl);
+	SET_DE(gb, wTempPals2 + 3 * PAL_SIZE);
+	gb->cpu.b = PAL_SIZE;
+	CALL(CopyHLToDE_Short);
+	hl = gb_pop16(gb);
+
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.c = gb->cpu.a;
+	hl = (uint16_t)(rd8(gb, hl) << 8 | gb->cpu.c);
+	gb->cpu.a = 0x01; // BANK("VRAM1")
+	wr8(gb, rVBK, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hl++);
+	wr8(gb, hffa0, gb->cpu.a);
+
+	static const uint16_t dest[4] = {
+		v1Tiles0, v1Tiles0 + 0x40 * TILE_SIZE, v1Tiles1, v1Tiles1 + 0x40 * TILE_SIZE,
+	};
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = rd8(gb, hl++);
+		gb->cpu.c = gb->cpu.a;
+		gb->cpu.a = rd8(gb, hl++);
+		gb_push16(gb, hl);
+		SET_HL(gb, gb->cpu.a << 8 | gb->cpu.c);
+		SET_BC(gb, dest[i]);
+		gb->cpu.a = rd8(gb, hffa0);
+		gb->cpu.e = (uint8_t)(0x68 + i); // BANK("Enemy Gfx 1 Slot n")
+		gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.e);
+		wr8(gb, hCallFuncBank, gb->cpu.a);
+		HCALL(Decompress);
+		hl = gb_pop16(gb);
+	}
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0); // VRAM0
+	gb->cpu.a = 13;
+	wr8(gb, hffa0, 13);
+	SET_DE(gb, wObjDataPtr01);
+	for (;;) {
+		gb->cpu.a = rd8(gb, hl++);
+		gb->cpu.c = gb->cpu.a;
+		gb->cpu.a = rd8(gb, hl++);
+		gb->cpu.b = gb->cpu.a;
+		gb->cpu.a = alu_inc(gb, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z)
+			break;
+		gb->cpu.a = gb->cpu.c;
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.e = alu_inc(gb, gb->cpu.e);
+		gb->cpu.a = gb->cpu.b;
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.e = alu_inc(gb, gb->cpu.e);
+		gb->cpu.a = alu_dec(gb, rd8(gb, hffa0));
+		wr8(gb, hffa0, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z)
+			break;
+	}
+	SET_HL(gb, hl);
+	JUMP(LoadObjPals);
+}

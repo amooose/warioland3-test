@@ -853,3 +853,145 @@ static void break_block(GB *gb, bool chance, uint16_t params)
 
 PORT(BreakBlock) { break_block(gb, true, ADDR_ObjParams_Coin); }
 PORT(BreakBlockWithColourCoin) { break_block(gb, false, ADDR_ObjParams_ColourCoin); }
+
+// wcedb / wcedc / wcedf = the SRAM bank, pointer and value of the block at
+// wBlockPtr
+static void save_block(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wSRAMBank);
+	wr8(gb, wcedb, gb->cpu.a);
+	uint16_t hl = wBlockPtr;
+	gb->cpu.a = rd8(gb, hl++);
+	wr8(gb, wcedc + 0, gb->cpu.a);
+	gb->cpu.d = gb->cpu.a;
+	gb->cpu.a = rd8(gb, hl);
+	wr8(gb, wcedc + 1, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, REG_DE(gb));
+	wr8(gb, wcedf, gb->cpu.a);
+}
+
+// The block at wBlockPtr = b (keeping bit 7), updated on screen with func
+// (Func_e31 or Func_e2b)
+static void replace_block(GB *gb, bool e2b)
+{
+	uint16_t hl = rd8(gb, wBlockPtr) << 8 | rd8(gb, wBlockPtr + 1);
+	SET_HL(gb, hl);
+	gb->cpu.a = alu_or(gb, alu_and(gb, rd8(gb, hl), 0x80), gb->cpu.b);
+	wr8(gb, hl, gb->cpu.a);
+	gb_push16(gb, hl);
+	if (e2b)
+		CALL(Func_e2b);
+	else
+		CALL(Func_e31);
+	SET_HL(gb, gb_pop16(gb));
+}
+
+// replace_block with Func_e31, then BreakBlock
+static void replace_and_break(GB *gb)
+{
+	replace_block(gb, false);
+	gb_call(gb, ADDR_BreakBlock); // same bank: whatever is mapped
+}
+
+// After breaking a block: free when rolling or fat, else solid unless
+// strong enough (garlic, or the super jump slam overalls for a smash attack)
+static void free_if_strong(GB *gb)
+{
+	if (ld_and(gb, wIsRolling))
+		GOTO(FREE);
+	gb->cpu.a = rd8(gb, wTransformation);
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_FAT_WARIO);
+	if (gb->cpu.f & FLAG_Z)
+		GOTO(FREE);
+	bool smash = ld_and(gb, wIsSmashAttacking);
+	gb->cpu.a = rd8(gb, wPowerUpLevel);
+	alu_cp(gb, gb->cpu.a, smash ? SUPER_JUMP_SLAM_OVERALLS : GARLIC);
+	GOTO((gb->cpu.f & FLAG_C) ? SOLID : FREE);
+}
+
+PORT_JUMP(Func_18f32)
+{
+	save_block(gb);
+	replace_and_break(gb);
+	GOTO(FREE);
+}
+
+PORT_JUMP(Func_19246)
+{
+	save_block(gb);
+	replace_and_break(gb);
+	GOTO(FREE);
+}
+
+PORT_JUMP(Func_19481)
+{
+	replace_and_break(gb);
+	GOTO(FREE);
+}
+
+PORT_JUMP(Func_18df1)
+{
+	replace_and_break(gb);
+	GOTO(ld_and(gb, wIsRolling) ? FREE : SOLID);
+}
+
+PORT_JUMP(Func_19086)
+{
+	save_block(gb);
+	gb->cpu.a = TRUE;
+	wr8(gb, wIsFloorTransition, TRUE);
+	replace_and_break(gb);
+	free_if_strong(gb);
+}
+
+PORT_JUMP(Func_19423)
+{
+	replace_block(gb, true);
+	gb->cpu.a = rd8(gb, wCurObjFlags);
+	if (alu_bit(gb, gb->cpu.a, OBJFLAG_ON_SCREEN_F))
+		gb_call(gb, ADDR_BreakBlock); // same bank: whatever is mapped
+	else
+		play_sfx(gb, SFX_BLOCK_BREAK);
+	GOTO(FREE);
+}
+
+PORT_JUMP(DoughnutBlockCollision)
+{
+	if (!wario_flag(gb))
+		GOTO(SOLID);
+	gb->cpu.a = rd8(gb, wTransformation);
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_FAT_WARIO);
+	if (!(gb->cpu.f & FLAG_Z))
+		GOTO(SOLID);
+	gb->cpu.a = alu_and(gb, rd8(gb, wCollisionPoints), COLLISION_UNK1 | COLLISION_UNK6);
+	if (gb->cpu.f & FLAG_Z)
+		GOTO(SOLID);
+	replace_and_break(gb);
+	GOTO(SOLID);
+}
+
+PORT_JUMP(CrackedBlockWithColourCoinCollision)
+{
+	if (!ld_and(gb, wBlockFuncBreakFlag))
+		GOTO(SOLID);
+	bool brk;
+	if (coll_bit(gb, COLLISION_UNK4_F)) {
+		brk = ld_and(gb, wAttackCounter) || ld_and(gb, wIsRolling);
+	} else if (coll_bit(gb, COLLISION_UNK5_F) || coll_bit(gb, COLLISION_UNK3_F)) {
+		gb->cpu.a = rd8(gb, wPowerUpLevel);
+		alu_cp(gb, gb->cpu.a, HEAD_SMASH_HELMET);
+		if (gb->cpu.f & FLAG_C)
+			GOTO(SOLID);
+		brk = ld_and(gb, wJumpVelTable) || ld_and(gb, wSwimVelIndex);
+	} else {
+		gb->cpu.a = alu_and(gb, gb->cpu.a, COLLISION_UNK1 | COLLISION_UNK6);
+		brk = !(gb->cpu.f & FLAG_Z);
+	}
+	if (!brk)
+		GOTO(SOLID);
+	replace_block(gb, false);
+	gb_call(gb, ADDR_BreakBlockWithColourCoin); // same bank: whatever is mapped
+	free_if_strong(gb);
+}
