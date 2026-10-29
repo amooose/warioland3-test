@@ -743,3 +743,113 @@ PORT_JUMP(BlockFunc_SmallGap)
 	ld_cp(gb, wTransformation, TRANSFORMATION_FLAT_WARIO);
 	JUMP_TO(ZF ? FREE : SOLID);
 }
+
+// --- switches and breakable blocks ---
+
+// Toggles the switch block Wario hit (and with it every switchable block),
+// then acts solid.
+PORT_JUMP(BlockFunc_Switch)
+{
+	if (!wario_flag(gb))
+		GOTO(SOLID);
+	gb->cpu.a = alu_and(gb, rd8(gb, wCollisionPoints), COLLISION_UNK3 | COLLISION_UNK5);
+	if (gb->cpu.f & FLAG_Z)
+		GOTO(SOLID);
+	uint16_t hl = rd8(gb, wBlockPtr) << 8 | rd8(gb, wBlockPtr + 1);
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	wr8(gb, wSwitchState, gb->cpu.a);
+	gb->cpu.a = alu_xor(gb, gb->cpu.a, 0x08);
+	wr8(gb, hl, gb->cpu.a);
+	CALL(Func_e31);
+	gb->cpu.a = alu_xor(gb, rd8(gb, wSwitchStateUpdated), 1);
+	wr8(gb, wSwitchStateUpdated, gb->cpu.a);
+	play_sfx(gb, SFX_SWITCH);
+	gb->cpu.b = 16;
+	CALL(DoGroundShake);
+	GOTO(SOLID);
+}
+
+// BreakBlock (a coin 1 time in 4, unless on cooldown) and
+// BreakBlockWithColourCoin: debris at the block in hPos and an object
+// (params) created there, with hPos and wCurObj kept as they were.
+static void break_block(GB *gb, bool chance, uint16_t params)
+{
+	// temporarily store hPos
+	gb->cpu.a = rd8(gb, hYPosHi);
+	wr8(gb, hYPosHiBackup, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hYPosLo);
+	wr8(gb, hYPosLoBackup, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hXPosHi);
+	wr8(gb, hXPosHiBackup, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hXPosLo);
+	wr8(gb, hXPosLoBackup, gb->cpu.a);
+
+	gb->cpu.b = PARTICLE_DEBRIS;
+	FARCALL(CreateParticleInBlock);
+	bool spawn = true;
+	if (chance) {
+		gb->cpu.a = alu_and(gb, rd8(gb, rDIV), 0x03);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			spawn = false;
+		} else {
+			gb->cpu.a = rd8(gb, wCoinCooldown);
+			alu_and(gb, gb->cpu.a, gb->cpu.a);
+			spawn = gb->cpu.f & FLAG_Z;
+		}
+	}
+	if (spawn) {
+		// push_wram BANK("Level Objects WRAM")
+		gb->cpu.a = rd8(gb, rWBK);
+		push_af(gb);
+		gb->cpu.a = 0x01;
+		wr8(gb, rWBK, 0x01);
+		if (chance) {
+			gb->cpu.a = COIN_COOLDOWN;
+			wr8(gb, wCoinCooldown, COIN_COOLDOWN);
+		}
+
+		// backup CurObj
+		SET_HL(gb, wCurObjUnk01);
+		SET_DE(gb, hCurObjBackup);
+		gb->cpu.b = OBJ_ID - OBJ_UNK_01;
+		CALL(CopyHLToDE);
+
+		uint16_t hl = wCurObjUnk01;
+		xor_a(gb);
+		wr8(gb, hl++, 0);
+		wr8(gb, hl++, 0);
+		gb->cpu.a = rd8(gb, hYPosLo);
+		wr8(gb, hl++, gb->cpu.a);
+		gb->cpu.a = rd8(gb, hYPosHi);
+		wr8(gb, hl++, gb->cpu.a);
+		gb->cpu.a = rd8(gb, hXPosLo);
+		wr8(gb, hl++, gb->cpu.a);
+		gb->cpu.a = rd8(gb, hXPosHi);
+		wr8(gb, hl++, gb->cpu.a);
+		SET_HL(gb, hl);
+		SET_BC(gb, params);
+		FARCALL(_CreateObjectFromCurObjPos);
+
+		// restore CurObj
+		SET_HL(gb, hCurObjBackup);
+		SET_DE(gb, wCurObjUnk01);
+		gb->cpu.b = OBJ_ID - OBJ_UNK_01;
+		CALL(CopyHLToDE);
+		pop_af(gb);
+		wr8(gb, rWBK, gb->cpu.a);
+	}
+
+	// restore hPos
+	gb->cpu.a = rd8(gb, hYPosHiBackup);
+	wr8(gb, hYPosHi, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hYPosLoBackup);
+	wr8(gb, hYPosLo, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hXPosHiBackup);
+	wr8(gb, hXPosHi, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hXPosLoBackup);
+	wr8(gb, hXPosLo, gb->cpu.a);
+}
+
+PORT(BreakBlock) { break_block(gb, true, ADDR_ObjParams_Coin); }
+PORT(BreakBlockWithColourCoin) { break_block(gb, false, ADDR_ObjParams_ColourCoin); }

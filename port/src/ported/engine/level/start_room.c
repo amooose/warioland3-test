@@ -565,3 +565,140 @@ PORT(DrawRoom_FromStart)
 	SET_HL(gb, wBackupBlockPos + 3);
 	SET_DE(gb, wBlockYPos + 3);
 }
+
+// --- multi-blocks ---
+
+#define PMB_PROCESS_BLOCKS (ADDR_ProcessMultiBlock + 0x63) // .ProcessBlocks
+
+// push_wram BANK("Level Objects WRAM") / farcall / pop_wram
+static void farcall_obj_wram(GB *gb, int bank, uint16_t addr)
+{
+	gb->cpu.a = rd8(gb, rWBK);
+	push_af(gb);
+	gb->cpu.a = 0x01;
+	wr8(gb, rWBK, 0x01);
+	port_farcall(gb, bank, addr);
+	pop_af(gb);
+	wr8(gb, rWBK, gb->cpu.a);
+}
+
+// Processes the blocks of a multi-block, then does a normal frame's
+// drawing.
+PORT(ProcessMultiBlock)
+{
+	gb_call_ret(gb, PMB_PROCESS_BLOCKS, ADDR_ProcessMultiBlock + 0x03);
+	FARCALL(UpdateParticles);
+	farcall_obj_wram(gb, BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority);
+	CALL(DrawWario);
+	farcall_obj_wram(gb, BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority);
+	CALL(ClearUnusedVirtualOAM);
+	gb->cpu.a = rd8(gb, wSRAMBank);
+	push_af(gb);
+	sramswitch(gb, BANK_sLevelBlockObjectMap);
+	gb->cpu.ime = false; // di
+	gb_call(gb, ADDR_SetTileQueueProcessingFunctions); // same bank: whatever is mapped
+	gb->cpu.ime = true; // ei
+	gb->cpu.ime_delay = 0;
+	pop_af(gb);
+	sramswitch(gb, gb->cpu.a);
+}
+
+// Processes the block next to wcedb:wcedc in each direction in
+// wMultiBlockParam's low 3 bits, until ProcessBlock leaves none.
+PORT_LOCAL(ProcessMultiBlock, ProcessBlocks)
+{
+	gb->cpu.a = alu_add(gb, alu_and(gb, rd8(gb, wMultiBlockParam), 0x0f), 0x10);
+	wr8(gb, wMultiBlockParam, gb->cpu.a);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, 0x08);
+	wr8(gb, wcede, gb->cpu.a);
+
+	for (;;) {
+		gb->cpu.a = alu_and(gb, rd8(gb, wMultiBlockParam), 0x07);
+		gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		uint8_t dir = 0; // up
+		if (gb->cpu.f & FLAG_Z) {
+			dir = 1; // right
+		} else {
+			gb->cpu.a = alu_dec(gb, gb->cpu.a);
+			if (gb->cpu.f & FLAG_Z) {
+				dir = 2; // left
+			} else {
+				gb->cpu.a = alu_dec(gb, gb->cpu.a);
+				if (gb->cpu.f & FLAG_Z)
+					dir = 3; // down
+			}
+		}
+		switch (dir) {
+		case 0: // the block above
+			gb->cpu.a = alu_inc(gb, rd8(gb, wcedc + 0));
+			gb->cpu.h = gb->cpu.a;
+			wr8(gb, wBlockPtr + 0, gb->cpu.a);
+			alu_cp(gb, gb->cpu.a, 0xc0); // HIGH(STARTOF(SRAM) + SIZEOF(SRAM))
+			gb->cpu.a = rd8(gb, wcedb);
+			if (gb->cpu.f & FLAG_Z) {
+				gb->cpu.a = (uint8_t)(sLevelBlockObjectMap >> 8);
+				gb->cpu.h = gb->cpu.a;
+				wr8(gb, wBlockPtr + 0, gb->cpu.a);
+				gb->cpu.a = alu_inc(gb, rd8(gb, wcedb));
+			}
+			wr8(gb, wBlockPtrBank, gb->cpu.a);
+			gb->cpu.a = rd8(gb, wcedc + 1);
+			gb->cpu.l = gb->cpu.a;
+			wr8(gb, wBlockPtr + 1, gb->cpu.a);
+			break;
+		case 1: // the block on the right
+			gb->cpu.a = rd8(gb, wcedb);
+			wr8(gb, wBlockPtrBank, gb->cpu.a);
+			gb->cpu.a = rd8(gb, wcedc + 0);
+			gb->cpu.h = gb->cpu.a;
+			wr8(gb, wBlockPtr + 0, gb->cpu.a);
+			gb->cpu.a = alu_inc(gb, rd8(gb, wcedc + 1));
+			gb->cpu.l = gb->cpu.a;
+			wr8(gb, wBlockPtr + 1, gb->cpu.a);
+			break;
+		case 2: // the block on the left
+			gb->cpu.a = rd8(gb, wcedb);
+			wr8(gb, wBlockPtrBank, gb->cpu.a);
+			gb->cpu.a = alu_dec(gb, rd8(gb, wcedc + 1));
+			gb->cpu.l = gb->cpu.a;
+			wr8(gb, wBlockPtr + 1, gb->cpu.a);
+			gb->cpu.a = rd8(gb, wcedc + 0);
+			gb->cpu.h = gb->cpu.a;
+			wr8(gb, wBlockPtr + 0, gb->cpu.a);
+			break;
+		default: // the block below
+			gb->cpu.a = alu_dec(gb, rd8(gb, wcedc + 0));
+			gb->cpu.h = gb->cpu.a;
+			wr8(gb, wBlockPtr + 0, gb->cpu.a);
+			alu_cp(gb, gb->cpu.a, 0x9f); // HIGH(STARTOF(SRAM)) - 1
+			gb->cpu.a = rd8(gb, wcedb);
+			if (gb->cpu.f & FLAG_Z) {
+				gb->cpu.a = 0xbf; // HIGH(STARTOF(SRAM) + SIZEOF(SRAM)) - 1
+				gb->cpu.h = gb->cpu.a;
+				wr8(gb, wBlockPtr + 0, gb->cpu.a);
+				gb->cpu.a = alu_dec(gb, rd8(gb, wcedb));
+			}
+			wr8(gb, wBlockPtrBank, gb->cpu.a);
+			gb->cpu.a = rd8(gb, wcedc + 1);
+			gb->cpu.l = gb->cpu.a;
+			wr8(gb, wBlockPtr + 1, gb->cpu.a);
+			break;
+		}
+
+		// .process_block
+		gb->cpu.a = alu_and(gb, rd8(gb, wMultiBlockParam), 0xff ^ 0x07);
+		wr8(gb, wMultiBlockParam, gb->cpu.a);
+		FARCALL_RET(ProcessBlock, ADDR_ProcessMultiBlock + 0x10d);
+		gb->cpu.a = alu_and(gb, rd8(gb, wMultiBlockParam), 0x07);
+		if (gb->cpu.f & FLAG_Z)
+			break;
+		gb_call_ret(gb, ADDR_Func_bb85, ADDR_ProcessMultiBlock + 0x11a);
+	}
+
+	// .break
+	xor_a(gb);
+	wr8(gb, wMultiBlockParam, 0);
+	wr8(gb, wIsFloorTransition, 0);
+	gb->cpu.a = rd8(gb, wPendingSubState);
+	wr8(gb, wSubState, gb->cpu.a);
+}

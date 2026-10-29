@@ -243,3 +243,33 @@ PORT(DespawnAllObjects)
 		FARCALL(DespawnObject);
 	}
 }
+
+// Loads the object data pointers of the Hidden Figure's room (.pointers,
+// up to a NULL) into wObjDataPtr01 onwards.
+PORT(LoadHiddenFigureData)
+{
+	uint16_t hl = ADDR_LoadHiddenFigureData + 0x1e; // .pointers
+	gb->cpu.a = 0x0d;
+	wr8(gb, hffa0, 0x0d);
+	SET_DE(gb, wObjDataPtr01);
+	for (;;) {
+		gb->cpu.a = rd8(gb, hl++);
+		gb->cpu.c = gb->cpu.a;
+		gb->cpu.a = rd8(gb, hl++);
+		gb->cpu.b = gb->cpu.a;
+		SET_HL(gb, hl);
+		gb->cpu.a = alu_inc(gb, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z)
+			return;
+		gb->cpu.a = gb->cpu.c;
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.e = alu_inc(gb, gb->cpu.e);
+		gb->cpu.a = gb->cpu.b;
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.e = alu_inc(gb, gb->cpu.e);
+		gb->cpu.a = alu_dec(gb, rd8(gb, hffa0));
+		wr8(gb, hffa0, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z)
+			return;
+	}
+}
