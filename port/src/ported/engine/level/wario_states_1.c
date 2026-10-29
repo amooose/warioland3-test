@@ -929,3 +929,89 @@ PORT_JUMP(HandleGroundShake)
 	anim(gb, OAM1);
 	RET();
 }
+
+PORT_JUMP(SetState_Idling)
+{
+	xor_a(gb);
+	wr8(gb, wWalkVelIndex, 0);
+	st(gb, wWarioState, WST_IDLING);
+	static const uint16_t zero[] = {wFrameDuration, wAnimationFrame, wJumpVelIndex,
+		wJumpVelTable, wWarioStateCounter, wWarioStateCycles, wIsSmashAttacking,
+		wIsCrouching, wAttackCounter, wGrabState, 0};
+	clear(gb, zero);
+	coll_box_blrt(gb);
+	FARCALL(CheckUpCollision);
+	ld_cp(gb, wWarioState, WST_IDLING);
+	if (!ZF) {
+		RET();
+		return;
+	}
+	if (b_and(gb)) {
+		LJUMP(CrouchOrSlide);
+		return;
+	}
+	load_gfx(gb, BANK_WarioIdleGfx, ADDR_WarioIdleGfx);
+	set_oam(gb, BANK_OAM_14000, ADDR_OAM_14000);
+	frameset_by_dir(gb, ADDR_Frameset_14252, ADDR_Frameset_1425f);
+	anim(gb, OAM1);
+	RET();
+}
+
+// farcall CheckFrontCollision / ld a, b / and $0f / ret nz
+static bool front_blocked(GB *gb)
+{
+	FARCALL(CheckFrontCollision);
+	gb->cpu.a = alu_and(gb, gb->cpu.b, 0x0f);
+	return gb->cpu.a != 0;
+}
+
+PORT(WalkIfPossible_Right)
+{
+	if (front_blocked(gb))
+		return;
+	CALL(ApplyWalkVelocity_Right);
+	CALL(MoveWarioRight);
+}
+
+PORT(WalkIfPossible_Left)
+{
+	if (front_blocked(gb))
+		return;
+	CALL(ApplyWalkVelocity_Left);
+	CALL(MoveWarioLeft);
+}
+
+PORT_JUMP(Func_1ec19)
+{
+	st(gb, wJumpVelTable, JUMP_VEL_KNOCK_BACK);
+	st(gb, wCollisionBoxTop, (uint8_t)-27);
+	FARCALL(CheckUpCollision);
+	ld_cp(gb, wWarioState, WST_CROUCHING);
+	if (!ZF) {
+		alu_cp(gb, gb->cpu.a, WST_CROUCH_WALKING);
+		if (!ZF) {
+			RET();
+			return;
+		}
+	}
+	if (!b_and(gb)) {
+		LJUMP(StartCrouchJump);
+		return;
+	}
+	xor_a(gb);
+	wr8(gb, wJumpVelTable, 0);
+	st(gb, wCollisionBoxTop, (uint8_t)-15);
+	RET();
+}
+
+PORT_JUMP(Func_1ec4b)
+{
+	st(gb, wCollisionBoxTop, (uint8_t)-27);
+	FARCALL(CheckUpCollision);
+	if (!b_and(gb)) {
+		LJUMP(SetState_Attacking);
+		return;
+	}
+	st(gb, wCollisionBoxTop, (uint8_t)-15);
+	RET();
+}

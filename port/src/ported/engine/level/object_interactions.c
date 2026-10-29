@@ -588,3 +588,63 @@ PORT(GetTreasure)
 	}
 	anim(gb, OAM1);
 }
+
+static void restore_pos_backup(GB *gb)
+{
+	gb->cpu.a = rd8(gb, hYPosHiBackup);
+	wr8(gb, hYPosHi, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hYPosLoBackup);
+	wr8(gb, hYPosLo, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hXPosHiBackup);
+	wr8(gb, hXPosHi, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hXPosLoBackup);
+	wr8(gb, hXPosLo, gb->cpu.a);
+}
+
+PORT(SetState_Stung)
+{
+	st(gb, wInvincibleCounter, 0x01);
+	play_sfx(gb, SFX_STING);
+	st(gb, wWarioState, WST_STUNG);
+	static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
+		wAttackCounter, wIsRolling, wIsSmashAttacking, 0};
+	clear(gb, zero);
+	st(gb, wJumpVelIndex, 0x6);
+	st(gb, wCollisionBoxBottom, (uint8_t)-1);
+	st(gb, wCollisionBoxLeft, (uint8_t)-9);
+	st(gb, wCollisionBoxRight, 9);
+	bool low_ceiling = false;
+	if (ld_and(gb, wIsCrouching)) {
+		st(gb, wCollisionBoxTop, (uint8_t)-27);
+		gb->cpu.a = rd8(gb, hYPosHi);
+		wr8(gb, hYPosHiBackup, gb->cpu.a);
+		gb->cpu.a = rd8(gb, hYPosLo);
+		wr8(gb, hYPosLoBackup, gb->cpu.a);
+		gb->cpu.a = rd8(gb, hXPosHi);
+		wr8(gb, hXPosHiBackup, gb->cpu.a);
+		gb->cpu.a = rd8(gb, hXPosLo);
+		wr8(gb, hXPosLoBackup, gb->cpu.a);
+		FARCALL(CheckUpCollision);
+		if (b_and(gb)) {
+			low_ceiling = true;
+		} else {
+			xor_a(gb);
+			wr8(gb, wIsCrouching, 0);
+			restore_pos_backup(gb);
+		}
+	}
+	if (low_ceiling) {
+		st(gb, wCollisionBoxTop, (uint8_t)-15);
+		xor_a(gb);
+		wr8(gb, wJumpVelTable, 0);
+		restore_pos_backup(gb);
+	} else {
+		st(gb, wCollisionBoxTop, (uint8_t)-27);
+		st(gb, wJumpVelTable, JUMP_VEL_KNOCK_BACK);
+	}
+	load_gfx(gb, BANK_WarioAirborneGfx, ADDR_WarioAirborneGfx);
+	set_oam(gb, BANK_OAM_15955, ADDR_OAM_15955);
+	reset_anim(gb);
+	frameset_by_dir(gb, ADDR_Frameset_15f7f, ADDR_Frameset_15f70);
+	anim(gb, OAM1);
+}
