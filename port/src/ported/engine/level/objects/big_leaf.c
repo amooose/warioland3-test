@@ -268,3 +268,21 @@ PORT_LOCAL(BigLeaf2Func, Func_42d0e)
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wCurObjFlags, 0);
 }
+
+// Waits state duration, then becomes a platform (.Update).
+PORT(BigLeaf2Func)
+{
+	gb->cpu.a = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
+	wr8(gb, wCurObjAction, gb->cpu.a);
+	uint16_t hl = wCurObjFlags;
+	wr8(gb, hl, (uint8_t)(rd8(gb, hl) | OBJFLAG_NO_COLLISION));
+	hl = LO(hl, OBJ_STATE_DURATION);
+	SET_HL(gb, hl);
+	uint8_t d = alu_dec(gb, rd8(gb, hl));
+	wr8(gb, hl, d);
+	if (d)
+		return;
+	store_update(gb, LO(hl, OBJ_UPDATE_FUNCTION + 1), ADDR_BigLeaf2Func + 0x22); // .Update
+	SET_DE(gb, ADDR_Frameset_68729);
+	CALL(SetObjectFramesetPtr);
+}
