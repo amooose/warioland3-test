@@ -25,3 +25,70 @@ static void goal_counter(GB *gb, uint16_t update)
 
 PORT_JUMP(ShootGoalCounterFunc) { goal_counter(gb, ADDR_ShootGoalCounterFunc + 0x20); }
 PORT_JUMP(WarioGoalCounterFunc) { goal_counter(gb, ADDR_WarioGoalCounterFunc + 0x20); }
+
+// a = [bc + var3], the next entry of a $80-terminated table of y offsets
+// (stays on the last one); b = a
+static void kick_y_offset(GB *gb)
+{
+	uint16_t hl = wCurObjVar3;
+	SET_HL(gb, hl);
+	gb->cpu.a = alu_add(gb, rd8(gb, hl), gb->cpu.c);
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.c = alu_dec(gb, gb->cpu.c);
+		gb->cpu.a = rd8(gb, REG_BC(gb));
+	} else {
+		wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+	}
+	gb->cpu.b = gb->cpu.a;
+}
+
+// moves Wario up by b: xor a / sub b / ld b, a / call MoveWarioUp /
+// jp HandleUpwardsFloorTransition
+static void kick_wario_up(GB *gb, uint16_t ret)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	gb->cpu.a = alu_sub(gb, 0, gb->cpu.b);
+	gb->cpu.b = gb->cpu.a;
+	gb_call_ret(gb, ADDR_MoveWarioUp, ret);
+	JUMP(HandleUpwardsFloorTransition);
+}
+
+// bc = the y offsets: moves the object and Wario along them
+PORT_JUMP(DoPreKickingJumpYMovement)
+{
+	kick_y_offset(gb);
+	gb->cpu.l = OBJ_Y_POS;
+	uint16_t hl = REG_HL(gb);
+	alu_cp(gb, gb->cpu.a, (uint8_t)-128);
+	gb->cpu.c = rd8(gb, hl);
+	if (!(gb->cpu.f & FLAG_C)) {
+		// .moving_up
+		gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.c);
+		wr8(gb, hl++, gb->cpu.a);
+		SET_HL(gb, hl);
+		if (!(gb->cpu.f & FLAG_C))
+			wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+		kick_wario_up(gb, ADDR_DoPreKickingJumpYMovement + 0x2e);
+		return;
+	}
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.c);
+	wr8(gb, hl++, gb->cpu.a);
+	SET_HL(gb, hl);
+	if (gb->cpu.f & FLAG_C)
+		wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+	gb_call_ret(gb, ADDR_MoveWarioDown, ADDR_DoPreKickingJumpYMovement + 0x20);
+	JUMP(HandleDownwardsFloorTransition);
+}
+
+PORT_JUMP(ApplyYOffsetOnKickedWarioBall)
+{
+	kick_y_offset(gb);
+	gb_call_ret(gb, ADDR_MoveWarioDown, ADDR_ApplyYOffsetOnKickedWarioBall + 0x14);
+	JUMP(HandleDownwardsFloorTransition);
+}
+
+PORT_JUMP(Func_5725b) { kick_wario_up(gb, ADDR_Func_5725b + 0x06); }
