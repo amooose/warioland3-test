@@ -1225,3 +1225,120 @@ PORT(LoadCutsceneBGMaps25) { load_cutscene_bg_maps(gb, ADDR_Cutscene25Attrmap, A
 PORT(LoadCutsceneBGMaps35) { load_cutscene_bg_maps(gb, ADDR_Cutscene35Attrmap, ADDR_LoadCutsceneAttrmap1, ADDR_Cutscene35Tilemap, ADDR_LoadCutsceneTilemap1); }
 PORT(LoadCutsceneBGMaps38) { load_cutscene_bg_maps(gb, ADDR_Cutscene38Attrmap, ADDR_LoadCutsceneAttrmap1, ADDR_Cutscene38Tilemap, ADDR_LoadCutsceneTilemap1); }
 PORT(LoadCutsceneBGMaps040) { load_cutscene_bg_maps(gb, ADDR_Cutscene40Attrmap, ADDR_LoadCutsceneAttrmap1, ADDR_Cutscene40Tilemap, ADDR_LoadCutsceneTilemap1); }
+
+// --- more scene object animations ---
+
+PORT(Func_9f146)
+{
+	SET_BC(gb, wSceneObj2State);
+	scene_obj_anim_sprite(gb, ADDR_Func_9f146 + 0x2a, ADDR_OAM_bd453);
+	SET_BC(gb, wSceneObj3State);
+	scene_obj_anim_sprite(gb, ADDR_Func_9f146 + 0x2a, ADDR_OAM_bd453);
+	SET_DE(gb, wSceneObj2);
+	gb_call(gb, ADDR_Func_9fb97);
+	SET_DE(gb, wSceneObj3);
+	gb_call(gb, ADDR_Func_9fba0);
+}
+
+// Func_9f174.Func_9f189
+static void func_9f189(GB *gb)
+{
+	for (;;) {
+		if (!scene_obj_anim(gb, ADDR_Func_9f174 + 0x50, ADDR_Func_9f0ae))
+			return;
+		alu_cp(gb, gb->cpu.a, 0x06);
+		if (gb->cpu.f & FLAG_Z) {
+			gb->cpu.b = 0x07;
+		} else {
+			alu_cp(gb, gb->cpu.a, 0x08);
+			if (gb->cpu.f & FLAG_Z) {
+				gb->cpu.b = 0x00;
+			} else {
+				alu_cp(gb, gb->cpu.a, 0x05);
+				if (gb->cpu.f & FLAG_Z)
+					sfx_if_animation_finished(gb, SFX_10A);
+				break;
+			}
+		}
+		gb_call(gb, ADDR_Func_9f0d0);
+		if (!(gb->cpu.f & FLAG_Z))
+			break;
+	}
+	scene_obj_sprite(gb, ADDR_OAM_bd46f, ADDR_Func_9f0bc);
+}
+
+PORT(Func_9f174)
+{
+	SET_BC(gb, wSceneObj4State);
+	func_9f189(gb);
+	SET_BC(gb, wSceneObj2State);
+	func_9f189(gb);
+	SET_BC(gb, wSceneObj3State);
+	func_9f189(gb);
+	SET_BC(gb, wSceneObj5State);
+	func_9f189(gb);
+}
+
+PORT(Func_9f1f3)
+{
+	SET_DE(gb, wSceneObj2);
+	gb_call(gb, ADDR_Func_9fb75);
+	SET_DE(gb, wSceneObj2);
+	gb_call(gb, ADDR_Func_9fb97);
+	SET_BC(gb, wSceneObj2State);
+	scene_obj_anim_sprite(gb, ADDR_Func_9f1f3 + 0x2a, ADDR_OAM_bd7a1);
+	SET_DE(gb, wSceneObj2);
+	gb_call(gb, ADDR_Func_9fb7e);
+}
+
+// Func_9f244.Func_9f27f
+static void func_9f27f(GB *gb)
+{
+	gb->cpu.d = gb->cpu.h;
+	gb->cpu.e = gb->cpu.l | (1 << 1);
+	gb->cpu.a = rd8(gb, REG_DE(gb));
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.e |= (1 << 0) | (1 << 2);
+	gb->cpu.a = rd8(gb, REG_DE(gb));
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	bool nz = !(gb->cpu.f & FLAG_Z);
+	gb->cpu.a = 0x01;
+	alu_cp(gb, gb->cpu.a, gb->cpu.c);
+	if (!nz) {
+		if (gb->cpu.f & FLAG_Z)
+			return;
+		gb->cpu.a = 0x01;
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		return;
+	}
+	// .asm_9f295
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = alu_xor(gb, gb->cpu.a, gb->cpu.a);
+	wr8(gb, REG_DE(gb), gb->cpu.a);
+	play_sfx(gb, SFX_011);
+}
+
+PORT(Func_9f244)
+{
+	SET_BC(gb, wSceneObj5State);
+	if (!scene_obj_anim(gb, ADDR_Func_9f244 + 0x1e, ADDR_Func_9f0b5))
+		return;
+	alu_cp(gb, gb->cpu.a, 0x02);
+	if (gb->cpu.f & FLAG_Z) {
+		sfx_if_animation_finished(gb, SFX_FLAP);
+	} else {
+		alu_cp(gb, gb->cpu.a, 0x01);
+		if (gb->cpu.f & FLAG_Z)
+			func_9f27f(gb);
+	}
+	scene_obj_sprite(gb, ADDR_OAM_188e16, ADDR_Func_9f0c1);
+}
+
+PORT(Func_9f323)
+{
+	SET_DE(gb, wSceneObj2);
+	gb_call(gb, ADDR_Func_9fb97);
+	SET_BC(gb, wSceneObj2State);
+	scene_obj_anim_sprite(gb, ADDR_Func_9f323 + 0x1b, ADDR_OAM_bdabc);
+}
