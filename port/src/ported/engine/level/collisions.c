@@ -14,6 +14,21 @@ static void call_process_block(GB *gb, uint16_t ret)
 	JUMP_TO(ADDR_ProcessBlock);
 }
 
+// A call that reaches ProcessBlock can come back with another ROM bank
+// mapped: a block function can switch it (a fuzzed block function table can
+// send ProcessBlock anywhere). The asm then returns into whatever that bank
+// holds at the return address. call_in_bank returns false when that
+// happened, with pc at `ret`, and the caller stops there; so its routine
+// must be a PORT_JUMP.
+static bool call_in_bank(GB *gb, uint16_t addr, uint16_t ret)
+{
+	gb_call_ret(gb, addr, ret);
+	if (gb->rom_bank == BANK_ProcessBlock)
+		return true;
+	JUMP_TO(ret);
+	return false;
+}
+
 // ld hl, hPos / call GetBlockPtr / ld a, points / ld [wCollisionPoints], a
 static void get_block_at_pos(GB *gb, uint8_t points)
 {
@@ -193,13 +208,14 @@ static void get_pos(GB *gb)
 }
 
 // resets wWarioSlopeInteraction
-PORT(Func_198c7)
+PORT_JUMP(Func_198c7)
 {
 	gb->cpu.a = 0;
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wWarioSlopeInteraction, 0);
 	get_pos(gb);
-	gb_call_ret(gb, ADDR_Func_19b51, (uint16_t)(ADDR_Func_198c7 + 0x18));
+	if (call_in_bank(gb, ADDR_Func_19b51, (uint16_t)(ADDR_Func_198c7 + 0x18)))
+		RET();
 }
 
 // ld a, [wIsSmashAttacking] / and a / jr z / ld a, TRUE / ld [wBlockFuncBreakFlag], a
@@ -219,7 +235,7 @@ static void break_if_smash_attacking(GB *gb)
 #define AIRBORNE_RET_RIGHT      (ADDR_CheckAirborneCollision + 0x61)
 #define AIRBORNE_RET_CENTRE     (ADDR_CheckAirborneCollision + 0x8d)
 
-PORT(CheckAirborneCollision)
+PORT_JUMP(CheckAirborneCollision)
 {
 	// call .Func_19a53, with its return address on the stack as in the asm
 	gb_push16(gb, (uint16_t)AIRBORNE_RET_FUNC_19A53);
@@ -228,83 +244,98 @@ PORT(CheckAirborneCollision)
 	wr8(gb, wWarioSlopeInteraction, 0);
 	break_if_smash_attacking(gb);
 	get_pos(gb);
-	gb_call_ret(gb, ADDR_Func_19b7b, (uint16_t)AIRBORNE_RET_CENTRE);
+	if (!call_in_bank(gb, ADDR_Func_19b7b, (uint16_t)AIRBORNE_RET_CENTRE))
+		return;
 	gb_pop16(gb);
 	alu_and(gb, gb->cpu.a, gb->cpu.a);
-	if (!(gb->cpu.f & FLAG_Z))
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
 		return;
+	}
 
 	break_if_smash_attacking(gb);
 	get_pos_at_box_edge(gb, true);
-	gb_call_ret(gb, ADDR_Func_19bfb, (uint16_t)AIRBORNE_RET_LEFT);
-	alu_and(gb, gb->cpu.a, gb->cpu.a);
-	if (!(gb->cpu.f & FLAG_Z))
+	if (!call_in_bank(gb, ADDR_Func_19bfb, (uint16_t)AIRBORNE_RET_LEFT))
 		return;
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
 	gb->cpu.a = rd8(gb, wIsOnSteppableObject);
 	alu_and(gb, gb->cpu.a, gb->cpu.a);
 	if (!(gb->cpu.f & FLAG_Z)) {
 		gb->cpu.b = gb->cpu.a;
+		RET();
 		return;
 	}
 
 	break_if_smash_attacking(gb);
 	get_pos_at_box_edge(gb, false);
-	gb_call_ret(gb, ADDR_Func_19bfb, (uint16_t)AIRBORNE_RET_RIGHT);
-	alu_and(gb, gb->cpu.a, gb->cpu.a);
-	if (!(gb->cpu.f & FLAG_Z))
+	if (!call_in_bank(gb, ADDR_Func_19bfb, (uint16_t)AIRBORNE_RET_RIGHT))
 		return;
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
 	gb->cpu.a = rd8(gb, wIsOnSteppableObject);
 	alu_and(gb, gb->cpu.a, gb->cpu.a);
-	if (gb->cpu.f & FLAG_Z)
-		return;
-	gb->cpu.b = gb->cpu.a;
+	if (!(gb->cpu.f & FLAG_Z))
+		gb->cpu.b = gb->cpu.a;
+	RET();
 }
 
 PORT_JUMP(Func_19b5c)
 {
-	uint16_t ret = (uint16_t)(ADDR_Func_19b5c + 3);
-	gb_call_ret(gb, ADDR_ProcessBlock, ret);
-	// A block function can switch the ROM bank; the asm then returns into
-	// whatever bank is mapped, so carry on there.
-	if (gb->rom_bank != BANK_Func_19b5c) {
-		JUMP_TO(ret);
+	if (!call_in_bank(gb, ADDR_ProcessBlock, (uint16_t)(ADDR_Func_19b5c + 3)))
 		return;
-	}
 	gb->cpu.b = gb->cpu.a;
 	RET();
 }
 
-PORT(CheckCentreCollision)
+PORT_JUMP(CheckCentreCollision)
 {
 	// collision in centre
 	gb->cpu.a = 0x01;
 	wr8(gb, wUnused_ced3, 0x01);
-	gb_call_ret(gb, ADDR_Func_198c7, (uint16_t)(ADDR_CheckCentreCollision + 0x08));
-	alu_and(gb, gb->cpu.a, gb->cpu.a);
-	if (!(gb->cpu.f & FLAG_Z))
+	if (!call_in_bank(gb, ADDR_Func_198c7, (uint16_t)(ADDR_CheckCentreCollision + 0x08)))
 		return;
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
 	gb->cpu.a = 0;
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wUnused_ced3, 0);
 
 	// collision on left
 	get_pos_at_box_edge(gb, true);
-	gb_call_ret(gb, ADDR_Func_19b8b, (uint16_t)(ADDR_CheckCentreCollision + 0x2d));
-	alu_and(gb, gb->cpu.a, gb->cpu.a);
-	if (!(gb->cpu.f & FLAG_Z))
+	if (!call_in_bank(gb, ADDR_Func_19b8b, (uint16_t)(ADDR_CheckCentreCollision + 0x2d)))
 		return;
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
 
 	// collision on right
 	get_pos_at_box_edge(gb, false);
-	gb_call_ret(gb, ADDR_Func_19b8b, (uint16_t)(ADDR_CheckCentreCollision + 0x4c));
-	alu_and(gb, gb->cpu.a, gb->cpu.a);
-	if (!(gb->cpu.f & FLAG_Z))
+	if (!call_in_bank(gb, ADDR_Func_19b8b, (uint16_t)(ADDR_CheckCentreCollision + 0x4c)))
 		return;
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
 
 	gb->cpu.a = rd8(gb, wIsOnSteppableObject);
 	alu_and(gb, gb->cpu.a, gb->cpu.a);
-	if (gb->cpu.f & FLAG_Z)
+	if (gb->cpu.f & FLAG_Z) {
+		RET();
 		return;
+	}
 	gb->cpu.b = gb->cpu.a;
 	// get_pos_y
 	gb->cpu.a = rd8(gb, wWarioYPos);
@@ -314,22 +345,27 @@ PORT(CheckCentreCollision)
 	SET_HL(gb, wWarioYPos + 1);
 	SET_DE(gb, hYPosHi + 1);
 	gb->cpu.a = 0x01;
+	RET();
 }
 
-PORT(Func_19bce)
+PORT_JUMP(Func_19bce)
 {
-	gb_call_ret(gb, ADDR_ProcessBlock, (uint16_t)(ADDR_Func_19bce + 3));
+	if (!call_in_bank(gb, ADDR_ProcessBlock, (uint16_t)(ADDR_Func_19bce + 3)))
+		return;
 	gb->cpu.b = gb->cpu.a;
+	RET();
 }
 
-PORT(Func_19823)
+PORT_JUMP(Func_19823)
 {
 	gb->cpu.a = TRUE;
 	wr8(gb, wBlockFuncBreakFlag, TRUE);
-	gb_call_ret(gb, ADDR_Func_19bd3, ADDR_Func_19823 + 0x08);
+	if (!call_in_bank(gb, ADDR_Func_19bd3, ADDR_Func_19823 + 0x08))
+		return;
 	gb->cpu.a = 0x01;
 	wr8(gb, wUnused_c18d, 0x01);
 	gb->cpu.b = 0x01;
+	RET();
 }
 
 // --- more collision checks ---
@@ -389,15 +425,8 @@ static void check_bottom_collision(GB *gb, bool right)
 	hpos_from_wario(gb, right, cx, flat ? cy_bottom_1 : cy_bottom_7);
 	gb->cpu.a = alu_and(gb, rd8(gb, hYPosLo), 0xf0);
 	wr8(gb, wc0dc, gb->cpu.a);
-	uint16_t ret = (uint16_t)(routine + (right ? 0x5d : 0x61));
-	gb_call_ret(gb, ADDR_Func_19bc3, ret);
-	// A block function can switch the ROM bank (a fuzzed block function
-	// table can send ProcessBlock anywhere). The asm then returns into
-	// whatever bank is mapped, so carry on there.
-	if (gb->rom_bank != BANK_CheckBottomRightCollision) {
-		JUMP_TO(ret);
+	if (!call_in_bank(gb, ADDR_Func_19bc3, (uint16_t)(routine + (right ? 0x5d : 0x61))))
 		return;
-	}
 	gb->cpu.a = alu_and(gb, gb->cpu.a, 0x0f);
 	if (ZF) {
 		JUMP_TO(ADDR_Func_19832);
@@ -439,23 +468,35 @@ PORT_JUMP(CheckFrontCollision)
 }
 
 // ld a, TRUE / ld [wBlockFuncWarioFlag], a / call routine / xor a /
-// ld [wBlockFuncWarioFlag], a
-static void as_wario(GB *gb, uint16_t routine, uint16_t ret)
+// ld [wBlockFuncWarioFlag], a; false when the call came back in another bank
+static bool as_wario(GB *gb, uint16_t routine, uint16_t ret)
 {
 	gb->cpu.a = TRUE;
 	wr8(gb, wBlockFuncWarioFlag, TRUE);
-	gb_call_ret(gb, routine, ret);
+	if (!call_in_bank(gb, routine, ret))
+		return false;
 	gb->cpu.a = 0;
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wBlockFuncWarioFlag, FALSE);
+	return true;
 }
 
-PORT(Func_19706) { as_wario(gb, ADDR_Func_19741, ADDR_Func_19706 + 0x08); }
-PORT(Func_19713) { as_wario(gb, ADDR_Func_197b1, ADDR_Func_19713 + 0x08); }
+PORT_JUMP(Func_19706)
+{
+	if (as_wario(gb, ADDR_Func_19741, ADDR_Func_19706 + 0x08))
+		RET();
+}
+
+PORT_JUMP(Func_19713)
+{
+	if (as_wario(gb, ADDR_Func_197b1, ADDR_Func_19713 + 0x08))
+		RET();
+}
 
 PORT_JUMP(Func_19720)
 {
-	as_wario(gb, ADDR_CheckAirborneCollision, ADDR_Func_19720 + 0x08);
+	if (!as_wario(gb, ADDR_CheckAirborneCollision, ADDR_Func_19720 + 0x08))
+		return;
 	gb->cpu.a = gb->cpu.b;
 	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
 		JUMP(TriggerFloorTransition);
@@ -463,7 +504,7 @@ PORT_JUMP(Func_19720)
 		JUMP(TriggerDownwardsFloorTransition);
 }
 
-PORT(Func_19832)
+PORT_JUMP(Func_19832)
 {
 	bool skip = co_ld_and(gb, wIsCrouching);
 	if (!skip) {
@@ -479,15 +520,21 @@ PORT(Func_19832)
 	if (!skip) {
 		gb->cpu.a = TRUE;
 		wr8(gb, wBlockFuncBreakFlag, TRUE);
-		gb_call_ret(gb, ADDR_Func_19bd3, ADDR_Func_19832 + 0x23);
-		gb->cpu.a = alu_and(gb, gb->cpu.a, 0x0f);
-		if (ZF)
+		if (!call_in_bank(gb, ADDR_Func_19bd3, ADDR_Func_19832 + 0x23))
 			return;
+		gb->cpu.a = alu_and(gb, gb->cpu.a, 0x0f);
+		if (ZF) {
+			RET();
+			return;
+		}
 		static const uint16_t checks[] = {wJumpVelTable, wAttackCounter, wWaterInteraction,
 			wIsCrouching, wIsOnSteppableObject, wTransformation, wIsInSand, 0};
-		for (const uint16_t *p = checks; *p; p++)
-			if (co_ld_and(gb, *p))
+		for (const uint16_t *p = checks; *p; p++) {
+			if (co_ld_and(gb, *p)) {
+				RET();
 				return;
+			}
+		}
 		gb->cpu.a = rd8(gb, wJoypadDown);
 		bool right;
 		if (alu_bit(gb, gb->cpu.a, B_PAD_RIGHT))
@@ -510,6 +557,7 @@ PORT(Func_19832)
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wUnused_c18d, 0);
 	gb->cpu.b = 0;
+	RET();
 }
 
 static void break_unless_puffy(GB *gb)
@@ -523,7 +571,7 @@ static void break_unless_puffy(GB *gb)
 	wr8(gb, wBlockFuncBreakFlag, TRUE);
 }
 
-PORT(Func_19942)
+PORT_JUMP(Func_19942)
 {
 	break_unless_puffy(gb);
 	// 2 pixels above collision box
@@ -538,50 +586,63 @@ PORT(Func_19942)
 	wr8(gb, hXPosLo - 3, gb->cpu.a);
 	SET_HL(gb, wWarioYPos);
 	SET_DE(gb, hXPosLo - 3);
-	gb_call_ret(gb, ADDR_Func_19beb, ADDR_Func_19942 + 0x2b);
+	if (call_in_bank(gb, ADDR_Func_19beb, ADDR_Func_19942 + 0x2b))
+		RET();
 }
 
-PORT(CheckUpCollision)
+PORT_JUMP(CheckUpCollision)
 {
 	gb->cpu.a = TRUE;
 	wr8(gb, wJumpCollision, TRUE);
-	gb_call_ret(gb, ADDR_Func_19942, ADDR_CheckUpCollision + 0x08);
-	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+	if (!call_in_bank(gb, ADDR_Func_19942, ADDR_CheckUpCollision + 0x08))
 		return;
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
 	gb->cpu.a = 0;
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wJumpCollision, 0);
 	break_unless_puffy(gb);
 	// left collision boundary - 3 pixels
 	hpos_from_wario(gb, false, alu_sub(gb, neg(gb, wCollisionBoxLeft), 3), cy_top_2);
-	gb_call_ret(gb, ADDR_Func_19b9b, ADDR_CheckUpCollision + 0x44);
-	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+	if (!call_in_bank(gb, ADDR_Func_19b9b, ADDR_CheckUpCollision + 0x44))
 		return;
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
 	break_unless_puffy(gb);
 	hpos_from_wario(gb, true, alu_sub(gb, rd8(gb, wCollisionBoxRight), 3), cy_top_2);
-	gb_call_ret(gb, ADDR_Func_19b9b, ADDR_CheckUpCollision + 0x7a);
+	if (call_in_bank(gb, ADDR_Func_19b9b, ADDR_CheckUpCollision + 0x7a))
+		RET();
 }
 
-PORT(Func_19a77)
+PORT_JUMP(Func_19a77)
 {
 	gb->cpu.a = 0;
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wc1ca, FALSE);
 	get_pos_at_box_edge(gb, true);
-	gb_call_ret(gb, ADDR_Func_19b3a, ADDR_Func_19a77 + 0x23);
+	if (!call_in_bank(gb, ADDR_Func_19b3a, ADDR_Func_19a77 + 0x23))
+		return;
 	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
-		if (!co_ld_and(gb, wc1ca))
+		if (!co_ld_and(gb, wc1ca)) {
+			RET();
 			return;
+		}
 	}
 	gb->cpu.a = 0;
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wc1ca, FALSE);
 	get_pos_at_box_edge(gb, false);
-	gb_call_ret(gb, ADDR_Func_19b3a, ADDR_Func_19a77 + 0x4c);
-	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+	if (!call_in_bank(gb, ADDR_Func_19b3a, ADDR_Func_19a77 + 0x4c))
 		return;
-	gb->cpu.a = TRUE;
-	wr8(gb, wc1ca, TRUE);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.a = TRUE;
+		wr8(gb, wc1ca, TRUE);
+	}
+	RET();
 }
 
 // processes the block before (or after) wBlockPtr
@@ -592,9 +653,11 @@ static void process_adjacent_block(GB *gb, bool next, uint16_t ret)
 	gb->cpu.a = rd8(gb, hl--);
 	gb->cpu.h = rd8(gb, hl);
 	gb->cpu.l = gb->cpu.a;
-	gb_call_ret(gb, ADDR_ProcessBlock, ret);
+	if (!call_in_bank(gb, ADDR_ProcessBlock, ret))
+		return;
 	gb->cpu.b = gb->cpu.a;
+	RET();
 }
 
-PORT(Func_19bab) { process_adjacent_block(gb, false, ADDR_Func_19bab + 0x0a); }
-PORT(Func_19bb7) { process_adjacent_block(gb, true, ADDR_Func_19bb7 + 0x0a); }
+PORT_JUMP(Func_19bab) { process_adjacent_block(gb, false, ADDR_Func_19bab + 0x0a); }
+PORT_JUMP(Func_19bb7) { process_adjacent_block(gb, true, ADDR_Func_19bb7 + 0x0a); }
