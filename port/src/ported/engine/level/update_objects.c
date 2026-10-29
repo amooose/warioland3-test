@@ -1584,9 +1584,12 @@ PORT_JUMP(ThrowObject_Right) { throw_object(gb, OBJSTATE_4F, OBJSTATE_FULL_THROW
 // checks the floor, and lands on a slope; it vanishes in water or sand, or
 // when it hits a ceiling or a wall. Otherwise it moves by OBJ_VAR_2 and
 // goes on to Func_627f0.
-static void thrown_sideways(GB *gb, bool left)
+// Func_62574 / Func_62605 do the same with other states for a ceiling
+// (ceil_state) or a wall (wall_state) and go on to Func_62690 without the
+// offscreen check.
+static void thrown_sideways(GB *gb, bool left, uint16_t routine, uint8_t ceil_state,
+	uint8_t wall_state, uint16_t next, uint8_t wall_ret)
 {
-	uint16_t routine = left ? ADDR_Func_626da : ADDR_Func_62768;
 	uint16_t hl = wCurObjXPos + 1;
 	gb->cpu.a = rd8(gb, hl--);
 	wr8(gb, hXPosHi, gb->cpu.a);
@@ -1620,8 +1623,11 @@ static void thrown_sideways(GB *gb, bool left)
 	gb->cpu.a = COLLISION_THROWN_OBJ;
 	wr8(gb, wBlockFuncSpecialCollision, gb->cpu.a);
 	gb_call_ret(gb, ADDR_Func_358b, (uint16_t)(routine + 0x50));
-	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
-		goto vanish;
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		st(gb, wCurObjState, ceil_state);
+		JUMP(HomeJumpRet);
+		return;
+	}
 	set_hpos_sub(gb, wCurObjYPos, 8);
 	if (left)
 		hxpos_left_edge(gb, REG_HL(gb));
@@ -1629,15 +1635,19 @@ static void thrown_sideways(GB *gb, bool left)
 		hxpos_right_edge(gb, REG_HL(gb));
 	gb->cpu.a = COLLISION_THROWN_OBJ;
 	wr8(gb, wBlockFuncSpecialCollision, gb->cpu.a);
-	gb_call_ret(gb, ADDR_Func_3513, (uint16_t)(routine + (left ? 0x77 : 0x74)));
-	if (alu_and(gb, gb->cpu.a, 0x0f))
-		goto vanish;
+	gb_call_ret(gb, ADDR_Func_3513, (uint16_t)(routine + wall_ret));
+	if (alu_and(gb, gb->cpu.a, 0x0f)) {
+		st(gb, wCurObjState, wall_state);
+		JUMP(HomeJumpRet);
+		return;
+	}
 	if (left)
 		CALL(MoveObjectLeftByVar2);
 	else
 		CALL(MoveObjectRightByVar2);
-	check_offscreen_grabbed(gb, left);
-	JUMP_TO(ADDR_Func_627f0);
+	if (next == ADDR_Func_627f0)
+		check_offscreen_grabbed(gb, left);
+	JUMP_TO(next);
 	return;
 
 vanish:
@@ -1646,8 +1656,26 @@ vanish:
 	JUMP(HomeJumpRet);
 }
 
-PORT_JUMP(Func_626da) { thrown_sideways(gb, true); }
-PORT_JUMP(Func_62768) { thrown_sideways(gb, false); }
+PORT_JUMP(Func_626da)
+{
+	thrown_sideways(gb, true, ADDR_Func_626da, OBJSTATE_VANISH_TOUCH, OBJSTATE_VANISH_TOUCH,
+		ADDR_Func_627f0, 0x77);
+}
+PORT_JUMP(Func_62768)
+{
+	thrown_sideways(gb, false, ADDR_Func_62768, OBJSTATE_VANISH_TOUCH, OBJSTATE_VANISH_TOUCH,
+		ADDR_Func_627f0, 0x74);
+}
+PORT_JUMP(Func_62574)
+{
+	thrown_sideways(gb, true, ADDR_Func_62574, OBJSTATE_14, OBJSTATE_15,
+		ADDR_Func_62690, 0x77);
+}
+PORT_JUMP(Func_62605)
+{
+	thrown_sideways(gb, false, ADDR_Func_62605, OBJSTATE_15, OBJSTATE_14,
+		ADDR_Func_62690, 0x74);
+}
 
 // --- an object held by Wario ---
 
@@ -1837,3 +1865,190 @@ pick_up:
 
 PORT_JUMP(Func_61f54) { grabbed_object(gb, true); }
 PORT_JUMP(Func_620a6) { grabbed_object(gb, false); }
+
+// wCurObjYPos/XPos = Wario's position, 30 (26 when smash attacking) up and
+// 7 to the right or left
+static void hold_above_wario(GB *gb, bool right)
+{
+	gb->cpu.a = rd8(gb, wIsSmashAttacking);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.a = alu_sub(gb, 30, gb->cpu.e);
+	gb->cpu.e = gb->cpu.a;
+	uint16_t hl = wCurObjYPos;
+	gb->cpu.a = alu_sub(gb, rd8(gb, wWarioYPos + 1), gb->cpu.e);
+	wr8(gb, hl++, gb->cpu.a);
+	gb->cpu.a = alu_sbc(gb, rd8(gb, wWarioYPos + 0), 0);
+	wr8(gb, hl++, gb->cpu.a);
+	if (right) {
+		gb->cpu.a = alu_add(gb, rd8(gb, wWarioXPos + 1), 7);
+		wr8(gb, hl++, gb->cpu.a);
+		gb->cpu.a = alu_adc(gb, rd8(gb, wWarioXPos + 0), 0);
+	} else {
+		gb->cpu.a = alu_sub(gb, rd8(gb, wWarioXPos + 1), 7);
+		wr8(gb, hl++, gb->cpu.a);
+		gb->cpu.a = alu_sbc(gb, rd8(gb, wWarioXPos + 0), 0);
+	}
+	wr8(gb, hl, gb->cpu.a);
+	SET_HL(gb, hl);
+}
+
+static void res_grabbed_at(GB *gb, uint16_t hl)
+{
+	wr8(gb, hl, (uint8_t)(rd8(gb, hl) & ~(1 << OBJFLAG_GRABBED_F)));
+}
+
+// Func_621fb (held to the right) / Func_622bd (held to the left)
+static void held_object(GB *gb, bool right)
+{
+	uint16_t routine = right ? ADDR_Func_621fb : ADDR_Func_622bd;
+	st(gb, wCurObjAction, (1 << NO_ACTIONS_F) | 1);
+	gb->cpu.a = rd8(gb, wGrabState);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_and(gb, gb->cpu.a, 0x0f);
+	alu_cp(gb, gb->cpu.a, GRAB_IDLE);
+	if (!ZF) {
+		alu_cp(gb, gb->cpu.a, GRAB_CHARGE_THROW);
+		if (ZF) {
+			st(gb, wCurObjState, right ? OBJSTATE_4B : OBJSTATE_4A);
+			JUMP(HomeJumpRet);
+			return;
+		}
+		alu_cp(gb, gb->cpu.a, GRAB_THROW);
+		if (ZF) {
+			JUMP_TO(right ? ADDR_ThrowObject_Right : ADDR_ThrowObject_Left);
+			return;
+		}
+		uint16_t hl = wCurObjFlags;
+		res_grabbed_at(gb, hl);
+		hl = (uint16_t)((hl & 0xff00) | OBJ_STATE);
+		SET_HL(gb, hl);
+		if (ld_and(gb, wIsCrouching)) {
+			st(gb, wCurObjVar2, 0x01);
+			gb->cpu.a = right ? OBJSTATE_15 : OBJSTATE_14;
+		} else {
+			gb->cpu.a = OBJSTATE_12;
+		}
+		wr8(gb, hl, gb->cpu.a);
+		JUMP(HomeJumpRet);
+		return;
+	}
+
+	// GrabIdle
+	hold_above_wario(gb, right);
+	neg_into_b(gb, wCurObjCollBoxTop);
+	set_hpos_sub(gb, wCurObjYPos, gb->cpu.b);
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = rd8(gb, hl++);
+	wr8(gb, hXPosLo, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hl++);
+	wr8(gb, hXPosHi, gb->cpu.a);
+	SET_HL(gb, hl);
+	gb_call_ret(gb, ADDR_Func_358b, (uint16_t)(routine + 0x7d));
+	if (!alu_and(gb, gb->cpu.a, right ? 0x0f : 0xff)) {
+		set_hpos_sub(gb, wCurObjYPos, 8);
+		if (right)
+			hxpos_right_edge(gb, REG_HL(gb));
+		else
+			hxpos_left_edge(gb, REG_HL(gb));
+		gb_call_ret(gb, ADDR_Func_3513, (uint16_t)(routine + (right ? 0x9d : 0x9f)));
+		if (!alu_and(gb, gb->cpu.a, right ? 0xff : 0x0f)) {
+			JUMP(HomeJumpRet);
+			return;
+		}
+	}
+	xor_a(gb);
+	wr8(gb, wGrabState, 0);
+	play_sfx(gb, SFX_01A);
+	st(gb, wCurObjVar2, 0x02);
+	hl = wCurObjAction;
+	gb->cpu.a = 31 | (1 << 7);
+	wr8(gb, hl--, gb->cpu.a);
+	gb->cpu.a = right ? OBJSTATE_14 : OBJSTATE_15;
+	wr8(gb, hl, gb->cpu.a); // OBJ_STATE
+	hl = (uint16_t)((hl & 0xff00) | OBJ_FLAGS);
+	SET_HL(gb, hl);
+	res_grabbed_at(gb, hl);
+	JUMP(HomeJumpRet);
+}
+
+PORT_JUMP(Func_621fb) { held_object(gb, true); }
+PORT_JUMP(Func_622bd) { held_object(gb, false); }
+
+// Func_6247b (charging a throw to the right) / Func_62382 (to the left)
+static void charging_throw(GB *gb, bool right)
+{
+	uint16_t routine = right ? ADDR_Func_6247b : ADDR_Func_62382;
+	st(gb, wCurObjAction, (1 << NO_ACTIONS_F) | 1);
+	gb->cpu.a = rd8(gb, wGrabState);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_and(gb, gb->cpu.a, 0x0f);
+	alu_cp(gb, gb->cpu.a, GRAB_CHARGE_THROW);
+	bool charge = ZF;
+	if (!charge) {
+		alu_cp(gb, gb->cpu.a, GRAB_THROW_FULLY_CHARGED);
+		charge = ZF;
+	}
+	if (charge) {
+		hold_above_wario(gb, right);
+		JUMP(HomeJumpRet);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, GRAB_HOLD_FULL_CHARGE);
+	if (ZF) {
+		uint16_t hl = hPickedUpObjPos;
+		gb->cpu.a = alu_sub(gb, rd8(gb, wWarioYPos + 1), 30);
+		wr8(gb, hl++, gb->cpu.a);
+		gb->cpu.a = alu_sbc(gb, rd8(gb, wWarioYPos + 0), 0);
+		wr8(gb, hl++, gb->cpu.a);
+		if (right) {
+			gb->cpu.a = alu_sub(gb, rd8(gb, wWarioXPos + 1), 5);
+			wr8(gb, hl++, gb->cpu.a);
+			gb->cpu.a = alu_sbc(gb, rd8(gb, wWarioXPos + 0), 0);
+		} else {
+			gb->cpu.a = alu_add(gb, rd8(gb, wWarioXPos + 1), 5);
+			wr8(gb, hl++, gb->cpu.a);
+			gb->cpu.a = alu_adc(gb, rd8(gb, wWarioXPos + 0), 0);
+		}
+		wr8(gb, hl++, gb->cpu.a);
+		set_hpos_sub(gb, hPickedUpObjPos, 4);
+		hl = REG_HL(gb);
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, hXPosLo, gb->cpu.a);
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, hXPosHi, gb->cpu.a);
+		SET_HL(gb, hl);
+		gb_call_ret(gb, ADDR_Func_3513, (uint16_t)(routine + 0x81));
+		if (!alu_and(gb, gb->cpu.a, 0x0f)) {
+			hl = hPickedUpObjPos;
+			uint16_t de = wCurObjYPos;
+			for (int i = 0; i < 4; i++) {
+				gb->cpu.a = rd8(gb, hl++);
+				wr8(gb, de, gb->cpu.a);
+				if (i < 3)
+					de = (uint16_t)((de & 0xff00) | alu_inc(gb, (uint8_t)de)); // inc e
+			}
+			SET_HL(gb, hl);
+			SET_DE(gb, de);
+			JUMP(HomeJumpRet);
+			return;
+		}
+		xor_a(gb);
+		wr8(gb, wGrabState, 0);
+		play_sfx(gb, SFX_01A);
+	} else {
+		alu_cp(gb, gb->cpu.a, GRAB_THROW);
+		if (ZF) {
+			JUMP_TO(right ? ADDR_ThrowObject_Right : ADDR_ThrowObject_Left);
+			return;
+		}
+	}
+	SET_HL(gb, wCurObjFlags);
+	res_grabbed_at(gb, wCurObjFlags);
+	st(gb, wCurObjState, OBJSTATE_12);
+	JUMP(HomeJumpRet);
+}
+
+PORT_JUMP(Func_6247b) { charging_throw(gb, true); }
+PORT_JUMP(Func_62382) { charging_throw(gb, false); }
