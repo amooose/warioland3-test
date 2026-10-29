@@ -655,19 +655,18 @@ PORT_JUMP(_ObjState_Fall)
 	obj_fall_and_land(gb, ADDR__ObjState_Fall + 0x3d, OBJSTATE_LAND);
 }
 
-PORT_JUMP(Func_627f0)
+// Func_627f0 / Func_62690: moves the object up or down by the table entry
+// at OBJ_VAR_3 (table_z if b was 1, else table_nz; +$20 if heavy) and
+// advances OBJ_VAR_3 until the table's $80 end marker.
+static void obj_y_by_table(GB *gb, uint16_t table_z, uint16_t table_nz)
 {
 	uint16_t hl = (uint16_t)((REG_HL(gb) & 0xff00) | OBJ_VAR_3);
 	SET_HL(gb, hl);
 	gb->cpu.a = rd8(gb, hl);
 	gb->cpu.b = alu_dec(gb, gb->cpu.b);
-	if (ZF) {
-		gb->cpu.b = 0x41;
-		gb->cpu.a = alu_add(gb, gb->cpu.a, 0x40);
-	} else {
-		gb->cpu.b = 0x40;
-		gb->cpu.a = alu_add(gb, gb->cpu.a, 0xc0);
-	}
+	uint16_t table = ZF ? table_z : table_nz;
+	gb->cpu.b = (uint8_t)(table >> 8);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, (uint8_t)table);
 	gb->cpu.c = gb->cpu.a;
 	gb->cpu.a = alu_rla(gb, rd8(gb, wCurObjInteractionType));
 	if (CF) {
@@ -703,6 +702,9 @@ PORT_JUMP(Func_627f0)
 		wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
 	JUMP(HomeJumpRet);
 }
+
+PORT_JUMP(Func_627f0) { obj_y_by_table(gb, ADDR_Data_60140, ADDR_Data_600c0); }
+PORT_JUMP(Func_62690) { obj_y_by_table(gb, ADDR_Data_60100, ADDR_Data_60080); }
 
 // --- misc states ---
 
@@ -1535,3 +1537,114 @@ PORT_JUMP(_VanishObject2)
 	gb_call(gb, ADDR__VanishObject);
 	JUMP(HomeJumpRet);
 }
+
+// --- throwing a grabbed object ---
+
+// ThrowObject_Left / ThrowObject_Right: b bit 6 set for a full throw.
+// OBJ_VAR_2 = the throw strength (1 when holding up), state = the throw
+// state, action = 31 | (1 << 7).
+static void throw_object(GB *gb, uint8_t state, uint8_t full_state)
+{
+	play_sfx(gb, SFX_THROW);
+	uint16_t hl = wCurObjInteractionType;
+	gb->cpu.a = alu_or(gb, alu_and(gb, rd8(gb, hl), HEAVY_OBJ), OBJ_INTERACTION_00);
+	wr8(gb, hl, gb->cpu.a);
+	gb->cpu.a = alu_rla(gb, gb->cpu.a);
+	hl = (uint16_t)((hl & 0xff00) | OBJ_STATE_DURATION);
+	gb->cpu.a = 0;
+	wr8(gb, hl++, 0);
+	hl = (uint16_t)((hl & 0xff00) | alu_inc(gb, (uint8_t)hl)); // inc l
+	bool full = alu_bit(gb, gb->cpu.b, 6);
+	if (full) {
+		gb->cpu.b = 0x04;
+	} else {
+		gb->cpu.b = CF ? 0x02 : 0x03;
+	}
+	gb->cpu.a = rd8(gb, wJoypadDown);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_UP))
+		gb->cpu.b = 0x01;
+	gb->cpu.a = gb->cpu.b;
+	wr8(gb, hl++, gb->cpu.a); // OBJ_VAR_2
+	xor_a(gb);
+	wr8(gb, hl++, 0); // OBJ_VAR_3
+	hl = (uint16_t)((hl & 0xff00) | alu_inc(gb, (uint8_t)hl)); // inc l
+	gb->cpu.a = full ? full_state : state;
+	wr8(gb, hl++, gb->cpu.a); // OBJ_STATE
+	gb->cpu.a = 31 | (1 << 7);
+	wr8(gb, hl--, gb->cpu.a); // OBJ_ACTION
+	SET_HL(gb, hl);
+	JUMP(HomeJumpRet);
+}
+
+PORT_JUMP(ThrowObject_Left) { throw_object(gb, OBJSTATE_4E, OBJSTATE_FULL_THROW_LEFT_START); }
+PORT_JUMP(ThrowObject_Right) { throw_object(gb, OBJSTATE_4F, OBJSTATE_FULL_THROW_RIGHT_START); }
+
+// Func_626da (moving left) / Func_62768 (moving right): a thrown object
+// moving sideways. While it's going down (wCurObjStateDuration set) it
+// checks the floor, and lands on a slope; it vanishes in water or sand, or
+// when it hits a ceiling or a wall. Otherwise it moves by OBJ_VAR_2 and
+// goes on to Func_627f0.
+static void thrown_sideways(GB *gb, bool left)
+{
+	uint16_t routine = left ? ADDR_Func_626da : ADDR_Func_62768;
+	uint16_t hl = wCurObjXPos + 1;
+	gb->cpu.a = rd8(gb, hl--);
+	wr8(gb, hXPosHi, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hl--);
+	wr8(gb, hXPosLo, gb->cpu.a);
+	SET_HL(gb, hl);
+	if (ld_and(gb, wCurObjStateDuration)) {
+		gb->cpu.a = rd8(gb, hl--);
+		wr8(gb, hYPosHi, gb->cpu.a);
+		gb->cpu.a = rd8(gb, hl);
+		wr8(gb, hYPosLo, gb->cpu.a);
+		SET_HL(gb, hl);
+		xor_a(gb);
+		wr8(gb, wc1ca, FALSE);
+		gb->cpu.a = alu_inc(gb, gb->cpu.a);
+		wr8(gb, wBlockFuncSpecialCollision, gb->cpu.a); // COLLISION_THROWN_OBJ
+		gb_call_ret(gb, ADDR_Func_352b, (uint16_t)(routine + 0x20));
+		alu_and(gb, gb->cpu.a, gb->cpu.a);
+		gb->cpu.a = 0x03;
+		wr8(gb, hffa0, gb->cpu.a);
+		if (!ZF) {
+			JUMP_TO(left ? ADDR_Func_62d34 : ADDR_Func_62e0f);
+			return;
+		}
+		if (ld_and(gb, wIsInWaterOrSand))
+			goto vanish;
+	}
+
+	neg_into_b(gb, wCurObjCollBoxTop);
+	set_hpos_sub(gb, wCurObjYPos, gb->cpu.b);
+	gb->cpu.a = COLLISION_THROWN_OBJ;
+	wr8(gb, wBlockFuncSpecialCollision, gb->cpu.a);
+	gb_call_ret(gb, ADDR_Func_358b, (uint16_t)(routine + 0x50));
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+		goto vanish;
+	set_hpos_sub(gb, wCurObjYPos, 8);
+	if (left)
+		hxpos_left_edge(gb, REG_HL(gb));
+	else
+		hxpos_right_edge(gb, REG_HL(gb));
+	gb->cpu.a = COLLISION_THROWN_OBJ;
+	wr8(gb, wBlockFuncSpecialCollision, gb->cpu.a);
+	gb_call_ret(gb, ADDR_Func_3513, (uint16_t)(routine + (left ? 0x77 : 0x74)));
+	if (alu_and(gb, gb->cpu.a, 0x0f))
+		goto vanish;
+	if (left)
+		CALL(MoveObjectLeftByVar2);
+	else
+		CALL(MoveObjectRightByVar2);
+	check_offscreen_grabbed(gb, left);
+	JUMP_TO(ADDR_Func_627f0);
+	return;
+
+vanish:
+	gb->cpu.a = OBJSTATE_VANISH_TOUCH;
+	wr8(gb, wCurObjState, gb->cpu.a);
+	JUMP(HomeJumpRet);
+}
+
+PORT_JUMP(Func_626da) { thrown_sideways(gb, true); }
+PORT_JUMP(Func_62768) { thrown_sideways(gb, false); }
