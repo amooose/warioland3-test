@@ -1413,3 +1413,62 @@ PORT_JUMP(Func_1eb46)
 		st(gb, wDirection, DIRECTION_LEFT);
 	LJUMP(SetState_CrouchWalking);
 }
+
+PORT_JUMP(UpdateState_Diving)
+{
+	FARCALL(CheckCentreCollision);
+	ld_cp(gb, wWarioState, WST_DIVING);
+	if (!ZF) {
+		RET();
+		return;
+	}
+	if (!b_and(gb)) {
+		LCALL(HandleDivingHorizontalMovement);
+		gb->cpu.a = inc_counter(gb);
+		alu_cp(gb, gb->cpu.a, 10);
+		if (CF) {
+			gb->cpu.b = 2;
+		} else {
+			alu_cp(gb, gb->cpu.a, 14);
+			if (!CF) {
+				LJUMP(SetState_Submerged);
+				return;
+			}
+			gb->cpu.b = 1;
+		}
+		CALL(MoveWarioDown);
+		FARCALL(CheckCentreCollision);
+		if (!b_and(gb)) {
+			RET();
+			return;
+		}
+	}
+	// .submerge
+	update_pos_y(gb);
+	LJUMP(SetState_Submerged); // fallthrough
+}
+
+PORT_JUMP(Func_1f825)
+{
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		xor_a(gb);
+		wr8(gb, wIsRolling, 0);
+		LJUMP(StartJump_FromInput);
+		return;
+	}
+	bool right = facing_right(gb);
+	if (ld_bit(gb, wJoypadPressed, right ? B_PAD_LEFT : B_PAD_RIGHT)) {
+		xor_a(gb);
+		wr8(gb, wIsRolling, 0);
+		LJUMP(SetState_Idling);
+		return;
+	}
+	if (right)
+		LCALL(WalkIfPossible_Right);
+	else
+		LCALL(WalkIfPossible_Left);
+	ld_cp(gb, wWalkVelIndex, 0x08);
+	if (!CF)
+		st(gb, wWalkVelIndex, 0x04);
+	RET();
+}
