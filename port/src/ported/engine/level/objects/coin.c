@@ -3,7 +3,7 @@
 
 #define CF(off) ((uint16_t)(ADDR_CoinFunc + (off)))
 #define COIN_UPDATE CF(0x2f) // .Update
-#define COIN_TABLE CF(0x77) // the table after .state_table's rst JumpTable
+#define COIN_TABLE CF(0x7a) // the table after .state_table's rst JumpTable
 
 // rst JumpTable: a = index, table = the address after the rst
 static uint16_t jumptable(GB *gb, uint16_t table)

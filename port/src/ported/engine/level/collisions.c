@@ -260,10 +260,18 @@ PORT(CheckAirborneCollision)
 	gb->cpu.b = gb->cpu.a;
 }
 
-PORT(Func_19b5c)
+PORT_JUMP(Func_19b5c)
 {
-	gb_call_ret(gb, ADDR_ProcessBlock, (uint16_t)(ADDR_Func_19b5c + 3));
+	uint16_t ret = (uint16_t)(ADDR_Func_19b5c + 3);
+	gb_call_ret(gb, ADDR_ProcessBlock, ret);
+	// A block function can switch the ROM bank; the asm then returns into
+	// whatever bank is mapped, so carry on there.
+	if (gb->rom_bank != BANK_Func_19b5c) {
+		JUMP_TO(ret);
+		return;
+	}
 	gb->cpu.b = gb->cpu.a;
+	RET();
 }
 
 PORT(CheckCentreCollision)
