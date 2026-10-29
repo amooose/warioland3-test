@@ -1424,3 +1424,37 @@ PORT(SetState_FlatAirborne)
 	set_frameset(gb, ADDR_Frameset_171bd);
 	anim(gb, OAM1);
 }
+
+PORT_JUMP(UpdateState_FatBumping)
+{
+	anim(gb, OAM1);
+	if (!anim_ended(gb)) {
+		RET();
+		return;
+	}
+	LJUMP(SetState_FatIdling);
+}
+
+PORT_JUMP(UpdateState_ZombieIdling)
+{
+	FARCALL(Func_19b25);
+	ld_cp(gb, wWarioState, WST_ZOMBIE_IDLING);
+	if (!ZF) {
+		RET();
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	ld_cp(gb, wWarioState, WST_ZOMBIE_IDLING);
+	if (!ZF) {
+		RET();
+		return;
+	}
+	if (!b_and(gb)) {
+		LJUMP(Func_29bb9);
+		return;
+	}
+	update_pos_y(gb);
+	anim(gb, OAM2);
+	LCALL(Func_2b34e);
+	RET();
+}
