@@ -27,20 +27,23 @@ scripting and expansion on top. The approach:
 
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`. All
   work is pushed and the tests are green.
-- **Progress:** before this session's last merges, 1371 / 3491 routines
-  (39.3%) and 33.8% of the instructions were ported. More was merged after
-  that (see "Good next batches"); rerun the progress target for current
-  numbers. With hooks on, about half of what the game executes runs as
-  C. Run `cmake --build build --target progress` and read
-  `build/progress.md` for the per-directory numbers and the "ready to port"
-  list.
-- **Fully ported:** `src/audio`. `src/home` is about 72% ported (by
-  instructions), 29% of the level engine (8% of the objects), 22% of the
-  overworld, and 25-35% of the title, pause, clear and action help code.
-- **Tests:** `ctest --test-dir build -j6` (about 16 minutes now; the
-  fuzz passes grow with every port) runs a difftest and a fuzz pass
-  for each input in `tests/inputs/` (8 tests with the 4 inputs there now;
-  `action_help2` is a local recording that isn't committed yet).
+- **Progress (2026-10-29):** 2136 / 3491 routines (61.2%) and 60.5% of
+  the instructions are ported. Run `cmake --build build --target progress`
+  and read `build/progress.md` for the per-directory numbers and the
+  "ready to port" list.
+- **By area (instructions):**
+  - Fully ported: `src/audio` and the action help power-ups.
+  - Mostly ported: action help 89%, level objects 82%, `src/home` 73%.
+  - About half: the level engine 51% (30k instructions, the biggest gap)
+    and the overworld 41% (22k).
+  - Little: title 34%, clear 31%, pause 27%, save 16%.
+  - Not started: golf, credits, game over, perfect.
+- **Tests:** `ctest --test-dir build -j6` takes about 20 minutes, and the
+  fuzz passes grow with every port, so run it in the background. It runs a
+  difftest and a fuzz pass for each input in `tests/inputs/`. Three inputs
+  are committed. `action_help2` and `coin_bug` are the user's local
+  recordings and aren't committed, but a local ctest picks them up (10
+  tests).
 
 ## Building
 
@@ -60,7 +63,7 @@ scripting and expansion on top. The approach:
 ```sh
 cmake -B build -S .            # rerun after adding new .c files (CONFIGURE_DEPENDS usually catches it)
 cmake --build build -j8
-ctest --test-dir build -j6     # ~1 min
+ctest --test-dir build -j6     # ~20 min
 ```
 
 A local Claude Code session on Windows usually runs Git Bash, which lacks
@@ -119,12 +122,22 @@ Each step that worked in the cloud session:
   `fuzz: PASS`.
 - **Commit early:** agents must commit verified work often. A session that
   hits the usage limit leaves everything uncommitted stranded.
+- **Few agents:** six large agents at once used up a whole session's usage
+  limit before most of their work was verified. Two or three, each with a
+  small batch, works better.
+- **Session restarts** kill the agents' background tasks. Check their task
+  output for "[killed]"; a leftover `wl3.exe` process doesn't mean they're
+  still running.
 
 Four agents ported 512 routines at once this way:
 
 - Make a git worktree per agent by hand (`git -c safe.directory=* worktree
   add -b port/<area> ../wl3-wt-<area> HEAD`). The Agent tool's own worktree
   isolation refuses this repo (the ownership check fails).
+  - Copy `warioland3.gbc` / `.sym` and the local recordings into the
+    worktree.
+  - Configure it without the ROM build: `cmake -S . -B build -G Ninja
+    -DWL3_BUILD_ROM=OFF -DRGBDS=C:/rgbds/`.
 - Give each agent a disjoint set of files (objects; Wario states and
   mechanics; overworld; everything else), and forbid edits to `ported.h`
   and the docs, so the commits cherry-pick cleanly.
@@ -163,6 +176,19 @@ Four agents ported 512 routines at once this way:
   in `syms.h`; take their offsets from `warioland3.sym`, which has them
   (`Func_810fc.PathNone`), and write `ADDR_Routine + offset`.
   `Func_810fc` and `SetSceneWarioState` do this.
+- **Jump-table offsets are never verified.** A routine that dispatches
+  through its own `rst JumpTable` jumps into its own code, so the difftest
+  and the fuzzer always call it inconclusive. A wrong table address passes
+  every test and only shows in play. `CoinFunc`'s table was 3 bytes off,
+  so coins re-ran their pickup state forever: lag and an endless pickup
+  sound. Check each table address against the ROM: the byte before it must
+  be `$ef`. Check each `gb_call_ret` return address too: the bytes before
+  it must be a `call` to the same routine.
+- **Bank changes after `gb_call_ret`.** A callee (a block function, for
+  example) can come back with another ROM bank mapped. The asm then returns
+  into whatever that bank holds, so check `gb->rom_bank` after the call and
+  `JUMP_TO(ret)` when it changed. The routine has to be a `PORT_JUMP` for
+  that. `Func_19b5c` and `CheckBottomRightCollision` do this.
 - **`dec l` / `inc e` versus `hld` / `hli`.** The 8-bit ones don't carry into
   the high byte, so model them as 8-bit.
 - **Unmasked arithmetic.** Fade components can wrap below 0 and then spill
@@ -220,22 +246,23 @@ Four agents ported 512 routines at once this way:
 
 ## Good next batches
 
-**Where the last session left off (2026-10-27):** six parallel agents
-(objects A-D / E-O / P-Z, overworld, level, misc) ported a lot more than got
-verified before the usage limit. Verified work is merged here. The rest is
-pushed as `wip/*` branches on the remote. Each branch is a verified commit
-plus one "WIP (unverified)" commit on top:
+**State (2026-10-29):** all the unverified work from the 2026-10-27
+session is now verified and merged. That covers the level, overworld,
+misc, obj2 and obj3 `wip/*` branches. The `wip/*` branches on the remote
+are no longer needed. `HandFunc.Func_477f3` (once a FAIL) passes with no
+code change. The `Func_19741` failure was a bank return in the bottom
+collision code, and it's fixed.
 
-| Branch | WIP commit | What's unverified |
-| --- | --- | --- |
-| `wip/obj2` | `030aaae` | hand, haridama, hebarii, mad_scienstein, nobiiru, octohon, muddee, jamano, omodonmeka, hidden_figure (`HandFunc.Func_477f3` is known to FAIL: wCurObjVar1 02 vs 01) |
-| `wip/obj3` | `436b991` | pesce, prince_froggy, scowler, shoot, snake, webber, wormwould, yellow_belly, tadpole, unused_flower, water_drop, wolfenboss, stove, rock, zip_line, part of robo_mouse/spear_bot (about 250 of 600 fuzz runs done, all PASS) |
-| `wip/misc` | `19e472e` | grab_gloves and 9 more action_help power-up files |
-| `wip/level` | `b0c181a` | the rest of the level engine batch. Its two "verified" commits (`71d9565` scroll/spawn edge, `2b331df` 152 level routines) also aren't merged: the full ctest failed `fuzz_n1_full_clear` on `Func_19741` (call 512, variant 169: the asm leaves ime=1 and bank 6, and changes `wBlockFunctionTable`). That looks like a rare path in the shared bottom-collision code. |
-| `wip/overworld` | (see branch) | about 250 overworld routines (UpdateTopBar, HandleBottomBar, DayNightTransition, temple/prologue/cutscene scenes); their earlier fuzz runs were void (CRLF in routine names) |
+In order:
 
-To finish one: cherry-pick its WIP commit, fuzz every PORT in its diff on
-all inputs, fix the FAILs, drop what still fails, run the full ctest.
+1. **Bank-return sweep.** Check the remaining `gb_call` / `gb_call_ret`
+   sites for a callee that can switch the ROM bank (see the pitfall
+   above).
+2. **Wario states** in the level engine. The top of "Ready to port" is
+   `SetState_Idling`, `WalkIfPossible_Right` / `_Left`, `SetState_Stung`
+   and `UpdateParticles`.
+3. **The overworld**, then the small screens: save, title, pause,
+   credits, game over.
 
 - **Not portable as is:** `EnableDoubleSpeed` (`stop`), `Func_81feb` (its
   `debug_nop` path loops forever), and `ZombieFunc.OnUnderground` (its bank 6
