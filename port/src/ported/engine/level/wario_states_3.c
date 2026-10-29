@@ -1458,3 +1458,165 @@ PORT_JUMP(UpdateState_ZombieIdling)
 	LCALL(Func_2b34e);
 	RET();
 }
+
+// farcall f / ld a, b / and a; true if nz
+static bool farcall_b(GB *gb, uint8_t bank, uint16_t addr)
+{
+	port_farcall(gb, bank, addr);
+	return b_and(gb);
+}
+
+PORT(Func_2b1cc)
+{
+	if (!facing_right(gb)) {
+		gb->cpu.b = 2;
+		CALL(MoveWarioLeft);
+		if (farcall_b(gb, BANK_Func_197b1, ADDR_Func_197b1)) {
+			gb->cpu.b = 2;
+			CALL(MoveWarioRight);
+		}
+	} else {
+		gb->cpu.b = 2;
+		CALL(MoveWarioRight);
+		if (farcall_b(gb, BANK_Func_19741, ADDR_Func_19741)) {
+			gb->cpu.b = 2;
+			CALL(MoveWarioLeft);
+		}
+	}
+	gb->cpu.a = rd8(gb, wJumpVelIndex);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0;
+	uint16_t hl = alu_add16(gb, ADDR_JumpVelTable_Normal, REG_DE(gb));
+	SET_HL(gb, hl);
+	uint8_t v = rd8(gb, hl);
+	if (alu_bit(gb, v, 7)) {
+		gb->cpu.a = alu_inc(gb, alu_cpl(gb, rd8(gb, hl)));
+		gb->cpu.b = gb->cpu.a;
+		CALL(MoveWarioUp);
+		SET_HL(gb, wJumpVelIndex);
+		wr8(gb, wJumpVelIndex, alu_inc(gb, rd8(gb, wJumpVelIndex)));
+	} else {
+		gb->cpu.b = v;
+		CALL(MoveWarioDown);
+		SET_HL(gb, wJumpVelIndex);
+		gb->cpu.a = alu_inc(gb, rd8(gb, wJumpVelIndex));
+		wr8(gb, wJumpVelIndex, gb->cpu.a);
+		alu_cp(gb, gb->cpu.a, MAX_JUMP_VEL_INDEX);
+		if (!CF)
+			wr8(gb, wJumpVelIndex, MAX_JUMP_VEL_INDEX);
+	}
+}
+
+PORT_JUMP(UpdateState_BallOString)
+{
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return;
+	}
+	sfx_loop(gb, 12, SFX_ROLL);
+	anim(gb, OAM1);
+	if (!facing_right(gb)) {
+		CALL(ApplyWalkVelocity_Left);
+		CALL(MoveWarioLeft);
+	} else {
+		CALL(ApplyWalkVelocity_Right);
+		CALL(MoveWarioRight);
+	}
+	ld_cp(gb, wWalkVelIndex, 0x18);
+	if (!CF)
+		st(gb, wWalkVelIndex, 0x14);
+	FARCALL(CheckFrontCollision);
+	gb->cpu.a = alu_and(gb, gb->cpu.b, 0x0f);
+	if (gb->cpu.a) {
+		LJUMP(Func_28bd5);
+		return;
+	}
+	if (farcall_b(gb, BANK_CheckCentreCollision, ADDR_CheckCentreCollision) == false) {
+		LJUMP(Func_28c15);
+		return;
+	}
+	update_pos_y(gb);
+	if (!ld_and(gb, wWarioSlopeInteraction)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = alu_and(gb, gb->cpu.a, 0x0f);
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_xor(gb, rd8(gb, wDirection), gb->cpu.b);
+	if (gb->cpu.a) {
+		LJUMP(Func_28bd5);
+		return;
+	}
+	RET();
+}
+
+// turns to dir with the new frameset if facing the other way, then
+// farcall CheckFrontCollision / ret nz / ld b, 1 / move
+PORT(HandleHotWarioInput)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wJoypadDown), PAD_RIGHT | PAD_LEFT);
+	if (!gb->cpu.a)
+		return;
+	gb->cpu.a = alu_and(gb, gb->cpu.a, PAD_RIGHT);
+	bool right = gb->cpu.a != 0;
+	bool turn = facing_right(gb) != right;
+	if (turn) {
+		st(gb, wDirection, right ? DIRECTION_RIGHT : DIRECTION_LEFT);
+		reset_anim(gb);
+		set_frameset(gb, right ? ADDR_Frameset_16b2f : ADDR_Frameset_16b26);
+		anim(gb, OAM1);
+	}
+	if (farcall_b(gb, BANK_CheckFrontCollision, ADDR_CheckFrontCollision))
+		return;
+	gb->cpu.b = 1;
+	if (right)
+		CALL(MoveWarioRight);
+	else
+		CALL(MoveWarioLeft);
+}
+
+PORT(SetState_ZombieLanding)
+{
+	play_sfx(gb, SFX_02A);
+	touch_states(gb, TOUCH_BUMP, 0x02);
+	xor_a(gb);
+	wr8(gb, wJumpVelIndex, 0);
+	wr8(gb, wJumpVelTable, 0);
+	st(gb, wWarioState, WST_ZOMBIE_LANDING);
+	static const uint16_t zero[] = {wWarioStateCounter, wFrameDuration, wAnimationFrame, 0};
+	clear(gb, zero);
+	FARCALL(Func_19a77);
+	if (ld_and(gb, wc1ca)) {
+		st(gb, wWarioStateCounter, 0x01);
+		frameset_by_dir(gb, ADDR_Frameset_1fc8bc, ADDR_Frameset_1fc8d5);
+	} else {
+		frameset_by_dir(gb, ADDR_Frameset_1fc948, ADDR_Frameset_1fc953);
+	}
+	anim(gb, OAM2);
+}
+
+PORT(SetState_BouncyStart)
+{
+	st(gb, wWarioState, WST_BOUNCY_START);
+	st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	st(gb, wJumpVelTable, 0x02);
+	collision_box(gb, -1, -29, -9, 9);
+	static const uint16_t zero[] = {wInvisibleFrame, wWalkVelIndex, wWarioStateCounter,
+		wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching, wIsRolling,
+		wIsSmashAttacking, 0};
+	clear(gb, zero);
+	CALL(UpdateLevelMusic);
+	reset_anim(gb);
+	SET_HL(gb, ADDR_WarioBouncyPal);
+	CALL(SetWarioPal);
+	load_gfx(gb, BANK_WarioBouncyGfx, ADDR_WarioBouncyGfx);
+	set_oam(gb, BANK_OAM_1fc95e, ADDR_OAM_1fc95e);
+	set_frameset(gb, ADDR_Frameset_1fcc6c);
+	anim(gb, OAM2);
+	if (!farcall_b(gb, BANK_Func_197b1, ADDR_Func_197b1))
+		return;
+	gb->cpu.b = 2;
+	CALL(MoveWarioRight);
+}

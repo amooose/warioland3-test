@@ -1230,3 +1230,59 @@ PORT_JUMP(DoHardLand)
 	anim(gb, OAM1);
 	RET();
 }
+
+PORT(HandleInvincibility)
+{
+	if (!ld_and(gb, wInvincibleCounter))
+		return;
+	alu_cp(gb, gb->cpu.a, 0x16);
+	if (!CF) {
+		// .fast
+		gb->cpu.a = alu_and(gb, rd8(gb, wGlobalCounter), 0b1);
+		if (gb->cpu.a)
+			return;
+		gb->cpu.a = alu_inc(gb, rd8(gb, wInvincibleCounter));
+		wr8(gb, wInvincibleCounter, gb->cpu.a);
+		alu_cp(gb, gb->cpu.a, 0x28);
+		if (!CF) {
+			xor_a(gb);
+			wr8(gb, wInvincibleCounter, 0);
+			wr8(gb, wInvisibleFrame, 0);
+			gb->cpu.a = alu_and(gb, rd8(gb, wJoypadDown), PAD_RIGHT | PAD_LEFT | PAD_DOWN);
+			if (gb->cpu.a)
+				return;
+			FARCALL(CheckUpCollision);
+			return;
+		}
+	} else {
+		alu_cp(gb, gb->cpu.a, 0x10);
+		if (!CF) {
+			// .slow
+			gb->cpu.a = alu_and(gb, rd8(gb, wGlobalCounter), 0b11);
+			if (gb->cpu.a)
+				return;
+			gb->cpu.a = alu_inc(gb, rd8(gb, wInvincibleCounter));
+			wr8(gb, wInvincibleCounter, gb->cpu.a);
+		} else {
+			ld_cp(gb, wWarioState, WST_STUNG);
+			if (ZF)
+				return;
+			alu_cp(gb, gb->cpu.a, WST_STUNG_RECOVERY);
+			if (ZF)
+				return;
+			st(gb, wInvincibleCounter, 0x10);
+			ld_cp(gb, wWarioPalsPtr + 0, (uint8_t)(ADDR_WarioInvisiblePal >> 8));
+			if (!ZF)
+				return;
+			ld_cp(gb, wWarioPalsPtr + 1, (uint8_t)ADDR_WarioInvisiblePal);
+			if (!ZF)
+				return;
+			SET_HL(gb, ADDR_WarioDefaultPal);
+			CALL(SetWarioPal);
+			return;
+		}
+	}
+	// .alternate_invisibility
+	gb->cpu.a = alu_xor(gb, rd8(gb, wInvisibleFrame), 0x1);
+	wr8(gb, wInvisibleFrame, gb->cpu.a);
+}
