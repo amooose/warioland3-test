@@ -1193,3 +1193,35 @@ PORT_LOCAL_JUMP(Cutscene04Func, Func_9db71)
 	wr8(gb, wCollectionRow, 0x08);
 	JUMP_TO(ADDR_AdvanceCutsceneFunc);
 }
+
+// --- the remaining LoadCutsceneBGMapsNN ---
+PORT(LoadCutsceneBGMaps12) { load_cutscene_bg_maps(gb, ADDR_Cutscene12Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene12Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps13) { load_cutscene_bg_maps(gb, ADDR_Cutscene13Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene13Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps15) { load_cutscene_bg_maps(gb, ADDR_Cutscene15Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene15Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps16) { load_cutscene_bg_maps(gb, ADDR_Cutscene16Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene16Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps17) { load_cutscene_bg_maps(gb, ADDR_Cutscene17Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene17Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps18) { load_cutscene_bg_maps(gb, ADDR_Cutscene18Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene18Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps20) { load_cutscene_bg_maps(gb, ADDR_Cutscene20Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene20Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps22) { load_cutscene_bg_maps(gb, ADDR_Cutscene22Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene22Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps23) { load_cutscene_bg_maps(gb, ADDR_Cutscene23Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene23Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps24) { load_cutscene_bg_maps(gb, ADDR_Cutscene24Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene24Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps26) { load_cutscene_bg_maps(gb, ADDR_Cutscene26Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene26Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps27) { load_cutscene_bg_maps(gb, ADDR_Cutscene27Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene27Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps28) { load_cutscene_bg_maps(gb, ADDR_Cutscene28Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene28Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps29) { load_cutscene_bg_maps(gb, ADDR_Cutscene29Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene29Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps30) { load_cutscene_bg_maps(gb, ADDR_Cutscene30Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene30Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps31) { load_cutscene_bg_maps(gb, ADDR_Cutscene31Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene31Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps32) { load_cutscene_bg_maps(gb, ADDR_Cutscene32Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene32Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps34) { load_cutscene_bg_maps(gb, ADDR_Cutscene34Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene34Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps36) { load_cutscene_bg_maps(gb, ADDR_Cutscene36Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene36Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps37) { load_cutscene_bg_maps(gb, ADDR_Cutscene37Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene37Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps39) { load_cutscene_bg_maps(gb, ADDR_Cutscene39Attrmap, ADDR_LoadCutsceneAttrmap0, ADDR_Cutscene39Tilemap, ADDR_LoadCutsceneTilemap0); }
+PORT(LoadCutsceneBGMaps04) { load_cutscene_bg_maps(gb, ADDR_Cutscene04Attrmap, ADDR_LoadCutsceneAttrmap1, ADDR_Cutscene04Tilemap, ADDR_LoadCutsceneTilemap1); }
+PORT(LoadCutsceneBGMaps05) { load_cutscene_bg_maps(gb, ADDR_Cutscene05Attrmap, ADDR_LoadCutsceneAttrmap1, ADDR_Cutscene05Tilemap, ADDR_LoadCutsceneTilemap1); }
+PORT(LoadCutsceneBGMaps14) { load_cutscene_bg_maps(gb, ADDR_Cutscene14Attrmap, ADDR_LoadCutsceneAttrmap1, ADDR_Cutscene14Tilemap, ADDR_LoadCutsceneTilemap1); }
+PORT(LoadCutsceneBGMaps19) { load_cutscene_bg_maps(gb, ADDR_Cutscene19Attrmap, ADDR_LoadCutsceneAttrmap1, ADDR_Cutscene19Tilemap, ADDR_LoadCutsceneTilemap1); }
+PORT(LoadCutsceneBGMaps21) { load_cutscene_bg_maps(gb, ADDR_Cutscene21Attrmap, ADDR_LoadCutsceneAttrmap1, ADDR_Cutscene21Tilemap, ADDR_LoadCutsceneTilemap1); }
+PORT(LoadCutsceneBGMaps25) { load_cutscene_bg_maps(gb, ADDR_Cutscene25Attrmap, ADDR_LoadCutsceneAttrmap1, ADDR_Cutscene25Tilemap, ADDR_LoadCutsceneTilemap1); }
+PORT(LoadCutsceneBGMaps35) { load_cutscene_bg_maps(gb, ADDR_Cutscene35Attrmap, ADDR_LoadCutsceneAttrmap1, ADDR_Cutscene35Tilemap, ADDR_LoadCutsceneTilemap1); }
+PORT(LoadCutsceneBGMaps38) { load_cutscene_bg_maps(gb, ADDR_Cutscene38Attrmap, ADDR_LoadCutsceneAttrmap1, ADDR_Cutscene38Tilemap, ADDR_LoadCutsceneTilemap1); }
+PORT(LoadCutsceneBGMaps040) { load_cutscene_bg_maps(gb, ADDR_Cutscene40Attrmap, ADDR_LoadCutsceneAttrmap1, ADDR_Cutscene40Tilemap, ADDR_LoadCutsceneTilemap1); }

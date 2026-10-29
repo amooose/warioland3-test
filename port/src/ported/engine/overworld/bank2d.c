@@ -1304,3 +1304,114 @@ PORT_JUMP(Func_b5045) { anim_b_jump(gb, ADDR_Frameset_a867f, 0x0e, ADDR_Func_b50
 PORT_JUMP(Func_b504f) { anim_b_jump(gb, ADDR_Frameset_a86da, 0x0e, ADDR_Func_b508a); }
 PORT_JUMP(Func_b50b6) { anim_b_jump(gb, ADDR_Frameset_a873d, 0x0e, ADDR_Func_b508a); }
 PORT_JUMP(Func_b50c0) { anim_b_jump(gb, ADDR_Frameset_a87d2, 0x20, ADDR_Func_b508a); }
+
+// --- scene object animation stubs (b4e56..b5130) ---
+
+PORT_JUMP(Func_b4e56)
+{
+	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
+	gb->cpu.b = 0x00;
+	JUMP_TO(ADDR_Func_b4e5b); // fallthrough
+}
+
+PORT_JUMP(Func_b4e62)
+{
+	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
+	JUMP_TO(ADDR_Func_b4e65); // fallthrough
+}
+
+PORT_JUMP(Func_b4e6b)
+{
+	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
+	gb->cpu.b = 0x00;
+	JUMP_TO(ADDR_Func_b4e70); // fallthrough
+}
+
+PORT_JUMP(Func_b4e70)
+{
+	gb_call(gb, ADDR_Func_b4a0d);
+	if (gb->cpu.f & FLAG_Z)
+		JUMP_TO(ADDR_Func_b4e04);
+	else
+		JUMP_TO(ADDR_Func_b4e65);
+}
+
+PORT_JUMP(Func_b4e77) { SET_DE(gb, ADDR_Frameset_a8de9); JUMP_TO(ADDR_Func_b4e56); }
+PORT_JUMP(Func_b4e81) { SET_DE(gb, ADDR_Frameset_a8dd1); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b4e86) { SET_DE(gb, ADDR_Frameset_a8e1e); JUMP_TO(ADDR_Func_b4e56); }
+PORT_JUMP(Func_b4ea4) { SET_DE(gb, ADDR_Frameset_a8e2c); JUMP_TO(ADDR_Func_b4e4d); }
+
+PORT(Func_b4ea9)
+{
+	SET_DE(gb, ADDR_Frameset_a8e5d);
+	gb_call(gb, ADDR_Func_b4e56);
+	gb->cpu.a = rd8(gb, wSceneObj7State);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	wr8(gb, wSceneObj8Duration, gb->cpu.a);
+	gb->cpu.a = 0x08;
+	wr8(gb, wSceneObj8State, gb->cpu.a);
+}
+
+PORT_JUMP(Func_b4ebd) { SET_DE(gb, ADDR_Frameset_a8e6c); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b4ec2) { SET_DE(gb, ADDR_Frameset_a8df8); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b4ec8) { anim_b_jump(gb, ADDR_Frameset_a8e04, 0x0c, ADDR_Func_b4e5b); }
+PORT_JUMP(Func_b4ed2) { SET_DE(gb, ADDR_Frameset_a8e01); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b4ed8) { anim_b_jump(gb, ADDR_Frameset_a8e11, 0x0e, ADDR_Func_b4e5b); }
+PORT_JUMP(Func_b4ee3) { SET_DE(gb, ADDR_Frameset_a8f17); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b4ee9) { anim_b_jump(gb, ADDR_Frameset_a9090, 0x11, ADDR_Func_b4e70); }
+PORT_JUMP(Func_b4ef4) { anim_b_jump(gb, ADDR_Frameset_a90eb, 0x11, ADDR_Func_b4e70); }
+PORT_JUMP(Func_b4eff) { SET_DE(gb, ADDR_Frameset_a9140); JUMP_TO(ADDR_Func_b4e62); }
+PORT_JUMP(Func_b4f05) { SET_DE(gb, ADDR_Frameset_a9143); JUMP_TO(ADDR_Func_b4e62); }
+PORT_JUMP(Func_b4f0b) { anim_b_jump(gb, ADDR_Frameset_a914e, 0x11, ADDR_Func_b4e70); }
+PORT_JUMP(Func_b4f16) { SET_DE(gb, ADDR_Frameset_a8e9d); JUMP_TO(ADDR_Func_b4e56); }
+PORT_JUMP(Func_b4f1c) { SET_DE(gb, ADDR_Frameset_a8eac); JUMP_TO(ADDR_Func_b4e56); }
+PORT_JUMP(Func_b4f22) { SET_DE(gb, ADDR_Frameset_a8eb7); JUMP_TO(ADDR_Func_b4e56); }
+PORT_JUMP(Func_b4f28) { SET_DE(gb, ADDR_Frameset_a8ec2); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b4f2e) { SET_DE(gb, ADDR_Frameset_a8ec7); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b4f34) { SET_DE(gb, ADDR_Frameset_a8eca); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b4f3a) { SET_DE(gb, ADDR_Frameset_a8eca); JUMP_TO(ADDR_Func_b4e56); }
+PORT_JUMP(Func_b4f40) { SET_DE(gb, ADDR_Frameset_a8ed3); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b4f46) { SET_DE(gb, ADDR_Frameset_a8eda); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b4f4c) { SET_DE(gb, ADDR_Frameset_a8ee1); JUMP_TO(ADDR_Func_b4e4d); }
+
+PORT_JUMP(Func_b4f52)
+{
+	SET_DE(gb, ADDR_Frameset_a8ee8);
+	gb_call(gb, ADDR_Func_b4e4d);
+	JUMP_TO(ADDR_Func_b4f58); // fallthrough
+}
+
+PORT_JUMP(Func_b4f82)
+{
+	SET_DE(gb, ADDR_Frameset_a8ee8);
+	gb_call(gb, ADDR_Func_b4e56);
+	JUMP_TO(ADDR_Func_b4f58);
+}
+
+PORT_JUMP(Func_b4f8a) { SET_DE(gb, ADDR_Frameset_a8f28); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b4f90) { SET_DE(gb, ADDR_Frameset_a8f31); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b4f96) { SET_DE(gb, ADDR_Frameset_a8f47); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b4f9c) { SET_DE(gb, ADDR_Frameset_a8f3a); JUMP_TO(ADDR_Func_b4e4d); }
+PORT_JUMP(Func_b501d) { SET_DE(gb, ADDR_Frameset_a8653); JUMP_TO(ADDR_Func_b5085); }
+PORT_JUMP(Func_b5022) { SET_DE(gb, ADDR_Frameset_a862d); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b5031) { SET_DE(gb, ADDR_Frameset_a8636); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b5040) { SET_DE(gb, ADDR_Frameset_a866e); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b5059) { SET_DE(gb, ADDR_Frameset_a872f); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b505e) { SET_DE(gb, ADDR_Frameset_a8732); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b5063) { SET_DE(gb, ADDR_Frameset_a8750); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b5068) { SET_DE(gb, ADDR_Frameset_a8761); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b506d) { SET_DE(gb, ADDR_Frameset_a879a); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b5072) { SET_DE(gb, ADDR_Frameset_a8764); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b5077) { SET_DE(gb, ADDR_Frameset_a876f); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b50b1) { SET_DE(gb, ADDR_Frameset_a879f); JUMP_TO(ADDR_Func_b5085); }
+PORT_JUMP(Func_b50ca) { SET_DE(gb, ADDR_Frameset_a87d9); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b50cf) { SET_DE(gb, ADDR_Frameset_a87dc); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b50d4) { SET_DE(gb, ADDR_Frameset_a87df); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b50d9) { SET_DE(gb, ADDR_Frameset_aa5f5); JUMP_TO(ADDR_Func_b50e1); }
+PORT_JUMP(Func_b50de) { SET_DE(gb, ADDR_Frameset_aa5f8); JUMP_TO(ADDR_Func_b50e1); }
+PORT_JUMP(Func_b50f6) { SET_DE(gb, ADDR_Frameset_aa0a3); JUMP_TO(ADDR_Func_b5114); }
+PORT_JUMP(Func_b5105) { SET_DE(gb, ADDR_Frameset_aa09d); JUMP_TO(ADDR_Func_b5114); }
+PORT_JUMP(Func_b512a) { SET_DE(gb, ADDR_Frameset_a87e8); JUMP_TO(ADDR_Func_b507c); }
+PORT_JUMP(Func_b5130) { SET_DE(gb, ADDR_Frameset_a87f1); JUMP_TO(ADDR_Func_b507c); }
