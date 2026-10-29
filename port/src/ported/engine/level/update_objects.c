@@ -1353,3 +1353,185 @@ PORT(HandleGrabbedObjectCollisions)
 	hl = gb_pop16(gb);
 	SET_HL(gb, hl);
 }
+
+// --- DoObjectAction ---
+
+// ld [hld], a (OBJ_ACTION = action) / ld a, state / ld [hl], a (OBJ_STATE)
+static void set_action_state(GB *gb, uint8_t action, uint8_t state)
+{
+	gb->cpu.a = action;
+	wr8(gb, wCurObjAction, action);
+	gb->cpu.a = state;
+	wr8(gb, wCurObjState, state);
+	SET_HL(gb, wCurObjState);
+}
+
+// ld hl, wCurObjAction / ld a, action / ld [hld], a / ld a, state / ld [hl], a
+static void action_hl_state(GB *gb, uint8_t action, uint8_t state)
+{
+	set_action_state(gb, action, state);
+}
+
+static void obj_flags_res_grabbed(GB *gb, bool set_no_collision)
+{
+	uint8_t v = (uint8_t)(rd8(gb, wCurObjFlags) & ~(1 << OBJFLAG_GRABBED_F));
+	wr8(gb, wCurObjFlags, v);
+	if (set_no_collision)
+		wr8(gb, wCurObjFlags, (uint8_t)(rd8(gb, wCurObjFlags) | (1 << OBJFLAG_NO_COLLISION_F)));
+}
+
+// ld a, [hld] (OBJ_UNK_1D) / and INTERACTION_RIGHT / ld a, no_actions_for 15 /
+// ld [hld], a / jr z, .right / left or right state
+static void action_by_interaction(GB *gb, uint8_t left, uint8_t right)
+{
+	alu_and(gb, rd8(gb, wCurObjUnk1d), INTERACTION_RIGHT);
+	set_action_state(gb, 15 | (1 << 7), ZF ? right : left);
+}
+
+static void action_wobble(GB *gb)
+{
+	obj_flags_res_grabbed(gb, false);
+	action_by_interaction(gb, OBJSTATE_WOBBLE_LEFT_START, OBJSTATE_WOBBLE_RIGHT_START);
+}
+
+// .Action06 / .Action12
+static void action_06(GB *gb, uint8_t b)
+{
+	gb->cpu.b = b;
+	gb->cpu.a = rd8(gb, wCurObjUnk1d);
+	wr8(gb, wCurObjAction, gb->cpu.b);
+	gb->cpu.l = alu_dec(gb, (uint8_t)wCurObjAction);
+	gb->cpu.h = (uint8_t)(wCurObjAction >> 8);
+	static const uint8_t states[4] = {OBJSTATE_0E, OBJSTATE_0D, OBJSTATE_0B, OBJSTATE_0C};
+	int i;
+	for (i = 0; i < 3; i++) {
+		gb->cpu.a = alu_rla(gb, gb->cpu.a);
+		if (CF)
+			break;
+	}
+	gb->cpu.a = states[i];
+	wr8(gb, REG_HL(gb), gb->cpu.a);
+}
+
+PORT_JUMP(DoObjectAction)
+{
+	gb->cpu.a = rd8(gb, wCurObjAction);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (ZF) {
+		RET();
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, NO_ACTIONS_F)) {
+		gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		alu_cp(gb, gb->cpu.a, 1 << NO_ACTIONS_F); // no_actions_for 0
+		if (ZF)
+			xor_a(gb);
+		wr8(gb, wCurObjAction, gb->cpu.a);
+		RET();
+		return;
+	}
+
+	// .jump: rst JumpTable
+	uint8_t idx = gb->cpu.a;
+	uint16_t table = ADDR_DoObjectAction + 0x14;
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0;
+	uint16_t hl = alu_add16(gb, table, gb->cpu.e);
+	gb->cpu.a = rd8(gb, hl);
+	gb->cpu.h = rd8(gb, (uint16_t)(hl + 1));
+	gb->cpu.l = gb->cpu.a;
+	uint16_t target = REG_HL(gb);
+	if (idx >= NUM_OBJ_ACTIONS) {
+		JUMP_TO(target);
+		return;
+	}
+
+	switch (idx) {
+	case OBJACTION_NONE:
+		break;
+	case OBJACTION_BUMP:
+		gb->cpu.a = alu_and(gb, rd8(gb, wCurObjInteractionType), INTERACTION_MASK);
+		if (ZF) {
+			action_wobble(gb);
+			break;
+		}
+		action_by_interaction(gb, OBJSTATE_BUMP_LEFT_START, OBJSTATE_BUMP_RIGHT_START);
+		break;
+	case OBJACTION_ATTACK:
+		obj_flags_res_grabbed(gb, true);
+		action_by_interaction(gb, OBJSTATE_ATTACKED_LEFT_START, OBJSTATE_ATTACKED_RIGHT_START);
+		break;
+	case OBJACTION_PICK_UP:
+		obj_flags_res_grabbed(gb, false);
+		gb->cpu.a = rd8(gb, wDirection);
+		gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+		set_action_state(gb, 15 | (1 << 7),
+			ZF ? OBJSTATE_PICKED_UP_RIGHT_START : OBJSTATE_PICKED_UP_LEFT_START);
+		break;
+	case OBJACTION_WOBBLE:
+		action_wobble(gb);
+		break;
+	case OBJACTION_VANISH_TOUCH:
+		obj_flags_res_grabbed(gb, true);
+		set_action_state(gb, 15 | (1 << 7), OBJSTATE_VANISH_TOUCH);
+		break;
+	case OBJACTION_06:
+		action_06(gb, 15 | (1 << 7));
+		break;
+	case OBJACTION_07:
+		xor_a(gb);
+		set_action_state(gb, 0, OBJSTATE_18);
+		break;
+	case OBJACTION_VANISH_TREASURE:
+		JUMP_TO(ADDR_VanishObject_NoSFX);
+		return;
+	case OBJACTION_STEP_ON:
+		xor_a(gb);
+		wr8(gb, wCurObjAction, 0);
+		SET_HL(gb, wCurObjFlags);
+		wr8(gb, wCurObjFlags, (uint8_t)(rd8(gb, wCurObjFlags) | (1 << OBJFLAG_STEPPED_F)));
+		break;
+	case OBJACTION_0A:
+		gb->cpu.a = 15 | (1 << 7);
+		wr8(gb, wCurObjAction, gb->cpu.a);
+		break;
+	case OBJACTION_FLATTEN:
+	case OBJACTION_0C:
+	case OBJACTION_0E:
+	case OBJACTION_TELEPORT:
+	case OBJACTION_11:
+		action_hl_state(gb, 15 | (1 << 7), OBJSTATE_ACTIVATE);
+		break;
+	case OBJACTION_0D:
+		action_hl_state(gb, 15 | (1 << 7), OBJSTATE_19);
+		break;
+	case OBJACTION_SMASH_ATTACK_WALKABLE:
+		action_hl_state(gb, 2 | (1 << 7), OBJSTATE_VANISH_TOUCH);
+		break;
+	case OBJACTION_12:
+		action_06(gb, 7 | (1 << 7));
+		break;
+	case OBJACTION_13:
+		action_hl_state(gb, 15 | (1 << 7), OBJSTATE_SPECIAL_3);
+		break;
+	}
+	RET();
+}
+
+PORT_JUMP(Func_62e57)
+{
+	play_sfx(gb, SFX_VANISH);
+	wr8(gb, wCurObjUpdateFunction + 1, (uint8_t)(ADDR_Func_4c860 >> 8));
+	gb->cpu.a = (uint8_t)ADDR_Func_4c860;
+	wr8(gb, wCurObjUpdateFunction + 0, gb->cpu.a);
+	SET_HL(gb, wCurObjUpdateFunction - 1);
+	gb_call(gb, ADDR_Func_618b4);
+	JUMP(HomeJumpRet);
+}
+
+PORT_JUMP(_VanishObject2)
+{
+	gb_call(gb, ADDR__VanishObject);
+	JUMP(HomeJumpRet);
+}

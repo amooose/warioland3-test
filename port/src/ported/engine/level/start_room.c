@@ -371,3 +371,197 @@ PORT(ApplyInitialCameraScroll)
 	wr8(gb, wBlockXPos + 1, 0);
 	wr8(gb, wBlockXPos + 0, 0);
 }
+
+// Sets hPos (and wWarioPos) to the block of wWarioSpawnPos, then searches the
+// object map for the spawn block ($f) to get the exact position.
+PORT(SetWarioPositionToSpawn)
+{
+	xor_a(gb);
+	wr8(gb, hXPosLo, 0);
+	gb->cpu.a = alu_and(gb, rd8(gb, wWarioSpawnPos), 0x0f);
+	wr8(gb, hXPosHi, gb->cpu.a);
+	xor_a(gb);
+	wr8(gb, hYPosLo, 0);
+	gb->cpu.a = alu_and(gb, rd8(gb, wWarioSpawnPos), 0xf0);
+	gb->cpu.a = alu_swap(gb, gb->cpu.a);
+	wr8(gb, hYPosHi, gb->cpu.a);
+	SET_HL(gb, hYPosHi);
+	CALL(Func_cc0);
+
+	obj_map_bank(gb, wObjectSpawnBlockY);
+	gb->cpu.h = gb->cpu.a;
+	gb->cpu.a = gb->cpu.c;
+	wr8(gb, wccec, gb->cpu.a);
+	sramswitch(gb, gb->cpu.a);
+
+	for (;;) {
+		gb->cpu.e = 16 / 2;
+		bool found = false;
+		do {
+			gb->cpu.a = alu_swap(gb, alu_and(gb, rd8(gb, REG_HL(gb)), 0xf0));
+			alu_cp(gb, gb->cpu.a, 0x0f);
+			if (!CF) {
+				found = true;
+				break;
+			}
+			flip_b(gb);
+			gb->cpu.a = alu_and(gb, rd8(gb, REG_HL(gb)), 0x0f);
+			alu_cp(gb, gb->cpu.a, 0x0f);
+			if (!CF) {
+				found = true;
+				break;
+			}
+			gb->cpu.l = alu_inc(gb, gb->cpu.l);
+			flip_b(gb);
+			gb->cpu.e = alu_dec(gb, gb->cpu.e);
+		} while (gb->cpu.e);
+		if (found)
+			break;
+		gb->cpu.a = alu_sub(gb, gb->cpu.l, 0x08);
+		gb->cpu.l = gb->cpu.a;
+		gb->cpu.h = alu_inc(gb, gb->cpu.h);
+		gb->cpu.a = gb->cpu.h;
+		alu_cp(gb, gb->cpu.a, 0xc0); // HIGH(STARTOF(SRAM) + SIZEOF(SRAM))
+		if (ZF) {
+			gb->cpu.h = (uint8_t)(sLevelBlockObjectMap >> 8);
+			gb->cpu.a = alu_inc(gb, rd8(gb, wccec));
+			wr8(gb, wccec, gb->cpu.a);
+			sramswitch(gb, gb->cpu.a);
+		}
+	}
+
+	// .found_spawn_block
+	gb->cpu.c = gb->cpu.a;
+	CALL(Func_cf8);
+	// update_pos
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = rd8(gb, hPos + i);
+		wr8(gb, wWarioPos + i, gb->cpu.a);
+	}
+	SET_HL(gb, hPos + 3);
+	SET_DE(gb, wWarioPos + 3);
+
+	gb->cpu.a = alu_and(gb, rd8(gb, wCameraConfigFlags), CAM_SCROLLING_MASK);
+	alu_cp(gb, gb->cpu.a, CAM_TRANSITIONS);
+	if (CF)
+		return;
+	gb->cpu.a = alu_and(gb, rd8(gb, wceef), 0x3c);
+	if (!ZF)
+		return;
+	CALL(UpdateFloor);
+}
+
+// ld a, [hli] / ld [de], a, down a column of the BG map (wrapping from
+// v0BGMap1 back to v0BGMap0), b = TILEMAP_HEIGHT times
+static void draw_room_col(GB *gb, uint16_t queue)
+{
+	gb->cpu.d = rd8(gb, wBGPtr + 0);
+	gb->cpu.a = gb->cpu.d;
+	gb->cpu.e = rd8(gb, wBGPtr + 1);
+	gb->cpu.a = gb->cpu.e;
+	SET_HL(gb, queue);
+	gb->cpu.b = TILEMAP_HEIGHT;
+	do {
+		uint16_t hl = REG_HL(gb);
+		gb->cpu.a = rd8(gb, hl);
+		SET_HL(gb, hl + 1);
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.a = alu_add(gb, gb->cpu.e, TILEMAP_WIDTH);
+		gb->cpu.e = gb->cpu.a;
+		gb->cpu.a = alu_adc(gb, gb->cpu.d, 0);
+		gb->cpu.d = gb->cpu.a;
+		alu_cp(gb, gb->cpu.a, (uint8_t)(v0BGMap1 >> 8));
+		if (ZF)
+			gb->cpu.d = (uint8_t)(v0BGMap0 >> 8);
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (gb->cpu.b);
+}
+
+// DrawRoom_FromStart.QueueRowTilesAndAttributes
+static void queue_row_tiles_and_attributes(GB *gb)
+{
+	gb_call(gb, ADDR_GetBlockBGPtr);
+	gb->cpu.a = rd8(gb, wBGMapAddressQueueSize);
+	gb->cpu.b = gb->cpu.a;
+	SET_DE(gb, wBGMapAddressQueue);
+	gb->cpu.a = alu_add(gb, gb->cpu.e, gb->cpu.b);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.b = TILEMAP_HEIGHT;
+	do {
+		gb->cpu.a = gb->cpu.h;
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.e = alu_inc(gb, gb->cpu.e);
+		gb->cpu.a = gb->cpu.l;
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.e = alu_inc(gb, gb->cpu.e);
+		SET_HL(gb, alu_add16(gb, REG_HL(gb), TILEMAP_WIDTH));
+		gb->cpu.a = alu_and(gb, gb->cpu.h, 0xfb);
+		gb->cpu.h = gb->cpu.a;
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (gb->cpu.b);
+
+	gb->cpu.a = alu_add(gb, rd8(gb, wBGMapAddressQueueSize), 2 * TILEMAP_HEIGHT);
+	wr8(gb, wBGMapAddressQueueSize, gb->cpu.a);
+
+	SET_HL(gb, wBlockPos);
+	CALL(GetBlockPtr);
+	gb->cpu.a = rd8(gb, wBlockPtrBank);
+	sramswitch(gb, gb->cpu.a);
+	gb->cpu.a = alu_and(gb, rd8(gb, wBlockXPos + 1), 0x08);
+	uint16_t hl = REG_HL(gb);
+	if (!ZF) {
+		gb_push16(gb, hl);
+		FARCALL(QueueBlockTilesAlongRow_OddColumn);
+		SET_HL(gb, gb_pop16(gb));
+		gb->cpu.a = rd8(gb, wBlockPtrBank);
+		sramswitch(gb, gb->cpu.a);
+		FARCALL(QueueBlockAttributesAlongRow_OddColumn);
+	} else {
+		gb_push16(gb, hl);
+		FARCALL(QueueBlockTilesAlongRow_EvenColumn);
+		SET_HL(gb, gb_pop16(gb));
+		gb->cpu.a = rd8(gb, wBlockPtrBank);
+		sramswitch(gb, gb->cpu.a);
+		FARCALL(QueueBlockAttributesAlongRow_EvenColumn);
+	}
+	gb->cpu.a = alu_add(gb, rd8(gb, wBGMapTileQueueSize), TILEMAP_WIDTH);
+	wr8(gb, wBGMapTileQueueSize, gb->cpu.a);
+}
+
+// loads all room tiles that are visible in the BGMap, row by row
+PORT(DrawRoom_FromStart)
+{
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = rd8(gb, wBlockPos + i);
+		wr8(gb, wBackupBlockPos + i, gb->cpu.a);
+	}
+	SET_HL(gb, wBlockPos + 3);
+	SET_DE(gb, wBackupBlockPos + 3);
+
+	gb->cpu.a = TILEMAP_WIDTH;
+	wr8(gb, wDrawRoomWidthLoopVar, gb->cpu.a);
+	do {
+		queue_row_tiles_and_attributes(gb);
+		draw_room_col(gb, wBGMapTileVRAM0Queue);
+		gb->cpu.a = 1; // BANK("VRAM1")
+		wr8(gb, rVBK, gb->cpu.a);
+		draw_room_col(gb, wBGMapTileVRAM1Queue);
+		xor_a(gb);
+		wr8(gb, rVBK, 0);
+		wr8(gb, wBGMapAddressQueueSize, 0);
+		wr8(gb, wBGMapTileQueueSize, 0);
+		gb->cpu.a = alu_add(gb, rd8(gb, wBlockXPos + 1), 0x08);
+		wr8(gb, wBlockXPos + 1, gb->cpu.a);
+		gb->cpu.a = alu_adc(gb, rd8(gb, wBlockXPos + 0), 0x00);
+		wr8(gb, wBlockXPos + 0, gb->cpu.a);
+		gb->cpu.a = alu_dec(gb, rd8(gb, wDrawRoomWidthLoopVar));
+		wr8(gb, wDrawRoomWidthLoopVar, gb->cpu.a);
+	} while (gb->cpu.a);
+
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = rd8(gb, wBackupBlockPos + i);
+		wr8(gb, wBlockYPos + i, gb->cpu.a);
+	}
+	SET_HL(gb, wBackupBlockPos + 3);
+	SET_DE(gb, wBlockYPos + 3);
+}
