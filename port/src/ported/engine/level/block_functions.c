@@ -1104,3 +1104,312 @@ PORT_JUMP(BlockFunc_CrackedBlockWithColourCoin_7c) { cracked_colour_coin(gb, 0x7
 PORT_JUMP(Func_18a0f) { cracked_colour_coin(gb, 0x7d); }
 PORT_JUMP(BlockFunc_CrackedBlockWithColourCoin_7e) { cracked_colour_coin(gb, 0x7e); }
 PORT_JUMP(Func_18a17) { cracked_colour_coin(gb, 0x7f); } // fallthrough
+
+// --- multi-blocks: big blocks broken as a whole ---
+// wMultiBlockParam bits 0-2 = the part already handled, bits 3-7 = a block
+// of the same group was broken this frame
+
+// ld b, block / jr target
+static void ldb_jump(GB *gb, uint8_t block, uint16_t target)
+{
+	gb->cpu.b = block;
+	JUMP_TO(target);
+}
+
+// ld a, n / ld [wMultiBlockParam], a
+static void multi_set(GB *gb, uint8_t n)
+{
+	gb->cpu.a = n;
+	wr8(gb, wMultiBlockParam, n);
+}
+
+// or n / ld [wMultiBlockParam], a
+static void multi_or(GB *gb, uint8_t n)
+{
+	gb->cpu.a = alu_or(gb, gb->cpu.a, n);
+	wr8(gb, wMultiBlockParam, gb->cpu.a);
+}
+
+// The common start: low bits set -> jump to low; high bits set -> or n and
+// jump to high. Returns whether it jumped.
+static bool multi_start(GB *gb, uint16_t low, uint8_t n, uint16_t high)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wMultiBlockParam), 0x07);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		JUMP_TO(low);
+		return true;
+	}
+	gb->cpu.a = alu_and(gb, rd8(gb, wMultiBlockParam), 0xf8);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		multi_or(gb, n);
+		JUMP_TO(high);
+		return true;
+	}
+	return false;
+}
+
+enum { PROGRESS_ANY, PROGRESS_SNOWBALL, PROGRESS_BIG_SNOWBALL };
+
+// Broken by Wario in the given transformation (as a snowball or a big
+// snowball for the snowman). n = 3 falls through into the or.
+static void transformation_multi(GB *gb, uint8_t n, uint8_t transformation, int progress)
+{
+	if (multi_start(gb, FREE, n, ADDR_Func_18f32))
+		return;
+	if (!wario_flag(gb))
+		GOTO(SOLID);
+	gb->cpu.a = rd8(gb, wTransformation);
+	alu_cp(gb, gb->cpu.a, transformation);
+	if (!(gb->cpu.f & FLAG_Z))
+		GOTO(SOLID);
+	if (progress != PROGRESS_ANY) {
+		gb->cpu.a = rd8(gb, wTransformationProgress);
+		if (progress == PROGRESS_SNOWBALL) {
+			alu_cp(gb, gb->cpu.a, 1);
+			if (gb->cpu.f & FLAG_C)
+				GOTO(SOLID);
+		} else {
+			alu_cp(gb, gb->cpu.a, 3);
+			if (!(gb->cpu.f & FLAG_Z))
+				GOTO(SOLID);
+		}
+	}
+	multi_set(gb, n);
+	if (n == 3)
+		multi_or(gb, 3);
+	GOTO(ADDR_Func_18f32);
+}
+
+PORT_JUMP(Func_18aa8) { transformation_multi(gb, 1, TRANSFORMATION_SNOWMAN_WARIO, PROGRESS_SNOWBALL); }
+PORT_JUMP(Func_18aec) { transformation_multi(gb, 3, TRANSFORMATION_SNOWMAN_WARIO, PROGRESS_SNOWBALL); }
+PORT_JUMP(Func_18b2d) { transformation_multi(gb, 2, TRANSFORMATION_SNOWMAN_WARIO, PROGRESS_SNOWBALL); }
+PORT_JUMP(Func_18b71) { transformation_multi(gb, 4, TRANSFORMATION_SNOWMAN_WARIO, PROGRESS_SNOWBALL); }
+PORT_JUMP(Func_18bb5) { transformation_multi(gb, 1, TRANSFORMATION_SNOWMAN_WARIO, PROGRESS_BIG_SNOWBALL); }
+PORT_JUMP(Func_18bf9) { transformation_multi(gb, 3, TRANSFORMATION_SNOWMAN_WARIO, PROGRESS_BIG_SNOWBALL); }
+PORT_JUMP(Func_18c3a) { transformation_multi(gb, 2, TRANSFORMATION_SNOWMAN_WARIO, PROGRESS_BIG_SNOWBALL); }
+PORT_JUMP(Func_18c7e) { transformation_multi(gb, 4, TRANSFORMATION_SNOWMAN_WARIO, PROGRESS_BIG_SNOWBALL); }
+PORT_JUMP(Func_19522) { transformation_multi(gb, 1, TRANSFORMATION_BALL_O_STRING_WARIO, PROGRESS_ANY); }
+PORT_JUMP(Func_19560) { transformation_multi(gb, 3, TRANSFORMATION_BALL_O_STRING_WARIO, PROGRESS_ANY); }
+PORT_JUMP(Func_1959b) { transformation_multi(gb, 2, TRANSFORMATION_BALL_O_STRING_WARIO, PROGRESS_ANY); }
+PORT_JUMP(YarnBlockCollision) { transformation_multi(gb, 4, TRANSFORMATION_BALL_O_STRING_WARIO, PROGRESS_ANY); }
+
+// The robo mouse: passes through (free) or breaks it (n, then broken).
+// Returns whether it jumped.
+static bool multi_robo_mouse(GB *gb, uint8_t n, uint16_t broken)
+{
+	gb->cpu.a = rd8(gb, wBlockFuncSpecialCollision);
+	alu_cp(gb, gb->cpu.a, COLLISION_ROBO_MOUSE_FREE);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP_TO(FREE);
+		return true;
+	}
+	alu_cp(gb, gb->cpu.a, COLLISION_ROBO_MOUSE_BREAK);
+	if (gb->cpu.f & FLAG_Z) {
+		multi_set(gb, n);
+		JUMP_TO(broken);
+		return true;
+	}
+	return false;
+}
+
+// Cracked multi-block: broken by an attack, a roll, a head smash (with the
+// helmet) or a ground pound
+static void cracked_multi(GB *gb, uint8_t n)
+{
+	if (multi_start(gb, FREE, n, ADDR_Func_18f32))
+		return;
+	if (multi_robo_mouse(gb, n, ADDR_Func_18f32))
+		return;
+	if (!ld_and(gb, wBlockFuncBreakFlag))
+		GOTO(SOLID);
+	bool brk;
+	if (coll_bit(gb, COLLISION_UNK4_F)) {
+		brk = ld_and(gb, wAttackCounter) || ld_and(gb, wIsRolling);
+	} else if (coll_bit(gb, COLLISION_UNK5_F) || coll_bit(gb, COLLISION_UNK3_F)) {
+		gb->cpu.a = rd8(gb, wPowerUpLevel);
+		alu_cp(gb, gb->cpu.a, HEAD_SMASH_HELMET);
+		if (gb->cpu.f & FLAG_C)
+			GOTO(SOLID);
+		brk = ld_and(gb, wJumpVelTable) || ld_and(gb, wSwimVelIndex);
+	} else {
+		gb->cpu.a = alu_and(gb, gb->cpu.a, COLLISION_UNK1 | COLLISION_UNK6);
+		brk = !(gb->cpu.f & FLAG_Z);
+	}
+	if (!brk)
+		GOTO(SOLID);
+	multi_set(gb, n);
+	GOTO(ADDR_Func_19086);
+}
+
+PORT_JUMP(Func_18e2c) { cracked_multi(gb, 1); }
+PORT_JUMP(Func_18ec0) { cracked_multi(gb, 3); }
+PORT_JUMP(Func_18f7d) { cracked_multi(gb, 2); }
+PORT_JUMP(Func_19011) { cracked_multi(gb, 4); }
+
+// Non-cracked multi-block: needs garlic (and the super jump slam overalls
+// for a roll or a ground pound), or Fat Wario's ground pound
+static void noncracked_multi(GB *gb, uint8_t n)
+{
+	if (multi_start(gb, SOLID, n, ADDR_Func_19246))
+		return;
+	if (multi_robo_mouse(gb, n, ADDR_Func_19246))
+		return;
+	if (!ld_and(gb, wBlockFuncBreakFlag))
+		GOTO(SOLID);
+	gb->cpu.a = rd8(gb, wTransformation);
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_FAT_WARIO);
+	bool overalls; // needs the super jump slam overalls
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = alu_and(gb, rd8(gb, wCollisionPoints), COLLISION_UNK1 | COLLISION_UNK6);
+		if (gb->cpu.f & FLAG_Z)
+			GOTO(SOLID);
+		overalls = false;
+	} else {
+		gb->cpu.a = rd8(gb, wPowerUpLevel);
+		alu_cp(gb, gb->cpu.a, GARLIC);
+		if (gb->cpu.f & FLAG_C)
+			GOTO(SOLID);
+		if (coll_bit(gb, COLLISION_UNK4_F)) {
+			if (ld_and(gb, wAttackCounter))
+				overalls = false;
+			else if (ld_and(gb, wIsRolling))
+				overalls = true;
+			else
+				GOTO(SOLID);
+		} else if (coll_bit(gb, COLLISION_UNK5_F) || coll_bit(gb, COLLISION_UNK3_F)) {
+			gb->cpu.a = rd8(gb, wPowerUpLevel);
+			alu_cp(gb, gb->cpu.a, HEAD_SMASH_HELMET);
+			if (gb->cpu.f & FLAG_C)
+				GOTO(SOLID);
+			if (!ld_and(gb, wJumpVelTable) && !ld_and(gb, wSwimVelIndex))
+				GOTO(SOLID);
+			overalls = false;
+		} else {
+			gb->cpu.a = alu_and(gb, gb->cpu.a, COLLISION_UNK1 | COLLISION_UNK6);
+			if (gb->cpu.f & FLAG_Z)
+				GOTO(SOLID);
+			overalls = true;
+		}
+	}
+	if (overalls) {
+		gb->cpu.a = rd8(gb, wPowerUpLevel);
+		alu_cp(gb, gb->cpu.a, SUPER_JUMP_SLAM_OVERALLS);
+		if (gb->cpu.f & FLAG_C)
+			GOTO(SOLID);
+	}
+	multi_set(gb, n);
+	GOTO(ADDR_Func_193dc);
+}
+
+PORT_JUMP(Func_190fe) { noncracked_multi(gb, 1); }
+PORT_JUMP(Func_191b3) { noncracked_multi(gb, 3); }
+PORT_JUMP(Func_19291) { noncracked_multi(gb, 2); }
+PORT_JUMP(Func_19346) { noncracked_multi(gb, 4); }
+
+PORT_JUMP(Func_193dc)
+{
+	save_block(gb);
+	gb->cpu.a = TRUE;
+	wr8(gb, wIsFloorTransition, TRUE);
+	GOTO(ADDR_Func_18df1);
+}
+
+// Broken by Ball-o'-String Wario
+PORT_JUMP(Func_19502)
+{
+	if (!wario_flag(gb))
+		GOTO(SOLID);
+	gb->cpu.a = rd8(gb, wTransformation);
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_BALL_O_STRING_WARIO);
+	GOTO((gb->cpu.f & FLAG_Z) ? ADDR_Func_19481 : SOLID);
+}
+
+// --- ld b, block / jr <collision> entries ---
+PORT_JUMP(Func_18a9a) { ldb_jump(gb, 0x79, ADDR_Func_18aa8); }
+PORT_JUMP(Func_18a9e) { ldb_jump(gb, 0x7a, ADDR_Func_18aa8); }
+PORT_JUMP(Func_18aa2) { ldb_jump(gb, 0x7b, ADDR_Func_18aa8); }
+PORT_JUMP(BlockFunc_18aa6) { ldb_jump(gb, 0x78, ADDR_Func_18aa8); }
+PORT_JUMP(Func_18ade) { ldb_jump(gb, 0x79, ADDR_Func_18aec); }
+PORT_JUMP(Func_18ae2) { ldb_jump(gb, 0x7a, ADDR_Func_18aec); }
+PORT_JUMP(Func_18ae6) { ldb_jump(gb, 0x7b, ADDR_Func_18aec); }
+PORT_JUMP(BlockFunc_18aea) { ldb_jump(gb, 0x78, ADDR_Func_18aec); }
+PORT_JUMP(BlockFunc_18b23) { ldb_jump(gb, 0x7a, ADDR_Func_18b2d); }
+PORT_JUMP(BlockFunc_18b2b) { ldb_jump(gb, 0x78, ADDR_Func_18b2d); }
+PORT_JUMP(BlockFunc_18b67) { ldb_jump(gb, 0x7a, ADDR_Func_18b71); }
+PORT_JUMP(BlockFunc_18b6f) { ldb_jump(gb, 0x78, ADDR_Func_18b71); }
+PORT_JUMP(BlockFunc_18bb3) { ldb_jump(gb, 0x78, ADDR_Func_18bb5); }
+PORT_JUMP(BlockFunc_18bf7) { ldb_jump(gb, 0x78, ADDR_Func_18bf9); }
+PORT_JUMP(BlockFunc_18c30) { ldb_jump(gb, 0x7a, ADDR_Func_18c3a); }
+PORT_JUMP(BlockFunc_18c38) { ldb_jump(gb, 0x78, ADDR_Func_18c3a); }
+PORT_JUMP(BlockFunc_18c74) { ldb_jump(gb, 0x7a, ADDR_Func_18c7e); }
+PORT_JUMP(BlockFunc_18c7c) { ldb_jump(gb, 0x78, ADDR_Func_18c7e); }
+PORT_JUMP(BlockFunc_CrackedBlock_78) { ldb_jump(gb, 0x78, ADDR_CrackedBlockCollision); }
+PORT_JUMP(BlockFunc_CrackedBlock_79) { ldb_jump(gb, 0x79, ADDR_CrackedBlockCollision); }
+PORT_JUMP(BlockFunc_CrackedBlock_7a) { ldb_jump(gb, 0x7a, ADDR_CrackedBlockCollision); }
+PORT_JUMP(BlockFunc_CrackedBlock_7b) { ldb_jump(gb, 0x7b, ADDR_CrackedBlockCollision); }
+PORT_JUMP(BlockFunc_CrackedBlock_7c) { ldb_jump(gb, 0x7c, ADDR_CrackedBlockCollision); }
+PORT_JUMP(BlockFunc_CrackedBlock_7d) { ldb_jump(gb, 0x7d, ADDR_CrackedBlockCollision); }
+PORT_JUMP(BlockFunc_CrackedBlock_7e) { ldb_jump(gb, 0x7e, ADDR_CrackedBlockCollision); }
+PORT_JUMP(BlockFunc_CrackedBlock_7f) { ldb_jump(gb, 0x7f, ADDR_CrackedBlockCollision); }
+PORT_JUMP(BlockFunc_NonCrackedBlock_78) { ldb_jump(gb, 0x78, ADDR_NonCrackedBlockCollision); }
+PORT_JUMP(BlockFunc_NonCrackedBlock_79) { ldb_jump(gb, 0x79, ADDR_NonCrackedBlockCollision); }
+PORT_JUMP(BlockFunc_NonCrackedBlock_7a) { ldb_jump(gb, 0x7a, ADDR_NonCrackedBlockCollision); }
+PORT_JUMP(BlockFunc_NonCrackedBlock_7b) { ldb_jump(gb, 0x7b, ADDR_NonCrackedBlockCollision); }
+PORT_JUMP(BlockFunc_NonCrackedBlock_7c) { ldb_jump(gb, 0x7c, ADDR_NonCrackedBlockCollision); }
+PORT_JUMP(BlockFunc_NonCrackedBlock_7d) { ldb_jump(gb, 0x7d, ADDR_NonCrackedBlockCollision); }
+PORT_JUMP(BlockFunc_NonCrackedBlock_7e) { ldb_jump(gb, 0x7e, ADDR_NonCrackedBlockCollision); }
+PORT_JUMP(BlockFunc_NonCrackedBlock_7f) { ldb_jump(gb, 0x7f, ADDR_NonCrackedBlockCollision); }
+PORT_JUMP(BlockFunc_18e0e) { ldb_jump(gb, 0x79, ADDR_Func_18e2c); }
+PORT_JUMP(BlockFunc_18e1a) { ldb_jump(gb, 0x7c, ADDR_Func_18e2c); }
+PORT_JUMP(BlockFunc_18e26) { ldb_jump(gb, 0x7f, ADDR_Func_18e2c); }
+PORT_JUMP(BlockFunc_18e2a) { ldb_jump(gb, 0x78, ADDR_Func_18e2c); }
+PORT_JUMP(BlockFunc_18ea2) { ldb_jump(gb, 0x79, ADDR_Func_18ec0); }
+PORT_JUMP(BlockFunc_18eae) { ldb_jump(gb, 0x7c, ADDR_Func_18ec0); }
+PORT_JUMP(BlockFunc_18ebe) { ldb_jump(gb, 0x78, ADDR_Func_18ec0); }
+PORT_JUMP(BlockFunc_18f5f) { ldb_jump(gb, 0x79, ADDR_Func_18f7d); }
+PORT_JUMP(BlockFunc_18f6b) { ldb_jump(gb, 0x7c, ADDR_Func_18f7d); }
+PORT_JUMP(BlockFunc_18f7b) { ldb_jump(gb, 0x78, ADDR_Func_18f7d); }
+PORT_JUMP(BlockFunc_18ff3) { ldb_jump(gb, 0x79, ADDR_Func_19011); }
+PORT_JUMP(BlockFunc_18fff) { ldb_jump(gb, 0x7c, ADDR_Func_19011); }
+PORT_JUMP(BlockFunc_19007) { ldb_jump(gb, 0x7e, ADDR_Func_19011); }
+PORT_JUMP(BlockFunc_1900f) { ldb_jump(gb, 0x78, ADDR_Func_19011); }
+PORT_JUMP(BlockFunc_190e4) { ldb_jump(gb, 0x7a, ADDR_Func_190fe); }
+PORT_JUMP(BlockFunc_190e8) { ldb_jump(gb, 0x7b, ADDR_Func_190fe); }
+PORT_JUMP(BlockFunc_190fc) { ldb_jump(gb, 0x78, ADDR_Func_190fe); }
+PORT_JUMP(BlockFunc_19199) { ldb_jump(gb, 0x7a, ADDR_Func_191b3); }
+PORT_JUMP(BlockFunc_1919d) { ldb_jump(gb, 0x7b, ADDR_Func_191b3); }
+PORT_JUMP(BlockFunc_191b1) { ldb_jump(gb, 0x78, ADDR_Func_191b3); }
+PORT_JUMP(BlockFunc_19277) { ldb_jump(gb, 0x7a, ADDR_Func_19291); }
+PORT_JUMP(BlockFunc_1927b) { ldb_jump(gb, 0x7b, ADDR_Func_19291); }
+PORT_JUMP(BlockFunc_1928f) { ldb_jump(gb, 0x78, ADDR_Func_19291); }
+PORT_JUMP(BlockFunc_1932c) { ldb_jump(gb, 0x7a, ADDR_Func_19346); }
+PORT_JUMP(BlockFunc_19330) { ldb_jump(gb, 0x7b, ADDR_Func_19346); }
+PORT_JUMP(BlockFunc_19344) { ldb_jump(gb, 0x78, ADDR_Func_19346); }
+PORT_JUMP(BlockFunc_EnemyBlock_78) { ldb_jump(gb, 0x78, ADDR_EnemyBlockCollision); }
+PORT_JUMP(BlockFunc_EnemyBlock_79) { ldb_jump(gb, 0x79, ADDR_EnemyBlockCollision); }
+PORT_JUMP(BlockFunc_EnemyBlock_7a) { ldb_jump(gb, 0x7a, ADDR_EnemyBlockCollision); }
+PORT_JUMP(BlockFunc_EnemyBlock_7b) { ldb_jump(gb, 0x7b, ADDR_EnemyBlockCollision); }
+PORT_JUMP(BlockFunc_EnemyBlock_7c) { ldb_jump(gb, 0x7c, ADDR_EnemyBlockCollision); }
+PORT_JUMP(BlockFunc_EnemyBlock_7d) { ldb_jump(gb, 0x7d, ADDR_EnemyBlockCollision); }
+PORT_JUMP(BlockFunc_EnemyBlock_7e) { ldb_jump(gb, 0x7e, ADDR_EnemyBlockCollision); }
+PORT_JUMP(BlockFunc_EnemyBlock_7f) { ldb_jump(gb, 0x7f, ADDR_EnemyBlockCollision); }
+PORT_JUMP(BlockFunc_BonfireBlock_78) { ldb_jump(gb, 0x78, ADDR_BonfireBlockCollision); }
+PORT_JUMP(BlockFunc_BonfireBlock_79) { ldb_jump(gb, 0x79, ADDR_BonfireBlockCollision); }
+PORT_JUMP(BlockFunc_BonfireBlock_7a) { ldb_jump(gb, 0x7a, ADDR_BonfireBlockCollision); }
+PORT_JUMP(BlockFunc_BonfireBlock_7b) { ldb_jump(gb, 0x7b, ADDR_BonfireBlockCollision); }
+PORT_JUMP(BlockFunc_BonfireBlock_7c) { ldb_jump(gb, 0x7c, ADDR_BonfireBlockCollision); }
+PORT_JUMP(BlockFunc_BonfireBlock_7d) { ldb_jump(gb, 0x7d, ADDR_BonfireBlockCollision); }
+PORT_JUMP(BlockFunc_BonfireBlock_7e) { ldb_jump(gb, 0x7e, ADDR_BonfireBlockCollision); }
+PORT_JUMP(BlockFunc_DoughnutBlock_78) { ldb_jump(gb, 0x78, ADDR_DoughnutBlockCollision); }
+PORT_JUMP(BlockFunc_DoughnutBlock_79) { ldb_jump(gb, 0x79, ADDR_DoughnutBlockCollision); }
+PORT_JUMP(BlockFunc_DoughnutBlock_7a) { ldb_jump(gb, 0x7a, ADDR_DoughnutBlockCollision); }
+PORT_JUMP(BlockFunc_DoughnutBlock_7b) { ldb_jump(gb, 0x7b, ADDR_DoughnutBlockCollision); }
+PORT_JUMP(BlockFunc_19518) { ldb_jump(gb, 0x7a, ADDR_Func_19522); }
+PORT_JUMP(BlockFunc_19520) { ldb_jump(gb, 0x78, ADDR_Func_19522); }
+PORT_JUMP(BlockFunc_19552) { ldb_jump(gb, 0x79, ADDR_Func_19560); }
+PORT_JUMP(BlockFunc_19556) { ldb_jump(gb, 0x7a, ADDR_Func_19560); }
+PORT_JUMP(BlockFunc_1955e) { ldb_jump(gb, 0x78, ADDR_Func_19560); }
+PORT_JUMP(BlockFunc_1958d) { ldb_jump(gb, 0x79, ADDR_Func_1959b); }
+PORT_JUMP(BlockFunc_19599) { ldb_jump(gb, 0x78, ADDR_Func_1959b); }
+PORT_JUMP(BlockFunc_YarnBlock_79) { ldb_jump(gb, 0x79, ADDR_YarnBlockCollision); }
+PORT_JUMP(BlockFunc_YarnBlock_78) { ldb_jump(gb, 0x78, ADDR_YarnBlockCollision); }

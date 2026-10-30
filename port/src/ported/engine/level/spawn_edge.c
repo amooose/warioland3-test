@@ -81,3 +81,13 @@ PORT(SpawnColEdgeObjects)
 		gb->cpu.e = alu_dec(gb, gb->cpu.e);
 	} while (gb->cpu.e);
 }
+
+// Copies the levels' common tiles to v0Tiles1 and loads the treasures
+PORT(LoadLevelCommonGfxAndTreasures)
+{
+	SET_HL(gb, ADDR_LevelsCommonGfx);
+	SET_DE(gb, v0Tiles1);
+	SET_BC(gb, ADDR_LevelsCommonGfxEnd - ADDR_LevelsCommonGfx);
+	CALL(CopyHLToDE_BC);
+	FARCALL(LoadLevelTreasureData);
+}
