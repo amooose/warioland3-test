@@ -2,6 +2,7 @@
 #include "difftest.h"
 #include "gb.h"
 #include "hooks.h"
+#include "trace.h"
 #include "input.h"
 #include "png.h"
 #include "savestate.h"
@@ -367,6 +368,9 @@ static void usage(const char *argv0)
 		"  --fuzz-routine LABELS fuzz only these routines (comma-separated)\n"
 		"  --fuzz-shard I/N      fuzz only every Nth ported routine, from the Ith\n"
 		"  --fuzz-verbose        list the asm instructions the fuzzing never executed\n"
+		"  --trace-write PATH    replay --input in the asm and write its per-frame trace\n"
+		"  --trace-check PATH    replay --input with the ported routines and compare\n"
+		"                        every game frame against the trace\n"
 		"  --trace               print CPU state every frame\n"
 		"  --break LABEL         print recent instructions whenever LABEL is reached\n"
 		"  --watch LABEL         print the byte at LABEL every frame (repeatable)\n"
@@ -411,6 +415,7 @@ int main(int argc, char **argv)
 	int scale = 4, run_frames = 0;
 	bool no_hooks = false, force_hooks = false, difftest = false;
 	const char *coverage_path = NULL, *fuzz_routine = NULL;
+	const char *trace_write_path = NULL, *trace_check_path = NULL;
 	bool fuzz = false, fuzz_verbose = false;
 	int fuzz_variants = 0, fuzz_shard_i = 0, fuzz_shard_n = 1;
 	static Frontend fe;
@@ -434,6 +439,8 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--hooks")) force_hooks = true;
 		else if (!strcmp(a, "--headless")) fe.headless = true;
 		else if (!strcmp(a, "--difftest")) difftest = true;
+		else if (!strcmp(a, "--trace-write") && next) trace_write_path = argv[++i];
+		else if (!strcmp(a, "--trace-check") && next) trace_check_path = argv[++i];
 		else if (!strcmp(a, "--coverage") && next) coverage_path = argv[++i];
 		else if (!strcmp(a, "--fuzz")) fuzz = true;
 		else if (!strcmp(a, "--fuzz-variants") && next) fuzz_variants = atoi(argv[++i]);
@@ -515,7 +522,7 @@ int main(int argc, char **argv)
 			load_state = fe.script.state_path;
 	}
 
-	if (difftest || coverage_path || fuzz) {
+	if (difftest || coverage_path || fuzz || trace_write_path || trace_check_path) {
 		if (load_state && !savestate_load_file(&gb, load_state))
 			return 1;
 		int end = run_frames ? (int)gb.frame_count + run_frames :
@@ -523,6 +530,10 @@ int main(int argc, char **argv)
 		const InputScript *script = fe.have_script ? &fe.script : NULL;
 		if (coverage_path)
 			return coverage_run(&gb, script, end, coverage_path) ? 0 : 1;
+		if (trace_write_path)
+			return trace_write(&gb, script, end, trace_write_path) ? 0 : 1;
+		if (trace_check_path)
+			return trace_check(&gb, script, trace_check_path) ? 0 : 1;
 		if (fuzz) {
 			fuzz_configure(fuzz_variants, fuzz_routine, fuzz_shard_i, fuzz_shard_n, fuzz_verbose);
 			return fuzz_run(&gb, script, end) ? 0 : 1;

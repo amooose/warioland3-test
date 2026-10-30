@@ -81,7 +81,22 @@ static void test_access(GB *gb, uint16_t addr, bool read)
 	}
 }
 
+static uint8_t gb_read_mem(GB *gb, uint16_t addr);
+
 uint8_t gb_read(GB *gb, uint16_t addr)
+{
+	if (gb->tap_addr && addr == gb->tap_addr) {
+		uint8_t v = gb->tap_override ? gb->tap_value : gb_read_mem(gb, addr);
+		gb->tap_addr = 0;
+		gb->tap_value = v;
+		return v;
+	}
+	if (addr == 0xff04 && gb->div_cb)
+		return gb->div_cb(gb, gb_read_mem(gb, addr));
+	return gb_read_mem(gb, addr);
+}
+
+static uint8_t gb_read_mem(GB *gb, uint16_t addr)
 {
 	if (gb->test.active)
 		test_access(gb, addr, true);

@@ -91,6 +91,7 @@ add_executable(wl3
 	src/ported.c
 	src/ppu.c
 	src/savestate.c
+	src/trace.c
 	${PORTED_SOURCES}
 	${GEN_DIR}/syms.h
 	${GEN_DIR}/constants.h

@@ -155,6 +155,17 @@ typedef struct GB {
 	void *user;
 	uint64_t frame_count;
 
+	// For per-frame traces (trace.c); unused otherwise. pc_cb runs before
+	// every instruction or native routine. The read tap catches the next
+	// read of tap_addr: it returns tap_value instead if tap_override, then
+	// leaves the value it returned in tap_value and clears tap_addr.
+	void (*pc_cb)(struct GB *gb);
+	// sees (and may replace) every read of DIV
+	uint8_t (*div_cb)(struct GB *gb, uint8_t value);
+	uint16_t tap_addr;
+	bool tap_override;
+	uint8_t tap_value;
+
 	// Set while the difftest runs a routine in isolation: gb_call then
 	// executes without advancing the rest of the hardware.
 	bool no_tick;

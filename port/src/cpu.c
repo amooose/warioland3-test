@@ -585,6 +585,8 @@ int cpu_step(GB *gb)
 		return cycles;
 	if (gb->cpu.halted)
 		return 4;
+	if (gb->pc_cb)
+		gb->pc_cb(gb);
 
 	Hook *hook = hook_find(gb, PC);
 	if (hook) {
