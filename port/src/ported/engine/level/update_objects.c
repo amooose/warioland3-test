@@ -2052,3 +2052,188 @@ static void charging_throw(GB *gb, bool right)
 
 PORT_JUMP(Func_6247b) { charging_throw(gb, true); }
 PORT_JUMP(Func_62382) { charging_throw(gb, false); }
+
+
+// The object update loop (UpdateObject and friends)
+
+enum { UPD_NORMAL, UPD_TEMPLE, UPD_FLOOR };
+
+// Return addresses (the bytes after each call, checked against the ROM).
+#define RET_TEMPLE_ACTION 0x5250 // UpdateObject_Temple: call DoObjectAction
+#define RET_TEMPLE_HCALL 0x5261  // UpdateObject_Temple: call hCallFunc
+#define RET_TEMPLE_ANIM 0x5264
+#define RET_TEMPLE_SCREEN 0x5267
+#define RET_NORMAL_ACTION 0x5461 // UpdateObject: call DoObjectAction
+#define RET_NORMAL_HCALL 0x5479  // UpdateObject: call hCallFunc
+#define RET_NORMAL_ANIM 0x547c
+#define RET_NORMAL_SCREEN 0x547f
+#define RET_FLOOR_HCALL 0x55b4  // UpdateObjectDuringFloorTransition: call hCallFunc
+#define RET_FLOOR_FRAME 0x55b7
+#define RET_FLOOR_SCREEN 0x55ba
+#define RET_TEMPLE_GRAB 0x530e  // UpdateObjects_Temple: call HandleGrabbedObjectCollisions
+#define RET_TEMPLE_LOOP 0x5316  // first call c, UpdateObject_Temple (then +7 each)
+#define RET_UPDATE_GRAB 0x5368  // UpdateObjects: call HandleGrabbedObjectCollisions
+#define RET_UPDATE_LOOP 0x5370  // first call c, UpdateObject
+#define RET_FLOOR_LOOP 0x53aa   // first call c, UpdateObjectDuringFloorTransition
+#define OBJFUNCS1_BANK 0x10     // BANK("Object Functions 1")
+#define OBJFUNCS4_BANK 0x13     // BANK("Object Functions 4")
+
+// ld a, [wCurObjId] / swap a / and $0f / or BANK("Object Functions 1") /
+// ldh [hCallFuncBank], a / (pointer from wCurObjUpdateFunction) / call hCallFunc
+static void call_update_function(GB *gb, uint8_t bank, bool by_id, uint16_t ret)
+{
+	if (by_id) {
+		CPU->a = alu_swap(gb, rd8(gb, wCurObjId));
+		CPU->a = alu_and(gb, CPU->a, 0x0f);
+		CPU->a = alu_or(gb, CPU->a, OBJFUNCS1_BANK);
+		bank = CPU->a;
+	} else {
+		CPU->a = bank;
+	}
+	wr8(gb, hCallFuncBank, bank);
+	CPU->a = rd8(gb, wCurObjUpdateFunction + 0);
+	wr8(gb, hCallFuncPointer + 0, CPU->a);
+	CPU->a = rd8(gb, wCurObjUpdateFunction + 1);
+	wr8(gb, hCallFuncPointer + 1, CPU->a);
+	uint8_t entry_bank = rd8(gb, wROMBank);
+	gb_call_ret(gb, hCallFunc, ret);
+	if (gb->test.active && gb->rom_bank != entry_bank)
+		gb->test.unrealistic = true;
+}
+
+static void update_object(GB *gb, int kind)
+{
+	gb_push16(gb, REG_HL(gb));
+	CPU->l = alu_inc(gb, CPU->l);
+	CPU->a = alu_rla(gb, CPU->a);
+	wr8(gb, wCurObjFlags, CPU->a);
+	uint16_t hl = REG_HL(gb);
+	for (int n = 1; n < OBJ_STRUCT_LENGTH - 1; n++) {
+		CPU->a = rd8(gb, hl++);
+		wr8(gb, (uint16_t)(wCurObj + n), CPU->a);
+	}
+	CPU->a = rd8(gb, hl);
+	wr8(gb, (uint16_t)(wCurObj + OBJ_STRUCT_LENGTH - 1), CPU->a);
+	SET_HL(gb, hl);
+
+	switch (kind) {
+	case UPD_NORMAL:
+		gb_call_ret(gb, ADDR_DoObjectAction, RET_NORMAL_ACTION);
+		call_update_function(gb, 0, true, RET_NORMAL_HCALL);
+		gb_call_ret(gb, ADDR_UpdateObjectAnimation, RET_NORMAL_ANIM);
+		gb_call_ret(gb, ADDR_CheckObjectOnScreen, RET_NORMAL_SCREEN);
+		break;
+	case UPD_TEMPLE:
+		gb_call_ret(gb, ADDR_DoObjectAction, RET_TEMPLE_ACTION);
+		call_update_function(gb, OBJFUNCS4_BANK, false, RET_TEMPLE_HCALL);
+		gb_call_ret(gb, ADDR_UpdateObjectAnimation, RET_TEMPLE_ANIM);
+		gb_call_ret(gb, ADDR_CheckObjectOnScreen, RET_TEMPLE_SCREEN);
+		break;
+	case UPD_FLOOR:
+		SET_HL(gb, wCurObjSubState);
+		if (alu_bit(gb, rd8(gb, wCurObjSubState), OBJSUBFLAG_UNINITIALISED_F))
+			call_update_function(gb, 0, true, RET_FLOOR_HCALL);
+		gb_call_ret(gb, ADDR_UpdateObjectFrame, RET_FLOOR_FRAME);
+		gb_call_ret(gb, ADDR_CheckObjectOnScreen, RET_FLOOR_SCREEN);
+		break;
+	}
+
+	CPU->b = rd8(gb, wSCY);
+	CPU->a = alu_add(gb, rd8(gb, wCurObjYPos + 0), OAM_Y_OFS);
+	CPU->a = alu_sub(gb, CPU->a, CPU->b);
+	wr8(gb, wCurObjScreenYPos, CPU->a);
+	CPU->b = rd8(gb, wSCX);
+	CPU->a = alu_add(gb, rd8(gb, wCurObjXPos), OAM_X_OFS);
+	CPU->a = alu_sub(gb, CPU->a, CPU->b);
+	wr8(gb, wCurObjScreenYPos + 1, CPU->a);
+	SET_HL(gb, wCurObjScreenYPos + 2);
+
+	if (kind == UPD_TEMPLE) {
+		SET_HL(gb, wSCYShake);
+		CPU->a = alu_add(gb, rd8(gb, wHiddenFigureSCYShake), rd8(gb, wSCYShake));
+		wr8(gb, wSCY, CPU->a);
+		CPU->a = rd8(gb, wc08b);
+		wr8(gb, wSCX, CPU->a);
+	}
+	SET_HL(gb, gb_pop16(gb));
+
+	hl = REG_HL(gb);
+	CPU->a = alu_and(gb, rd8(gb, wCurObjFlags), 0xff ^ OBJFLAG_STEPPED);
+	wr8(gb, hl++, CPU->a);
+	SET_HL(gb, hl);
+	CPU->l = alu_inc(gb, CPU->l);
+	CPU->l = alu_inc(gb, CPU->l);
+	hl = REG_HL(gb);
+	static const uint16_t fields1[] = {
+		wCurObjYPos + 0, wCurObjYPos + 1, wCurObjXPos + 0, wCurObjXPos + 1,
+		wCurObjId, wCurObjInteractionType,
+		wCurObjCollBoxTop, wCurObjCollBoxBottom, wCurObjCollBoxLeft, wCurObjCollBoxRight,
+		wCurObjScreenYPos, wCurObjScreenXPos, wCurObjFrame,
+		wCurObjOAMPtr + 0, wCurObjOAMPtr + 1, wCurObjFramesetPtr + 0, wCurObjFramesetPtr + 1,
+		wCurObjFrameDuration + 0, wCurObjFrameDuration + 1, wCurObjStateDuration,
+		wCurObjVar1, wCurObjVar2, wCurObjVar3, wCurObjSubState, wCurObjState, wCurObjAction,
+	};
+	for (size_t i = 0; i < sizeof(fields1) / sizeof(fields1[0]); i++) {
+		CPU->a = rd8(gb, fields1[i]);
+		wr8(gb, hl++, CPU->a);
+	}
+	SET_HL(gb, hl);
+	CPU->l = alu_inc(gb, CPU->l);
+	hl = REG_HL(gb);
+	CPU->a = rd8(gb, wCurObjUpdateFunction + 0);
+	wr8(gb, hl++, CPU->a);
+	CPU->a = rd8(gb, wCurObjUpdateFunction + 1);
+	wr8(gb, hl, CPU->a);
+	SET_HL(gb, hl);
+}
+
+PORT(UpdateObject) { update_object(gb, UPD_NORMAL); }
+PORT(UpdateObject_Temple) { update_object(gb, UPD_TEMPLE); }
+PORT(UpdateObjectDuringFloorTransition) { update_object(gb, UPD_FLOOR); }
+
+// ld hl, wObj1Flags / ld a, [hl] / rra / call c, fn, then ld l, LOW(wObjNFlags)
+// for the others
+static void update_all(GB *gb, uint16_t fn, uint16_t ret)
+{
+	SET_HL(gb, wObj1Flags);
+	for (int n = 0; n < NUM_OBJECTS; n++) {
+		if (n)
+			CPU->l = (uint8_t)(wObj1Flags + n * OBJ_STRUCT_SIZE);
+		CPU->a = alu_rra(gb, rd8(gb, REG_HL(gb)));
+		if (CPU->f & FLAG_C)
+			gb_call_ret(gb, fn, (uint16_t)(ret + n * 7));
+	}
+}
+
+static void update_objects_temple(GB *gb)
+{
+	gb_call_ret(gb, ADDR_HandleGrabbedObjectCollisions, RET_TEMPLE_GRAB);
+	update_all(gb, ADDR_UpdateObject_Temple, RET_TEMPLE_LOOP);
+}
+
+PORT(UpdateObjects_Temple) { update_objects_temple(gb); }
+
+PORT(UpdateObjects)
+{
+	CPU->e = rd8(gb, wPowerUpLevel);
+	CPU->a = alu_rla(gb, rd8(gb, wTransformation));
+	if (CPU->f & FLAG_C)
+		CPU->e = SUPER_JUMP_SLAM_OVERALLS;
+	CPU->a = CPU->e;
+	wr8(gb, wEffectivePowerUp, CPU->a);
+
+	CPU->a = rd8(gb, wLevel);
+	alu_cp(gb, CPU->a, THE_TEMPLE);
+	if (CPU->f & FLAG_Z) {
+		update_objects_temple(gb); // jr z, UpdateObjects_Temple
+		return;
+	}
+	CPU->a = rd8(gb, wIsFloorTransition);
+	CPU->a = alu_and(gb, CPU->a, CPU->a);
+	if (!(CPU->f & FLAG_Z)) {
+		update_all(gb, ADDR_UpdateObjectDuringFloorTransition, RET_FLOOR_LOOP);
+		return;
+	}
+	gb_call_ret(gb, ADDR_HandleGrabbedObjectCollisions, RET_UPDATE_GRAB);
+	update_all(gb, ADDR_UpdateObject, RET_UPDATE_LOOP);
+}
