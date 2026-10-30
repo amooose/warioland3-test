@@ -162,6 +162,9 @@ typedef struct GB {
 	void (*pc_cb)(struct GB *gb);
 	// sees (and may replace) every read of memory
 	uint8_t (*read_cb)(struct GB *gb, uint16_t addr, uint8_t value);
+	// Counts of the instructions the interpreter runs (not native code):
+	// one per ROM byte, then one per address $0000-$ffff for code in RAM.
+	uint64_t *asm_profile;
 	uint16_t tap_addr;
 	bool tap_override;
 	uint8_t tap_value;

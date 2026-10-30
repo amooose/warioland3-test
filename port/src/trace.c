@@ -370,6 +370,107 @@ bool trace_write(GB *gb, const InputScript *input, int end_frame, const char *pa
 	return true;
 }
 
+// --- asm profile: what the interpreter still runs when the port plays ---
+
+typedef struct {
+	size_t off; // into GB.asm_profile
+	const char *name;
+	uint64_t count;
+	int distinct;
+	bool ported;
+} ProfLabel;
+
+static int by_off(const void *a, const void *b)
+{
+	size_t x = ((const ProfLabel *)a)->off, y = ((const ProfLabel *)b)->off;
+	return x < y ? -1 : x > y;
+}
+
+static int by_count(const void *a, const void *b)
+{
+	uint64_t x = ((const ProfLabel *)a)->count, y = ((const ProfLabel *)b)->count;
+	return x > y ? -1 : x < y;
+}
+
+static size_t prof_off(const GB *gb, int bank, uint16_t addr)
+{
+	if (addr >= 0x8000)
+		return gb->rom_size + addr;
+	return addr < 0x4000 ? addr : (size_t)bank * 0x4000 + (addr - 0x4000);
+}
+
+// The label at or before off (labels sorted by offset), or -1.
+static long label_at(const ProfLabel *l, size_t n, size_t off)
+{
+	long lo = 0, hi = (long)n - 1, found = -1;
+	while (lo <= hi) {
+		long mid = (lo + hi) / 2;
+		if (l[mid].off <= off) {
+			found = mid;
+			lo = mid + 1;
+		} else {
+			hi = mid - 1;
+		}
+	}
+	return found;
+}
+
+// One line per global label whose code the interpreter ran, most run
+// first: instructions run, distinct instructions, and whether the label has
+// a native routine (then the asm ran is a part the port hands back to asm,
+// or code jumped into past its entry).
+static bool write_profile(const GB *gb, const char *path)
+{
+	size_t n = 0, cap = (size_t)sym_count();
+	ProfLabel *l = calloc(cap ? cap : 1, sizeof(ProfLabel));
+	for (int i = 0; i < sym_count(); i++) {
+		const char *name;
+		int bank;
+		uint16_t addr;
+		if (!sym_get(i, &name, &bank, &addr) || strchr(name, '.'))
+			continue;
+		l[n++] = (ProfLabel){prof_off(gb, bank, addr), name, 0, 0, false};
+	}
+	qsort(l, n, sizeof(*l), by_off);
+	for (int i = 0; i < hook_count(); i++) {
+		Hook *h = hook_get(i);
+		long k = label_at(l, n, prof_off(gb, h->bank, h->addr));
+		if (k >= 0 && l[k].off == prof_off(gb, h->bank, h->addr))
+			l[k].ported = true;
+	}
+	uint64_t total = 0, in_ported = 0;
+	for (size_t off = 0; off < gb->rom_size + 0x10000; off++) {
+		uint64_t c = gb->asm_profile[off];
+		if (!c)
+			continue;
+		long k = label_at(l, n, off);
+		if (k < 0)
+			continue;
+		l[k].count += c;
+		l[k].distinct++;
+		total += c;
+		if (l[k].ported)
+			in_ported += c;
+	}
+	qsort(l, n, sizeof(*l), by_count);
+	FILE *f = fopen(path, "w");
+	if (!f) {
+		fprintf(stderr, "trace: can't write %s\n", path);
+		free(l);
+		return false;
+	}
+	fprintf(f, "# instructions the interpreter ran: %llu, %llu of them under labels with a native routine\n",
+		(unsigned long long)total, (unsigned long long)in_ported);
+	fprintf(f, "# count distinct label ported\n");
+	for (size_t i = 0; i < n && l[i].count; i++)
+		fprintf(f, "%llu %d %s %s\n", (unsigned long long)l[i].count, l[i].distinct, l[i].name,
+			l[i].ported ? "ported" : "-");
+	fclose(f);
+	printf("trace: asm profile written to %s (%llu instructions interpreted)\n", path, (unsigned long long)total);
+	free(l);
+	return true;
+}
+
 static Record *read_trace(const char *path, size_t *n)
 {
 	FILE *f = fopen(path, "rb");
@@ -477,7 +578,7 @@ static void diff_states(const GB *ref, const GB *nat, const uint64_t ref_hash[NR
 	}
 }
 
-bool trace_check(GB *gb, const InputScript *input, const char *path)
+bool trace_check(GB *gb, const InputScript *input, const char *path, const char *profile_path)
 {
 	if (!setup())
 		return false;
@@ -490,6 +591,8 @@ bool trace_check(GB *gb, const InputScript *input, const char *path)
 	// The starting state, to rerun the asm from for the details of a mismatch.
 	GB *start = malloc(sizeof(GB));
 	*start = *gb;
+	if (profile_path)
+		gb->asm_profile = calloc(gb->rom_size + 0x10000, sizeof(uint64_t));
 
 	joypad_from_trace = false;
 	checking = true;
@@ -533,6 +636,10 @@ bool trace_check(GB *gb, const InputScript *input, const char *path)
 	}
 	size_t i = chk_i;
 	frame_deadline = 0;
+	if (profile_path)
+		write_profile(gb, profile_path);
+	free(gb->asm_profile);
+	gb->asm_profile = NULL;
 
 	if (screen_diffs)
 		printf("trace: the screen alone differs in %zu game frames, the first at %zu\n", screen_diffs,

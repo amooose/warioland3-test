@@ -618,6 +618,9 @@ int cpu_step(GB *gb)
 			size_t off = PC < 0x4000 ? PC : (size_t)(gb->rom_bank % gb->rom_banks) * 0x4000 + (PC - 0x4000);
 			gb->test.exec_map[off] = 1;
 		}
+		if (gb->asm_profile)
+			gb->asm_profile[PC < 0x8000 ? (PC < 0x4000 ? PC : (size_t)(gb->rom_bank % gb->rom_banks) * 0x4000 +
+				(PC - 0x4000)) : gb->rom_size + PC]++;
 		if (break_bank >= 0 && PC == break_addr && (PC >= 0x4000 ? gb->rom_bank : 0) == break_bank) {
 			fprintf(stderr, "break #%d at frame %llu\n", ++break_count, (unsigned long long)gb->frame_count);
 			cpu_dump_history(gb, HISTORY_LEN);

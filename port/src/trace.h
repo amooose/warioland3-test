@@ -16,7 +16,9 @@ bool trace_write(GB *gb, const InputScript *input, int end_frame, const char *pa
 // Replay `input` with the native routines on, feeding each game frame the
 // buttons the trace recorded for it, and compare every frame against the
 // trace at path. At the first mismatch, rerun the asm to that frame and
-// print the bytes that differ. Returns true if every frame matched.
-bool trace_check(GB *gb, const InputScript *input, const char *path);
+// print the bytes that differ. Returns true if every frame matched. With
+// profile_path, also write there what the interpreter still ran (asm the
+// native routines don't cover yet), by label.
+bool trace_check(GB *gb, const InputScript *input, const char *path, const char *profile_path);
 
 #endif
