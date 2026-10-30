@@ -351,11 +351,15 @@ static CheckResult check_once(const GB *base, Hook *h, Report *r, const char **w
 		return CHECK_INCONCLUSIVE;
 	if (native_stuck) {
 		// Fine if the asm loops forever too; otherwise the native code is
-		// stuck where the original isn't.
+		// stuck where the original isn't. An asm run that turned
+		// unrealistic on its way out proves nothing either way.
 		bool asm_left;
 		prepare(ref, base);
 		ref->test.exec_map = exec_map;
-		if (run_asm_until(ref, 0xffff, 0, entry_sp, &asm_left) || asm_left) {
+		bool asm_ends = run_asm_until(ref, 0xffff, 0, entry_sp, &asm_left) || asm_left;
+		if (asm_ends && ref->test.unrealistic)
+			return CHECK_INCONCLUSIVE;
+		if (asm_ends) {
 			*why = "the native code never finishes, the asm does";
 			return CHECK_FAIL;
 		}

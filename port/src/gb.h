@@ -178,8 +178,8 @@ typedef struct GB {
 		// Set when the run does something real game code never does, which
 		// a fuzzed input can provoke: a data access to the stack (other than
 		// push/pop/call/ret), switching the ROM bank from code running in
-		// the switchable bank, or executing RAM other than HRAM. Native and
-		// asm can't be compared then.
+		// the switchable bank, or executing RAM other than HRAM and the WRAM
+		// code buffers. Native and asm can't be compared then.
 		bool unrealistic;
 		bool in_stack_op;
 		// Time flows in this check (see difftest.c): reads of the clock
