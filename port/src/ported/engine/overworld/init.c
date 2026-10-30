@@ -661,3 +661,81 @@ PORT_JUMP(InitEastMapSide)
 	gb_call(gb, ADDR_Func_80b1b);
 	JUMP_TO(ADDR_Func_8065e);
 }
+
+// rst JumpTable, with the table at `table` (right after the rst): leaves
+// every register as JumpTable does and returns the target (= hl).
+static uint16_t init_jumptable(GB *gb, uint16_t table)
+{
+	gb_push16(gb, table); // rst JumpTable
+	uint16_t hl = gb_pop16(gb); // pop hl
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0;
+	hl = alu_add16(gb, hl, gb->cpu.e);
+	gb->cpu.a = rd8(gb, hl);
+	gb->cpu.h = rd8(gb, (uint16_t)(hl + 1));
+	gb->cpu.l = gb->cpu.a;
+	return REG_HL(gb);
+}
+
+// ld hl, wDayNight / srl [hl] / rra / rl [hl]: swaps bit 0 of a and [hl]
+static void swap_day_night_bit0(GB *gb)
+{
+	SET_HL(gb, wDayNight);
+	wr8(gb, wDayNight, alu_srl(gb, rd8(gb, wDayNight)));
+	gb->cpu.a = alu_rra(gb, gb->cpu.a);
+	wr8(gb, wDayNight, alu_rl(gb, rd8(gb, wDayNight)));
+}
+
+PORT_JUMP(InitMapSide)
+{
+	CALL(DisableLCD);
+	CALL(FillBGMap0_With7f);
+
+	// stop_music2
+	gb->cpu.a = 0xff;
+	wr8(gb, hMusicIDBackup + 0, 0xff);
+	wr8(gb, hMusicID + 0, 0xff);
+	gb->cpu.a = 0x00;
+	wr8(gb, hMusicIDBackup + 1, 0x00);
+	wr8(gb, hMusicID + 1, 0x00);
+
+	gb->cpu.a = 0x02;
+	wr8(gb, rWBK, 0x02);
+	CALL(ClearVirtualOAM);
+	gb_call(gb, ADDR_VBlank_Overworld);
+
+	gb_call(gb, ADDR_ClearOWWRAM);
+	gb_call(gb, ADDR_GetNextTreasureToCollect);
+
+	gb->cpu.a = gb->cpu.b = rd8(gb, wDayNight);
+	if (!alu_bit(gb, gb->cpu.a, 7)) {
+		gb->cpu.a = alu_swap(gb, rd8(gb, wDayNight));
+		gb->cpu.a = alu_and(gb, gb->cpu.a, 0x0f);
+		wr8(gb, w2d011, gb->cpu.a);
+		// swap bit 0 in a and [hl]
+		swap_day_night_bit0(gb);
+	} else {
+		// .asm_8059b
+		gb_call(gb, ADDR_SwitchDayNight);
+		gb->cpu.a = gb->cpu.b & ~(1 << 7) & ~(1 << 4); // res 7, a / res 4, a
+		wr8(gb, w2d011, gb->cpu.a);
+
+		gb->cpu.a = rd8(gb, wTransitionParam);
+		if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+			gb->cpu.a = alu_xor(gb, rd8(gb, w2d011), 0x1);
+			wr8(gb, w2d011, gb->cpu.a);
+			swap_day_night_bit0(gb);
+			wr8(gb, wDayNight, rd8(gb, wDayNight) & ~(1 << 7)); // res 7, [hl]
+		}
+	}
+	// .asm_805be
+	gb->cpu.a = rd8(gb, w2d011);
+	wr8(gb, w2d07c, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d07d, 0);
+	gb->cpu.a = rd8(gb, wNextMapSide);
+	wr8(gb, wCurMapSide, gb->cpu.a);
+	JUMP_TO(init_jumptable(gb, ADDR_InitMapSide + 0x70));
+}
