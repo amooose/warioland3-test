@@ -1725,3 +1725,212 @@ PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d8e1)
 }
 
 PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d8f0) { rh_carry(gb, true); }
+
+// --- Hidden Figure's face ---
+
+#define HFF(addr) ((uint16_t)(ADDR_HiddenFigureFaceFunc + ((addr) - 0x4ce47)))
+#define HFF_FUNC_4CF13 HFF(0x4cf13)
+#define HFF_FUNC_4CF3F HFF(0x4cf3f)
+
+// Picks the frameset by Wario's screen x: < $38, < $78, or further right
+static void hff_face_by_x(GB *gb, uint16_t left, uint16_t middle, uint16_t right)
+{
+	gb->cpu.a = rd8(gb, wWarioScreenXPos);
+	alu_cp(gb, gb->cpu.a, 0x38);
+	if (gb->cpu.f & FLAG_C) {
+		SET_DE(gb, left);
+	} else {
+		alu_cp(gb, gb->cpu.a, 0x78);
+		SET_DE(gb, (gb->cpu.f & FLAG_C) ? middle : right);
+	}
+	JUMP(SetObjectFramesetPtr);
+}
+
+// .asm_4ce9d
+static void hff_face_hurt(GB *gb)
+{
+	hff_face_by_x(gb, ADDR_Frameset_6a092, ADDR_Frameset_6a08d, ADDR_Frameset_6a097);
+}
+
+PORT_JUMP(HiddenFigureFaceFunc)
+{
+	uint16_t hl = w1d14e;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP_TO(ADDR_Func_4ce39);
+		return;
+	}
+	hl = wCurObjState;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) {
+		// .asm_4ce63
+		gb->cpu.a = rd8(gb, wCurObjFramesetOffset);
+		alu_cp(gb, gb->cpu.a, 0x04);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			RET();
+			return;
+		}
+		gb->cpu.a = rd8(gb, wCurObjFrameDuration);
+		alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			RET();
+			return;
+		}
+		gb->cpu.a = rd8(gb, w1d14c);
+		alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			hff_face_hurt(gb);
+			return;
+		}
+		gb->cpu.a = rd8(gb, w1d14d);
+		alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			hff_face_hurt(gb);
+			return;
+		}
+		gb->cpu.a = alu_dec(gb, rd8(gb, w1d15a));
+		if (gb->cpu.f & FLAG_Z) {
+			hff_face_hurt(gb);
+			return;
+		}
+		hff_face_by_x(gb, ADDR_Frameset_6a07a, ADDR_Frameset_6a06c, ADDR_Frameset_6a07f);
+		return;
+	}
+	gb->cpu.a = alu_and(gb, gb->cpu.a, 0xfe);
+	alu_cp(gb, gb->cpu.a, 0x28);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, hl, 0);
+		hl = LO(hl, OBJ_FLAGS);
+		SET_HL(gb, hl);
+		hf_res_bit(gb, hl, OBJFLAG_NO_COLLISION_F);
+		RET();
+		return;
+	}
+
+	// .asm_4ceba
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hl, 0);
+	SET_DE(gb, ADDR_Frameset_6a084);
+	CALL(SetObjectFramesetPtr);
+	hl = REG_HL(gb);
+	gb->cpu.a = 0x3c;
+	wr8(gb, hl++, 0x3c);
+	hf_set_update(gb, hl, HFF_FUNC_4CF13);
+	gb->cpu.a = 0x01;
+	wr8(gb, w1d151, 0x01);
+	hl = w1d15a;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) {
+		RET();
+		return;
+	}
+	uint8_t d = alu_dec(gb, rd8(gb, hl));
+	wr8(gb, hl, d);
+	if (d) {
+		// .asm_4cf03
+		gb->cpu.a = alu_dec(gb, rd8(gb, hl));
+		if (gb->cpu.f & FLAG_Z) {
+			// play_music2 MUSIC_HIDDEN_FIGURE_BATTLE_2
+			gb->cpu.a = (uint8_t)(MUSIC_HIDDEN_FIGURE_BATTLE_2 >> 8);
+			wr8(gb, hMusicIDBackup + 0, gb->cpu.a);
+			wr8(gb, hMusicID + 0, gb->cpu.a);
+			gb->cpu.a = (uint8_t)MUSIC_HIDDEN_FIGURE_BATTLE_2;
+			wr8(gb, hMusicIDBackup + 1, gb->cpu.a);
+			wr8(gb, hMusicID + 1, gb->cpu.a);
+		}
+		RET();
+		return;
+	}
+	hl = hf_set_update(gb, wCurObjUpdateFunction + 1, HFF_FUNC_4CF3F);
+	hl = LO(hl, OBJ_FLAGS);
+	SET_HL(gb, hl);
+	hf_set_bit(gb, hl, 3);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w1d151, 0);
+	// stop_music2
+	gb->cpu.a = 0xff;
+	wr8(gb, hMusicIDBackup + 0, 0xff);
+	wr8(gb, hMusicID + 0, 0xff);
+	gb->cpu.a = 0x00;
+	wr8(gb, hMusicIDBackup + 1, 0x00);
+	wr8(gb, hMusicID + 1, 0x00);
+	gb->cpu.a = 0x10;
+	wr8(gb, wCurObjStateDuration, 0x10);
+	gb->cpu.a = 0x02;
+	wr8(gb, wAutoMoveState, 0x02);
+	RET();
+}
+
+PORT_LOCAL_JUMP(HiddenFigureFaceFunc, Func_4cf13)
+{
+	uint16_t hl = wCurObjStateDuration;
+	SET_HL(gb, hl);
+	uint8_t d = alu_dec(gb, rd8(gb, hl));
+	wr8(gb, hl, d);
+	if (d) {
+		gb->cpu.a = rd8(gb, hl);
+		alu_cp(gb, gb->cpu.a, 0x2c);
+		if (gb->cpu.f & FLAG_Z)
+			play_sfx(gb, SFX_0CE);
+		JUMP_TO(ADDR_Func_4cfe0);
+		return;
+	}
+	// .asm_4cf29
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w1d151, 0);
+	hl = hf_set_update(gb, hl, ADDR_HiddenFigureFaceFunc);
+	hl = LO(hl, OBJ_FLAGS);
+	SET_HL(gb, hl);
+	hf_res_bit(gb, hl, OBJFLAG_NO_COLLISION_F);
+	gb_call(gb, ADDR_Func_4d005);
+	hff_face_hurt(gb);
+}
+
+PORT_LOCAL(HiddenFigureFaceFunc, Func_4cf3f)
+{
+	hf_no_actions(gb);
+	uint16_t hl = wCurObjStateDuration;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	uint8_t d = alu_dec(gb, rd8(gb, hl));
+	wr8(gb, hl, d);
+	if (d)
+		return;
+	play_sfx(gb, SFX_0CE);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureFaceFunc, Func_4cf55)
+{
+	hf_no_actions(gb);
+	uint16_t hl = wCurObjStateDuration;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) {
+		RET();
+		return;
+	}
+	uint8_t d = alu_dec(gb, rd8(gb, hl));
+	wr8(gb, hl, d);
+	if (d) {
+		RET();
+		return;
+	}
+	play_sfx(gb, SFX_HIDDEN_FIGURE_LAUGH);
+	SET_DE(gb, ADDR_Frameset_6a071);
+	JUMP(SetObjectFramesetPtr);
+}
