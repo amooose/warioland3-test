@@ -808,3 +808,202 @@ PORT(ObjInteraction_Ice)
 	touch_states(gb, TOUCH_ATTACK, 0x02);
 	FARCALL(SetState_IceSkatinStart);
 }
+
+PORT_JUMP(Func_209ca)
+{
+	ld_cp(gb, wWarioState, WST_ATTACKING_AIRBORNE);
+	if (ZF) {
+		xor_a(gb);
+		wr8(gb, wAttackCounter, 0);
+	}
+	if (ld_and(gb, wWaterInteraction)) {
+		RET();
+		return;
+	}
+	ld_cp(gb, wWarioState, WST_DIVING);
+	if (ZF) {
+		RET();
+		return;
+	}
+	st(gb, wIsOnSteppableObject, TRUE);
+	if (ld_and(gb, wc1c1)) {
+		alu_cp(gb, gb->cpu.a, 0x03);
+		if (!CF)
+			gb->cpu.a = 0x02;
+		gb->cpu.b = gb->cpu.a;
+		CALL(MoveWarioUp);
+	}
+	gb->cpu.b = OBJACTION_STEP_ON;
+	LCALL(SetObjAction);
+	if (!ld_and(gb, wJumpVelTable) || ld_and(gb, wAttackCounter) || ld_and(gb, wIsRolling)) {
+		JUMP_TO(ProcessInteractions_next_obj);
+		return;
+	}
+	CALL(TriggerFloorTransition_SkipUpdateYPos);
+	ld_cp(gb, wInvincibleCounter, 0x01);
+	if (ZF) {
+		JUMP_TO(ProcessInteractions_next_obj);
+		return;
+	}
+	if (ld_and(gb, wTransformation)) {
+		RET();
+		return;
+	}
+	if (ld_and(gb, wGrabState)) {
+		FARCALL(SetState_GrabIdling);
+	} else if (ld_and(gb, wIsCrouching)) {
+		xor_a(gb);
+		wr8(gb, wWaterInteraction, 0);
+		FARCALL(CrouchOrSlide);
+	} else {
+		xor_a(gb);
+		wr8(gb, wWaterInteraction, 0);
+		FARCALL(SetState_Idling);
+	}
+	JUMP_TO(ProcessInteractions_next_obj);
+}
+
+PORT_JUMP(Func_20a6f)
+{
+	gb->cpu.b = ld(gb, wWarioScreenXPos);
+	alu_cp(gb, ld(gb, wObjScreenXPos), gb->cpu.b);
+	bool left = CF;
+	for (;;) {
+		if (!left) { // .asm_20a79
+			if (!ld_and(gb, wDirection)) {
+				JUMP_TO(ProcessInteractions_next_obj);
+				return;
+			}
+			st(gb, wInteractionSide, INTERACTION_RIGHT);
+			FARCALL(Func_197b1);
+			if (b_and(gb))
+				break;
+			ld_cp(gb, wc1c3, 0xff);
+			if (ZF) {
+				left = true;
+				continue;
+			}
+			gb->cpu.b = gb->cpu.a;
+			CALL(MoveWarioLeft);
+			break;
+		} else { // .asm_20aa5
+			if (ld_and(gb, wDirection)) {
+				JUMP_TO(ProcessInteractions_next_obj);
+				return;
+			}
+			st(gb, wInteractionSide, INTERACTION_LEFT);
+			FARCALL(Func_19741);
+			if (b_and(gb))
+				break;
+			ld_cp(gb, wc1c4, 0xff);
+			if (ZF) {
+				left = false;
+				continue;
+			}
+			gb->cpu.b = gb->cpu.a;
+			CALL(MoveWarioRight);
+			break;
+		}
+	}
+	// .asm_20acf
+	gb->cpu.a = rd8(gb, wTransformation);
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_BALL_O_STRING_WARIO);
+	if (ZF) {
+		ld_cp(gb, wTransformationProgress, 1);
+		if (ZF)
+			FARCALL(Func_28bd5);
+		RET();
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_HOT_WARIO);
+	if (ZF) {
+		ld_cp(gb, wTransformationProgress, 1);
+		if (ZF)
+			FARCALL(Func_2afc5);
+		RET();
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_ICE_SKATIN);
+	if (ZF) {
+		ld_cp(gb, wWarioState, WST_ICE_SKATIN_CRASH);
+		if (!ZF)
+			FARCALL(Func_1ec215);
+		RET();
+		return;
+	}
+	xor_a(gb);
+	wr8(gb, wWalkVelIndex, 0);
+	if (!ld_and(gb, wIsRolling) && !ld_and(gb, wAttackCounter)) {
+		JUMP_TO(ProcessInteractions_next_obj);
+		return;
+	}
+	FARCALL(DoJumpingBump);
+	RET();
+}
+
+// routine called when an object is attacked
+// whether by Wario's B attack, Fat Wario bump, rolling, etc.
+PORT(AttackObject)
+{
+	play_sfx(gb, SFX_017);
+	gb->cpu.b = ld(gb, wWarioScreenXPos);
+	alu_cp(gb, ld(gb, wObjScreenXPos), gb->cpu.b);
+	bool left = CF;
+	st(gb, wInteractionSide, left ? INTERACTION_LEFT : INTERACTION_RIGHT);
+	// x = Wario's x +/- 8, y = Wario's y - 8
+	gb->cpu.a = rd8(gb, wWarioXPos + 1);
+	gb->cpu.a = left ? alu_sub(gb, gb->cpu.a, 0x08) : alu_add(gb, gb->cpu.a, 0x08);
+	wr8(gb, hXPosLo, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wWarioXPos + 0);
+	gb->cpu.a = left ? alu_sbc(gb, gb->cpu.a, 0x00) : alu_adc(gb, gb->cpu.a, 0x00);
+	wr8(gb, hXPosLo - 1, gb->cpu.a);
+	gb->cpu.a = alu_sub(gb, rd8(gb, wWarioXPos - 1), 0x08);
+	wr8(gb, hXPosLo - 2, gb->cpu.a);
+	gb->cpu.a = alu_sbc(gb, rd8(gb, wWarioXPos - 2), 0x00);
+	wr8(gb, hXPosLo - 3, gb->cpu.a);
+	SET_HL(gb, wWarioXPos - 2);
+	SET_DE(gb, hXPosLo - 3);
+
+	// .spawn_stars
+	gb->cpu.b = PARTICLE_STARS;
+	FARCALL(CreateParticle);
+	gb->cpu.b = OBJACTION_ATTACK;
+	LCALL(SetObjAction);
+	gb->cpu.a = rd8(gb, wTransformation);
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_FAT_WARIO);
+	if (ZF) {
+		FARCALL(SetState_FatBumping);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_SNOWMAN_WARIO);
+	if (ZF) {
+		if (!ld_and(gb, wTransformationProgress))
+			FARCALL(SetState_SnowmanBumped);
+		return;
+	}
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	if (ld_and(gb, wIsRolling)) {
+		if (!ld_bit(gb, wObjInteractionType, HEAVY_OBJ_F))
+			return;
+		ld_cp(gb, wPowerUpLevel, GARLIC);
+		if (!CF)
+			return;
+		FARCALL(DoJumpingBump_NoSFX);
+		return;
+	}
+	// .not_rolling
+	if (ld_bit(gb, wObjInteractionType, HEAVY_OBJ_F)) {
+		FARCALL(DoJumpingBump_NoSFX);
+		return;
+	}
+	if (ld_and(gb, wJumpVelTable))
+		FARCALL(StartFall);
+	else
+		FARCALL(SetState_Idling);
+}
+
+PORT(Func_217a9)
+{
+	FARCALL(DoJumpingBump);
+}

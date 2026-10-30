@@ -1029,3 +1029,16 @@ PORT_JUMP(SetState_BallStart)
 	anim(gb, OAM3);
 	RET();
 }
+
+// call ApplyJumpVelocity / farcall walk / cap the walk velocity
+static void jump_and_walk(GB *gb, uint8_t bank, uint16_t walk, uint8_t max, uint8_t v)
+{
+	CALL(ApplyJumpVelocity);
+	port_farcall(gb, bank, walk);
+	ld_cp(gb, wWalkVelIndex, max);
+	if (!CF)
+		st(gb, wWalkVelIndex, v);
+}
+
+PORT(Func_1ee00f) { jump_and_walk(gb, BANK_Func_2b17a, ADDR_Func_2b17a, 0x10, 0x0c); }
+PORT(Func_1ee02e) { jump_and_walk(gb, BANK_HandleWalk, ADDR_HandleWalk, 0x08, 0x04); }

@@ -2068,3 +2068,40 @@ PORT_JUMP(UpdateState_PuffyTurning)
 	}
 	LJUMP(SetState_PuffyRising);
 }
+
+PORT_JUMP(Func_2af9c)
+{
+	CALL(ApplyJumpVelocity);
+	LCALL(HandleWalk);
+	cap_walk_vel(gb, 0x14, 0x10);
+	FARCALL(CheckFrontCollision);
+	if (!b_and(gb)) {
+		RET();
+		return;
+	}
+	st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	LJUMP(Func_2afc5); // fallthrough
+}
+
+PORT(Func_2b2a4)
+{
+	CALL(ApplyJumpVelocity);
+	LCALL(Func_2b17a);
+	cap_walk_vel(gb, 0x08, 0x04);
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (!ZF)
+		return;
+	st(gb, wIsSmashAttacking, TRUE);
+}
+
+PORT(Func_2b3dd)
+{
+	CALL(ApplyJumpVelocity);
+	SET_HL(gb, wWarioStateCycles);
+	if (ld_and(gb, wWarioStateCycles)) {
+		wr8(gb, wWarioStateCycles, alu_dec(gb, gb->cpu.a));
+		return;
+	}
+	LCALL(Func_2b17a);
+	cap_walk_vel(gb, 0x04, 0x00);
+}
