@@ -3644,3 +3644,466 @@ PORT_JUMP(Func_b7c18)
 	gb->cpu.a = rd8(gb, REG_BC(gb));
 	JUMP_TO(jumptable(gb, ADDR_Func_b7c18 + 2));
 }
+
+#define WOW_EARTHQUAKE_B5D0A (ADDR_WOWFunc_Earthquake + 0xa2) // .Func_b5d0a
+
+PORT_JUMP(EOWFunc_Daytime) { ow_func_jumptable(gb, ADDR_EOWFunc_Daytime); }
+PORT_LOCAL_JUMP(EOWFunc_Daytime, Func_b78eb) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(EOWFunc_Daytime, Func_b78f0) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(EOWFunc_Daytime, Func_b78f5)
+{
+	FARCALL(Func_84b97);
+	if (nonzero(gb, wOWPalTransitionState)) {
+		RET();
+		return;
+	}
+	gb->cpu.ime = false; // di
+	FARCALL(VBlank_OWScene);
+	gb->cpu.ime = true; // ei
+	gb->cpu.ime_delay = 0;
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+// ld hl, w2d03e / ld [hli], a (a = n) / xor a / ld [hli], a / ld [hli], a
+static void set_2d03e(GB *gb, uint8_t n)
+{
+	wr8(gb, w2d03e, n);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d03e + 1, 0);
+	wr8(gb, w2d03e + 2, 0);
+	SET_HL(gb, w2d03e + 3);
+}
+
+// start of an earthquake shake: wOWUIObj1YCoord = 1, w2d049 = 1, w2d03e = 3
+static void shake_start(GB *gb)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, wOWUIObj1YCoord, 0x01);
+	wr8(gb, w2d049, 0x01);
+	gb->cpu.a = 0x03;
+	set_2d03e(gb, 0x03);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+// ld a, [wOWFuncCounter] / cp n: true (ret c) if below n
+static bool counter_below(GB *gb, uint8_t n)
+{
+	gb->cpu.a = rd8(gb, wOWFuncCounter);
+	alu_cp(gb, gb->cpu.a, n);
+	return gb->cpu.f & FLAG_C;
+}
+
+PORT_JUMP(SOWFunc_Earthquake)
+{
+	gb_call(gb, ADDR_Func_b71fc);
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, ADDR_SOWFunc_Earthquake + 7));
+}
+PORT_LOCAL_JUMP(SOWFunc_Earthquake, Func_b6c53) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(SOWFunc_Earthquake, Func_b6c58) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(SOWFunc_Earthquake, Func_b6c5d) { shake_start(gb); }
+PORT_LOCAL_JUMP(SOWFunc_Earthquake, Func_b6c73) { wait_ow_func(gb, 120); }
+// .asm_b6c86
+static void sow_earthquake_obj2(GB *gb)
+{
+	set_state(gb, 0x1b, wSceneObj2State);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(SOWFunc_Earthquake, Func_b6c78)
+{
+	SET_HL(gb, ADDR_Data_855f9);
+	gb_call(gb, ADDR_Func_b5868);
+	play_sfx(gb, SFX_061);
+	sow_earthquake_obj2(gb);
+}
+PORT_LOCAL_JUMP(SOWFunc_Earthquake, Func_b6c91)
+{
+	SET_HL(gb, wSceneObj2State);
+	JUMP_TO(ADDR_WaitOWObjDisappear);
+}
+PORT_LOCAL_JUMP(SOWFunc_Earthquake, Func_b6c97)
+{
+	gb->cpu.a = alu_add(gb, 0x02, rd8(gb, wSceneObj2YCoord));
+	wr8(gb, wSceneObj2YCoord, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, 0xfe, rd8(gb, wSceneObj2YCoord + 1));
+	wr8(gb, wSceneObj2YCoord + 1, gb->cpu.a);
+	sow_earthquake_obj2(gb);
+}
+// end of an earthquake shake: w2d03e = $0e, w2d049 = 0
+static void shake_end(GB *gb)
+{
+	gb->cpu.a = 0x0e;
+	set_2d03e(gb, 0x0e);
+	wr8(gb, w2d049, 0);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(SOWFunc_Earthquake, Func_b6ca4)
+{
+	gb->cpu.a = 0x03;
+	wr8(gb, wOWUIObj1YCoord, 0x03);
+	shake_end(gb);
+}
+
+// EOWFunc_BurnVines.Func_b77ce
+static void burn_vines_sfx(GB *gb)
+{
+	SET_HL(gb, w2d123);
+	wr8(gb, w2d123, alu_inc(gb, rd8(gb, w2d123)));
+	gb->cpu.a = rd8(gb, w2d123);
+	alu_cp(gb, gb->cpu.a, 0x0f);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d123, 0);
+	gb->cpu.a = rd8(gb, wSceneObj1State);
+	alu_cp(gb, gb->cpu.a, 0x15);
+	if (gb->cpu.f & FLAG_Z) {
+		play_sfx(gb, SFX_126);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x16);
+	if (gb->cpu.f & FLAG_Z) {
+		play_sfx(gb, SFX_125);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x14);
+	if (gb->cpu.f & FLAG_Z)
+		play_sfx(gb, SFX_01E);
+}
+
+PORT_JUMP(EOWFunc_BurnVines)
+{
+	burn_vines_sfx(gb);
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, ADDR_EOWFunc_BurnVines + 7));
+}
+PORT_LOCAL_JUMP(EOWFunc_BurnVines, Func_b7803) { wait_ow_func(gb, 40); }
+PORT_LOCAL_JUMP(EOWFunc_BurnVines, Func_b7808) { wait_ow_func(gb, 30); }
+PORT_LOCAL_JUMP(EOWFunc_BurnVines, Func_b780d)
+{
+	set_state(gb, 0x15, wSceneObj1State);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_BurnVines, Func_b7818) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(EOWFunc_BurnVines, Func_b781d)
+{
+	set_state(gb, 0x16, wSceneObj1State);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_BurnVines, Func_b7828) { wait_ow_func(gb, 30); }
+PORT_LOCAL_JUMP(EOWFunc_BurnVines, Func_b782d)
+{
+	set_state(gb, 0x14, wSceneObj1State);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_BurnVines, Func_b7838) { wait_ow_func(gb, 90); }
+PORT_LOCAL_JUMP(EOWFunc_BurnVines, Func_b783d)
+{
+	set_state(gb, 0x00, wSceneObj9State);
+	set_state(gb, 0x15, wSceneObj1State); // jr .Func_b780d
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_BurnVines, Func_b7847) { wait_ow_func(gb, 40); }
+PORT_LOCAL_JUMP(EOWFunc_BurnVines, Func_b784c)
+{
+	set_state(gb, 0x18, wSceneObj1State);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_BurnVines, Func_b7857)
+{
+	SET_HL(gb, wSceneObj1State);
+	JUMP_TO(ADDR_WaitOWObjDisappear);
+}
+
+PORT_JUMP(EOWFunc_Earthquake)
+{
+	gb_call(gb, ADDR_Func_b71fc);
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, ADDR_EOWFunc_Earthquake + 7));
+}
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b7138) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b713d) { wait_ow_func(gb, 40); }
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b7142)
+{
+	for (int row = 10; row <= 11; row++) {
+		uint16_t hl = (uint16_t)(wAttrmap + row * TILEMAP_WIDTH + 2);
+		gb->cpu.b = 0x04;
+		do {
+			wr8(gb, hl, rd8(gb, hl) | (1 << B_BG_PRIO));
+			hl++;
+			gb->cpu.b = alu_dec(gb, gb->cpu.b);
+		} while (!(gb->cpu.f & FLAG_Z));
+		SET_HL(gb, hl);
+	}
+	gb->cpu.a = TRUE;
+	wr8(gb, wOWPendingTileUpdate, TRUE);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b7160)
+{
+	set_state(gb, 0x03, wSceneObj6State);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b716b) { wait_ow_func(gb, 10); }
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b7170)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, wOWUIObj1YCoord, 0x01);
+	set_state(gb, 0x06, wSceneObj15State);
+	set_state(gb, 0x04, wSceneObj6State);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+// ld a, [wOWFuncCounter] / cp n / ret c / ld hl, wSceneObj6YCoord / inc [hl] /
+// jp AdvanceOWFunc
+static void eow_earthquake_move(GB *gb, uint8_t n)
+{
+	if (counter_below(gb, n)) {
+		RET();
+		return;
+	}
+	SET_HL(gb, wSceneObj6YCoord);
+	wr8(gb, wSceneObj6YCoord, alu_inc(gb, rd8(gb, wSceneObj6YCoord)));
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b7188) { eow_earthquake_move(gb, 0x0a); }
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b7195) { eow_earthquake_move(gb, 0x20); }
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b71a2) { eow_earthquake_move(gb, 0x1c); }
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b71af) { eow_earthquake_move(gb, 0x18); }
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b71bc) { eow_earthquake_move(gb, 0x14); }
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b71c9)
+{
+	gb->cpu.a = 0x03;
+	wr8(gb, wOWUIObj1YCoord, 0x03);
+	set_state(gb, 0x07, wSceneObj15State);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b71d9)
+{
+	set_state(gb, 0x05, wSceneObj6State);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b71e4)
+{
+	gb->cpu.a = rd8(gb, wSceneObj6Frame);
+	alu_cp(gb, gb->cpu.a, 0x09);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_Earthquake, Func_b71ed)
+{
+	if (counter_below(gb, 0x09)) {
+		RET();
+		return;
+	}
+	SET_HL(gb, ADDR_Data_8563e);
+	gb_call(gb, ADDR_Func_b5868);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+// NOWFunc_Prologue.Func_b59e5
+static void prologue_sfx(GB *gb)
+{
+	if (!nonzero(gb, wOWUIObj2Attributes))
+		return;
+	SET_HL(gb, wOWUIObj2Duration);
+	wr8(gb, wOWUIObj2Duration, alu_inc(gb, rd8(gb, wOWUIObj2Duration)));
+	gb->cpu.a = rd8(gb, wOWUIObj2Duration);
+	alu_cp(gb, gb->cpu.a, 0x01);
+	if (gb->cpu.f & FLAG_Z) {
+		play_sfx(gb, SFX_08E);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x30);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWUIObj2Duration, 0);
+}
+
+PORT_JUMP(NOWFunc_Prologue)
+{
+	gb_call(gb, ADDR_Func_b71fc);
+	FARCALL(Func_15868e);
+	prologue_sfx(gb);
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, ADDR_NOWFunc_Prologue + 0x19));
+}
+PORT_LOCAL_JUMP(NOWFunc_Prologue, Func_b5949)
+{
+	if (counter_below(gb, 60)) {
+		RET();
+		return;
+	}
+	shake_start(gb);
+}
+PORT_LOCAL_JUMP(NOWFunc_Prologue, Func_b5965)
+{
+	if (counter_below(gb, 134)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x04;
+	wr8(gb, wOWUIObj1YCoord, 0x04);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(NOWFunc_Prologue, Func_b5973)
+{
+	gb->cpu.a = rd8(gb, wOWUIObj1YCoord);
+	alu_cp(gb, gb->cpu.a, 0x05);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	set_obj_state_sfx_advance(gb, 0x2b, wSceneObj1State, SFX_061);
+}
+PORT_LOCAL_JUMP(NOWFunc_Prologue, Func_b598c)
+{
+	if (nonzero(gb, wOWUIObj1YCoord)) {
+		RET();
+		return;
+	}
+	shake_end(gb);
+}
+PORT_LOCAL_JUMP(NOWFunc_Prologue, Func_b59a0) { wait_ow_func(gb, 86); }
+PORT_LOCAL_JUMP(NOWFunc_Prologue, Func_b59a5)
+{
+	if (counter_below(gb, 6)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d150, 0x01);
+	wr8(gb, wOWUIObj2Attributes, 0x01);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+// .asm_b59b9
+static void prologue_set_flag(GB *gb, uint16_t flag)
+{
+	SET_HL(gb, flag);
+	if (counter_below(gb, 6)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x01;
+	wr8(gb, flag, 0x01);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(NOWFunc_Prologue, Func_b59b6) { prologue_set_flag(gb, w2d151); }
+PORT_LOCAL_JUMP(NOWFunc_Prologue, Func_b59c5) { prologue_set_flag(gb, wd152); }
+PORT_LOCAL_JUMP(NOWFunc_Prologue, Func_b59ca) { prologue_set_flag(gb, wd153); }
+PORT_LOCAL_JUMP(NOWFunc_Prologue, Func_b59cf) { prologue_set_flag(gb, wd154); }
+PORT_LOCAL_JUMP(NOWFunc_Prologue, Func_b59d4) { prologue_set_flag(gb, wd155); }
+PORT_LOCAL_JUMP(NOWFunc_Prologue, Func_b59d9) { wait_ow_func(gb, 120); }
+PORT_LOCAL_JUMP(NOWFunc_Prologue, Func_b59de)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWUIObj2Attributes, 0);
+	JUMP_TO(ADDR_EndOWFunc);
+}
+
+// WOWFunc_Earthquake.asm_b5d2d
+static void wow_earthquake_next(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWUIObj1FramesetOffset, 0);
+	SET_HL(gb, wOWUIObj1FramesetOffset - 1);
+	wr8(gb, wOWUIObj1FramesetOffset - 1, alu_inc(gb, rd8(gb, wOWUIObj1FramesetOffset - 1)));
+}
+PORT_LOCAL(WOWFunc_Earthquake, Func_b5d0a)
+{
+	SET_HL(gb, wOWUIObj1Duration + 1);
+	gb->cpu.a = rd8(gb, wOWUIObj1Duration);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	wr8(gb, wOWUIObj1Duration + 1, alu_inc(gb, rd8(gb, wOWUIObj1Duration + 1)));
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	gb_call(gb, jumptable(gb, WOW_EARTHQUAKE_B5D0A + 9));
+}
+PORT_LOCAL(WOWFunc_Earthquake, Func_b5d25)
+{
+	set_state(gb, 0x14, wSceneObj13State);
+	wow_earthquake_next(gb);
+}
+PORT_LOCAL(WOWFunc_Earthquake, Func_b5d34)
+{
+	set_state(gb, 0x15, wSceneObj15State);
+	wow_earthquake_next(gb);
+}
+PORT_LOCAL(WOWFunc_Earthquake, Func_b5d3e)
+{
+	set_state(gb, 0x14, wSceneObj14State);
+	wow_earthquake_next(gb);
+}
+PORT_LOCAL(WOWFunc_Earthquake, Func_b5d48)
+{
+	set_state(gb, 0x15, wSceneObj12State);
+	wow_earthquake_next(gb);
+}
+PORT_LOCAL(WOWFunc_Earthquake, Func_b5d52)
+{
+	gb->cpu.a = rd8(gb, wOWUIObj1FramesetOffset);
+	alu_cp(gb, gb->cpu.a, 0x0a);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	wow_earthquake_next(gb);
+}
+PORT_LOCAL(WOWFunc_Earthquake, Func_b5d5a)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, wOWUIObj1Duration, 0x01);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWUIObj1Duration + 1, 0);
+	SET_HL(gb, wOWUIObj1Duration + 1);
+}
+
+PORT_JUMP(WOWFunc_Earthquake)
+{
+	gb_call(gb, ADDR_Func_b71fc);
+	gb_call(gb, WOW_EARTHQUAKE_B5D0A);
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, ADDR_WOWFunc_Earthquake + 0x0a));
+}
+PORT_LOCAL_JUMP(WOWFunc_Earthquake, Wait1) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(WOWFunc_Earthquake, Func_b5c8f) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(WOWFunc_Earthquake, Func_b5c94)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, wOWUIObj1YCoord, 0x01);
+	wr8(gb, wOWUIObj1Duration, 0x01);
+	set_state(gb, 0x17, wSceneObj11State);
+	set_state(gb, 0x19, wSceneObj10State);
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d049, 0x01);
+	gb->cpu.a = 0x03;
+	set_2d03e(gb, 0x03);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(WOWFunc_Earthquake, WaitShake) { wait_ow_func(gb, 120); }
+PORT_LOCAL_JUMP(WOWFunc_Earthquake, Func_b5cc4)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWUIObj1Duration, 0);
+	gb->cpu.a = 0x03;
+	wr8(gb, wOWUIObj1YCoord, 0x03);
+	set_state(gb, 0x18, wSceneObj11State);
+	set_state(gb, 0x1a, wSceneObj10State);
+	shake_end(gb);
+}
+PORT_LOCAL_JUMP(WOWFunc_Earthquake, WaitPostShake) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(WOWFunc_Earthquake, DropRocks)
+{
+	set_state(gb, 0x16, wSceneObj13State);
+	SET_HL(gb, ADDR_Data_85549);
+	gb_call(gb, ADDR_Func_b5868);
+	sfx_advance(gb, SFX_061);
+}
