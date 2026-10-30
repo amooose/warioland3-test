@@ -4458,3 +4458,317 @@ PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b74b0)
 	wr8(gb, wOWUIObj2YCoord, 0x04);
 	JUMP_TO(ADDR_AdvanceOWFunc);
 }
+
+#define CANYON_B6869 (ADDR_SOWFunc_CanyonThunder + 0xd1) // .Func_b6869
+#define CANYON_B6879 (ADDR_SOWFunc_CanyonThunder + 0xe1) // .Func_b6879
+#define CANYON_B68CD (ADDR_SOWFunc_CanyonThunder + 0x135) // .Func_b68cd
+
+// SOWFunc_CanyonThunder.apply_pals
+static void canyon_apply_pals(GB *gb)
+{
+	wr8(gb, wPalConfig1 + 0, (uint8_t)rBGPI);
+	wr8(gb, wPalConfig1 + 1, BGPI_AUTOINC | (0 * PAL_SIZE));
+	wr8(gb, wPalConfig1 + 2, 1 * PAL_SIZE);
+	wr8(gb, wPalConfig1 + 3, (uint8_t)(wTempBGPals >> 8));
+	gb->cpu.a = (uint8_t)wTempBGPals;
+	wr8(gb, wPalConfig1 + 4, gb->cpu.a);
+	SET_HL(gb, wPalConfig1 + 5);
+}
+
+// SOWFunc_CanyonThunder.got_pal
+static void canyon_got_pal(GB *gb, uint16_t pals)
+{
+	SET_HL(gb, pals);
+	SET_DE(gb, wTempBGPals);
+	gb->cpu.b = BANK_Pals_84280; // aka BANK(Pals_8698d)
+	gb->cpu.c = 8 * PAL_SIZE;
+	CALL(CopyFarBytes);
+	canyon_apply_pals(gb);
+}
+
+// SOWFunc_CanyonThunder.flash2_pal
+static void canyon_flash2_pal(GB *gb)
+{
+	SET_HL(gb, wTempBGPals + 0 * PAL_SIZE);
+	gb->cpu.b = 3 * PAL_SIZE;
+	gb_call(gb, ADDR_Func_b69a6);
+	SET_HL(gb, wTempBGPals + 7 * PAL_SIZE);
+	gb->cpu.b = 4;
+	gb_call(gb, ADDR_Func_b69a6);
+	canyon_apply_pals(gb);
+}
+
+// ld hl, wPalConfig1TotalSteps / ld a, [hl] / and a / ret z / inc [hl]:
+// false on the ret z
+static bool canyon_step(GB *gb)
+{
+	SET_HL(gb, wPalConfig1TotalSteps);
+	gb->cpu.a = alu_and(gb, rd8(gb, wPalConfig1TotalSteps), rd8(gb, wPalConfig1TotalSteps));
+	if (gb->cpu.f & FLAG_Z)
+		return false;
+	wr8(gb, wPalConfig1TotalSteps, alu_inc(gb, rd8(gb, wPalConfig1TotalSteps)));
+	return true;
+}
+
+PORT_LOCAL(SOWFunc_CanyonThunder, Func_b6869)
+{
+	if (!canyon_step(gb))
+		return;
+	alu_cp(gb, gb->cpu.a, 0x05);
+	if (gb->cpu.f & FLAG_Z) {
+		canyon_flash2_pal(gb);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x09);
+	if (gb->cpu.f & FLAG_Z)
+		canyon_got_pal(gb, ADDR_Pals_8698d); // .flash1_pal
+}
+
+PORT_LOCAL(SOWFunc_CanyonThunder, Func_b6879)
+{
+	if (!canyon_step(gb))
+		return;
+	alu_cp(gb, gb->cpu.a, 0x01);
+	if (gb->cpu.f & FLAG_Z) {
+		canyon_got_pal(gb, ADDR_Pals_8698d); // .flash1_pal
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x05);
+	if (gb->cpu.f & FLAG_Z) {
+		canyon_flash2_pal(gb);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x09);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	// .asm_b6892
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wPalConfig1TotalSteps, 0);
+	gb->cpu.a = rd8(gb, w2d062);
+	alu_cp(gb, gb->cpu.a, 0x07);
+	canyon_got_pal(gb, (gb->cpu.f & FLAG_Z) ? ADDR_Pals_8698d : ADDR_Pals_84280);
+}
+
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b68cd)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d124), rd8(gb, w2d124));
+	if (gb->cpu.f & FLAG_Z) {
+		RET();
+		return;
+	}
+	SET_HL(gb, w2d125);
+	wr8(gb, w2d125, alu_inc(gb, rd8(gb, w2d125)));
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	JUMP_TO(jumptable(gb, CANYON_B68CD + 11));
+}
+
+// SOWFunc_CanyonThunder.asm_b6910
+static void canyon_b6910(GB *gb)
+{
+	SET_HL(gb, w2d124);
+	wr8(gb, w2d124, alu_inc(gb, rd8(gb, w2d124)));
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d125, 0);
+}
+
+// lb de, d, e / ld c, c / ld a, d / ld [hli], a / ld a, e / ld [hli], a /
+// set 2, l / ld a, c / call SetSceneObjState
+static void canyon_place(GB *gb, uint16_t obj, uint8_t d, uint8_t e, uint8_t c)
+{
+	gb->cpu.d = d;
+	gb->cpu.e = e;
+	gb->cpu.c = c;
+	gb->cpu.a = d;
+	wr8(gb, obj, d);
+	gb->cpu.a = e;
+	wr8(gb, (uint16_t)(obj + 1), e);
+	uint16_t hl = (uint16_t)(obj + 2);
+	hl |= 1 << 2; // set 2, l
+	SET_HL(gb, hl);
+	gb->cpu.a = c;
+	CALL(SetSceneObjState);
+}
+
+// SOWFunc_CanyonThunder.asm_b68f6
+static void canyon_b68f6(GB *gb, uint16_t obj, uint8_t d, uint8_t e, uint8_t c)
+{
+	canyon_place(gb, obj, d, e, c);
+	gb->cpu.a = 0x01;
+	wr8(gb, wPalConfig1TotalSteps, 0x01);
+	gb_call(gb, CANYON_B6869);
+	play_sfx(gb, SFX_124); // .asm_b6908
+	canyon_b6910(gb);
+}
+
+// ld a, 7 / ld hl, w2d125 / cp [hl] / ret nc / jr .asm_b6910
+static void canyon_b6925(GB *gb)
+{
+	gb->cpu.a = 0x07;
+	SET_HL(gb, w2d125);
+	alu_cp(gb, gb->cpu.a, rd8(gb, w2d125));
+	if (!(gb->cpu.f & FLAG_C))
+		return;
+	canyon_b6910(gb);
+}
+
+PORT_LOCAL(SOWFunc_CanyonThunder, Func_b68ee) { canyon_b68f6(gb, wSceneObj2, 0x50, 0x38, 0x17); }
+PORT_LOCAL(SOWFunc_CanyonThunder, Func_b6919)
+{
+	gb_call(gb, CANYON_B6869);
+	canyon_b6925(gb);
+}
+PORT_LOCAL(SOWFunc_CanyonThunder, Func_b6925) { canyon_b6925(gb); }
+PORT_LOCAL(SOWFunc_CanyonThunder, Func_b692e) { canyon_b68f6(gb, wSceneObj1, 0x48, 0x46, 0x12); }
+PORT_LOCAL(SOWFunc_CanyonThunder, Func_b6938) { canyon_b68f6(gb, wSceneObj2, 0x42, 0x2e, 0x17); }
+PORT_LOCAL(SOWFunc_CanyonThunder, Func_b6942) { canyon_b68f6(gb, wSceneObj1, 0x3e, 0x38, 0x12); }
+PORT_LOCAL(SOWFunc_CanyonThunder, Func_b694c)
+{
+	canyon_place(gb, wSceneObj10, 0x3b, 0x1f, 0x12);
+	play_sfx(gb, SFX_124); // .asm_b6908
+	canyon_b6910(gb);
+}
+PORT_LOCAL(SOWFunc_CanyonThunder, Func_b6960)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d124, 0);
+	wr8(gb, w2d125, 0);
+}
+
+PORT_JUMP(SOWFunc_CanyonThunder)
+{
+	gb_call(gb, CANYON_B68CD);
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, ADDR_SOWFunc_CanyonThunder + 7));
+}
+
+// SOWFunc_CanyonThunder.asm_b67d6
+static void canyon_b67d6(GB *gb)
+{
+	CALL(SetSceneObjState);
+	gb->cpu.a = 0x01;
+	wr8(gb, wPalConfig1TotalSteps, 0x01);
+	gb_call(gb, CANYON_B6879);
+	sfx_advance(gb, SFX_124);
+}
+
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b67c7) { wait_ow_func(gb, 34); }
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b67cc) { wait_ow_func(gb, 90); }
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b67d1)
+{
+	SET_HL(gb, wSceneObj2State);
+	gb->cpu.a = 0x12;
+	canyon_b67d6(gb);
+}
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b67ec)
+{
+	gb_call(gb, CANYON_B6879);
+	wait_ow_func(gb, 16);
+}
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b67f4)
+{
+	SET_HL(gb, wSceneObj10State);
+	gb->cpu.a = 0x12;
+	canyon_b67d6(gb);
+}
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b67f9)
+{
+	gb_call(gb, CANYON_B6879);
+	wait_ow_func(gb, 54);
+}
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b6801)
+{
+	gb->cpu.a = 0x56;
+	wr8(gb, wSceneObj2YCoord, 0x56);
+	wr8(gb, wSceneObj2YCoord + 1, 0x47);
+	SET_HL(gb, wSceneObj2State);
+	gb->cpu.a = 0x17;
+	canyon_b67d6(gb);
+}
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b6810)
+{
+	gb_call(gb, CANYON_B6879);
+	gb->cpu.a = alu_and(gb, rd8(gb, wPalConfig1TotalSteps), rd8(gb, wPalConfig1TotalSteps));
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b681b) { wait_ow_func(gb, 30); }
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b6820)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d124, 0x01);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b6828)
+{
+	gb->cpu.a = rd8(gb, w2d124);
+	alu_cp(gb, gb->cpu.a, 0x07);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b6831) { wait_ow_func(gb, 7); }
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b6836)
+{
+	gb->cpu.a = 0x0a;
+	SET_HL(gb, wSceneObj5State);
+	CALL(SetSceneObjState);
+	SET_HL(gb, ADDR_Data_855b2);
+	gb_call(gb, ADDR_Func_b5868);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b6847) { wait_ow_func(gb, 45); }
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b684c)
+{
+	SET_HL(gb, ADDR_Pals_84280);
+	SET_DE(gb, wTempPals1);
+	gb->cpu.b = BANK_Pals_84280;
+	gb->cpu.c = 8 * PAL_SIZE;
+	CALL(CopyFarBytes);
+	SET_HL(gb, ADDR_Pals_84980);
+	SET_DE(gb, wTempPals2);
+	gb->cpu.b = BANK_Pals_84980;
+	gb->cpu.c = 8 * PAL_SIZE;
+	CALL(CopyFarBytes);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b6968)
+{
+	gb->cpu.a = rd8(gb, wOWFuncCounter);
+	if (!alu_bit(gb, gb->cpu.a, 0)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_Func_b588d);
+}
+PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b6971)
+{
+	SET_HL(gb, wTempPals1);
+	SET_DE(gb, wTempBGPals);
+	gb->cpu.b = 8 * PAL_SIZE;
+	CALL(CopyHLToDE);
+	SET_HL(gb, wTempPals2);
+	SET_DE(gb, wTempOBPals);
+	gb->cpu.b = 8 * PAL_SIZE;
+	CALL(CopyHLToDE);
+	SET_HL(gb, wTempPals1);
+	gb->cpu.b = 3 * PAL_SIZE;
+	gb_call(gb, ADDR_Func_b69a6);
+	SET_HL(gb, wTempPals1 + 7 * PAL_SIZE);
+	gb->cpu.b = 4;
+	gb_call(gb, ADDR_Func_b69a6);
+	SET_HL(gb, wTempPals2);
+	gb->cpu.b = 4 * PAL_SIZE;
+	gb_call(gb, ADDR_Func_b69a6);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wPalConfig1TotalSteps, 0);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}

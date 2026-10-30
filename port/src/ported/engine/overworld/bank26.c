@@ -668,3 +668,322 @@ PORT_JUMP(ProcessCollectionLinkState)
 	}
 	RET();
 }
+
+// decompress_tiles0 / decompress_tilemap
+static void decompress_to(GB *gb, uint8_t bank, uint16_t src, uint16_t dest)
+{
+	gb->cpu.a = bank;
+	wr8(gb, wTempBank, bank);
+	SET_HL(gb, src);
+	SET_BC(gb, dest);
+	gb->cpu.a = rd8(gb, wTempBank);
+	wr8(gb, hCallFuncBank, gb->cpu.a);
+	HCALL(Decompress);
+}
+
+static void stop_music2(GB *gb)
+{
+	gb->cpu.a = 0xff;
+	wr8(gb, hMusicIDBackup + 0, 0xff);
+	wr8(gb, hMusicID + 0, 0xff);
+	gb->cpu.a = 0x00;
+	wr8(gb, hMusicIDBackup + 1, 0x00);
+	wr8(gb, hMusicID + 1, 0x00);
+}
+
+PORT(_InitTreasureCollection)
+{
+	CALL(DisableLCD);
+	CALL(FillBGMap0_With7f);
+	CALL(ClearVirtualOAM);
+
+	gb->cpu.a = (uint8_t)(MUSIC_TREASURE_COLLECTION >> 8);
+	wr8(gb, hMusicIDBackup + 0, gb->cpu.a);
+	wr8(gb, hMusicID + 0, gb->cpu.a);
+	gb->cpu.a = (uint8_t)MUSIC_TREASURE_COLLECTION;
+	wr8(gb, hMusicIDBackup + 1, gb->cpu.a);
+	wr8(gb, hMusicID + 1, gb->cpu.a);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rSCX, 0);
+	wr8(gb, wSCX, 0);
+	wr8(gb, rSCY, 0);
+	wr8(gb, wSCY, 0);
+
+	gb->cpu.a = 0x02;
+	wr8(gb, rWBK, 0x02);
+	gb_call(gb, ADDR_VBlank_TreasureCollection);
+	gb_call(gb, ADDR_Func_9a54e);
+	gb_call(gb, ADDR_Func_9a559);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wHDMA, 0);
+
+	gb->cpu.a = alu_and(gb, rd8(gb, wIsCollectionOpen), rd8(gb, wIsCollectionOpen));
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.b = 0;
+		gb->cpu.c = 0;
+		gb->cpu.a = alu_and(gb, rd8(gb, wTransitionParam), rd8(gb, wTransitionParam));
+		bool search = !(gb->cpu.f & FLAG_Z);
+		if (search) {
+			alu_cp(gb, gb->cpu.a, NUM_TREASURES);
+			search = gb->cpu.f & FLAG_C;
+		}
+		if (search) {
+			for (;;) {
+				alu_cp(gb, gb->cpu.a, NUM_COLLECTION_CELLS + 1);
+				if (gb->cpu.f & FLAG_C)
+					break;
+				gb->cpu.b = alu_inc(gb, gb->cpu.b);
+				gb->cpu.a = alu_sub(gb, gb->cpu.a, NUM_COLLECTION_CELLS);
+			}
+			gb->cpu.a = alu_dec(gb, gb->cpu.a);
+			gb->cpu.c = gb->cpu.a;
+		}
+		gb->cpu.a = gb->cpu.b;
+		wr8(gb, wCollectionPage, gb->cpu.a);
+		gb->cpu.a = gb->cpu.c;
+		wr8(gb, wCollectionCell, gb->cpu.a);
+		gb->cpu.a = TRUE;
+		wr8(gb, wIsCollectionOpen, TRUE);
+	}
+
+	gb_call(gb, ADDR_GetCurrentCollectionCellRowAndColumn);
+	gb_call(gb, ADDR_GetCollectionCellCoords);
+
+	SET_HL(gb, ADDR_Pals_9ad45);
+	CALL(LoadPalsToTempPals1);
+	SET_HL(gb, ADDR_Pals_9ad05);
+	CALL(LoadPalsToTempPals2);
+
+	decompress_to(gb, BANK_TreasureCollectionCursorGfx, ADDR_TreasureCollectionCursorGfx, v0Tiles0);
+	decompress_to(gb, BANK_TreasureCollectionGfx, ADDR_TreasureCollectionGfx, v0Tiles2);
+
+	gb_call(gb, ADDR_LoadCollectionPageTreasureGfx);
+
+	gb->cpu.a = 1; // BANK("VRAM1")
+	wr8(gb, rVBK, 1);
+	SET_HL(gb, ADDR_NumbersGfx);
+	SET_DE(gb, v1Tiles1 + 0x20 * TILE_SIZE);
+	SET_BC(gb, 0x14 * TILE_SIZE);
+	CALL(CopyHLToDE_BC);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+
+	decompress_to(gb, BANK_TreasureCollectionAttrmap, ADDR_TreasureCollectionAttrmap, wAttrmap);
+	decompress_to(gb, BANK_TreasureCollectionTilemap, ADDR_TreasureCollectionTilemap, wTilemap);
+
+	gb_call(gb, ADDR_ApplyPageTreasuresPals);
+
+	gb->cpu.a = 0x1 | BG_BANK1;
+	for (int i = 0; i < 3; i++)
+		wr8(gb, wAttrmap + 1 * TILEMAP_WIDTH + 2 + i, gb->cpu.a);
+	for (int i = 0; i < 3; i++)
+		wr8(gb, wAttrmap + 2 * TILEMAP_WIDTH + 2 + i, gb->cpu.a);
+
+	gb->cpu.a = alu_inc(gb, rd8(gb, wCollectionPage));
+	gb->cpu.a = alu_add(gb, gb->cpu.a, 0x20);
+	wr8(gb, wTilemap + 1 * TILEMAP_WIDTH + 16, gb->cpu.a);
+
+	SET_HL(gb, wTilemap);
+	SET_DE(gb, v0BGMap1);
+	SET_BC(gb, 18 * TILEMAP_WIDTH);
+	CALL(CopyHLToDE_BC);
+	gb->cpu.a = 1; // BANK("VRAM1")
+	wr8(gb, rVBK, 1);
+	SET_HL(gb, wAttrmap);
+	SET_DE(gb, v0BGMap1);
+	SET_BC(gb, 18 * TILEMAP_WIDTH);
+	CALL(CopyHLToDE_BC);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+	SET_HL(gb, v0BGMap1 + 1 * TILEMAP_WIDTH + 2);
+	FARCALL(PrintNumCollectedTreasures);
+
+	SET_HL(gb, wSceneObj1State);
+	gb->cpu.a = 0x01;
+	CALL(SetSceneObjState);
+	gb->cpu.b = 0x10;
+	gb->cpu.a = 0x08;
+	wr8(gb, wSceneObj9XCoord, 0x08);
+	wr8(gb, wSceneObj9XCoord - 1, 0x10);
+	gb->cpu.a = 0x98;
+	wr8(gb, wSceneObj10XCoord, 0x98);
+	wr8(gb, wSceneObj10XCoord - 1, 0x10);
+	gb->cpu.a = LCDC_ON | LCDC_BG_9C00 | LCDC_OBJ_16 | LCDC_OBJ_ON | LCDC_BG_ON;
+	wr8(gb, rLCDC, gb->cpu.a);
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}
+
+// HandleTreasureCollectionInput.SetScrollMode
+static void set_scroll_mode(GB *gb)
+{
+	gb->cpu.a = TRUE;
+	wr8(gb, wCollectionScrollMode, TRUE);
+	SET_HL(gb, wSceneObj9State);
+	gb->cpu.a = 0x03;
+	CALL(SetSceneObjState);
+	SET_HL(gb, wSceneObj10State);
+	gb->cpu.a = 0x04;
+	CALL(SetSceneObjState);
+}
+
+// HandleTreasureCollectionInput.change_page
+static void change_page(GB *gb)
+{
+	play_sfx(gb, SFX_0EB);
+	gb->cpu.a = 0x0c;
+	wr8(gb, wSubState, 0x0c);
+	RET();
+}
+
+PORT_JUMP(HandleTreasureCollectionInput)
+{
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_B)) {
+		stop_music2(gb);
+		gb->cpu.a = 0xff; // stop_sfx
+		wr8(gb, hSFXID + 0, 0xff);
+		gb->cpu.a = 0x00;
+		wr8(gb, hSFXID + 1, 0x00);
+		gb->cpu.a = 0x08;
+		wr8(gb, wSubState, 0x08);
+		RET();
+		return;
+	}
+
+	SET_HL(gb, wCollectionPage);
+	gb->cpu.a = rd8(gb, wJoypadDown);
+	gb->cpu.b = gb->cpu.a;
+	if (alu_bit(gb, gb->cpu.b, B_PAD_A)) {
+		gb->cpu.a = alu_and(gb, rd8(gb, wCollectionScrollMode), rd8(gb, wCollectionScrollMode));
+		if (gb->cpu.f & FLAG_Z)
+			set_scroll_mode(gb);
+		SET_HL(gb, wCollectionPage);
+		uint16_t hl = wCollectionPage;
+		if (alu_bit(gb, gb->cpu.b, B_PAD_RIGHT)) {
+			gb->cpu.a = 0x04;
+			alu_cp(gb, gb->cpu.a, rd8(gb, hl));
+			if (gb->cpu.f & FLAG_Z)
+				wr8(gb, hl, 0x00);
+			else
+				wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+		} else if (alu_bit(gb, gb->cpu.b, B_PAD_LEFT)) {
+			gb->cpu.a = alu_and(gb, rd8(gb, hl), rd8(gb, hl));
+			if (gb->cpu.f & FLAG_Z)
+				wr8(gb, hl, 0x04);
+			else
+				wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+		} else {
+			RET();
+			return;
+		}
+		// .asm_9a68f
+		play_sfx(gb, SFX_0EB);
+		stop_music2(gb);
+		gb->cpu.a = 0x0c;
+		wr8(gb, wSubState, 0x0c);
+		RET();
+		return;
+	}
+
+	// .no_a_btn
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCollectionScrollMode, 0);
+	wr8(gb, wSceneObj9State, 0);
+	wr8(gb, wSceneObj10State, 0);
+
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	gb->cpu.b = gb->cpu.a;
+	SET_HL(gb, wCollectionCol);
+	uint16_t hl = wCollectionCol;
+	gb->cpu.a = rd8(gb, hl);
+	if (alu_bit(gb, gb->cpu.b, B_PAD_RIGHT)) {
+		alu_cp(gb, gb->cpu.a, NUM_COLLECTION_COLS - 1);
+		if (gb->cpu.f & FLAG_Z) { // .page_right
+			wr8(gb, hl, 0x00);
+			gb->cpu.a = alu_sub(gb, rd8(gb, wCollectionCell), NUM_COLLECTION_ROWS);
+			wr8(gb, wCollectionCell, gb->cpu.a);
+			SET_HL(gb, wCollectionPage);
+			wr8(gb, wCollectionPage, alu_inc(gb, rd8(gb, wCollectionPage)));
+			gb->cpu.a = rd8(gb, wCollectionPage);
+			alu_cp(gb, gb->cpu.a, NUM_COLLECTION_PAGES);
+			if (gb->cpu.f & FLAG_Z)
+				wr8(gb, wCollectionPage, 0x00);
+			change_page(gb);
+			return;
+		}
+		wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+		gb->cpu.a = alu_inc(gb, rd8(gb, wCollectionCell));
+	} else if (alu_bit(gb, gb->cpu.b, B_PAD_LEFT)) {
+		alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z) { // .page_left
+			wr8(gb, hl, NUM_COLLECTION_ROWS);
+			gb->cpu.a = alu_add(gb, rd8(gb, wCollectionCell), NUM_COLLECTION_ROWS);
+			wr8(gb, wCollectionCell, gb->cpu.a);
+			SET_HL(gb, wCollectionPage);
+			wr8(gb, wCollectionPage, alu_dec(gb, rd8(gb, wCollectionPage)));
+			gb->cpu.a = rd8(gb, wCollectionPage);
+			alu_cp(gb, gb->cpu.a, 0xff);
+			if (gb->cpu.f & FLAG_Z)
+				wr8(gb, wCollectionPage, NUM_COLLECTION_PAGES - 1);
+			change_page(gb);
+			return;
+		}
+		wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+		gb->cpu.a = alu_dec(gb, rd8(gb, wCollectionCell));
+	} else {
+		SET_HL(gb, wCollectionRow);
+		hl = wCollectionRow;
+		gb->cpu.a = rd8(gb, hl);
+		bool up = alu_bit(gb, gb->cpu.b, B_PAD_UP);
+		if (!up && !alu_bit(gb, gb->cpu.b, B_PAD_DOWN)) {
+			gb_call(gb, ADDR_ProcessCollectionLinkState);
+			RET();
+			return;
+		}
+		bool cant;
+		if (up) {
+			alu_and(gb, gb->cpu.a, gb->cpu.a);
+			cant = gb->cpu.f & FLAG_Z;
+		} else {
+			alu_cp(gb, gb->cpu.a, NUM_COLLECTION_ROWS - 1);
+			cant = !(gb->cpu.f & FLAG_C);
+		}
+		if (cant) { // .cant_scroll
+			play_sfx(gb, SFX_0E5);
+			RET();
+			return;
+		}
+		if (up) {
+			wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+			gb->cpu.a = alu_sub(gb, rd8(gb, wCollectionCell), NUM_COLLECTION_COLS);
+		} else {
+			wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+			gb->cpu.a = alu_add(gb, rd8(gb, wCollectionCell), NUM_COLLECTION_COLS);
+		}
+	}
+
+	// .got_target_cell
+	wr8(gb, wCollectionCell, gb->cpu.a);
+	play_sfx(gb, SFX_0E2);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	static const uint16_t states[] = {
+		wSceneObj2State, wSceneObj3State, wSceneObj4State, wSceneObj5State,
+		wSceneObj6State, wSceneObj7State, wSceneObj8State,
+	};
+	for (int i = 0; i < 7; i++)
+		wr8(gb, states[i], 0);
+	SET_DE(gb, wCollectionLinkState);
+	wr8(gb, wCollectionLinkState, 0);
+	gb->cpu.e = alu_inc(gb, gb->cpu.e);
+	wr8(gb, REG_DE(gb), 0);
+	JUMP_TO(ADDR_GetCollectionCellCoords);
+}
