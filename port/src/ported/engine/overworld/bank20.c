@@ -2839,3 +2839,367 @@ PORT(Func_81714)
 	for (unsigned i = 0; i < sizeof(objs) / sizeof(objs[0]); i++)
 		func_8175d(gb, objs[i]);
 }
+
+PORT_JUMP(Func_8139f)
+{
+	SET_HL(gb, w2d0e5);
+	gb->cpu.a = rd8(gb, w2d0e5);
+	alu_cp(gb, gb->cpu.a, 0x08);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x03;
+	wr8(gb, w2d0e0, gb->cpu.a);
+	JUMP_TO(ADDR_Func_81398);
+}
+
+PORT_JUMP(Func_813ad)
+{
+	gb->cpu.a = rd8(gb, w2d0e0);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_Func_81398);
+}
+
+PORT_JUMP(Func_813b4)
+{
+	gb_call(gb, ADDR_GetMapSideAndLevelForNextTreasure);
+	CALL(LoadLevelName);
+	JUMP_TO(ADDR_Func_81398);
+}
+
+PORT_JUMP(Func_813ef)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wPalConfig1TotalSteps, 0);
+	JUMP_TO(ADDR_Func_81398);
+}
+
+PORT_JUMP(Func_813f6)
+{
+	FARCALL(FadeInLevelName);
+	gb->cpu.c = alu_srl(gb, gb->cpu.c);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x1c;
+	SET_HL(gb, wSceneObj13State);
+	CALL(SetSceneObjState);
+	JUMP_TO(ADDR_Func_81398);
+}
+
+PORT_JUMP(Func_81413)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wJoypadPressed), PAD_B | PAD_RIGHT | PAD_LEFT | PAD_DOWN);
+	SET_HL(gb, wSceneObj13State);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = rd8(gb, wSceneObj13State);
+		if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+			JUMP_TO(ADDR_Func_81398);
+			return;
+		}
+		RET();
+		return;
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	CALL(SetSceneObjState);
+	JUMP_TO(ADDR_Func_81398);
+}
+
+PORT_JUMP(LoadSpriteInsideWindow_High)
+{
+	gb->cpu.b = 0x20;
+	JUMP_TO(ADDR_LoadSpriteInsideWindow);
+}
+
+PORT(ShowTopBarSelectedButton)
+{
+	gb->cpu.a = rd8(gb, wTopBarSelection);
+	gb->cpu.c = 0x00;
+	if (alu_bit(gb, gb->cpu.a, TOPBAR_DAY_NIGHT_F)) {
+		// .day_night
+		gb->cpu.a = rd8(gb, w2d011);
+		if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+			gb->cpu.c = 0x05; // night spell
+	} else {
+		static const int bits[] = {TOPBAR_CUTSCENE_F, TOPBAR_COLLECTION_F, TOPBAR_NEXT_MAP_F, TOPBAR_PREV_MAP_F};
+		for (int i = 0; i < 4; i++) {
+			gb->cpu.c = alu_inc(gb, gb->cpu.c);
+			if (alu_bit(gb, gb->cpu.a, bits[i]))
+				break;
+		}
+	}
+	// .got_selection
+	gb->cpu.a = alu_add(gb, gb->cpu.c, gb->cpu.c); // *2
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0x00;
+	uint16_t hl = alu_add16(gb, ADDR_ShowTopBarSelectedButton + 0x4e, REG_DE(gb)); // .button_data
+	gb->cpu.a = rd8(gb, hl++);
+	wr8(gb, wOWUIObj1XCoord, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hl);
+	wr8(gb, wOWUIObj1State, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWUIObj1State - 1, 0);
+	wr8(gb, wOWUIObj1State - 2, 0); // FramesetOffset
+
+	// if either Next Map or Prev Map are selected
+	// then show the NEXT MAP indicator
+	gb->cpu.c = 0x00;
+	gb->cpu.a = alu_and(gb, rd8(gb, wTopBarSelection), TOPBAR_NEXT_MAP | TOPBAR_PREV_MAP);
+	if (!(gb->cpu.f & FLAG_Z))
+		gb->cpu.c = 0x0b; // NEXT MAP indicator
+	gb->cpu.a = gb->cpu.c;
+	wr8(gb, wOWUIObj2State, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWUIObj2State - 1, 0);
+	wr8(gb, wOWUIObj2State - 2, 0); // wOWUIObj2Duration
+	SET_HL(gb, wOWUIObj2State - 2);
+}
+
+// Func_82521 with the table dispatch; false if it jumped out of the table
+static bool func_82521(GB *gb)
+{
+	for (;;) {
+		gb_push16(gb, REG_HL(gb)); // push hl
+		uint16_t target = jumptable(gb, ADDR_Func_82521 + 2);
+		uint16_t de;
+		uint8_t next = 0;
+		switch (target - ADDR_Func_82521) {
+		case 0x20: SET_HL(gb, gb_pop16(gb)); return true; // .Func_82541
+		case 0x22: de = ADDR_Frameset_aa091; break;
+		case 0x27: de = ADDR_Frameset_aa094; break;
+		case 0x2c: de = ADDR_Frameset_aa097; break;
+		case 0x31: de = ADDR_Frameset_aa09a; break;
+		case 0x36: de = ADDR_Frameset_aa09d; break;
+		case 0x3b: de = ADDR_Frameset_aa0bc; next = 0x07; break;
+		case 0x46: de = ADDR_Frameset_aa0a3; break;
+		case 0x4b: de = ADDR_Frameset_aa0c1; next = 0x05; break;
+		case 0x56: de = ADDR_Frameset_aa0a9; break;
+		case 0x5b: de = ADDR_Frameset_aa0ae; break;
+		case 0x60: de = ADDR_Frameset_aa0b1; break;
+		case 0x65: de = ADDR_Frameset_aa0c6; break;
+		case 0x6a: de = ADDR_Frameset_aa0b4; break;
+		case 0x6f: de = ADDR_Frameset_aa0b9; break;
+		default:
+			JUMP_TO(target);
+			return false;
+		}
+		SET_DE(gb, de);
+		SET_HL(gb, gb_pop16(gb)); // pop hl
+		gb->cpu.b = 0x2a; // .UpdateAnimation
+		CALL(UpdateOWAnimation);
+		if (!next)
+			return true;
+		gb->cpu.b = next;
+		// .Func_8259a
+		gb->cpu.a = rd8(gb, wOWAnimationFinished);
+		alu_cp(gb, gb->cpu.a, 0xff);
+		if (!(gb->cpu.f & FLAG_Z))
+			return true;
+		gb->cpu.l |= 1 << 2; // set 2, l
+		gb->cpu.d = gb->cpu.h;
+		gb->cpu.e = gb->cpu.l;
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, REG_DE(gb), 0);
+		gb->cpu.e = alu_inc(gb, gb->cpu.e);
+		wr8(gb, REG_DE(gb), 0);
+		gb->cpu.e = alu_inc(gb, gb->cpu.e);
+		gb->cpu.a = gb->cpu.b;
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		// call Func_82521 (a = 5 or 7: always in the table)
+	}
+}
+
+PORT_JUMP(Func_82521)
+{
+	if (gb->rom_bank != BANK_Func_82521) {
+		gb_push16(gb, REG_HL(gb));
+		JUMP_TO(jumptable(gb, ADDR_Func_82521 + 2)); // runs whatever is mapped
+		return;
+	}
+	if (func_82521(gb))
+		RET();
+}
+
+// loops twice, once for de + (2 * TILEMAP_WIDTH)
+// and then for the original de
+PORT(Func_8269f)
+{
+	gb_push16(gb, REG_DE(gb)); // push de
+	gb->cpu.a = alu_add(gb, gb->cpu.e, 2 * TILEMAP_WIDTH);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.a = alu_adc(gb, 0x00, gb->cpu.d);
+	gb->cpu.d = gb->cpu.a;
+	gb->cpu.c = 2;
+	uint16_t hl = REG_HL(gb);
+	for (;;) {
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.e = alu_inc(gb, gb->cpu.e);
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.e = alu_dec(gb, gb->cpu.e);
+		gb->cpu.a = alu_add(gb, gb->cpu.e, TILEMAP_WIDTH);
+		gb->cpu.e = gb->cpu.a;
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.e = alu_inc(gb, gb->cpu.e);
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.c = alu_dec(gb, gb->cpu.c);
+		if (gb->cpu.f & FLAG_Z)
+			break;
+		SET_DE(gb, gb_pop16(gb)); // pop de
+	}
+	SET_HL(gb, hl);
+}
+
+PORT(ApplyTopBarButtonAttributes)
+{
+	wr8(gb, wHDMASourceHi, (uint8_t)((wAttrmap + 0x2a * TILE_SIZE) >> 8));
+	wr8(gb, wHDMASourceLo, (uint8_t)(wAttrmap + 0x2a * TILE_SIZE));
+	wr8(gb, wHDMADestHi, 0x1b);
+	wr8(gb, wHDMADestLo, 0xc0);
+	wr8(gb, wHDMAMode, 0x4 - 1);
+
+	wr8(gb, w2d0b5SourceHi, (uint8_t)((wAttrmap + 0x26 * TILE_SIZE) >> 8));
+	wr8(gb, w2d0b5SourceLo, (uint8_t)(wAttrmap + 0x26 * TILE_SIZE));
+	wr8(gb, w2d0b5DestHi, 0x1b);
+	wr8(gb, w2d0b5DestLo, 0xc0);
+	gb->cpu.a = 0x4 - 1;
+	wr8(gb, w2d0b5Mode, gb->cpu.a);
+}
+
+// unreferenced
+PORT(UnreferencedLCD_82729)
+{
+	SET_HL(gb, ADDR_UnreferencedLCD_82729 + 0xc); // .func
+	SET_DE(gb, wLCDFunc);
+	gb->cpu.b = 0x1f; // .func_end - .func
+	CALL(CopyHLToDE);
+}
+
+// unreferenced
+PORT(UnreferencedLCD_82754)
+{
+	SET_HL(gb, ADDR_UnreferencedLCD_82754 + 0xc); // .func
+	SET_DE(gb, wLCDFunc);
+	gb->cpu.b = 0x01; // .func_end - .func
+	CALL(CopyHLToDE);
+}
+
+PORT_JUMP(Func_82c33)
+{
+	SET_HL(gb, wOWFuncCounter);
+	wr8(gb, wOWFuncCounter, alu_inc(gb, rd8(gb, wOWFuncCounter)));
+	gb->cpu.a = rd8(gb, w2d062);
+	uint16_t target = jumptable(gb, ADDR_Func_82c33 + 8);
+	if (gb->rom_bank != BANK_Func_82c33) {
+		JUMP_TO(target);
+		return;
+	}
+	switch (target - ADDR_Func_82c33) {
+	case 0x1e: // .Func_82c51
+		gb->cpu.a = 30;
+		JUMP_TO(ADDR_Func_82c1d);
+		return;
+	case 0x22: // .Func_82c55
+		gb->cpu.a = alu_sub(gb, rd8(gb, wCurMapSide), 1);
+		gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_Z) | ((gb->cpu.f & FLAG_C) ? 0 : FLAG_C)); // ccf
+		// carry set if not North
+		gb->cpu.a = alu_sbc(gb, rd8(gb, wOWSceneActionParam), 0);
+		wr8(gb, wLevel2, gb->cpu.a);
+		gb->cpu.a = rd8(gb, wCurEvent);
+		alu_cp(gb, gb->cpu.a, EVENT_GOLD_MUSIC_BOX);
+		if (gb->cpu.f & FLAG_Z) {
+			gb->cpu.a = 0x07;
+			wr8(gb, wOWSceneActionParam, gb->cpu.a);
+			JUMP_TO(ADDR_Func_82c22);
+			return;
+		}
+		alu_cp(gb, gb->cpu.a, EVENT_SUPER_GRAB_GLOVES);
+		if (gb->cpu.f & FLAG_Z) {
+			gb->cpu.a = rd8(gb, wCurMapSide);
+			alu_cp(gb, gb->cpu.a, EAST);
+			if (gb->cpu.f & FLAG_Z) {
+				gb->cpu.a = rd8(gb, wOWSceneActionParam);
+				alu_cp(gb, gb->cpu.a, 0x07);
+				if (gb->cpu.f & FLAG_Z) {
+					gb->cpu.a = MYSTERY_HANDLE;
+					CALL(IsTreasureCollected);
+					if (gb->cpu.f & FLAG_Z) {
+						JUMP_TO(ADDR_Func_82c29);
+						return;
+					}
+				}
+			}
+		}
+		JUMP_TO(ADDR_Func_82c22);
+		return;
+	case 0x5c: // .Func_82c8f
+		gb->cpu.a = 12;
+		JUMP_TO(ADDR_Func_82c1d);
+		return;
+	case 0x60: // .Func_82c93
+		gb->cpu.a = rd8(gb, wLevel2);
+		gb->cpu.c = gb->cpu.a;
+		SET_DE(gb, wCurSceneObj);
+		gb_call(gb, ADDR_SetObjPositionToLevelCoords);
+		gb->cpu.a = 0x02;
+		SET_HL(gb, wCurSceneObjState);
+		CALL(SetSceneObjState);
+		play_sfx(gb, SFX_104);
+		JUMP_TO(ADDR_Func_82c22);
+		return;
+	case 0x7d: // .Func_82cb0
+		gb->cpu.a = rd8(gb, wCurSceneObjState);
+		if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+			RET();
+			return;
+		}
+		JUMP_TO(ADDR_Func_82c22);
+		return;
+	default: // Func_82a0a etc.
+		JUMP_TO(target);
+		return;
+	}
+}
+
+// unreferenced
+PORT_JUMP(Func_817b1)
+{
+	gb->cpu.a = rd8(gb, wGameModeFlags);
+	if (alu_bit(gb, gb->cpu.a, MODE_GAME_CLEARED_F)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = EVENT_PROLOGUE;
+	for (;;) {
+		wr8(gb, w2dffc, gb->cpu.a);
+		gb_call(gb, ADDR_CheckIfEventIsUnlocked);
+		gb->cpu.a = rd8(gb, w2dffc);
+		if (gb->cpu.f & FLAG_Z)
+			break;
+		gb->cpu.a = alu_inc(gb, gb->cpu.a);
+		gb->cpu.b = EVENT_BLUE_CRAYON;
+		alu_cp(gb, gb->cpu.a, gb->cpu.b);
+		if (gb->cpu.f & FLAG_C)
+			continue;
+		gb->cpu.a = gb->cpu.b;
+		break;
+	}
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	gb_call(gb, ADDR_LoadEventTreasures);
+	gb->cpu.a = rd8(gb, w2dfff);
+	wr8(gb, wStoredTransitionParam, gb->cpu.a);
+	JUMP_TO(ADDR_SetCutsceneButtonSelectable_GotTransitionParam);
+}

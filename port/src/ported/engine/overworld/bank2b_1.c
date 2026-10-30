@@ -1854,3 +1854,472 @@ PORT(_InitTempleScene)
 	SET_HL(gb, wSubState);
 	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
 }
+
+PORT(Func_ac9ca)
+{
+	FARCALL(Func_84e43);
+	gb->cpu.a = rd8(gb, wPalConfig1TotalSteps);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	wr8(gb, w2d014, gb->cpu.a);
+	SET_HL(gb, w2d013);
+	wr8(gb, w2d013, alu_inc(gb, rd8(gb, w2d013)));
+}
+
+// unreferenced
+PORT_JUMP(Func_aca20)
+{
+	SET_HL(gb, wTempPals1);
+	JUMP_TO(ADDR_Func_aca28);
+}
+
+PORT_JUMP(Func_aca25)
+{
+	SET_HL(gb, wTempPals2);
+	JUMP_TO(ADDR_Func_aca28); // fallthrough
+}
+
+PORT_JUMP(Func_ad329)
+{
+	gb->cpu.a = rd8(gb, wSceneWarioState);
+	alu_cp(gb, gb->cpu.a, gb->cpu.b);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_Func_ad335);
+}
+
+PORT_JUMP(Func_ad33c)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d890, 0);
+	wr8(gb, w2d891, 0);
+	SET_HL(gb, w2d891);
+	JUMP_TO(ADDR_Func_ad016);
+}
+
+PORT(HandleTempleShakeAndRocks)
+{
+	FARCALL(_HandleTempleShakeAndRocks);
+}
+
+PORT(DoHiddenFigureLeftHandMovement)
+{
+	gb->cpu.a = rd8(gb, w2d8da);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	SET_HL(gb, wSceneObj3);
+	SET_DE(gb, ADDR_Data_ad939);
+	CALL(ApplyOWMovement);
+}
+
+PORT(DoHiddenFigureRightHandMovement)
+{
+	gb->cpu.a = rd8(gb, w2d8dc);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	SET_HL(gb, wSceneObj4);
+	SET_DE(gb, ADDR_Data_ad939);
+	CALL(ApplyOWMovement_Mirrored);
+}
+
+// HandleTempleWarioPanic.Next
+static void panic_next(GB *gb)
+{
+	SET_HL(gb, w2d892);
+	wr8(gb, w2d892, alu_inc(gb, rd8(gb, w2d892)));
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	gb->cpu.l = alu_inc(gb, gb->cpu.l);
+	wr8(gb, REG_HL(gb), 0); // w2d893
+}
+
+// call ApplySceneWarioMovement* / cp x / ret nz / ld [hl], a /
+// ld a, state / call SetSceneWarioState: false on the ret nz
+static bool panic_move(GB *gb, uint16_t move, uint8_t x, uint8_t state)
+{
+	gb_call(gb, move);
+	alu_cp(gb, gb->cpu.a, x);
+	if (!(gb->cpu.f & FLAG_Z))
+		return false;
+	wr8(gb, REG_HL(gb), gb->cpu.a);
+	gb->cpu.a = state;
+	gb_call(gb, ADDR_SetSceneWarioState);
+	return true;
+}
+
+PORT_JUMP(HandleTempleWarioPanic)
+{
+	gb->cpu.a = rd8(gb, w2d894);
+	alu_cp(gb, gb->cpu.a, 0x01);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	SET_HL(gb, w2d893);
+	wr8(gb, w2d893, alu_inc(gb, rd8(gb, w2d893)));
+	gb->cpu.c = gb->cpu.l;
+	gb->cpu.b = gb->cpu.h;
+	gb->cpu.l = alu_dec(gb, gb->cpu.l);
+	gb->cpu.a = rd8(gb, REG_HL(gb)); // w2d892
+	uint16_t target = jumptable(gb, ADDR_HandleTempleWarioPanic + 0xf);
+	switch (target - ADDR_HandleTempleWarioPanic) {
+	case 0x1f: // .PanicRunRight
+		gb->cpu.a = SCENEWARIO_PANIC_RUN_RIGHT;
+		gb_call(gb, ADDR_SetSceneWarioState);
+		panic_next(gb);
+		break;
+	case 0x2c: // .MoveRight
+	move_right:
+		if (panic_move(gb, ADDR_ApplySceneWarioMovementRight, 0x80, SCENEWARIO_PANIC_RUN_LEFT))
+			panic_next(gb);
+		break;
+	case 0x3a: // .MoveLeft
+		if (panic_move(gb, ADDR_ApplySceneWarioMovementLeft, 0x20, SCENEWARIO_PANIC_RUN_RIGHT)) {
+			// Previous
+			SET_HL(gb, w2d892);
+			wr8(gb, w2d892, alu_dec(gb, rd8(gb, w2d892)));
+			gb->cpu.a = 0;
+			gb->cpu.f = FLAG_Z; // xor a
+			gb->cpu.l = alu_inc(gb, gb->cpu.l);
+			wr8(gb, REG_HL(gb), 0); // w2d893
+		}
+		break;
+	case 0x4e: // .PanicRunUntilMovingRight
+		gb->cpu.a = rd8(gb, wSceneWarioState);
+		alu_cp(gb, gb->cpu.a, SCENEWARIO_PANIC_RUN_RIGHT);
+		if (gb->cpu.f & FLAG_Z) {
+			// .moving_right
+			panic_next(gb);
+			goto move_right;
+		}
+		if (panic_move(gb, ADDR_ApplySceneWarioMovementLeft, 0x20, SCENEWARIO_PANIC_RUN_RIGHT))
+			panic_next(gb);
+		break;
+	case 0x68: // .MoveLeftToCentre
+		if (panic_move(gb, ADDR_ApplySceneWarioMovementLeft, 0x50, SCENEWARIO_IDLE_LEFT))
+			panic_next(gb);
+		break;
+	case 0x76: // .TurnBack
+		gb->cpu.a = rd8(gb, REG_BC(gb));
+		alu_cp(gb, gb->cpu.a, 20);
+		if (gb->cpu.f & FLAG_C)
+			break;
+		gb->cpu.a = SCENEWARIO_TURN_BACK_LEFT;
+		gb_call(gb, ADDR_SetSceneWarioState);
+		panic_next(gb);
+		break;
+	case 0x81: // .WaitUntilLookBackThenFinish
+		gb->cpu.a = rd8(gb, wSceneWarioState);
+		alu_cp(gb, gb->cpu.a, SCENEWARIO_LOOK_BACK);
+		if (!(gb->cpu.f & FLAG_Z))
+			break;
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, w2d894, 0);
+		wr8(gb, w2d893, 0);
+		wr8(gb, w2d892, 0);
+		break;
+	default: // out of the table
+		JUMP_TO(target);
+		return;
+	}
+	RET();
+}
+
+// HandleTempleMusicBoxes.Next
+static void music_boxes_next(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d8a1, 0);
+	SET_HL(gb, w2d8a0);
+	wr8(gb, w2d8a0, alu_inc(gb, rd8(gb, w2d8a0)));
+}
+
+PORT_JUMP(HandleTempleMusicBoxes)
+{
+	gb_call(gb, ADDR_HandleTempleMusicBox1Hover);
+	gb_call(gb, ADDR_HandleTempleMusicBox2Hover);
+	gb_call(gb, ADDR_HandleTempleMusicBox3Hover);
+	gb_call(gb, ADDR_HandleTempleMusicBox4Hover);
+	gb_call(gb, ADDR_HandleTempleMusicBox5Hover);
+
+	gb->cpu.a = rd8(gb, w2d8a0);
+	SET_HL(gb, w2d8a1);
+	wr8(gb, w2d8a1, alu_inc(gb, rd8(gb, w2d8a1)));
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	gb->cpu.b = gb->cpu.h;
+	gb->cpu.c = gb->cpu.l;
+	uint16_t target = jumptable(gb, ADDR_HandleTempleMusicBoxes + 0x19);
+	uint16_t box = 0, unk7 = 0;
+	switch (target - ADDR_HandleTempleMusicBoxes) {
+	case 0x35: // .Next
+		music_boxes_next(gb);
+		RET();
+		return;
+	case 0x3c: box = wTempleMusicBox1; break;
+	case 0x48: box = wTempleMusicBox2; break;
+	case 0x4d: box = wTempleMusicBox3; break;
+	case 0x52: box = wTempleMusicBox4; break;
+	case 0x57: box = wTempleMusicBox5; break;
+	case 0x5c: // .Reset
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, w2d8a0, 0);
+		wr8(gb, w2d8a1, 0);
+		SET_HL(gb, w2d8a1);
+		RET();
+		return;
+	case 0x63: box = wTempleMusicBox1; unk7 = wSceneObj8Unk7; break;
+	case 0x72: box = wTempleMusicBox2; unk7 = wSceneObj9Unk7; break;
+	case 0x7a: box = wTempleMusicBox3; unk7 = wSceneObj10Unk7; break;
+	case 0x82: box = wTempleMusicBox4; unk7 = wSceneObj11Unk7; break;
+	case 0x8a: box = wTempleMusicBox5; unk7 = wSceneObj12Unk7; break;
+	default: // out of the table
+		JUMP_TO(target);
+		return;
+	}
+	if (!unk7) {
+		// .WaitThenInitMusicBox
+		SET_HL(gb, box);
+		gb->cpu.a = rd8(gb, REG_BC(gb));
+		alu_cp(gb, gb->cpu.a, 16);
+		if (gb->cpu.f & FLAG_C) {
+			RET();
+			return;
+		}
+		gb->cpu.a = 0x01;
+		wr8(gb, box, gb->cpu.a);
+	} else {
+		// .WaitThenDeinitMusicBox
+		SET_DE(gb, box);
+		gb->cpu.a = rd8(gb, unk7);
+		SET_HL(gb, unk7 - 1);
+		alu_cp(gb, gb->cpu.a, 16);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			RET();
+			return;
+		}
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, unk7 - 1, 0);
+		wr8(gb, box, 0);
+	}
+	music_boxes_next(gb);
+	RET();
+}
+
+// Func_ac0b6: inc c / ld a, [bc] / inc a / ld [bc], a / cp n: returns a
+static uint8_t inc_unk7(GB *gb, uint8_t n)
+{
+	gb->cpu.c = alu_inc(gb, gb->cpu.c);
+	gb->cpu.a = alu_inc(gb, rd8(gb, REG_BC(gb)));
+	wr8(gb, REG_BC(gb), gb->cpu.a);
+	alu_cp(gb, gb->cpu.a, n);
+	return gb->cpu.a;
+}
+
+// Func_ac0b6.asm_ac254 (carrying)
+static void func_ac0b6_carry(GB *gb)
+{
+	gb->cpu.c = alu_inc(gb, gb->cpu.c);
+	gb->cpu.a = rd8(gb, wSceneWarioFrame);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.d = 0xff; // .asm_ac267
+		gb->cpu.a = 25;
+	} else {
+		gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		if (!(gb->cpu.f & FLAG_Z))
+			return;
+		gb->cpu.d = 0x01; // .asm_ac261
+		gb->cpu.a = 26;
+	}
+	// .asm_ac26b
+	alu_cp(gb, gb->cpu.a, gb->cpu.e);
+	if (!(gb->cpu.f & FLAG_Z))
+		return; // not target frame
+	gb->cpu.a = alu_xor(gb, rd8(gb, REG_BC(gb)), 0x01);
+	wr8(gb, REG_BC(gb), gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.d, rd8(gb, REG_HL(gb)));
+	wr8(gb, REG_HL(gb), gb->cpu.a);
+}
+
+// Func_ac0b6.asm_ac275 (picking up)
+static void func_ac0b6_pickup(GB *gb)
+{
+	gb->cpu.c = alu_inc(gb, gb->cpu.c);
+	gb->cpu.a = rd8(gb, wSceneWarioFrame);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	bool inc = true;
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		// .asm_ac286
+		gb->cpu.a = 0x00;
+		alu_cp(gb, gb->cpu.a, gb->cpu.e);
+		if (!(gb->cpu.f & FLAG_Z))
+			return;
+		gb->cpu.d = 0xfc;
+		gb->cpu.e = 0xea;
+	} else if (gb->cpu.a = alu_dec(gb, gb->cpu.a), gb->cpu.f & FLAG_Z) {
+		// .asm_ac29c
+		gb->cpu.a = 0x01;
+		alu_cp(gb, gb->cpu.a, gb->cpu.e);
+		if (!(gb->cpu.f & FLAG_Z))
+			return;
+		gb->cpu.d = 0xf0;
+		gb->cpu.e = 0xec;
+	} else {
+		// .asm_ac2a6
+		gb->cpu.a = 0x02;
+		alu_cp(gb, gb->cpu.a, gb->cpu.e);
+		if (!(gb->cpu.f & FLAG_Z))
+			return;
+		gb->cpu.a = 0x80;
+		gb->cpu.d = 0xde;
+		gb->cpu.e = 0xf9;
+		inc = false;
+	}
+	if (inc) // .asm_ac28e
+		gb->cpu.a = alu_inc(gb, rd8(gb, REG_BC(gb)));
+	// .asm_ac290
+	wr8(gb, REG_BC(gb), gb->cpu.a);
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = alu_add(gb, rd8(gb, wSceneWarioYCoord), gb->cpu.d);
+	wr8(gb, hl++, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, rd8(gb, wSceneWarioXCoord), gb->cpu.e);
+	wr8(gb, hl--, gb->cpu.a);
+	SET_HL(gb, hl);
+}
+
+enum { AC0B6_ANIM, AC0B6_STATE, AC0B6_SFX30, AC0B6_CARRY, AC0B6_SFX08E, AC0B6_SFX11A, AC0B6_BIG };
+
+PORT_JUMP(Func_ac0b6)
+{
+	static const struct { uint16_t off; uint8_t kind; uint8_t e; uint16_t frameset, oam; uint8_t oam_bank; } entries[] = {
+		{0x067, AC0B6_ANIM, 0, ADDR_Frameset_15ed91, 0, 0},
+		{0x06c, AC0B6_ANIM, 0, ADDR_Frameset_15ed94, 0, 0},
+		{0x071, AC0B6_ANIM, 0, ADDR_Frameset_15ed97, 0, 0},
+		{0x076, AC0B6_ANIM, 0, ADDR_Frameset_15ed9a, 0, 0},
+		{0x07b, AC0B6_STATE, 0x0a, ADDR_Frameset_15ed9d, 0, 0},
+		{0x086, AC0B6_ANIM, 0, ADDR_Frameset_15edb3, 0, 0},
+		{0x08b, AC0B6_SFX30, 0, ADDR_Frameset_15eda6, 0, 0},
+		{0x0a9, AC0B6_ANIM, 0, ADDR_Frameset_15edc0, 0, 0},
+		{0x0ae, AC0B6_ANIM, 0, ADDR_Frameset_15edc3, 0, 0},
+		{0x0b3, AC0B6_STATE, 0x0a, ADDR_Frameset_15edc6, 0, 0},
+		{0x0be, AC0B6_STATE, 0x0b, ADDR_Frameset_15ede9, 0, 0},
+		{0x0c9, AC0B6_STATE, 0x0a, ADDR_Frameset_15edf2, 0, 0},
+		{0x0d4, AC0B6_STATE, 0x0a, ADDR_Frameset_15ee0f, 0, 0},
+		{0x0df, AC0B6_STATE, 0x17, ADDR_Frameset_15ee1e, 0, 0},
+		{0x0ea, AC0B6_STATE, 0x0a, ADDR_Frameset_15ee3b, 0, 0},
+		{0x0f5, AC0B6_ANIM, 0, ADDR_Frameset_15ee44, 0, 0},
+		{0x0fb, AC0B6_ANIM, 0, ADDR_Frameset_15ee57, 0, 0},
+		{0x101, AC0B6_CARRY, 0, ADDR_Frameset_15ee64, 0, 0},
+		{0x11b, AC0B6_ANIM, 0, ADDR_Frameset_15ee67, 0, 0},
+		{0x121, AC0B6_ANIM, 0, ADDR_Frameset_15ee70, 0, 0},
+		{0x127, AC0B6_SFX08E, 0, ADDR_Frameset_15ee79, 0, 0},
+		{0x145, AC0B6_SFX11A, 0, ADDR_Frameset_15ee82, 0, 0},
+		{0x168, AC0B6_BIG, 0, ADDR_Frameset_681d2, ADDR_OAM_18007b, BANK_OAM_18007b},
+		{0x176, AC0B6_BIG, 0, ADDR_Frameset_68b12, ADDR_OAM_18422f, BANK_OAM_18422f},
+		{0x184, AC0B6_BIG, 0, ADDR_Frameset_68562, ADDR_OAM_180ea7, BANK_OAM_180ea7},
+		{0x192, AC0B6_ANIM, 0, ADDR_Frameset_15ee87, 0, 0},
+		{0x198, AC0B6_ANIM, 0, ADDR_Frameset_15ee8a, 0, 0},
+	};
+	for (;;) {
+		gb->cpu.a = rd8(gb, REG_BC(gb));
+		uint16_t target = jumptable(gb, ADDR_Func_ac0b6 + 2);
+		uint16_t off = (uint16_t)(target - ADDR_Func_ac0b6);
+		if (gb->rom_bank != BANK_Func_ac0b6) {
+			JUMP_TO(target);
+			return;
+		}
+		if (off == 0x66) { // .Func_ac11c
+			RET();
+			return;
+		}
+		unsigned i;
+		for (i = 0; i < sizeof(entries) / sizeof(entries[0]); i++)
+			if (entries[i].off == off)
+				break;
+		if (i == sizeof(entries) / sizeof(entries[0])) {
+			JUMP_TO(target); // Func_ac056, or out of the table
+			return;
+		}
+		SET_DE(gb, entries[i].frameset);
+		if (entries[i].kind == AC0B6_BIG) {
+			gb_call(gb, ADDR_Func_ac021);
+			SET_DE(gb, entries[i].oam);
+			gb->cpu.b = entries[i].oam_bank;
+			JUMP(LoadOWSpriteWithScroll);
+			return;
+		}
+		gb_call(gb, ADDR_Func_ac016);
+		switch (entries[i].kind) {
+		case AC0B6_STATE:
+			gb->cpu.e = entries[i].e;
+			// .set_new_state_if_finished
+			gb_call(gb, ADDR_SetObjStateIfAnimationIsFinished);
+			if (gb->cpu.f & FLAG_Z)
+				continue; // jr Func_ac0b6
+			break;
+		case AC0B6_SFX30: // .PlaySFXEvery30Frames
+			inc_unk7(gb, 30);
+			if (!(gb->cpu.f & FLAG_C)) {
+				gb->cpu.a = 0;
+				gb->cpu.f = FLAG_Z; // xor a
+				wr8(gb, REG_BC(gb), 0); // unk7
+				play_sfx(gb, SFX_138);
+			}
+			break;
+		case AC0B6_SFX08E: // .Func_ac1e9
+			inc_unk7(gb, 0x30);
+			if (!(gb->cpu.f & FLAG_C)) {
+				gb->cpu.a = 0;
+				gb->cpu.f = FLAG_Z; // xor a
+				wr8(gb, REG_BC(gb), 0);
+				play_sfx(gb, SFX_08E);
+			}
+			break;
+		case AC0B6_SFX11A: // .Func_ac207
+			inc_unk7(gb, 0x01);
+			if (gb->cpu.f & FLAG_Z) {
+				play_sfx(gb, SFX_11A); // .asm_ac215
+				break;
+			}
+			alu_cp(gb, gb->cpu.a, 0x28);
+			if (!(gb->cpu.f & FLAG_C)) {
+				gb->cpu.a = 0;
+				gb->cpu.f = FLAG_Z; // xor a
+				wr8(gb, REG_BC(gb), 0);
+			}
+			break;
+		case AC0B6_CARRY: // .Func_ac1c3
+			gb->cpu.a = rd8(gb, wSceneWarioState);
+			alu_cp(gb, gb->cpu.a, SCENEWARIO_CARRY_WALK);
+			if (gb->cpu.f & FLAG_Z) {
+				func_ac0b6_carry(gb);
+				break;
+			}
+			alu_cp(gb, gb->cpu.a, SCENEWARIO_PICKUP);
+			if (gb->cpu.f & FLAG_Z)
+				func_ac0b6_pickup(gb);
+			break;
+		default: // AC0B6_ANIM
+			break;
+		}
+		// .asm_ac0f5
+		SET_DE(gb, ADDR_OAM_15e97d);
+		JUMP_TO(ADDR_Func_ac04c);
+		return;
+	}
+}
