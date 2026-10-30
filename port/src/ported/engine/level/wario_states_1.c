@@ -3837,3 +3837,85 @@ PORT_JUMP(Func_1eefc)
 		st(gb, wWalkVelIndex, uphill ? (heavy ? 0x00 : 0x04) : (heavy ? 0x04 : 0x0c));
 	RET();
 }
+
+PORT_JUMP(HandleInput_Attacking)
+{
+	bool turn;
+	if (facing_right(gb))
+		turn = ld_bit(gb, wJoypadDown, B_PAD_LEFT);
+	else
+		turn = ld_bit(gb, wJoypadDown, B_PAD_RIGHT);
+	if (turn) {
+		LJUMP(SetState_Turning);
+		return;
+	}
+	// .check_pressed
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_A)) {
+		LJUMP(StartJumpingAirborneAttack);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, B_PAD_DOWN)) {
+		LJUMP(SetState_CrouchSliding);
+		return;
+	}
+	RET();
+}
+
+PORT_JUMP(UpdateState_GrabIdling)
+{
+	if (room_transition_check(gb))
+		return;
+	if (!still_in(gb, WST_GRAB_IDLING)) {
+		RET();
+		return;
+	}
+	if (!ld_and(gb, wGrabState)) {
+		LJUMP(SetState_Idling);
+		return;
+	}
+	LCALL(Func_1ee88);
+	if (!still_in(gb, WST_GRAB_IDLING)) {
+		RET();
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (!still_in(gb, WST_GRAB_IDLING)) {
+		RET();
+		return;
+	}
+	if (!b_and(gb)) {
+		LJUMP(Func_1edd3);
+		return;
+	}
+	update_pos_y(gb);
+	RET();
+}
+
+PORT_JUMP(UpdateState_GrabWalking)
+{
+	if (room_transition_check(gb))
+		return;
+	if (!still_in(gb, WST_GRAB_WALKING)) {
+		RET();
+		return;
+	}
+	if (!ld_and(gb, wGrabState)) {
+		LJUMP(SetState_Walking_ResetWalkVel);
+		return;
+	}
+	sfx_loop(gb, 36, SFX_WALK);
+	anim(gb, OAM1);
+	LCALL(Func_1eefc);
+	if (!still_in(gb, WST_GRAB_WALKING)) {
+		RET();
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (!b_and(gb)) {
+		LJUMP(Func_1edd3);
+		return;
+	}
+	update_pos_y(gb);
+	RET();
+}

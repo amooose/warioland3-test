@@ -1219,3 +1219,16 @@ PORT_JUMP(Func_20602)
 	gb->cpu.b = OBJACTION_VANISH_TOUCH;
 	LJUMP(SetObjAction); // fallthrough
 }
+
+PORT_JUMP(Func_21aac)
+{
+	gb->cpu.a = alu_dec(gb, rd8(gb, wIsSmashAttacking));
+	if (!ZF) {
+		LJUMP(Func_209ca);
+		return;
+	}
+	// smash attack object
+	LCALL(Func_20602);
+	gb->cpu.b = OBJACTION_SMASH_ATTACK_WALKABLE;
+	LJUMP(SetObjAction);
+}
