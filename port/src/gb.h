@@ -172,6 +172,11 @@ typedef struct GB {
 	// How many gb_call()s are in progress. Save states can only be taken or
 	// loaded at depth 0, when no native code is mid-routine.
 	int call_depth;
+	// A jmp_buf in the loop that runs the game, or NULL. When native code
+	// calls into the game's reset (InitWithoutDemoPowerUpReset, which throws
+	// the stack away), gb_call_ret longjmps there instead of nesting the
+	// rest of the session inside the call, which would never return.
+	void *reset_unwind;
 
 	// Support for the difftest and fuzzer; all zero in normal play.
 	struct {

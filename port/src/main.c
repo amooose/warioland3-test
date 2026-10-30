@@ -8,6 +8,7 @@
 #include "savestate.h"
 
 #include <SDL.h>
+#include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -563,6 +564,10 @@ int main(int argc, char **argv)
 	gb.frame_cb = on_frame;
 	gb.user = &fe;
 
+	// A reset reached from native code comes back here (see reset_unwind).
+	static jmp_buf reset;
+	gb.reset_unwind = &reset;
+	setjmp(reset);
 	for (;;) {
 		if ((fe.pending_save || fe.pending_load || fe.quit) && gb.call_depth == 0) {
 			do_pending(&fe, &gb);

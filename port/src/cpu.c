@@ -7,6 +7,7 @@
 #include "hooks.h"
 #include "syms.h"
 
+#include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -665,6 +666,12 @@ void gb_call_ret(GB *gb, uint16_t addr, uint16_t ret)
 	}
 	gb->call_depth++;
 	while (!(PC == ret && SP == saved_sp) && !gb->test.crashed) {
+		// The game resets: it sets SP back to the top, so no caller of ours
+		// will ever be returned to. Drop the native frames as it does.
+		if (PC == ADDR_InitWithoutDemoPowerUpReset && gb->reset_unwind && !gb->test.active) {
+			gb->call_depth = 0;
+			longjmp(*(jmp_buf *)gb->reset_unwind, 1);
+		}
 		// Under test, steps count against the budget too: a halted CPU
 		// makes no memory accesses.
 		if (gb->test.budget && --gb->test.budget == 0)

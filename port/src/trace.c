@@ -504,12 +504,18 @@ bool trace_check(GB *gb, const InputScript *input, const char *path)
 	bool ok = true;
 	frame_deadline = n ? recs[0].video_frame + 600 : 0;
 	switch (setjmp(stuck)) {
-	case 0:
+	case 0: {
 		if (!n)
 			break;
+		// as in normal play, a reset from native code unwinds to here
+		static jmp_buf reset;
+		gb->reset_unwind = &reset;
+		setjmp(reset);
 		for (;;)
 			gb_tick(gb, cpu_step(gb));
+	}
 	case CHECK_STUCK: {
+		gb->reset_unwind = NULL;
 		printf("trace: game frame %zu never ends (the asm ended it in video frame %u)\n", chk_i,
 			recs[chk_i].video_frame);
 		const char *name = sym_name_at(gb->cpu.pc < 0x4000 ? 0 : gb->rom_bank, gb->cpu.pc);
