@@ -487,6 +487,19 @@ static void func_9aa56(GB *gb, uint16_t frameset)
 	JUMP_TO(ADDR_Func_9aa56);
 }
 
+// unreferenced
+PORT_JUMP(Func_9aa60)
+{
+	gb_call(gb, ADDR_Func_9a9ec);
+	gb->cpu.e = 0x00;
+	gb_call(gb, ADDR_Func_9a9fd);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		JUMP_TO(ADDR_Func_9aa59);
+		return;
+	}
+	JUMP_TO(ADDR_AnimateTreasureCollection + 0x3d); // .Func_9aa4a
+}
+
 PORT_JUMP(Func_9aa6d) { func_9aa56(gb, ADDR_Frameset_9ace1); }
 PORT_JUMP(Func_9aa72) { func_9aa56(gb, ADDR_Frameset_9acea); }
 PORT_JUMP(Func_9aa77) { func_9aa56(gb, ADDR_Frameset_9acf3); }
