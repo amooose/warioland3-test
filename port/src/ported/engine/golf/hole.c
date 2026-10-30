@@ -1735,3 +1735,734 @@ PORT_JUMP(HandleGolfHole)
 	gb_call(gb, ADDR_LoadGolfWarioStateGfx);
 	JUMP_TO(ADDR_Func_1c9cf9); // same bank
 }
+
+static void play_music2(GB *gb, uint16_t music)
+{
+	gb->cpu.a = (uint8_t)(music >> 8);
+	wr8(gb, hMusicIDBackup + 0, gb->cpu.a);
+	wr8(gb, hMusicID + 0, gb->cpu.a);
+	gb->cpu.a = (uint8_t)music;
+	wr8(gb, hMusicIDBackup + 1, gb->cpu.a);
+	wr8(gb, hMusicID + 1, gb->cpu.a);
+}
+
+PORT_JUMP(SetUpGolfHoleObjects)
+{
+	gb->cpu.a = (uint8_t)(ADDR_OAM_1ca6cf >> 8);
+	wr8(gb, wGolfOAMPtr + 0, gb->cpu.a);
+	gb->cpu.a = (uint8_t)ADDR_OAM_1ca6cf;
+	wr8(gb, wGolfOAMPtr + 1, gb->cpu.a);
+	gb->cpu.a = BASE_SHOT_POWER;
+	wr8(gb, wShotPowerGaugeCursor, gb->cpu.a);
+
+	uint16_t hl = wGolfWarioYPos;
+	wr8(gb, hl++, 0x58);
+	wr8(gb, hl++, 0);
+	wr8(gb, hl++, 0x40);
+	wr8(gb, hl++, 0);
+	wr8(gb, hl++, (uint8_t)PARAGOOM_TEE_BOX_LEVEL);
+	wr8(gb, hl++, (uint8_t)(PARAGOOM_TEE_BOX_LEVEL >> 8));
+	wr8(gb, hl++, 0x80);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hl++, 0);
+	SET_HL(gb, hl);
+
+	gb_call(gb, ADDR_UpdateGolfHoleUI);
+	gb_call(gb, ADDR_UpdateGolfParaGoom);
+	gb_call(gb, ADDR_UpdateGolfWario);
+	JUMP(ClearUnusedVirtualOAM);
+}
+
+PORT_JUMP(GolfHoleState_Walk)
+{
+	uint8_t cnt = rd8(gb, wGolfCounter);
+	gb->cpu.a = cnt;
+	SET_HL(gb, wGolfCounter);
+	alu_cp(gb, cnt, 0x19);
+	if (gb->cpu.f & FLAG_C) {
+		alu_cp(gb, cnt, 0x18);
+		if (gb->cpu.f & FLAG_C) {
+			wr8(gb, wGolfCounter, alu_inc(gb, cnt));
+			gb->cpu.a = alu_and(gb, cnt, cnt);
+			if (gb->cpu.a) {
+				RET();
+				return;
+			}
+			gb->cpu.a = 0x03;
+			wr8(gb, wGolfVBlankMode, 0x03);
+			wr8(gb, w1dc21, 0x03);
+			JUMP_TO(ADDR_PrintGolfStrokeNumber);
+			return;
+		}
+		// .asm_1c98e1
+		gb->cpu.a = alu_and(gb, rd8(gb, w1dc47), rd8(gb, w1dc47));
+		if (gb->cpu.a) {
+			gb->cpu.a = rd8(gb, wGolfWarioYPos);
+			alu_cp(gb, gb->cpu.a, 0x60);
+			if (gb->cpu.f & FLAG_C) {
+				gb->cpu.e = rd8(gb, wGolfParaGoomYPos);
+				gb->cpu.d = rd8(gb, wGolfParaGoomYPos + 1);
+				gb->cpu.a = gb->cpu.e;
+				gb->cpu.d = alu_srl(gb, gb->cpu.d);
+				gb->cpu.e = alu_rr(gb, gb->cpu.e);
+				gb->cpu.d = alu_srl(gb, gb->cpu.d);
+				gb->cpu.e = alu_rr(gb, gb->cpu.e);
+				SET_HL(gb, wGolfWarioYPos);
+				gb->cpu.a = alu_sub(gb, rd8(gb, wGolfWarioYPos), gb->cpu.e);
+				if (gb->cpu.f & FLAG_C) {
+					// descend tee box
+					wr8(gb, wGolfWarioYPos, alu_inc(gb, rd8(gb, wGolfWarioYPos)));
+					wr8(gb, wGolfWarioYPos, alu_inc(gb, rd8(gb, wGolfWarioYPos)));
+					gb->cpu.a = rd8(gb, wGolfWarioYPos);
+					alu_cp(gb, gb->cpu.a, 0x60);
+					if (!(gb->cpu.f & FLAG_C)) {
+						gb->cpu.a = 0x01;
+						wr8(gb, wGolfVBlankMode, 0x01);
+					}
+					RET();
+					return;
+				}
+			}
+		}
+		// .move_x_pos
+		gb->cpu.a = rd8(gb, wGolfWarioXPos);
+		gb->cpu.d = rd8(gb, wGolfWarioXPos + 1);
+		gb->cpu.e = gb->cpu.a;
+		SET_HL(gb, wGolfWarioTargetXPos);
+		gb_call(gb, ADDR_Compare16Bit);
+		alu_cp(gb, gb->cpu.a, 0x1);
+		if (gb->cpu.f & FLAG_Z) {
+			// already in target position
+			gb->cpu.a = 0;
+			gb->cpu.f = FLAG_Z; // xor a
+			wr8(gb, wGolfCounter, 0);
+			gb->cpu.a = GOLFHOLESTATE_BETWEEN_SHOTS;
+			wr8(gb, wGolfHoleState, gb->cpu.a);
+			RET();
+			return;
+		}
+		// .start_walking
+		SET_HL(gb, wGolfCounter);
+		wr8(gb, wGolfCounter, alu_inc(gb, rd8(gb, wGolfCounter)));
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wGolfWarioDuration, 0);
+		wr8(gb, wGolfWarioFramesetOffset, 0);
+		wr8(gb, wGolfWarioState, GOLF_WARIO_WALKING);
+		gb->cpu.a = 0x02;
+		wr8(gb, wGolfVBlankMode, 0x02);
+		RET();
+		return;
+	}
+
+	// .walk
+	bool reached;
+	gb->cpu.a = alu_and(gb, rd8(gb, wGolfWarioDir), rd8(gb, wGolfWarioDir));
+	if (!gb->cpu.a) {
+		gb->cpu.e = gb->cpu.a = alu_add(gb, rd8(gb, wGolfWarioXPos), 4);
+		gb->cpu.d = gb->cpu.a = alu_adc(gb, rd8(gb, wGolfWarioXPos + 1), 0);
+		gb_push16(gb, REG_DE(gb));
+		gb_push16(gb, wGolfWarioXPos);
+		SET_HL(gb, wGolfWarioTargetXPos);
+		gb_call(gb, ADDR_Compare16Bit);
+		gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+		reached = gb->cpu.a != 0;
+	} else {
+		// .wario_dir_right
+		gb->cpu.e = gb->cpu.a = alu_sub(gb, rd8(gb, wGolfWarioXPos), 4);
+		gb->cpu.d = gb->cpu.a = alu_sbc(gb, rd8(gb, wGolfWarioXPos + 1), 0);
+		gb_push16(gb, REG_DE(gb));
+		gb_push16(gb, wGolfWarioXPos);
+		SET_HL(gb, wGolfWarioTargetXPos);
+		gb_call(gb, ADDR_Compare16Bit);
+		alu_cp(gb, gb->cpu.a, 0x2);
+		reached = !(gb->cpu.f & FLAG_Z);
+	}
+	uint16_t hl = gb_pop16(gb);
+	SET_DE(gb, gb_pop16(gb));
+	if (!reached) {
+		// .continue_walking
+		gb->cpu.a = gb->cpu.e;
+		wr8(gb, hl++, gb->cpu.e);
+		wr8(gb, hl, gb->cpu.d);
+		SET_HL(gb, hl);
+		RET();
+		return;
+	}
+	// .reached_target
+	uint16_t de = wGolfWarioTargetXPos;
+	gb->cpu.a = rd8(gb, de);
+	wr8(gb, hl++, gb->cpu.a);
+	de++;
+	gb->cpu.a = rd8(gb, de);
+	wr8(gb, hl, gb->cpu.a);
+	SET_DE(gb, de);
+	gb->cpu.a = rd8(gb, wGolfHoleDirection);
+	wr8(gb, wGolfWarioDir, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wGolfCounter, 0);
+	wr8(gb, wGolfWarioDuration, 0);
+	wr8(gb, wGolfWarioFramesetOffset, 0);
+
+	SET_HL(gb, w1dc01);
+	gb->cpu.a = rd8(gb, w1dc01);
+	uint8_t st;
+	alu_cp(gb, gb->cpu.a, GOLFHOLESTATE_CLEARED);
+	if (gb->cpu.f & FLAG_Z) {
+		// .asm_1c99a4
+		gb->cpu.a = rd8(gb, wGolfResult);
+		alu_cp(gb, gb->cpu.a, GOLFRESULT_OVER_PAR);
+		if (gb->cpu.f & FLAG_C) {
+			st = GOLF_WARIO_CLEARED;
+		} else {
+			play_music2(gb, MUSIC_GOLF_GAME_OVER);
+			st = GOLF_WARIO_LOST;
+		}
+	} else {
+		alu_cp(gb, gb->cpu.a, GOLFHOLESTATE_GAME_OVER);
+		st = (gb->cpu.f & FLAG_Z) ? GOLF_WARIO_LOST : GOLF_WARIO_IDLING;
+	}
+	// .asm_1c99bd
+	wr8(gb, wGolfWarioState, st);
+	wr8(gb, wGolfVBlankMode, 0x02);
+	gb->cpu.a = rd8(gb, w1dc01);
+	wr8(gb, wGolfHoleState, gb->cpu.a);
+	RET();
+}
+
+PORT(GolfHoleState_Cleared)
+{
+	gb->cpu.a = rd8(gb, w1d800);
+	alu_cp(gb, gb->cpu.a, 0x01);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		GOLF_OBJ(GolfOverlayText, 0x50, 0x58, ADDR_Frameset_1caf8d);
+		CALL(LoadGolfSprite);
+
+		SET_HL(gb, wGolfCounter);
+		gb->cpu.a = rd8(gb, wGolfCounter);
+		alu_cp(gb, gb->cpu.a, 0x50);
+		if (gb->cpu.f & FLAG_C) {
+			wr8(gb, wGolfCounter, alu_inc(gb, gb->cpu.a));
+			return;
+		}
+		// .input_allowed
+		gb->cpu.a = rd8(gb, wJoypadPressed);
+		if (!alu_bit(gb, gb->cpu.a, B_PAD_A))
+			return;
+		// exit: stop_music2
+		gb->cpu.a = 0xff;
+		wr8(gb, hMusicIDBackup + 0, 0xff);
+		wr8(gb, hMusicID + 0, 0xff);
+		gb->cpu.a = 0x00;
+		wr8(gb, hMusicIDBackup + 1, 0);
+		wr8(gb, hMusicID + 1, 0);
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, w1d800, 0);
+		wr8(gb, wGolfMenuOption, 0);
+		gb->cpu.a = alu_and(gb, rd8(gb, wIsMinigameCleared), rd8(gb, wIsMinigameCleared));
+		if (gb->cpu.a) {
+			gb->cpu.a = 0x08;
+			wr8(gb, wSubState, 0x08);
+			return;
+		}
+		gb->cpu.a = TRUE;
+		wr8(gb, wIsMinigameCleared, TRUE);
+		gb->cpu.a = SST_GOLF_CLEAR;
+		wr8(gb, wSubState, SST_GOLF_CLEAR);
+		return;
+	}
+
+	// .asm_1c9ac2
+	gb_call(gb, ADDR_ShowGolfResultOverlayText);
+	gb_call(gb, ADDR_ShowGolfScore);
+	gb->cpu.b = 0x50;
+	gb->cpu.a = rd8(gb, wGolfWarioState);
+	alu_cp(gb, gb->cpu.a, 0x06);
+	if (!(gb->cpu.f & FLAG_Z))
+		gb->cpu.b = 0x70;
+	SET_HL(gb, wGolfCounter);
+	gb->cpu.a = rd8(gb, wGolfCounter);
+	alu_cp(gb, gb->cpu.a, gb->cpu.b);
+	if (gb->cpu.f & FLAG_C) {
+		wr8(gb, wGolfCounter, alu_inc(gb, gb->cpu.a));
+		return;
+	}
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (!alu_bit(gb, gb->cpu.a, B_PAD_A))
+		return;
+	gb->cpu.c = rd8(gb, wGolfStroke);
+	gb->cpu.a = alu_add(gb, rd8(gb, wGolfCourseScore), gb->cpu.c);
+	wr8(gb, wGolfCourseScore, gb->cpu.a);
+	SET_HL(gb, wGolfCourseHole);
+	gb->cpu.a = rd8(gb, wGolfCourseHole);
+	alu_cp(gb, gb->cpu.a, NUM_GOLF_COURSE_HOLES);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		// still more holes left
+		wr8(gb, wGolfCourseHole, alu_inc(gb, gb->cpu.a));
+		SET_HL(gb, wPredeterminedGolfHole);
+		wr8(gb, wPredeterminedGolfHole, alu_inc(gb, rd8(gb, wPredeterminedGolfHole)));
+		gb->cpu.a = 0x04;
+		wr8(gb, wSubState, 0x04);
+		return;
+	}
+	// .finished_course
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wGolfCounter, 0);
+	wr8(gb, wGolfWarioDuration, 0);
+	wr8(gb, wGolfWarioFramesetOffset, 0);
+	wr8(gb, wGolfOverlayTextDuration, 0);
+	wr8(gb, wGolfOverlayTextFramesetOffset, 0);
+	wr8(gb, wGolfParaGoomGhostDuration, 0);
+	wr8(gb, wGolfParaGoomGhostFramesetOffset, 0);
+
+	gb->cpu.a = rd8(gb, wGolfCourseScore);
+	alu_cp(gb, gb->cpu.a, GOLF_BASE_SCORE + 1); // golf_score 1
+	gb->cpu.a = (gb->cpu.f & FLAG_C) ? GOLFRESULT_COURSE_UNDER_PAR : GOLFRESULT_COURSE_OVER_PAR;
+	wr8(gb, wGolfResult, gb->cpu.a);
+	// .asm_1c9b29
+	gb->cpu.a = rd8(gb, wGolfCourse);
+	gb->cpu.d = 0x00;
+	gb->cpu.e = gb->cpu.a;
+	uint16_t hl = alu_add16(gb, wGolfBestScores, REG_DE(gb));
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, wGolfCourseScore);
+	alu_cp(gb, gb->cpu.a, rd8(gb, hl));
+	if (gb->cpu.f & FLAG_C) {
+		play_sfx(gb, SFX_0FA);
+		gb->cpu.a = GOLF_WARIO_CLEARED;
+	} else {
+		gb->cpu.a = GOLF_WARIO_LOST;
+	}
+	wr8(gb, wGolfWarioState, gb->cpu.a);
+	gb->cpu.a = GOLFHOLESTATE_RESULT;
+	wr8(gb, wGolfHoleState, gb->cpu.a);
+}
+
+// GolfHoleState_Scroll.HandleDirectionalInputScroll
+static void handle_directional_input_scroll(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_A) || alu_bit(gb, gb->cpu.a, B_PAD_B)) {
+		// .restore_scroll
+		gb->cpu.a = rd8(gb, wTempGolfXScroll + 0);
+		wr8(gb, wGolfXScroll + 0, gb->cpu.a);
+		gb->cpu.a = rd8(gb, wTempGolfXScroll + 1);
+		wr8(gb, wGolfXScroll + 1, gb->cpu.a);
+		gb->cpu.a = GOLFHOLESTATE_WAIT_INPUT;
+		wr8(gb, wGolfHoleState, gb->cpu.a);
+		gb_call(gb, ADDR_UpdateGolfDisplayMode);
+		return;
+	}
+
+	SET_HL(gb, wGolfXScroll + 1);
+	gb->cpu.a = rd8(gb, wGolfXScroll);
+	gb->cpu.d = rd8(gb, wGolfXScroll + 1);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.a = alu_and(gb, rd8(gb, wGolfHoleScrollingDir), rd8(gb, wGolfHoleScrollingDir));
+	bool input;
+	if (!gb->cpu.a) {
+		// dir right
+		gb->cpu.a = rd8(gb, wJoypadDown);
+		input = alu_bit(gb, gb->cpu.a, B_PAD_RIGHT);
+		if (input) {
+			gb->cpu.a = alu_and(gb, gb->cpu.d, gb->cpu.d);
+			if (gb->cpu.a) {
+				gb->cpu.a = gb->cpu.e;
+				alu_cp(gb, gb->cpu.a, (uint8_t)MAX_GOLF_X_SCROLL);
+				if (!(gb->cpu.f & FLAG_C))
+					return; // cannot scroll right
+			}
+			SET_DE(gb, (uint16_t)(REG_DE(gb) + 1));
+		}
+	} else {
+		// .dir_left
+		gb->cpu.a = rd8(gb, wJoypadDown);
+		input = alu_bit(gb, gb->cpu.a, B_PAD_LEFT);
+		if (input) {
+			gb->cpu.a = alu_or(gb, gb->cpu.d, gb->cpu.e);
+			if (!gb->cpu.a)
+				return; // cannot scroll left
+			SET_DE(gb, (uint16_t)(REG_DE(gb) - 1));
+		}
+	}
+	if (input) {
+		// .apply_scroll
+		gb->cpu.a = gb->cpu.d;
+		wr8(gb, wGolfXScroll + 1, gb->cpu.d);
+		gb->cpu.a = gb->cpu.e;
+		wr8(gb, wGolfXScroll, gb->cpu.e);
+		SET_HL(gb, wGolfXScroll);
+		gb_call(gb, ADDR_UpdateGolfDisplayMode);
+		return;
+	}
+
+	// .no_directional_input: auto-scroll to the original position
+	SET_HL(gb, wGolfXScroll + 1);
+	gb->cpu.a = rd8(gb, wGolfXScroll);
+	gb->cpu.d = rd8(gb, wGolfXScroll + 1);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.a = alu_and(gb, rd8(gb, wGolfHoleScrollingDir), rd8(gb, wGolfHoleScrollingDir));
+	if (gb->cpu.a)
+		SET_DE(gb, (uint16_t)(REG_DE(gb) + 1));
+	else
+		SET_DE(gb, (uint16_t)(REG_DE(gb) - 1));
+	gb->cpu.a = gb->cpu.d;
+	wr8(gb, wGolfXScroll + 1, gb->cpu.d);
+	gb->cpu.a = gb->cpu.e;
+	wr8(gb, wGolfXScroll, gb->cpu.e);
+	SET_HL(gb, wTempGolfXScroll);
+	gb_call(gb, ADDR_Sub16Bit);
+	gb->cpu.a = alu_or(gb, gb->cpu.d, gb->cpu.e);
+	if (!gb->cpu.a) {
+		// done auto-scrolling
+		gb->cpu.a = GOLFHOLESTATE_WAIT_INPUT;
+		wr8(gb, wGolfHoleState, gb->cpu.a);
+	}
+	gb_call(gb, ADDR_UpdateGolfDisplayMode);
+}
+
+PORT_JUMP(GolfHoleState_Scroll)
+{
+	gb_push16(gb, ADDR_GolfHoleState_Scroll + 3); // call .HandleDirectionalInputScroll
+	handle_directional_input_scroll(gb);
+	gb_pop16(gb);
+
+	// handle ParaGoom ghost
+	SET_HL(gb, wGolfParaGoomXPos + 1);
+	gb->cpu.a = rd8(gb, wGolfParaGoomXPos);
+	gb->cpu.d = rd8(gb, wGolfParaGoomXPos + 1);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = alu_srl(gb, gb->cpu.d);
+	gb->cpu.e = alu_rr(gb, gb->cpu.e);
+	gb->cpu.d = alu_srl(gb, gb->cpu.d);
+	gb->cpu.e = alu_rr(gb, gb->cpu.e);
+
+	gb->cpu.a = rd8(gb, wGolfTerrain);
+	alu_cp(gb, gb->cpu.a, GOLF_TERRAIN_ROUGH);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.b = 0x80;
+	} else {
+		alu_cp(gb, gb->cpu.a, GOLF_TERRAIN_BUNKER);
+		gb->cpu.b = (gb->cpu.f & FLAG_Z) ? 0x50 : 0xa0;
+	}
+	// .asm_1c9083
+	gb->cpu.a = alu_and(gb, rd8(gb, wGolfHoleDirection), rd8(gb, wGolfHoleDirection));
+	if (!gb->cpu.a) {
+		gb->cpu.e = gb->cpu.a = alu_add(gb, gb->cpu.e, gb->cpu.b);
+		gb->cpu.d = gb->cpu.a = alu_adc(gb, gb->cpu.d, 0);
+	} else {
+		gb->cpu.e = gb->cpu.a = alu_sub(gb, gb->cpu.e, gb->cpu.b);
+		gb->cpu.d = gb->cpu.a = alu_sbc(gb, gb->cpu.d, 0);
+	}
+	// .asm_1c9099
+	gb_push16(gb, REG_DE(gb));
+	gb_call(gb, ADDR_Func_1c8f56);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	SET_DE(gb, gb_pop16(gb));
+	if (!gb->cpu.a) {
+		RET(); // outside of view
+		return;
+	}
+	// .inside_view
+	gb->cpu.b = rd8(gb, wSCX);
+	gb->cpu.a = alu_add(gb, gb->cpu.e, OAM_X_OFS);
+	gb->cpu.a = alu_sub(gb, gb->cpu.a, gb->cpu.b);
+	wr8(gb, wGolfParaGoomGhostXCoord, gb->cpu.a);
+	gb->cpu.a = 0x72;
+	wr8(gb, wGolfParaGoomGhostYCoord, 0x72);
+	SET_HL(gb, wGolfParaGoomGhostDuration);
+	SET_DE(gb, ADDR_Frameset_1cb0a4);
+	CALL(UpdateGolfObjectAnimation);
+	gb->cpu.a = rd8(gb, wGolfParaGoomGhostCurrentFrame);
+	wr8(gb, wGolfParaGoomGhostFrame, gb->cpu.a);
+	SET_HL(gb, wGolfParaGoomGhostSprite);
+	JUMP(LoadGolfSprite);
+}
+
+// ld a, [wGolfOverlayTextCurrentFrame] / ld [wGolfOverlayTextFrame], a /
+// ld hl, wGolfOverlayTextSprite / jp LoadGolfSprite
+static void overlay_text_sprite(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wGolfOverlayTextCurrentFrame);
+	wr8(gb, wGolfOverlayTextFrame, gb->cpu.a);
+	SET_HL(gb, wGolfOverlayTextSprite);
+	JUMP(LoadGolfSprite);
+}
+
+// ld de, frameset / ld hl, wGolfOverlayTextDuration /
+// call UpdateGolfObjectAnimation / ld a, c / and a; true on nz
+static bool overlay_text_anim(GB *gb, uint16_t frameset)
+{
+	SET_DE(gb, frameset);
+	SET_HL(gb, wGolfOverlayTextDuration);
+	CALL(UpdateGolfObjectAnimation);
+	gb->cpu.a = alu_and(gb, gb->cpu.c, gb->cpu.c);
+	return gb->cpu.a != 0;
+}
+
+// The Frameset_1cb016 animation with its SFX_0E5: true when it has
+// finished (c != 0), else it tail-jumps into LoadGolfSprite.
+static bool overlay_text_1cb016(GB *gb)
+{
+	if (overlay_text_anim(gb, ADDR_Frameset_1cb016))
+		return true;
+	gb->cpu.a = rd8(gb, wGolfOverlayTextFramesetOffset);
+	alu_cp(gb, gb->cpu.a, 0x2);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = rd8(gb, wGolfOverlayTextDuration);
+		alu_cp(gb, gb->cpu.a, 1);
+		if (gb->cpu.f & FLAG_Z)
+			play_sfx(gb, SFX_0E5);
+	}
+	overlay_text_sprite(gb);
+	return false;
+}
+
+PORT_JUMP(GolfHoleState_SpecialTerrain)
+{
+	const uint16_t hole_x_signs = ADDR_GolfHoleState_SpecialTerrain + 0x22b;   // .HoleXPosOffsetSigns
+	const uint16_t hole_x_offsets = ADDR_GolfHoleState_SpecialTerrain + 0x243; // .HoleXPosOffsets
+	const uint16_t hole_y_offsets = ADDR_GolfHoleState_SpecialTerrain + 0x25b; // .HoleYPosOffset
+
+	gb->cpu.a = 0x50;
+	wr8(gb, wGolfOverlayTextYCoord, 0x50);
+	gb->cpu.a = 0x58;
+	wr8(gb, wGolfOverlayTextXCoord, 0x58);
+	wr8(gb, wGolfObj4State, 0x58);
+	gb->cpu.a = GOLFHOLESTATE_BETWEEN_SHOTS;
+	wr8(gb, w1dc01, gb->cpu.a);
+
+	gb->cpu.a = alu_and(gb, rd8(gb, wGolfTerrain), GOLF_TERRAIN_MASK);
+	uint8_t t = gb->cpu.a;
+	enum { DEFAULT, HOLE, ROUGH, BUNKER, WATER, OB } kind = DEFAULT;
+	static const uint8_t terrains[] = { GOLF_TERRAIN_HOLE, GOLF_TERRAIN_ROUGH,
+		GOLF_TERRAIN_BUNKER, GOLF_TERRAIN_WATER, GOLF_TERRAIN_OB };
+	for (int i = 0; i < 5; i++) {
+		alu_cp(gb, t, terrains[i]);
+		if (gb->cpu.f & FLAG_Z) {
+			kind = HOLE + i;
+			break;
+		}
+	}
+
+	enum { L_9743, L_976f } next = L_976f;
+
+	switch (kind) {
+	case DEFAULT:
+		gb->cpu.a = rd8(gb, wGolfParaGoomState);
+		alu_cp(gb, gb->cpu.a, GOLF_PARAGOOM_4);
+		if (gb->cpu.f & FLAG_Z) {
+			next = L_9743;
+			break;
+		}
+		if (!overlay_text_1cb016(gb))
+			return;
+		// .asm_1c96ba
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wGolfParaGoomYPos + 0, 0);
+		wr8(gb, wGolfParaGoomYPos + 1, 0);
+		gb->cpu.a = rd8(gb, wLastGolfParaGoomXPos + 0);
+		wr8(gb, wGolfParaGoomYPos + 2, gb->cpu.a);
+		gb->cpu.a = rd8(gb, wLastGolfParaGoomXPos + 1);
+		wr8(gb, wGolfParaGoomYPos + 3, gb->cpu.a);
+		SET_HL(gb, wGolfParaGoomYPos + 3);
+		gb_call(gb, ADDR_AlignGolfXScrollWithParaGoom);
+		gb_call(gb, ADDR_UpdateGolfDisplayMode);
+		gb_call(gb, ADDR_UpdateGolfHoleDirection);
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wGolfParaGoomFramesetOffset, 0);
+		gb->cpu.a = GOLF_PARAGOOM_4;
+		wr8(gb, wGolfParaGoomState, gb->cpu.a);
+		JUMP_TO(ADDR_SetGolfParaGoomRespawnYPosIfEnoughStrokes);
+		return;
+
+	case ROUGH:
+	case BUNKER:
+		if (overlay_text_anim(gb, kind == ROUGH ? ADDR_Frameset_1cb035 : ADDR_Frameset_1cb068)) {
+			next = L_976f;
+			break;
+		}
+		gb->cpu.a = rd8(gb, wGolfOverlayTextFramesetOffset);
+		alu_cp(gb, gb->cpu.a, kind == ROUGH ? 0x0a : 0x06);
+		if (gb->cpu.f & FLAG_Z) {
+			// .asm_1c9708
+			gb->cpu.a = alu_and(gb, rd8(gb, wGolfOverlayTextDuration), rd8(gb, wGolfOverlayTextDuration));
+			if (gb->cpu.f & FLAG_Z)
+				play_sfx(gb, SFX_0F0);
+		}
+		overlay_text_sprite(gb);
+		return;
+
+	case WATER:
+	case OB:
+		gb->cpu.a = rd8(gb, wGolfParaGoomState);
+		alu_cp(gb, gb->cpu.a, GOLF_PARAGOOM_4);
+		if (gb->cpu.f & FLAG_Z) {
+			next = L_9743;
+			break;
+		}
+		alu_cp(gb, gb->cpu.a, GOLF_PARAGOOM_6);
+		if (gb->cpu.f & FLAG_Z) {
+			SET_HL(gb, wGolfParaGoomYPos);
+			gb->cpu.a = rd8(gb, wGolfParaGoomYPos);
+			alu_cp(gb, gb->cpu.a, kind == WATER ? 0xc0 : 0xa0);
+			if (gb->cpu.f & FLAG_C) {
+				// sink
+				gb->cpu.a = alu_add(gb, gb->cpu.a, 4);
+				wr8(gb, wGolfParaGoomYPos, gb->cpu.a);
+				SET_HL(gb, wGolfParaGoomYPos + 1);
+				RET();
+				return;
+			}
+			if (kind == WATER) {
+				// .done_sinking_water
+				gb->cpu.a = GOLF_PARAGOOM_2;
+				wr8(gb, wGolfParaGoomState, gb->cpu.a);
+				gb->cpu.a = GOLF_TERRAIN_PLAIN;
+				wr8(gb, wStrokeGolfTerrain, gb->cpu.a);
+				RET();
+				return;
+			}
+			// .done_sinking_ob
+			gb->cpu.a = GOLF_PARAGOOM_3;
+			wr8(gb, wGolfParaGoomState, gb->cpu.a);
+		} else if (kind == WATER) {
+			RET();
+			return;
+		}
+		// .asm_1c97b5
+		if (!overlay_text_1cb016(gb))
+			return;
+		// .asm_1c97e4
+		gb->cpu.a = GOLF_PARAGOOM_4;
+		wr8(gb, wGolfParaGoomState, gb->cpu.a);
+		gb_call(gb, ADDR_AlignGolfXScrollWithParaGoom);
+		gb_call(gb, ADDR_UpdateGolfDisplayMode);
+		JUMP_TO(ADDR_UpdateGolfHoleDirection);
+		return;
+
+	case HOLE:
+	default: {
+		SET_HL(gb, wGolfCounter);
+		gb->cpu.a = rd8(gb, wGolfCounter);
+		alu_cp(gb, gb->cpu.a, 0x30);
+		if (gb->cpu.f & FLAG_C) {
+			alu_cp(gb, gb->cpu.a, 0x18);
+			if (!(gb->cpu.f & FLAG_C)) {
+				// .inside_delay
+				wr8(gb, wGolfCounter, alu_inc(gb, gb->cpu.a));
+				RET();
+				return;
+			}
+			wr8(gb, wGolfCounter, alu_inc(gb, gb->cpu.a));
+			uint16_t de = wGolfParaGoomXPos;
+			gb->cpu.b = 0x00;
+			gb->cpu.c = gb->cpu.a;
+			uint16_t hl = alu_add16(gb, hole_x_signs, REG_BC(gb));
+			gb->cpu.a = alu_and(gb, rd8(gb, hl), rd8(gb, hl));
+			bool neg = gb->cpu.a != 0;
+			hl = alu_add16(gb, hole_x_offsets, REG_BC(gb));
+			if (!neg) {
+				gb->cpu.a = alu_add(gb, rd8(gb, de), rd8(gb, hl));
+				wr8(gb, de, gb->cpu.a);
+				de++;
+				gb->cpu.a = alu_adc(gb, rd8(gb, de), 0);
+			} else {
+				gb->cpu.a = alu_sub(gb, rd8(gb, de), rd8(gb, hl));
+				wr8(gb, de, gb->cpu.a);
+				de++;
+				gb->cpu.a = alu_sbc(gb, rd8(gb, de), 0);
+			}
+			wr8(gb, de, gb->cpu.a);
+			SET_DE(gb, de);
+			// .hole_y_pos_offsets
+			hl = alu_add16(gb, hole_y_offsets, REG_BC(gb));
+			SET_HL(gb, hl);
+			gb->cpu.a = alu_add(gb, rd8(gb, wGolfParaGoomYPos), rd8(gb, hl));
+			wr8(gb, wGolfParaGoomYPos, gb->cpu.a);
+			RET();
+			return;
+		}
+		// .done_hole_animation
+		gb->cpu.c = rd8(gb, wGolfPar);
+		gb->cpu.a = rd8(gb, wGolfStroke);
+		alu_cp(gb, gb->cpu.a, gb->cpu.c);
+		if (gb->cpu.f & FLAG_Z) {
+			// .par
+			play_music2(gb, MUSIC_GOLF_CLEAR);
+			gb->cpu.a = GOLFRESULT_PAR;
+			wr8(gb, wGolfResult, gb->cpu.a);
+		} else if (gb->cpu.f & FLAG_C) {
+			// under par
+			play_music2(gb, MUSIC_GOLF_CLEAR);
+		} else {
+			// .over_par
+			gb->cpu.a = GOLFRESULT_OVER_PAR;
+			wr8(gb, wGolfResult, gb->cpu.a);
+			gb->cpu.a = rd8(gb, w1d800);
+			alu_cp(gb, gb->cpu.a, 0x01);
+			if (!(gb->cpu.f & FLAG_Z)) {
+				gb->cpu.a = GOLFHOLESTATE_GAME_OVER;
+				wr8(gb, w1dc01, gb->cpu.a);
+				next = L_976f;
+				break;
+			}
+		}
+		// .asm_1c9863
+		gb->cpu.a = GOLFHOLESTATE_CLEARED;
+		wr8(gb, w1dc01, gb->cpu.a);
+		next = L_976f;
+		break;
+	}
+	}
+
+	if (next == L_9743) {
+		SET_HL(gb, wGolfParaGoomYPos + 1);
+		gb->cpu.a = alu_or(gb, rd8(gb, wGolfParaGoomYPos), rd8(gb, wGolfParaGoomYPos + 1));
+		if (gb->cpu.f & FLAG_Z)
+			play_sfx(gb, SFX_0EE);
+		gb->cpu.a = rd8(gb, wLastGolfParaGoomYPos);
+		gb->cpu.d = rd8(gb, wLastGolfParaGoomYPos + 1);
+		gb->cpu.e = gb->cpu.a;
+		gb->cpu.a = alu_add(gb, rd8(gb, wGolfParaGoomYPos), 2);
+		wr8(gb, wGolfParaGoomYPos, gb->cpu.a);
+		gb->cpu.a = alu_adc(gb, rd8(gb, wGolfParaGoomYPos + 1), 0);
+		wr8(gb, wGolfParaGoomYPos + 1, gb->cpu.a);
+		SET_HL(gb, wGolfParaGoomYPos);
+		gb_call(gb, ADDR_Compare16Bit);
+		alu_cp(gb, gb->cpu.a, 0x2);
+		if (!(gb->cpu.f & FLAG_C)) {
+			RET();
+			return;
+		}
+		gb->cpu.a = rd8(gb, wStrokeGolfTerrain);
+		wr8(gb, wGolfTerrain, gb->cpu.a);
+	}
+	// .asm_1c976f
+	gb->cpu.a = rd8(gb, wGolfParaGoomState);
+	alu_cp(gb, gb->cpu.a, GOLF_PARAGOOM_5);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		gb->cpu.a = 0; // GOLF_PARAGOOM_0
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wGolfParaGoomState, 0);
+	}
+	// .asm_1c977a
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wGolfCounter, 0);
+	wr8(gb, wGolfParaGoomDuration, 0);
+	wr8(gb, wGolfWarioDuration, 0);
+	wr8(gb, wGolfParaGoomFramesetOffset, 0);
+	wr8(gb, wGolfWarioFramesetOffset, 0);
+	wr8(gb, wGolfOverlayTextFramesetOffset, 0);
+	wr8(gb, wGolfOverlayText, 0);
+	gb_call(gb, ADDR_UpdateGolfHoleDirection);
+	gb->cpu.a = GOLFHOLESTATE_WALK;
+	wr8(gb, wGolfHoleState, gb->cpu.a);
+	RET();
+}
