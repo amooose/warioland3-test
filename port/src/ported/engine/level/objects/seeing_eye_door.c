@@ -30,7 +30,7 @@ PORT(SeeingEyeDoorFunc)
 
 #define SEEING_EYE_DOOR_LOOK_AROUND (ADDR_SeeingEyeDoorFunc + 0xa0) // .LookAround
 #define SEEING_EYE_DOOR_DEFAULT (ADDR_SeeingEyeDoorFunc + 0xb4) // .Default
-#define SEEING_EYE_DOOR_STATE_54F6 0x54f6 // unlabeled state after .LookAround
+#define SEEING_EYE_DOOR_STATE_54F6 (ADDR_SeeingEyeDoorFunc + 0x56) // .WaitForWarioInRange
 
 // ld a, [wWarioScreenXPos] / add $2a / ld b, a / ld a, [wCurObjScreenXPos] /
 // add $2a / cp b: carry when the door is left of Wario
@@ -256,4 +256,23 @@ PORT_LOCAL(SeeingEyeDoorFunc, LookAround)
 	if (v)
 		return;
 	look_done(gb);
+}
+
+// Waits for Wario (unless invisible) to come within $36 pixels below the
+// door's top, then checks his distance again.
+PORT_LOCAL(SeeingEyeDoorFunc, WaitForWarioInRange)
+{
+	gb->cpu.a = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
+	wr8(gb, wCurObjAction, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wTransformation);
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_INVISIBLE_WARIO);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	gb->cpu.a = alu_sub(gb, rd8(gb, wCurObjScreenYPos), 0x19);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_sub(gb, rd8(gb, wWarioScreenYPos), gb->cpu.b);
+	alu_cp(gb, gb->cpu.a, 0x36);
+	if (!(gb->cpu.f & FLAG_C))
+		return;
+	port_SeeingEyeDoorFunc__CheckWarioDistance(gb); // jr .CheckWarioDistance
 }

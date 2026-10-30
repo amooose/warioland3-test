@@ -46,6 +46,7 @@ SeeingEyeDoorFunc:
 	call SetObjectFramesetPtr
 	jr .Default
 
+.WaitForWarioInRange:
 	ld a, no_actions_for 1
 	ld [wCurObjAction], a
 	ld a, [wTransformation]
@@ -91,9 +92,9 @@ SeeingEyeDoorFunc:
 	ld de, Frameset_68c36
 	call SetObjectFramesetPtr
 	ld l, OBJ_UPDATE_FUNCTION + 1
-	ld a, $54
+	ld a, HIGH(.WaitForWarioInRange)
 	ld [hld], a
-	ld a, $f6
+	ld a, LOW(.WaitForWarioInRange)
 	ld [hld], a
 	ret
 
