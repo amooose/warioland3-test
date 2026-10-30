@@ -1430,3 +1430,316 @@ PORT_JUMP(UpdateState_BallAirborne)
 	update_pos_y(gb);
 	LJUMP(Func_1edaf8);
 }
+
+PORT_JUMP(Func_1ed09b)
+{
+	flip_dir(gb);
+	JUMP(RecoverFromTransformation);
+}
+
+PORT_JUMP(UpdateState_MagicRecovering)
+{
+	JUMP(RecoverFromTransformation);
+}
+
+PORT_JUMP(UpdateStart_FanRecovering)
+{
+	anim(gb, OAM3);
+	if (!anim_ended(gb)) {
+		RET();
+		return;
+	}
+	JUMP(RecoverFromTransformation_WithoutInvincibility);
+}
+
+PORT_JUMP(UpdateState_IceSkatinCrash)
+{
+	anim(gb, OAM2);
+	if (!anim_ended(gb)) {
+		RET();
+		return;
+	}
+	get_pos(gb);
+	gb->cpu.b = PARTICLE_ICE;
+	FARCALL(CreateParticle);
+	JUMP(RecoverFromTransformation);
+}
+
+PORT_JUMP(UpdateState_SplitKnockedBack)
+{
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return;
+	}
+	if (ld_and(gb, wWaterInteraction)) {
+		JUMP(RecoverFromTransformation);
+		return;
+	}
+	CALL(ApplyJumpVelocity);
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb)) {
+		FARCALL(HandleWalk);
+		CALL(Func_1762);
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	play_sfx(gb, SFX_044);
+	xor_a(gb);
+	wr8(gb, wFrameDuration, 0);
+	wr8(gb, wAnimationFrame, 0);
+	if (ld_and(gb, wDirection))
+		set_frameset(gb, ADDR_Frameset_1ffc8e);
+	else
+		set_frameset(gb, ADDR_Frameset_1ffccf);
+	anim(gb, OAM2);
+	LJUMP(SetState_Splitting); // fallthrough
+}
+
+PORT_JUMP(UpdateState_SnowmanIdle)
+{
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return;
+	}
+	if (ld_and(gb, wWaterInteraction)) {
+		JUMP(RecoverFromTransformation);
+		return;
+	}
+	LCALL(HandleSnowmanInput);
+	ld_cp(gb, wWarioState, WST_SNOWMAN_IDLE);
+	if (!ZF) {
+		RET();
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (!b_and(gb)) {
+		LJUMP(SetState_SnowmanAirborne_Fall);
+		return;
+	}
+	RET();
+}
+
+PORT_JUMP(UpdateState_SnowmanTurning)
+{
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return;
+	}
+	if (ld_and(gb, wWaterInteraction)) {
+		JUMP(RecoverFromTransformation);
+		return;
+	}
+	anim(gb, OAM2);
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		LJUMP(SetState_SnowmanAirborne_Jump);
+		return;
+	}
+	if (!anim_ended(gb)) {
+		RET();
+		return;
+	}
+	LJUMP(SetState_SnowmanWalking);
+}
+
+PORT_JUMP(UpdateState_SnowballCrash)
+{
+	anim(gb, OAM2);
+	if (!anim_ended(gb)) {
+		RET();
+		return;
+	}
+	get_pos(gb);
+	gb->cpu.b = PARTICLE_SNOW;
+	FARCALL(CreateParticle);
+	JUMP(RecoverFromTransformation);
+}
+
+PORT_JUMP(UpdateState_SnowmanStart)
+{
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return;
+	}
+	if (ld_and(gb, wWaterInteraction)) {
+		JUMP(RecoverFromTransformation);
+		return;
+	}
+	if (ld_and(gb, wJumpVelTable)) {
+		CALL(ApplyJumpVelocity);
+		FARCALL(CheckAirborneCollision);
+		if (!b_and(gb)) {
+			JUMP(TriggerDownwardsFloorTransition);
+			return;
+		}
+		CALL(TriggerFloorTransition);
+		xor_a(gb);
+		wr8(gb, wJumpVelTable, 0);
+		wr8(gb, wJumpVelIndex, 0);
+	}
+	anim(gb, OAM2);
+	if (!anim_ended(gb)) {
+		RET();
+		return;
+	}
+	LJUMP(SetState_SnowmanIdle); // fallthrough
+}
+
+PORT_JUMP(UpdateState_FallingFromOwl)
+{
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return;
+	}
+	if (ld_and(gb, wWaterInteraction)) {
+		JUMP(RecoverFromTransformation);
+		return;
+	}
+	CALL(ApplyJumpVelocity);
+	FARCALL(Func_2b17a);
+	ld_cp(gb, wWalkVelIndex, 0x08);
+	if (!CF)
+		st(gb, wWalkVelIndex, 0x04);
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb)) {
+		RET();
+		return;
+	}
+	update_pos_y(gb);
+	JUMP(RecoverFromTransformation);
+}
+
+PORT_JUMP(UpdateState_HangingRail)
+{
+	if (!ld_and(gb, wWarioStateCounter) && anim_ended(gb)) {
+		st(gb, wWarioStateCounter, 0x01);
+		xor_a(gb);
+		wr8(gb, wFrameDuration, 0);
+		wr8(gb, wAnimationFrame, 0);
+		set_frameset(gb, ADDR_Frameset_1feeb4);
+	}
+	anim(gb, OAM2);
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_B)) {
+		JUMP(RecoverFromTransformation_WithoutInvincibility);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, B_PAD_A)) {
+		LJUMP(Func_1ede4d);
+		return;
+	}
+	if (!ld_and(gb, wAutoMoveState)) {
+		LJUMP(Func_1ede69);
+		return;
+	}
+	RET();
+}
+
+PORT_JUMP(UpdateState_SnowballAirborne)
+{
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return;
+	}
+	if (ld_and(gb, wWaterInteraction)) {
+		JUMP(RecoverFromTransformation);
+		return;
+	}
+	anim(gb, OAM2);
+	FARCALL(CheckFrontCollision);
+	gb->cpu.a = alu_and(gb, gb->cpu.b, 0x0f);
+	if (gb->cpu.a) {
+		LJUMP(SetState_SnowballCrash);
+		return;
+	}
+	CALL(ApplyJumpVelocity);
+	FARCALL(HandleWalk);
+	ld_cp(gb, wWalkVelIndex, 0x18);
+	if (!CF)
+		st(gb, wWalkVelIndex, 0x14);
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb)) {
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	CALL(TriggerFloorTransition);
+	LJUMP(SetState_SnowballRolling);
+}
+
+PORT_JUMP(UpdateState_SnowmanAirborne)
+{
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return;
+	}
+	if (ld_and(gb, wWaterInteraction)) {
+		JUMP(RecoverFromTransformation);
+		return;
+	}
+	anim(gb, OAM2);
+	if (!ld_and(gb, wWarioStateCounter) && anim_ended(gb)) {
+		xor_a(gb);
+		wr8(gb, wFrameDuration, 0);
+		wr8(gb, wAnimationFrame, 0);
+		st(gb, wWarioStateCounter, 1);
+		if (ld_and(gb, wDirection))
+			set_frameset(gb, ADDR_Frameset_1ff625);
+		else
+			set_frameset(gb, ADDR_Frameset_1ff622);
+		anim(gb, OAM2);
+	}
+	LCALL(Func_1edf01);
+	ld_cp(gb, wWarioState, WST_SNOWMAN_AIRBORNE);
+	if (!ZF) {
+		RET();
+		return;
+	}
+	ld_cp(gb, wJumpVelIndex, 0x18);
+	if (CF) {
+		FARCALL(CheckUpCollision);
+		if (!b_and(gb)) {
+			RET();
+			return;
+		}
+		ld_cp(gb, wWarioState, WST_SNOWMAN_AIRBORNE);
+		if (!ZF) {
+			RET();
+			return;
+		}
+		LJUMP(SetState_SnowmanAirborne_Fall);
+		return;
+	}
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb)) {
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	CALL(TriggerFloorTransition);
+	FARCALL(CheckCentreCollision);
+	if (ld_and(gb, wWarioSlopeInteraction)) {
+		LJUMP(TurnIntoSmallSnowball);
+		return;
+	}
+	if (!ld_and(gb, wGroundShakeCounter)) {
+		st(gb, wGroundShakeCounter, 0x20);
+		st(gb, wIsWarioGroundShaking, TRUE);
+	}
+	if (!ld_and(gb, wFloorTransitionDir))
+		play_sfx(gb, SFX_024);
+	st(gb, wWarioState, WST_SNOWMAN_LANDING);
+	static const uint16_t zero[] = {wJumpVelTable, wJumpVelIndex, wIsSmashAttacking,
+		wWarioStateCounter, wFrameDuration, wAnimationFrame, 0};
+	clear(gb, zero);
+	if (ld_and(gb, wDirection))
+		set_frameset(gb, ADDR_Frameset_1ff617);
+	else
+		set_frameset(gb, ADDR_Frameset_1ff60c);
+	anim(gb, OAM2);
+	RET();
+}
