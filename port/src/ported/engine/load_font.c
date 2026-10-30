@@ -30,3 +30,19 @@ PORT(LoadLanguageSelectionText)
 	SET_BC(gb, v0BGMap0);
 	CALL(Decompress);
 }
+
+PORT(LoadGBIncompatibleScreenGfx)
+{
+	SET_HL(gb, ADDR_GBIncompatibleGfx);
+	SET_BC(gb, v0Tiles0);
+	CALL(Decompress);
+}
+
+PORT(LoadGBIncompatibleScreenMap)
+{
+	SET_HL(gb, ADDR_GBIncompatibleTilemap);
+	SET_BC(gb, v0BGMap0);
+	CALL(Decompress);
+	gb->cpu.a = 0xe4; // %11100100
+	wr8(gb, rBGP, gb->cpu.a);
+}

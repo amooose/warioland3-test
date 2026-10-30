@@ -211,3 +211,95 @@ PORT(InitMusicalCoinScreen)
 	SET_HL(gb, wSubState);
 	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
 }
+
+PORT(Func_d4507)
+{
+	gb_call(gb, ADDR_DoPencilMovement);
+	push_af(gb);
+	SET_HL(gb, wMenuObj1);
+	gb_call(gb, ADDR_LoadPencilSprite);
+	SET_HL(gb, wMenuObj3FramesetPtr + 1);
+	FARCALL_BANK(0x7c, UpdateObjAnim);
+	SET_HL(gb, wMenuObj3);
+	FARCALL(LoadPauseMenuSprite);
+	CALL(ClearUnusedVirtualOAM);
+	pop_af(gb);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wTimer, 0);
+	play_sfx(gb, SFX_03A);
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}
+
+PORT(Func_d454c)
+{
+	gb_call(gb, ADDR_DoPencilScribbling);
+
+	SET_HL(gb, wMenuObj1);
+	gb_call(gb, ADDR_LoadPencilSprite);
+
+	SET_HL(gb, wMenuObj3FramesetPtr + 1);
+	FARCALL_BANK(0x7c, UpdateObjAnim);
+	SET_HL(gb, wMenuObj3YCoord);
+	FARCALL(LoadPauseMenuSprite);
+	CALL(ClearUnusedVirtualOAM);
+
+	SET_HL(gb, wTimer);
+	wr8(gb, wTimer, alu_inc(gb, rd8(gb, wTimer)));
+	gb->cpu.a = rd8(gb, wTimer);
+	alu_cp(gb, gb->cpu.a, 52);
+	if (!(gb->cpu.f & FLAG_C)) {
+		// .done
+		play_sfx(gb, SFX_MUSICAL_COIN);
+		// fallthrough: Func_d45e1
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wTimer + 0, 0);
+		gb->cpu.a = 2;
+		wr8(gb, wTimer + 1, 2);
+		SET_HL(gb, wSubState);
+		wr8(gb, wSubState, SST_CLEAR_EXIT);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 20);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = rd8(gb, wAllMusicalCoinsLevel);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0x00;
+	uint16_t hl = alu_add16(gb, ADDR_MusicalCoinLevelBGPals, REG_DE(gb));
+	gb->cpu.b = rd8(gb, hl);
+	gb->cpu.a = rd8(gb, wAllMusicalCoinsLevel);
+	int row = 0;
+	static const uint8_t limits[] = {NUM_LEVELS - 5, NUM_LEVELS - 10, NUM_LEVELS - 15, NUM_LEVELS - 20};
+	for (int i = 0; i < 4; i++) {
+		alu_cp(gb, gb->cpu.a, limits[i]);
+		if (!(gb->cpu.f & FLAG_C)) {
+			row = 4 - i;
+			break;
+		}
+	}
+	if (row)
+		gb->cpu.a = alu_sub(gb, gb->cpu.a, (uint8_t)(5 * row));
+	hl = (uint16_t)(v0BGMap0 + (9 + row) * TILEMAP_WIDTH + 8); // hlbgcoord 8, 9 + row
+	// .got_coords
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0x00;
+	hl = alu_add16(gb, hl, REG_DE(gb));
+	gb->cpu.d = (uint8_t)(hl >> 8);
+	gb->cpu.e = (uint8_t)hl;
+	hl = wBGMapTileVRAM0Queue;
+	gb->cpu.a = gb->cpu.d;
+	wr8(gb, hl++, gb->cpu.a);
+	gb->cpu.a = gb->cpu.e;
+	wr8(gb, hl++, gb->cpu.a);
+	wr8(gb, hl, gb->cpu.b);
+	SET_HL(gb, hl);
+	gb->cpu.a = 0x81;
+	wr8(gb, wcee4, gb->cpu.a);
+}

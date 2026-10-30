@@ -26,3 +26,18 @@ PORT(InitTimeAttackDescription)
 	SET_HL(gb, wSubState);
 	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
 }
+
+PORT_JUMP(TimeAttackDescription)
+{
+	gb_call(gb, ADDR_AdjustJapaneseTimeAttackDescriptionWindow);
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (!alu_bit(gb, gb->cpu.a, B_PAD_A)) {
+		RET();
+		return;
+	}
+	CALL(DisableLCD);
+	CALL(FillWhiteBGPal);
+	gb->cpu.a = LCDC_DEFAULT;
+	wr8(gb, rLCDC, gb->cpu.a);
+	JUMP_TO(ADDR_StartOverworldState); // same bank
+}

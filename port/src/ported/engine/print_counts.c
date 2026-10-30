@@ -67,3 +67,31 @@ PORT(GetOWLevelCollectedTreasures)
 	pop_af(gb); // pop_wram
 	wr8(gb, rWBK, gb->cpu.a);
 }
+
+// ld [hl], a / add hl, de / inc a / ld [hli], a / add hl, bc
+static uint16_t print_digit(GB *gb, uint16_t hl, uint8_t digit)
+{
+	gb->cpu.a = alu_add(gb, digit, digit); // *2
+	gb->cpu.a = alu_add(gb, gb->cpu.a, 0xa0);
+	wr8(gb, hl, gb->cpu.a);
+	hl = alu_add16(gb, hl, REG_DE(gb));
+	gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	wr8(gb, hl++, gb->cpu.a);
+	return alu_add16(gb, hl, REG_BC(gb));
+}
+
+PORT(PrintNumCollectedTreasures)
+{
+	SET_BC(gb, (uint16_t)-TILEMAP_WIDTH);
+	SET_DE(gb, TILEMAP_WIDTH);
+	uint16_t hl = REG_HL(gb);
+
+	// hundreds
+	hl = print_digit(gb, hl, alu_and(gb, rd8(gb, wNumCollectedTreasures + 0), 0x0f));
+	// tens
+	gb->cpu.a = alu_swap(gb, rd8(gb, wNumCollectedTreasures + 1));
+	hl = print_digit(gb, hl, alu_and(gb, gb->cpu.a, 0x0f));
+	// ones
+	hl = print_digit(gb, hl, alu_and(gb, rd8(gb, wNumCollectedTreasures + 1), 0x0f));
+	SET_HL(gb, hl);
+}
