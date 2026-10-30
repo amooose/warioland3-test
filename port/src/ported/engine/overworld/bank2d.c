@@ -4107,3 +4107,354 @@ PORT_LOCAL_JUMP(WOWFunc_Earthquake, DropRocks)
 	gb_call(gb, ADDR_Func_b5868);
 	sfx_advance(gb, SFX_061);
 }
+
+// NOWFunc_DayNightSpell.Func_b57f4
+static void day_night_spell_b57f4(GB *gb)
+{
+	gb->cpu.a = (uint8_t)((wAttrmap + 21 * TILEMAP_WIDTH) >> 8);
+	wr8(gb, wHDMASourceHi, gb->cpu.a);
+	wr8(gb, wHDMASourceLo, (uint8_t)(wAttrmap + 21 * TILEMAP_WIDTH));
+	wr8(gb, wHDMADestHi, (uint8_t)(((v0BGMap0 + 30 * TILEMAP_WIDTH) >> 8) - 0x80));
+	wr8(gb, wHDMADestLo, (uint8_t)(v0BGMap0 + 30 * TILEMAP_WIDTH));
+	wr8(gb, wHDMAMode, 2 * 2 - 1);
+	wr8(gb, w2d0b5SourceHi, (uint8_t)((wAttrmap + 19 * TILEMAP_WIDTH) >> 8));
+	wr8(gb, w2d0b5SourceLo, (uint8_t)(wAttrmap + 19 * TILEMAP_WIDTH));
+	wr8(gb, w2d0b5DestHi, (uint8_t)(((v0BGMap0 + 30 * TILEMAP_WIDTH) >> 8) - 0x80));
+	wr8(gb, w2d0b5DestLo, (uint8_t)(v0BGMap0 + 30 * TILEMAP_WIDTH));
+	gb->cpu.a = 2 * 2 - 1;
+	wr8(gb, w2d0b5Mode, gb->cpu.a);
+}
+
+// NOWFunc_DayNightSpell.Func_b5827: copies a 2x2 tile and attribute block
+// from hl to rows 19-22 of wAttrmap
+static void day_night_spell_b5827(GB *gb)
+{
+	uint16_t hl = REG_HL(gb);
+	uint16_t saved = wAttrmap + 19 * TILEMAP_WIDTH + 11;
+	SET_DE(gb, saved);
+	gb->cpu.a = alu_add(gb, gb->cpu.e, 2 * TILEMAP_WIDTH);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.a = alu_adc(gb, 0x00, gb->cpu.d);
+	gb->cpu.d = gb->cpu.a;
+	gb->cpu.c = 2;
+	for (;;) {
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.e = alu_inc(gb, gb->cpu.e);
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.e = alu_dec(gb, gb->cpu.e);
+		gb->cpu.a = alu_add(gb, gb->cpu.e, TILEMAP_WIDTH);
+		gb->cpu.e = gb->cpu.a;
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.e = alu_inc(gb, gb->cpu.e);
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.c = alu_dec(gb, gb->cpu.c);
+		if (gb->cpu.f & FLAG_Z)
+			break;
+		SET_DE(gb, saved); // pop de
+	}
+	SET_HL(gb, hl);
+}
+
+#define DAY_NIGHT_VISIBLE_ATTR (ADDR_NOWFunc_DayNightSpell + 0xe3)
+#define DAY_NIGHT_INVISIBLE_ATTR (ADDR_NOWFunc_DayNightSpell + 0xeb)
+#define DAY_NIGHT_PRESSED_ATTR (ADDR_NOWFunc_DayNightSpell + 0xf3)
+
+// NOWFunc_DayNightSpell.apply_attribute
+static void day_night_apply_attr(GB *gb, uint16_t attr)
+{
+	SET_HL(gb, attr);
+	day_night_spell_b5827(gb);
+	day_night_spell_b57f4(gb);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+static void day_night_set_button(GB *gb, uint8_t wait, uint8_t state, uint16_t attr, bool sfx)
+{
+	gb->cpu.a = rd8(gb, wOWFuncCounter);
+	alu_cp(gb, gb->cpu.a, wait);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	gb->cpu.a = state;
+	SET_HL(gb, wSceneObj5State);
+	CALL(SetSceneObjState);
+	if (sfx)
+		play_sfx(gb, SFX_SELECTION);
+	day_night_apply_attr(gb, attr);
+}
+
+static void day_night_wait_press(GB *gb, uint8_t frame)
+{
+	gb->cpu.a = rd8(gb, wSceneObj5Frame);
+	alu_cp(gb, gb->cpu.a, frame);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	day_night_apply_attr(gb, DAY_NIGHT_VISIBLE_ATTR);
+}
+
+// NOWFunc_DayNightSpell.OpenTopBar
+static void day_night_open_top_bar(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wSCY);
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	wr8(gb, wSCY, gb->cpu.a);
+	alu_cp(gb, gb->cpu.a, 0xec);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+PORT_JUMP(NOWFunc_DayNightSpell) { ow_func_jumptable(gb, ADDR_NOWFunc_DayNightSpell); }
+PORT_LOCAL_JUMP(NOWFunc_DayNightSpell, Wait1) { wait_ow_func(gb, 30); }
+PORT_LOCAL_JUMP(NOWFunc_DayNightSpell, Wait3) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(NOWFunc_DayNightSpell, StartOpenTopBar)
+{
+	play_sfx(gb, SFX_0E9);
+	gb_call(gb, ADDR_AdvanceOWFunc);
+	day_night_open_top_bar(gb); // fallthrough
+}
+PORT_LOCAL_JUMP(NOWFunc_DayNightSpell, OpenTopBar) { day_night_open_top_bar(gb); }
+PORT_LOCAL_JUMP(NOWFunc_DayNightSpell, Wait2) { wait_ow_func(gb, 40); }
+PORT_LOCAL_JUMP(NOWFunc_DayNightSpell, SetButtonVisible) { day_night_set_button(gb, 20, 0x25, DAY_NIGHT_VISIBLE_ATTR, false); }
+PORT_LOCAL_JUMP(NOWFunc_DayNightSpell, SetButtonInvisible) { day_night_set_button(gb, 20, 0x00, DAY_NIGHT_INVISIBLE_ATTR, false); }
+PORT_LOCAL_JUMP(NOWFunc_DayNightSpell, WaitAndPressDayButton) { day_night_set_button(gb, 60, 0x26, DAY_NIGHT_PRESSED_ATTR, true); }
+PORT_LOCAL_JUMP(NOWFunc_DayNightSpell, WaitDayButtonPress) { day_night_wait_press(gb, 0x04); }
+PORT_LOCAL_JUMP(NOWFunc_DayNightSpell, DayNightTransition)
+{
+	FARCALL(Func_84c0d);
+	gb->cpu.a = alu_and(gb, rd8(gb, wOWPalTransitionState), rd8(gb, wOWPalTransitionState));
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	gb->cpu.ime = false; // di
+	FARCALL(VBlank_Overworld);
+	gb->cpu.ime = true; // ei
+	gb->cpu.ime_delay = 0;
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(NOWFunc_DayNightSpell, WaitAndPressNightButton) { day_night_set_button(gb, 60, 0x28, DAY_NIGHT_PRESSED_ATTR, true); }
+PORT_LOCAL_JUMP(NOWFunc_DayNightSpell, WaitNightButtonPress) { day_night_wait_press(gb, 0x06); }
+
+#define FORM_CASTLE_B74CB (ADDR_EOWFunc_FormCastle + 0x136) // .Func_b74cb
+#define FORM_CASTLE_DATA (ADDR_EOWFunc_FormCastle + 0x1bb) // .data
+
+// EOWFunc_FormCastle.asm_b750a
+static void form_castle_b750a(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWUIObj2YCoord + 1, 0);
+	SET_HL(gb, wOWUIObj2YCoord);
+	wr8(gb, wOWUIObj2YCoord, alu_inc(gb, rd8(gb, wOWUIObj2YCoord)));
+}
+
+// EOWFunc_FormCastle.Func_b7544: hl = .data + 2 * [wOWUIObj2Frame]
+static void form_castle_b7544(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wOWUIObj2Frame);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0;
+	SET_HL(gb, alu_add16(gb, FORM_CASTLE_DATA, REG_DE(gb)));
+}
+
+PORT_LOCAL(EOWFunc_FormCastle, Func_b74cb)
+{
+	SET_HL(gb, wOWUIObj2YCoord + 1);
+	gb->cpu.a = alu_and(gb, rd8(gb, wOWUIObj2YCoord), rd8(gb, wOWUIObj2YCoord));
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	wr8(gb, wOWUIObj2YCoord + 1, alu_inc(gb, rd8(gb, wOWUIObj2YCoord + 1)));
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) { // .asm_b74df
+		gb->cpu.a = BGPI_AUTOINC | (0 * PAL_SIZE);
+		wr8(gb, wPalConfig1Index + 0, gb->cpu.a);
+		wr8(gb, wPalConfig1Index + 1, 6);
+		wr8(gb, wPalConfig1Index + 2, (uint8_t)(wTempBGPals >> 8));
+		wr8(gb, wPalConfig1Index + 3, (uint8_t)wTempBGPals);
+		wr8(gb, wPalConfig2Index + 0, BGPI_AUTOINC | (0 * PAL_SIZE));
+		wr8(gb, wPalConfig2Index + 1, 6);
+		wr8(gb, wPalConfig2Index + 2, (uint8_t)(wTempPals1 >> 8));
+		gb->cpu.a = (uint8_t)wTempPals1;
+		wr8(gb, wPalConfig2Index + 3, gb->cpu.a);
+		SET_HL(gb, ADDR_Pals_84840);
+		SET_DE(gb, wTempBGPals);
+		gb->cpu.c = 6 * PAL_SIZE;
+		gb->cpu.b = BANK_Pals_84840;
+		CALL(CopyFarBytes);
+		form_castle_b750a(gb);
+		return;
+	}
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) { // .asm_b7511
+		form_castle_b7544(gb);
+		gb->cpu.b = rd8(gb, REG_HL(gb));
+		gb->cpu.a = rd8(gb, wOWUIObj2YCoord + 1);
+		alu_cp(gb, gb->cpu.a, gb->cpu.b);
+		if (gb->cpu.f & FLAG_C)
+			return;
+		gb->cpu.a = (uint8_t)rBGPI;
+		wr8(gb, wPalConfig1, gb->cpu.a);
+		SET_HL(gb, wPalConfig1 + 1);
+		form_castle_b750a(gb);
+		return;
+	}
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) { // .asm_b7522
+		form_castle_b7544(gb);
+		SET_HL(gb, REG_HL(gb) + 1);
+		gb->cpu.b = rd8(gb, REG_HL(gb));
+		gb->cpu.a = rd8(gb, wOWUIObj2YCoord + 1);
+		alu_cp(gb, gb->cpu.a, gb->cpu.b);
+		if (gb->cpu.f & FLAG_C)
+			return;
+		gb->cpu.a = (uint8_t)rBGPI;
+		wr8(gb, wPalConfig2, gb->cpu.a);
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wOWUIObj2YCoord + 1, 0);
+		SET_HL(gb, wOWUIObj2YCoord);
+		wr8(gb, wOWUIObj2YCoord, alu_dec(gb, rd8(gb, wOWUIObj2YCoord)));
+		return;
+	}
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) { // .asm_b7539
+		gb->cpu.a = (uint8_t)rBGPI;
+		wr8(gb, wPalConfig2, gb->cpu.a);
+		SET_HL(gb, wPalConfig2 + 1);
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wOWUIObj2YCoord, 0);
+	}
+}
+
+PORT_JUMP(EOWFunc_FormCastle)
+{
+	gb_call(gb, FORM_CASTLE_B74CB);
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, ADDR_EOWFunc_FormCastle + 7));
+}
+
+// EOWFunc_FormCastle.asm_b7410 (called and jumped to)
+static void form_castle_b7410(GB *gb)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wOWFuncCounter), 0x03);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	SET_HL(gb, wOWUIObj2Frame);
+	wr8(gb, wOWUIObj2Frame, alu_inc(gb, rd8(gb, wOWUIObj2Frame)));
+}
+
+// ld a, [wOWFuncCounter] / cp n / ret c / ld hl, data / call Func_b5868 /
+// jp AdvanceOWFunc
+static void form_castle_b5868(GB *gb, uint8_t n, uint16_t data)
+{
+	gb->cpu.a = rd8(gb, wOWFuncCounter);
+	alu_cp(gb, gb->cpu.a, n);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	SET_HL(gb, data);
+	gb_call(gb, ADDR_Func_b5868);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+static void set_state_advance(GB *gb, uint8_t state, uint16_t obj_state)
+{
+	gb->cpu.a = state;
+	SET_HL(gb, obj_state);
+	CALL(SetSceneObjState);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b73c4) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b73c9) { wait_ow_func(gb, 40); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b73ce) { set_obj_state_sfx_advance(gb, 0x10, wSceneObj1State, SFX_12E); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b73e1) { wait_ow_func(gb, 40); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b73e6)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d121, 0x01);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b73ee)
+{
+	// .Func_b741b
+	gb->cpu.a = alu_and(gb, rd8(gb, wOWFuncCounter), 0x03);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		SET_DE(gb, ADDR_Data_b64cd);
+		SET_HL(gb, wSceneObj1YCoord);
+		CALL(ApplyOWMovement);
+	}
+	gb->cpu.a = rd8(gb, wSceneObj1Unk7);
+	alu_cp(gb, gb->cpu.a, 0x30);
+	if (gb->cpu.f & FLAG_Z) { // .asm_b7404
+		gb->cpu.a = alu_and(gb, rd8(gb, wOWFuncCounter), 0x03);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			gb->cpu.a = 0x01;
+			wr8(gb, wOWUIObj2YCoord, 0x01);
+		}
+		RET();
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x50);
+	if (gb->cpu.f & FLAG_Z) {
+		form_castle_b7410(gb);
+		RET();
+		return;
+	}
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	form_castle_b7410(gb);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b742b) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b7430) { set_state_advance(gb, 0x11, wSceneObj1State); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b743b) { form_castle_b5868(gb, 0x28, ADDR_Data_85b3d); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b744a) { form_castle_b5868(gb, 0x05, ADDR_Data_85b2c); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b7459) { form_castle_b5868(gb, 0x05, ADDR_Data_85b1b); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b7468) { form_castle_b5868(gb, 0x05, ADDR_Data_85b0a); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b7477) { form_castle_b5868(gb, 0x05, ADDR_Data_85afd); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b7486) { form_castle_b5868(gb, 0x05, ADDR_Data_85af4); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b7495) { set_state_advance(gb, 0x12, wSceneObj7State); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b74a0) { wait_ow_func(gb, 10); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b74a5) { set_state_advance(gb, 0x00, wSceneObj1State); }
+PORT_LOCAL_JUMP(EOWFunc_FormCastle, Func_b74b0)
+{
+	gb->cpu.a = rd8(gb, wOWFuncCounter);
+	alu_cp(gb, gb->cpu.a, 0x0a);
+	bool dec = gb->cpu.f & FLAG_Z;
+	if (!dec) {
+		alu_cp(gb, gb->cpu.a, 0x14);
+		dec = gb->cpu.f & FLAG_Z;
+	}
+	if (dec) { // .asm_b74c6
+		SET_HL(gb, wOWUIObj2Frame);
+		wr8(gb, wOWUIObj2Frame, alu_dec(gb, rd8(gb, wOWUIObj2Frame)));
+		RET();
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x21);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x04;
+	wr8(gb, wOWUIObj2YCoord, 0x04);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
