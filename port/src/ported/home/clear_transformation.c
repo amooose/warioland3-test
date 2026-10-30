@@ -1,14 +1,49 @@
 // Port of src/home/clear_transformation.asm
 #include "ported.h"
 
-// ClearTransformationValues.RestoreBlindPalettes, which waits for H-Blank and
-// stays in asm. Local labels aren't exported: it follows the 46 bytes of
-// ClearTransformationValues.
-#define ADDR_RestoreBlindPalettes (ADDR_ClearTransformationValues + 0x2e)
-
 PORT(PlayRecoverySFX)
 {
 	play_sfx(gb, SFX_RECOVERY);
+}
+
+// Copies b palettes from hl to the palette data port c, one palette per
+// H-Blank (wait_not_hblank / wait_hblank).
+static void copy_pals_hblank(GB *gb, uint16_t hl)
+{
+	do {
+		while (!(gb->cpu.a = alu_and(gb, rd8(gb, rSTAT), STAT_MODE)))
+			idle(gb, 32);
+		while ((gb->cpu.a = alu_and(gb, rd8(gb, rSTAT), STAT_MODE)))
+			idle(gb, 32);
+		for (int i = 0; i < PAL_SIZE; i++) {
+			gb->cpu.a = rd8(gb, hl++);
+			wr8(gb, (uint16_t)(0xff00 + gb->cpu.c), gb->cpu.a);
+		}
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (gb->cpu.b);
+	SET_HL(gb, hl);
+}
+
+// .RestoreBlindPalettes: restores the palettes after recovering from the
+// Blind transformation
+static void restore_blind_palettes(GB *gb)
+{
+	gb->cpu.a = BGPI_AUTOINC | 0;
+	wr8(gb, rBGPI, gb->cpu.a);
+	gb->cpu.b = 8;
+	gb->cpu.c = (uint8_t)rBGPD;
+	copy_pals_hblank(gb, wTempPals1);
+
+	gb->cpu.a = OBPI_AUTOINC | (3 * PAL_SIZE);
+	wr8(gb, rOBPI, gb->cpu.a);
+	gb->cpu.b = 4;
+	gb->cpu.c = (uint8_t)rOBPD;
+	copy_pals_hblank(gb, (uint16_t)(wTempPals2 + 3 * PAL_SIZE));
+}
+
+PORT_LOCAL(ClearTransformationValues, RestoreBlindPalettes)
+{
+	restore_blind_palettes(gb);
 }
 
 PORT(ClearTransformationValues)
@@ -16,7 +51,7 @@ PORT(ClearTransformationValues)
 	gb->cpu.a = rd8(gb, wTransformation);
 	alu_cp(gb, gb->cpu.a, TRANSFORMATION_BLIND);
 	if (gb->cpu.f & FLAG_Z)
-		gb_call(gb, ADDR_RestoreBlindPalettes);
+		restore_blind_palettes(gb);
 
 	gb->cpu.a = 0;
 	gb->cpu.f = FLAG_Z;

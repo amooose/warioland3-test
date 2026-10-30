@@ -237,9 +237,123 @@ PORT_LOCAL(ZombieFunc, Init)
 	wr8(gb, wCurObjFrame, A);
 }
 
-// .OnUnderground stays in asm: the collision routines it calls (bank 6,
-// Func_19b51 at $5b51...) run at addresses inside its own body, which the
-// fuzzer takes for a wrong-bank run, so no check of it is conclusive.
+// The position 4 pixels up and dx pixels to the side into hYPos / hXPos
+// (dx < 0: sub / sbc, else add / adc).
+static void zb_ahead_pos_to_h(GB *gb, int dx)
+{
+	ld_hl(gb, wCurObjYPos);
+	A = alu_sub(gb, rd_hli(gb), 4);
+	wr8(gb, hYPosLo, A);
+	A = alu_sbc(gb, rd_hli(gb), 0);
+	wr8(gb, hYPosHi, A);
+	if (dx < 0) {
+		A = alu_sub(gb, rd_hli(gb), (uint8_t)-dx);
+		wr8(gb, hXPosLo, A);
+		A = alu_sbc(gb, rd_hli(gb), 0);
+	} else {
+		A = alu_add(gb, rd_hli(gb), (uint8_t)dx);
+		wr8(gb, hXPosLo, A);
+		A = alu_adc(gb, rd_hli(gb), 0);
+	}
+	wr8(gb, hXPosHi, A);
+}
+
+// Underground: walks along (turning at walls and ledges) until Wario comes
+// near, then starts rising. The collision routines it calls run in bank 6
+// at addresses inside this body (Func_19b51 at $5b51...).
+PORT_LOCAL(ZombieFunc, OnUnderground)
+{
+	zb_no_actions(gb);
+	A = 2;
+	wr8(gb, wCurObjFrameDuration, A);
+	obj_pos_to_hpos(gb);
+	gb_call_ret(gb, ADDR_Func_3543, ZB(0x6b));
+	if (!alu_and(gb, A, A)) {
+		xor_a(gb);
+		wr8(gb, wCurObjFlags, A);
+		return;
+	}
+	// .asm_45b27
+	ld_hl(gb, wCurObjXPos);
+	A = alu_rlca(gb, rd8(gb, wCurObjSubState));
+	bool blocked;
+	if (!CF) {
+		A = alu_sub(gb, alu_and(gb, rd_hl(gb), 0x0f), 4);
+		blocked = false;
+		if (CF) {
+			gb_call_ret(gb, ADDR_ProcessBlockOnLeft, ZB(0x86));
+			blocked = !(A = alu_and(gb, A, 0x0f));
+		}
+		if (!blocked) {
+			// .asm_45b3f
+			zb_ahead_pos_to_h(gb, -4);
+			gb_call_ret(gb, ADDR_Func_3513, ZB(0xa5));
+			blocked = alu_and(gb, A, A) != 0;
+			if (!blocked)
+				gb_call_ret(gb, ADDR_MoveObjectLeft, ZB(0xab));
+		}
+	} else {
+		// .asm_45b69
+		A = alu_add(gb, alu_and(gb, rd_hl(gb), 0x0f), 3);
+		alu_cp(gb, A, 16);
+		blocked = false;
+		if (!CF) {
+			gb_call_ret(gb, ADDR_ProcessBlockOnRight, ZB(0xc1));
+			blocked = !(A = alu_and(gb, A, 0x0f));
+		}
+		if (!blocked) {
+			// .asm_45b79
+			zb_ahead_pos_to_h(gb, 3);
+			gb_call_ret(gb, ADDR_Func_3513, ZB(0xdf));
+			blocked = alu_and(gb, A, A) != 0;
+			if (!blocked)
+				gb_call_ret(gb, ADDR_MoveObjectRight, ZB(0xe5));
+		}
+	}
+	if (blocked) {
+		// .asm_45b61
+		ld_hl(gb, wCurObjSubState);
+		A = alu_xor(gb, rd_hl(gb), OBJSUBFLAG_HDIR);
+		wr_hl(gb, A);
+		return;
+	}
+	// .asm_45b99
+	ld_hl(gb, wCurObjStateDuration);
+	A = rd_hl(gb);
+	if (alu_and(gb, A, A)) {
+		dec_mhl(gb);
+		return;
+	}
+	// .asm_45ba2
+	gb->cpu.c = 0x2a;
+	zb_diff(gb, wWarioScreenYPos, wCurObjScreenYPos);
+	alu_cp(gb, A, 24);
+	if (!CF) {
+		alu_cp(gb, A, (uint8_t)-24);
+		if (CF)
+			return;
+	}
+	// .in_y_range
+	zb_diff(gb, wWarioScreenXPos, wCurObjScreenXPos);
+	alu_cp(gb, A, (uint8_t)-32);
+	if (!CF)
+		return;
+	alu_cp(gb, A, 32);
+	if (CF)
+		return;
+	alu_cp(gb, A, (uint8_t)-64);
+	if (CF) {
+		alu_cp(gb, A, 64);
+		if (!CF)
+			return;
+	}
+	// .in_x_range
+	ld_hl(gb, wCurObjUpdateFunction + 1);
+	A = (uint8_t)(ZB_START_RISE >> 8); wr_hld(gb, A);
+	A = (uint8_t)ZB_START_RISE; wr_hld(gb, A);
+	A = 20;
+	wr8(gb, wCurObjStateDuration, A);
+}
 
 PORT_LOCAL(ZombieFunc, StartRise)
 {
