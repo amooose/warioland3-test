@@ -229,6 +229,49 @@ PORT(VBlank_1fb6b7)
 	CALL(CopyHLToDE);
 }
 
+// VBlank_1fb6b7.Func, as copied to wVBlankFunc (see ram_code.c). Its call
+// returns to base + n, the block's start wherever it runs from.
+PORT_LOCAL_JUMP(VBlank_1fb6b7, Func)
+{
+	uint16_t base = gb->cpu.pc;
+	gb->cpu.a = rd8(gb, wIsDMATransferPending);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		uint16_t hl = wPendingDMASourceBank;
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, rROMB0 + 0x100, gb->cpu.a);
+		gb->cpu.c = (uint8_t)rVDMA_SRC_HIGH;
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, (uint16_t)(0xff00 | gb->cpu.c), gb->cpu.a);
+		gb->cpu.c = alu_inc(gb, gb->cpu.c);
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, (uint16_t)(0xff00 | gb->cpu.c), gb->cpu.a);
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, rVBK, gb->cpu.a);
+		gb->cpu.c = alu_inc(gb, gb->cpu.c);
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, (uint16_t)(0xff00 | gb->cpu.c), gb->cpu.a);
+		gb->cpu.c = alu_inc(gb, gb->cpu.c);
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, (uint16_t)(0xff00 | gb->cpu.c), gb->cpu.a);
+		gb->cpu.c = alu_inc(gb, gb->cpu.c);
+		gb->cpu.a = rd8(gb, hl);
+		wr8(gb, (uint16_t)(0xff00 | gb->cpu.c), gb->cpu.a);
+		SET_HL(gb, hl);
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wIsDMATransferPending, gb->cpu.a);
+	}
+	// .not_pending
+	gb->cpu.a = rd8(gb, wSCY);
+	wr8(gb, rSCY, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wSCX);
+	wr8(gb, rSCX, gb->cpu.a);
+	gb->cpu.a = (uint8_t)(wVirtualOAM >> 8);
+	gb_call_ret(gb, hTransferVirtualOAM, (uint16_t)(base + 0x33));
+	RET();
+}
+
 // Flashes an input prompt: alternately clears it and shows it, every 4
 // frames, then moves on to the next state after 7 flashes.
 static void flash_input(GB *gb, uint16_t obj, uint16_t clear_fs, uint16_t show_fs)
