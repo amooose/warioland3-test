@@ -1342,3 +1342,436 @@ PORT(Func_9f323)
 	SET_BC(gb, wSceneObj2State);
 	scene_obj_anim_sprite(gb, ADDR_Func_9f323 + 0x1b, ADDR_OAM_bdabc);
 }
+
+// ---- InitCutsceneNN ----
+
+// ld b, BANK(pals) / ld hl, pals / call LoadFarPalsToTempPals1 (or 2)
+#define PALS1(p) do { gb->cpu.b = BANK_##p; SET_HL(gb, ADDR_##p); CALL(LoadFarPalsToTempPals1); } while (0)
+#define PALS2(p) do { gb->cpu.b = BANK_##p; SET_HL(gb, ADDR_##p); CALL(LoadFarPalsToTempPals2); } while (0)
+// ld b, BANK(tiles) / ld hl, tiles / call LoadFarTiles
+#define FAR_TILES(t) do { gb->cpu.b = BANK_##t; SET_HL(gb, ADDR_##t); CALL(LoadFarTiles); } while (0)
+// the same into VRAM bank 1
+#define FAR_TILES1(t) do { \
+	gb->cpu.a = 1; wr8(gb, rVBK, 1); \
+	FAR_TILES(t); \
+	gb->cpu.a = 0; gb->cpu.f = FLAG_Z; wr8(gb, rVBK, 0); \
+} while (0)
+// decompress_attrmap / decompress_tilemap
+#define ATTRMAP(m, dest) decompress_tiles1(gb, BANK_##m, ADDR_##m, dest)
+#define TILEMAP(m, dest) decompress_tiles0(gb, BANK_##m, ADDR_##m, dest)
+
+static void lcdc_flip_bg_map(GB *gb)
+{
+	gb->cpu.a = LCDC_BG_MAP;
+	wr8(gb, wLCDCFlagsToFlip, gb->cpu.a);
+}
+
+PORT_JUMP(InitCutscene06)
+{
+	gb_call(gb, ADDR_LoadCutscenes3Gfx);
+	ATTRMAP(Cutscene08Attrmap, v1BGMap0);
+	TILEMAP(Cutscene08Tilemap, v0BGMap0);
+	PALS1(Pals_b8080);
+	PALS2(Pals_b8900);
+	JUMP_TO(ADDR_Func_9d01a);
+}
+
+PORT_JUMP(InitCutscene07)
+{
+	gb_call(gb, ADDR_LoadCutscenes1Gfx_Vram0);
+	ATTRMAP(Cutscene06Attrmap, v1BGMap0);
+	TILEMAP(Cutscene06Tilemap, v0BGMap0);
+	PALS1(Pals_b8000);
+	PALS2(Pals_b89c0);
+	JUMP_TO(ADDR_Func_9d158);
+}
+
+// hl = pals for TempPals2
+PORT_JUMP(Func_9c25f)
+{
+	gb->cpu.b = BANK_Pals_b8ac0;
+	CALL(LoadFarPalsToTempPals2);
+	SET_HL(gb, ADDR_Pals_b8200);
+	gb->cpu.b = BANK_Pals_b8200;
+	CALL(LoadFarPalsToTempPals1);
+	lcdc_flip_bg_map(gb);
+	gb_call(gb, ADDR_LoadCutscenes2Gfx);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps01);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps04);
+}
+
+static void func_9c25f(GB *gb, uint16_t pals)
+{
+	SET_HL(gb, pals);
+	JUMP_TO(ADDR_Func_9c25f);
+}
+
+PORT_JUMP(InitCutscene08) { func_9c25f(gb, ADDR_Pals_b8ac0); }
+PORT_JUMP(InitCutscene10) { func_9c25f(gb, ADDR_Pals_b8b00); }
+PORT_JUMP(InitCutscene1d) { func_9c25f(gb, ADDR_Pals_b8b80); }
+PORT_JUMP(InitCutscene17) { func_9c25f(gb, ADDR_Pals_b8b40); }
+PORT_JUMP(InitCutscene25) { func_9c25f(gb, ADDR_Pals_b8bc0); }
+
+PORT_JUMP(InitCutscene09)
+{
+	PALS1(Pals_b8200);
+	PALS2(Pals_b8a80);
+	gb_call(gb, ADDR_LoadCutscenes2Gfx);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps03);
+}
+
+PORT_JUMP(InitCutscene0a)
+{
+	PALS1(Pals_b8040);
+	PALS2(Pals_b8a00);
+	gb_call(gb, ADDR_LoadCutscenes1Gfx_Vram0);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps03);
+	JUMP_TO(ADDR_Func_9d0e6);
+}
+
+PORT_JUMP(InitCutscene0c)
+{
+	PALS1(Pals_b8040);
+	PALS2(Pals_b8d40);
+	gb_call(gb, ADDR_LoadCutscenes4Gfx);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps03);
+}
+
+PORT_JUMP(InitCutscene0d)
+{
+	PALS1(Pals_b8040);
+	PALS2(Pals_b8dc0);
+	gb_call(gb, ADDR_LoadCutscenes4Gfx);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps01);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps02);
+}
+
+PORT_JUMP(InitCutscene0e)
+{
+	PALS1(Pals_b8200);
+	PALS2(Pals_b8980);
+	gb_call(gb, ADDR_LoadCutscenes1Gfx_Vram0);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps03);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps21);
+}
+
+PORT_JUMP(InitCutscene11)
+{
+	PALS1(Pals_b8040);
+	PALS2(Pals_b8c40);
+	gb_call(gb, ADDR_LoadCutscenes1Gfx_Vram0);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps03);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps21);
+}
+
+PORT_JUMP(InitCutscene13)
+{
+	PALS1(Pals_b8040);
+	PALS2(Pals_b8e00);
+	lcdc_flip_bg_map(gb);
+	gb_call(gb, ADDR_LoadCutscenes4Gfx);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps05);
+}
+
+PORT_JUMP(InitCutscene14)
+{
+	PALS1(Pals_b8200);
+	PALS2(Pals_b8a40);
+	lcdc_flip_bg_map(gb);
+	gb_call(gb, ADDR_LoadCutscenes2Gfx);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps01);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps05);
+}
+
+PORT_JUMP(InitCutscene15)
+{
+	PALS1(Pals_b81c0);
+	PALS2(Pals_b8e80);
+	// .asm_9c367
+	gb->cpu.a = LCDC_WINDOW;
+	wr8(gb, wLCDCFlagsToFlip, gb->cpu.a);
+	gb->cpu.a = 0x28;
+	wr8(gb, rWY, gb->cpu.a);
+	wr8(gb, wCutsceneWY, gb->cpu.a);
+	gb->cpu.a = 80 + WX_OFS;
+	wr8(gb, rWX, gb->cpu.a);
+	wr8(gb, wCutsceneWX, gb->cpu.a);
+	gb_call(gb, ADDR_LoadCutscenes2Gfx);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps14);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps13);
+	JUMP_TO(ADDR_Func_9da0e);
+}
+
+PORT_JUMP(InitCutscene19)
+{
+	PALS1(Pals_b8140);
+	PALS2(Pals_b8940);
+	gb_call(gb, ADDR_LoadCutscenes4Gfx);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps12);
+}
+
+PORT_JUMP(InitCutscene1b)
+{
+	gb_call(gb, ADDR_LoadCutscenes4Gfx);
+	decompress_tiles1(gb, BANK_OwlGfx, ADDR_OwlGfx, v1Tiles0);
+	FAR_TILES1(LevelMainTiles28);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps03);
+	ATTRMAP(Cutscene33Attrmap, v1BGMap1);
+	TILEMAP(Cutscene33Tilemap, v0BGMap1);
+	PALS1(Pals_b8040);
+	PALS2(Pals_b8c80);
+	JUMP_TO(ADDR_SetBGPriorityOnTopRows_BGMap1);
+}
+
+PORT_JUMP(InitCutscene1e)
+{
+	PALS1(Pals_b80c0);
+	PALS2(Pals_b8cc0);
+	gb_call(gb, ADDR_LoadCutscenes3Gfx);
+	ATTRMAP(Cutscene09Attrmap, v1BGMap0);
+	TILEMAP(Cutscene09Tilemap, v0BGMap0);
+	JUMP_TO(ADDR_Func_9d536);
+}
+
+PORT_JUMP(InitCutscene22)
+{
+	gb_call(gb, ADDR_LoadCutscenes3Gfx);
+	ATTRMAP(Cutscene10Attrmap, v1BGMap0);
+	TILEMAP(Cutscene10Tilemap, v0BGMap0);
+	JUMP_TO(ADDR_ClearTempPals_Bank27);
+}
+
+PORT_JUMP(InitCutscene24)
+{
+	PALS1(Pals_b82c0);
+	PALS2(Pals_b82c0);
+	gb_call(gb, ADDR_LoadCutscenes8Gfx_Vram0);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps28);
+	FAR_TILES1(SpecialTiles0);
+	JUMP_TO(ADDR_Func_9db85);
+}
+
+PORT_JUMP(InitCutscene27)
+{
+	FAR_TILES(LevelMainTiles14);
+	FAR_TILES1(SpecialTiles1);
+	ATTRMAP(Cutscene11Attrmap, v1BGMap0);
+	TILEMAP(Cutscene11Tilemap, v0BGMap0);
+	SET_HL(gb, ADDR_Pals_cc5c0);
+	SET_DE(gb, wTempPals1);
+	gb->cpu.c = 8 * PAL_SIZE;
+	gb->cpu.b = BANK_Pals_cc5c0;
+	CALL(CopyFarBytes);
+	decompress_tiles1(gb, BANK_CartGfx, ADDR_CartGfx, v0Tiles1);
+	copy_bytes(gb, ADDR_InitCutscene27 + 0x91, wTempPals2 + 6 * PAL_SIZE, 1 * PAL_SIZE); // .palette
+	JUMP_TO(ADDR_Func_9d64b);
+}
+
+PORT_JUMP(InitCutscene18)
+{
+	PALS1(Pals_b8200);
+	PALS2(Pals_b8d80);
+	gb_call(gb, ADDR_LoadCutscenes1Gfx_Vram0);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps01);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps02);
+}
+
+PORT_JUMP(InitCutscene1f)
+{
+	PALS1(Pals_b8280);
+	PALS2(Pals_b8f00);
+	gb_call(gb, ADDR_Func_9c931);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps16);
+	gb_call(gb, ADDR_SetBGPriorityOnTopRows_Vram0);
+	gb_call(gb, ADDR_Func_9cc4f);
+	JUMP_TO(ADDR_Func_9dc6a);
+}
+
+PORT_JUMP(InitCutscene21)
+{
+	PALS1(Pals_b8300);
+	PALS2(Pals_b8300);
+	gb_call(gb, ADDR_Func_9c977);
+	FAR_TILES(LevelMainTiles22);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps31);
+}
+
+PORT_JUMP(InitCutscene37)
+{
+	PALS1(Pals_b8240);
+	PALS2(Pals_b8f40);
+	gb_call(gb, ADDR_LoadCutscenes4Gfx);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps12);
+}
+
+PORT_JUMP(InitCutscene38)
+{
+	PALS1(Pals_b8200);
+	PALS2(Pals_b8f80);
+	gb_call(gb, ADDR_Func_9c931);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps03);
+}
+
+PORT_JUMP(InitCutscene30)
+{
+	FAR_TILES(LevelMainTiles7);
+	gb_call(gb, ADDR_Func_9c977);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps26);
+	gb_call(gb, ADDR_ClearTempPals_Bank27);
+	JUMP_TO(ADDR_Func_9ded4);
+}
+
+PORT_JUMP(InitCutscene39)
+{
+	PALS1(Pals_b8380);
+	PALS2(Pals_b8fc0);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps15);
+}
+
+PORT_JUMP(InitCutscene3a)
+{
+	gb_call(gb, ADDR_ClearTempPals_Bank27);
+	gb_call(gb, ADDR_LoadCutscenes9Gfx_Vram1);
+	FAR_TILES(LevelMainTiles30);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps37);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps38);
+	JUMP_TO(ADDR_Func_9e018);
+}
+
+PORT_JUMP(InitCutscene3c)
+{
+	PALS1(Pals_b84c0);
+	PALS2(Pals_b84c0);
+	gb_call(gb, ADDR_Func_9c977);
+	FAR_TILES(LevelMainTiles31);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps23);
+	JUMP_TO(ADDR_SetBGPriorityOnTopRows_Vram1);
+}
+
+PORT_JUMP(InitCutscene43)
+{
+	PALS1(Pals_b8440);
+	PALS2(Pals_b8440);
+	FAR_TILES(LevelMainTiles36);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps20);
+}
+
+PORT_JUMP(InitCutscene54)
+{
+	gb_call(gb, ADDR_LoadCutscenes9Gfx_Vram1);
+	FAR_TILES(LevelMainTiles24);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps36);
+	gb_call(gb, ADDR_ClearTempPals_Bank27);
+	JUMP_TO(ADDR_Func_9e2b8);
+}
+
+PORT_JUMP(InitCutscene3d)
+{
+	PALS1(Pals_b8700);
+	PALS2(Pals_b9000);
+	gb_call(gb, ADDR_LoadCutscenes9Gfx_Vram0);
+	decompress_tiles1(gb, BANK_ParaGoomGfx, ADDR_ParaGoomGfx, v1Tiles0 + 0x40 * TILE_SIZE);
+	FAR_TILES1(LevelMainTiles30);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps34);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps35);
+}
+
+PORT_JUMP(InitCutscene4a)
+{
+	PALS1(Pals_b83c0);
+	PALS2(Pals_b9040);
+	gb_call(gb, ADDR_Func_9c937);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps17);
+	JUMP_TO(ADDR_Func_9e438);
+}
+
+PORT_JUMP(InitCutscene4c)
+{
+	gb_call(gb, ADDR_ClearTempPals_Bank27);
+	gb_call(gb, ADDR_LoadCutscenes8Gfx_Vram0);
+	decompress_tiles1(gb, BANK_FireGfx, ADDR_FireGfx, v1Tiles1);
+	gb_call(gb, ADDR_LoadLevelMainTiles29_Vram1);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps32);
+	JUMP_TO(ADDR_Func_9e4ae);
+}
+
+PORT_JUMP(InitCutscene4e)
+{
+	gb_call(gb, ADDR_ClearTempPals_Bank27);
+	gb_call(gb, ADDR_LoadCutscenes1Gfx_Vram1);
+	FAR_TILES(LevelMainTiles27);
+	JUMP_TO(ADDR_LoadCutsceneBGMaps30);
+}
+
+PORT_JUMP(InitCutscene4f)
+{
+	PALS1(Pals_b8480);
+	PALS2(Pals_b8480);
+	FAR_TILES(LevelMainTiles23);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps22);
+	JUMP_TO(ADDR_Func_9e5a1);
+}
+
+PORT_JUMP(InitCutscene51)
+{
+	PALS1(Pals_b8400);
+	PALS2(Pals_b8400);
+	gb_call(gb, ADDR_Func_9c931);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps18);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps19);
+	gb_call(gb, ADDR_SetBGPriorityOnTopRows_Vram0);
+	JUMP_TO(ADDR_Func_9e655);
+}
+
+PORT_JUMP(InitCutscene56)
+{
+	gb_call(gb, ADDR_ClearTempPals_Bank27);
+	FAR_TILES(LevelMainTiles11);
+	gb_call(gb, ADDR_Func_9c97d);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps24);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps25);
+	JUMP_TO(ADDR_Func_9e6ef);
+}
+
+PORT_JUMP(InitCutscene57)
+{
+	gb_call(gb, ADDR_ClearTempPals_Bank27);
+	gb_call(gb, ADDR_Func_9c937);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps29);
+	gb_call(gb, ADDR_SetBGPriorityOnTopRows_Vram0);
+	JUMP_TO(ADDR_Func_9e79a);
+}
+
+PORT_JUMP(InitCutscene58)
+{
+	gb_call(gb, ADDR_ClearTempPals_Bank27);
+	gb_call(gb, ADDR_LoadCutscenes9Gfx_Vram0);
+	decompress_tiles1(gb, BANK_WallCrackGfx, ADDR_WallCrackGfx, v1Tiles1);
+	gb_call(gb, ADDR_LoadLevelMainTiles29_Vram1);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps39);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps040);
+	JUMP_TO(ADDR_Func_9e855);
+}
+
+PORT_JUMP(InitCutscene55)
+{
+	gb_call(gb, ADDR_ClearTempPals_Bank27);
+	gb_call(gb, ADDR_LoadLevelMainTiles29_Vram0);
+	gb_call(gb, ADDR_LoadCutscenes7Gfx_Vram1);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps27);
+	JUMP_TO(ADDR_Func_9e91a);
+}
+
+PORT(InitCutscene44)
+{
+	lcdc_flip_bg_map(gb);
+	PALS1(Pals_b8200);
+	PALS2(Pals_b90c0);
+	gb_call(gb, ADDR_Func_9c931);
+	decompress_tiles1(gb, BANK_OctohonGfx, ADDR_OctohonGfx, v1Tiles1 + 0x40 * TILE_SIZE);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps01);
+	gb_call(gb, ADDR_LoadCutsceneBGMaps04);
+	gb_call(gb, ADDR_SetBGPriorityOnTopRows_BGMap1);
+	gb_call(gb, ADDR_SetBGPriorityOnTopRows_Vram0);
+	gb_call(gb, ADDR_Func_9cc4f);
+}
