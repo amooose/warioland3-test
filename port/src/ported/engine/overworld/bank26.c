@@ -467,3 +467,90 @@ PORT(GetLevelTimeAttackScore)
 	wr8(gb, REG_DE(gb), gb->cpu.a);
 	SET_HL(gb, hl);
 }
+
+PORT(Func_9aa59)
+{
+	SET_DE(gb, ADDR_OAM_9ac5d);
+	gb_call(gb, ADDR_Func_9a9f7);
+}
+
+PORT(Func_9aa56)
+{
+	gb_call(gb, ADDR_Func_9a9ec);
+	SET_DE(gb, ADDR_OAM_9ac5d); // fallthrough into Func_9aa59
+	gb_call(gb, ADDR_Func_9a9f7);
+}
+
+static void func_9aa56(GB *gb, uint16_t frameset)
+{
+	SET_DE(gb, frameset);
+	JUMP_TO(ADDR_Func_9aa56);
+}
+
+PORT_JUMP(Func_9aa6d) { func_9aa56(gb, ADDR_Frameset_9ace1); }
+PORT_JUMP(Func_9aa72) { func_9aa56(gb, ADDR_Frameset_9acea); }
+PORT_JUMP(Func_9aa77) { func_9aa56(gb, ADDR_Frameset_9acf3); }
+PORT_JUMP(Func_9aa7c) { func_9aa56(gb, ADDR_Frameset_9acfc); }
+
+PORT(AnimateTreasureCollection)
+{
+	static const uint16_t objs[10] = {
+		wSceneObj1State, wSceneObj2State, wSceneObj3State, wSceneObj4State, wSceneObj5State,
+		wSceneObj6State, wSceneObj7State, wSceneObj8State, wSceneObj9State, wSceneObj10State,
+	};
+	for (int i = 0; i < 10; i++) {
+		SET_BC(gb, objs[i]);
+		gb_call(gb, ADDR_AnimateTreasureCollection + 0x3d); // .Func_9aa4a
+	}
+}
+
+// ld a, [bc] / jumptable
+PORT_LOCAL_JUMP(AnimateTreasureCollection, Func_9aa4a)
+{
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	gb_push16(gb, ADDR_AnimateTreasureCollection + 0x3f); // rst JumpTable
+	uint16_t hl = gb_pop16(gb); // pop hl
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0;
+	hl = alu_add16(gb, hl, gb->cpu.e);
+	gb->cpu.a = rd8(gb, hl);
+	gb->cpu.h = rd8(gb, (uint16_t)(hl + 1));
+	gb->cpu.l = gb->cpu.a;
+	JUMP_TO(REG_HL(gb));
+}
+
+PORT_JUMP(Func_9aab5)
+{
+	gb->cpu.a = rd8(gb, wMapSideLevelID);
+	alu_cp(gb, gb->cpu.a, OW_EXITS);
+	if (!(gb->cpu.f & FLAG_C)) {
+		RET();
+		return;
+	}
+	gb_call(gb, ADDR_ClearTreasureData);
+	gb_call(gb, ADDR_Func_9aaf4);
+	gb_call(gb, ADDR_Func_9ab1c);
+	gb->cpu.a = rd8(gb, wGameModeFlags);
+	if (alu_bit(gb, gb->cpu.a, MODE_TIME_ATTACK_F)) {
+		JUMP_TO(ADDR_GetLevelTimeAttackScore);
+		return;
+	}
+	gb_call(gb, ADDR_LoadLevelTreasures);
+	gb_call(gb, ADDR_FillBottomBarTreasureIDs);
+	gb_call(gb, ADDR_WriteUncollectedBottomBarTreasureIDs);
+	gb_call(gb, ADDR_LoadTreasurePals);
+	gb_call(gb, ADDR_LoadTreasureTiles);
+	gb->cpu.a = (uint8_t)(wTileBuffer >> 8);
+	wr8(gb, wHDMASourceHi, gb->cpu.a);
+	gb->cpu.a = (uint8_t)wTileBuffer;
+	wr8(gb, wHDMASourceLo, gb->cpu.a);
+	gb->cpu.a = 0x09;
+	wr8(gb, wHDMADestHi, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wHDMADestLo, 0);
+	gb->cpu.a = 0x10 - 1; // $10 dma_tiles
+	wr8(gb, wHDMAMode, gb->cpu.a);
+	RET();
+}

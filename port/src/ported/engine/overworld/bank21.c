@@ -1238,3 +1238,159 @@ PORT_LOCAL_JUMP(DayNightTransition, NightToDayTable)
 	gb->cpu.a = rd8(gb, wOWPalTransitionState);
 	JUMP_TO(jumptable(gb, ADDR_DayNightTransition + 0x11e));
 }
+
+#define DNT_LOAD_BASE_AND_TARGET_PALS (ADDR_DayNightTransition + 0x2e)
+#define DNT_ADVANCE_TABLE (ADDR_DayNightTransition + 0x47)
+#define DNT_FADE_COLOURS (ADDR_DayNightTransition + 0x57)
+#define DNT_LOAD_PAL1 (ADDR_DayNightTransition + 0xdc)
+#define DNT_LOAD_PAL2 (ADDR_DayNightTransition + 0xf2)
+
+PORT_JUMP(Func_84b97)
+{
+	SET_HL(gb, wOWPalTransitionCounter);
+	wr8(gb, wOWPalTransitionCounter, alu_inc(gb, rd8(gb, wOWPalTransitionCounter)));
+	gb->cpu.a = rd8(gb, wOWPalTransitionState);
+	JUMP_TO(jumptable(gb, ADDR_Func_84b97 + 8));
+}
+
+PORT_LOCAL(Func_84b97, Func_84bad)
+{
+	gb_call(gb, DNT_LOAD_BASE_AND_TARGET_PALS);
+	gb->cpu.a = 0x03;
+	wr8(gb, w2d809, gb->cpu.a);
+}
+
+// waits until wOWPalTransitionCounter reaches n, then advances the table
+static void wait_then_advance(GB *gb, uint8_t n)
+{
+	gb->cpu.a = rd8(gb, wOWPalTransitionCounter);
+	alu_cp(gb, gb->cpu.a, n);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	JUMP_TO(DNT_ADVANCE_TABLE);
+}
+
+PORT_LOCAL_JUMP(Func_84b97, Func_84bb6) { wait_then_advance(gb, 0x04); }
+PORT_LOCAL_JUMP(Func_84b97, Func_84bcd) { wait_then_advance(gb, 0x06); }
+
+PORT_LOCAL(Func_84b97, Func_84bbf)
+{
+	gb_call(gb, DNT_FADE_COLOURS);
+	gb->cpu.a = rd8(gb, wDayNightTransistionSteps);
+	alu_cp(gb, gb->cpu.a, 0x0a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d809, 0);
+}
+
+PORT_LOCAL(Func_84b97, Func_84bd6)
+{
+	gb_call(gb, DNT_LOAD_PAL1);
+	gb->cpu.a = 0x02;
+	wr8(gb, w2d809, gb->cpu.a);
+	gb->cpu.a = 0x13;
+	SET_HL(gb, wSceneObj7State);
+	CALL(SetSceneObjState);
+}
+
+PORT_LOCAL(Func_84b97, Func_84be7)
+{
+	gb_call(gb, DNT_FADE_COLOURS);
+	gb->cpu.a = rd8(gb, wDayNightTransistionSteps);
+	alu_cp(gb, gb->cpu.a, 0x16);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = 0x03;
+	wr8(gb, w2d809, gb->cpu.a);
+}
+
+PORT_LOCAL(Func_84b97, Func_84bf6)
+{
+	gb->cpu.a = rd8(gb, wOWBarsState);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!gb->cpu.a)
+		wr8(gb, wDayNight, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d011, 0);
+	wr8(gb, w2d0e3, 0);
+	wr8(gb, wOWPalTransitionState, 0);
+	wr8(gb, wOWPalTransitionCounter, 0);
+}
+
+PORT_JUMP(Func_84c0d)
+{
+	SET_HL(gb, wOWPalTransitionCounter);
+	wr8(gb, wOWPalTransitionCounter, alu_inc(gb, rd8(gb, wOWPalTransitionCounter)));
+	gb->cpu.a = rd8(gb, wOWPalTransitionState);
+	JUMP_TO(jumptable(gb, ADDR_Func_84c0d + 8));
+}
+
+PORT_LOCAL_JUMP(Func_84c0d, Init)
+{
+	gb->cpu.ime = false; // di
+	gb_call(gb, ADDR_VBlank_OWPalTransition);
+	gb->cpu.ime = true; // ei
+	gb->cpu.ime_delay = 0;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	gb_call(gb, ADDR_LoadBaseAndTargetOWPals);
+	JUMP_TO(DNT_ADVANCE_TABLE);
+}
+
+PORT_LOCAL_JUMP(Func_84c0d, FadeColours) { JUMP_TO(DNT_FADE_COLOURS); }
+PORT_LOCAL_JUMP(Func_84c0d, LoadPal1) { JUMP_TO(DNT_LOAD_PAL1); }
+PORT_LOCAL_JUMP(Func_84c0d, LoadPal2) { JUMP_TO(DNT_LOAD_PAL2); }
+
+
+PORT_LOCAL(Func_84c0d, SwitchDayNight)
+{
+	gb->cpu.a = alu_xor(gb, rd8(gb, w2d011), 0x01);
+	wr8(gb, w2d011, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d0e3, 0);
+	wr8(gb, wOWPalTransitionState, 0);
+	wr8(gb, wOWPalTransitionCounter, 0);
+}
+
+// copies the tile at bc (and the one $a0 on) to de (and de - $300), for
+// count tiles; then moves both pointers on a row
+static void copy_ow_ui_tiles(GB *gb, uint16_t ptrs, uint16_t count)
+{
+	for (;;) {
+		uint16_t hl = ptrs;
+		gb->cpu.a = rd8(gb, hl++);
+		gb->cpu.e = gb->cpu.a;
+		gb->cpu.a = rd8(gb, hl++);
+		gb->cpu.d = gb->cpu.a;
+		gb->cpu.a = rd8(gb, hl++);
+		gb->cpu.c = gb->cpu.a;
+		gb->cpu.a = rd8(gb, hl++);
+		gb->cpu.b = gb->cpu.a;
+		gb->cpu.a = rd8(gb, REG_BC(gb));
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		hl = alu_add16(gb, 0xa0, REG_BC(gb));
+		gb->cpu.d = alu_dec(gb, gb->cpu.d);
+		gb->cpu.d = alu_dec(gb, gb->cpu.d);
+		gb->cpu.d = alu_dec(gb, gb->cpu.d);
+		gb->cpu.a = rd8(gb, hl);
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		SET_HL(gb, hl);
+		gb->cpu.a = alu_dec(gb, rd8(gb, count));
+		wr8(gb, count, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z)
+			return;
+		SET_DE(gb, ptrs);
+		gb_call(gb, ADDR_Func_85a91);
+		gb_call(gb, ADDR_Func_85a91);
+	}
+}
+
+PORT(Func_85a68) { copy_ow_ui_tiles(gb, wOWUIObj1Duration, wOWUIObj1Attributes); }
+PORT(Func_85aa2) { copy_ow_ui_tiles(gb, wOWUIObj2Duration, wOWUIObj2Attributes); }
+PORT(Func_85acb) { copy_ow_ui_tiles(gb, wd154, wd153); }

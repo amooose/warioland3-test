@@ -858,3 +858,83 @@ PORT(PrintBestTimes)
 			return;
 	}
 }
+
+PORT(_InitBestTimeList)
+{
+	CALL(DisableLCD);
+	CALL(FillBGMap0_With7f);
+	CALL(ClearVirtualOAM);
+
+	// play_music2 MUSIC_TREASURE_COLLECTION
+	gb->cpu.a = (uint8_t)(MUSIC_TREASURE_COLLECTION >> 8);
+	wr8(gb, hMusicIDBackup + 0, gb->cpu.a);
+	wr8(gb, hMusicID + 0, gb->cpu.a);
+	gb->cpu.a = (uint8_t)MUSIC_TREASURE_COLLECTION;
+	wr8(gb, hMusicIDBackup + 1, gb->cpu.a);
+	wr8(gb, hMusicID + 1, gb->cpu.a);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rSCX, 0);
+	wr8(gb, wSCX, 0);
+	gb->cpu.a = rd8(gb, wObj1SubState);
+	gb->cpu.a = alu_rra(gb, gb->cpu.a);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.a)
+		gb->cpu.a = 0x70;
+	wr8(gb, rSCY, gb->cpu.a);
+	wr8(gb, wSCY, gb->cpu.a);
+
+	gb->cpu.a = 0x02;
+	wr8(gb, rWBK, gb->cpu.a);
+	// .VBlank_158a14
+	SET_HL(gb, ADDR__InitBestTimeList + 0xb4); // .func
+	SET_DE(gb, wVBlankFunc);
+	gb->cpu.b = 0x16; // .func_end - .func
+	CALL(CopyHLToDE);
+	// .Func_158a09
+	SET_HL(gb, wCollectionRow);
+	SET_BC(gb, 0x800);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	CALL(WriteAToHL_BCTimes);
+
+	SET_HL(gb, ADDR_Pals_158b63);
+	CALL(LoadPalsToTempPals1);
+
+	// decompress_tiles0 BestTimeListGfx, v0Tiles1, $20
+	gb->cpu.a = BANK_BestTimeListGfx;
+	wr8(gb, wTempBank, gb->cpu.a);
+	SET_HL(gb, ADDR_BestTimeListGfx);
+	SET_BC(gb, v0Tiles1 + 0x20 * TILE_SIZE);
+	gb->cpu.a = rd8(gb, wTempBank);
+	wr8(gb, hCallFuncBank, gb->cpu.a);
+	HCALL(Decompress);
+	// decompress_attrmap BestTimeListAttrmap, v1BGMap0
+	gb->cpu.a = 1;
+	wr8(gb, rVBK, 1);
+	gb->cpu.a = BANK_BestTimeListAttrmap;
+	wr8(gb, wTempBank, gb->cpu.a);
+	SET_HL(gb, ADDR_BestTimeListAttrmap);
+	SET_BC(gb, v1BGMap0);
+	gb->cpu.a = rd8(gb, wTempBank);
+	wr8(gb, hCallFuncBank, gb->cpu.a);
+	HCALL(Decompress);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+	// decompress_tilemap BestTimeListTilemap, v0BGMap0
+	gb->cpu.a = BANK_BestTimeListTilemap;
+	wr8(gb, wTempBank, gb->cpu.a);
+	SET_HL(gb, ADDR_BestTimeListTilemap);
+	SET_BC(gb, v0BGMap0);
+	gb->cpu.a = rd8(gb, wTempBank);
+	wr8(gb, hCallFuncBank, gb->cpu.a);
+	HCALL(Decompress);
+
+	gb_call(gb, ADDR_PrintBestTimes);
+	gb->cpu.a = LCDC_BG_ON | LCDC_OBJ_ON | LCDC_ON;
+	wr8(gb, rLCDC, gb->cpu.a);
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}
