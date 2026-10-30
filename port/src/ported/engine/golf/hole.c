@@ -733,6 +733,8 @@ PORT(Compare16Bit)
 	SET_DE(gb, gb_pop16(gb));
 }
 
+static uint16_t jumptable(GB *gb, uint16_t table);
+
 PORT_JUMP(Func_1c9cf9)
 {
 	gb->cpu.a = rd8(gb, wGolfDisplayMode);
@@ -748,9 +750,8 @@ PORT_JUMP(Func_1c9cf9)
 	}
 	// .got_lcd_config
 	wr8(gb, wGolfLCDConfig, gb->cpu.a);
-	wr8(gb, rVBK, gb->cpu.a);
-	gb->cpu.a = (uint8_t)(wVirtualOAM >> 8);
-	JUMP_TO(hTransferVirtualOAM);
+	gb->cpu.a = rd8(gb, wGolfVBlankMode);
+	JUMP_TO(jumptable(gb, ADDR_Func_1c9cf9 + 0x1c));
 }
 
 // rst JumpTable, with the table at `table` (right after the rst). Leaves
@@ -2559,4 +2560,88 @@ PORT(PickAndLoadGolfHole)
 	wr8(gb, wGolfHoleHoleXPos + 0, gb->cpu.a);
 	gb->cpu.a = rd8(gb, w1db82 + 1);
 	wr8(gb, wGolfHoleHoleXPos + 1, gb->cpu.a);
+}
+
+#define GOLF_COURSE_PALS (ADDR_InitGolfHole + 0x8d) // .GolfCoursePals
+#define SET_UP_GOLF_HOLE (ADDR_InitGolfHole + 0x95) // .SetUpGolfHole
+
+PORT(InitGolfHole)
+{
+	CALL(DisableLCD);
+	CALL(ClearVirtualOAM);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wRoomAnimatedTilesEnabled, 0);
+
+	uint16_t hl = wGolfHoleRAMStart;
+	SET_BC(gb, wGolfRAMEnd - wGolfHoleRAMStart);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	do { // .loop
+		wr8(gb, hl++, gb->cpu.a);
+		gb->cpu.c = alu_dec(gb, gb->cpu.c);
+		if (gb->cpu.f & FLAG_Z)
+			gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (!(gb->cpu.f & FLAG_Z));
+
+	hl = GOLF_COURSE_PALS;
+	gb->cpu.a = rd8(gb, wGolfMenuOption);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a); // *2
+	gb->cpu.b = 0x00;
+	gb->cpu.c = gb->cpu.a;
+	hl = alu_add16(gb, hl, REG_BC(gb));
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.h = rd8(gb, hl);
+	gb->cpu.l = gb->cpu.a;
+	CALL(LoadPalsToTempPals1);
+	SET_HL(gb, ADDR_Pals_1ca18f);
+	CALL(LoadPalsToTempPals2);
+
+	gb->cpu.a = BANK_GolfGfx;
+	wr8(gb, wTempBank, gb->cpu.a);
+	gb->cpu.a = BANK_v1Tiles0; // BANK("VRAM1")
+	wr8(gb, rVBK, gb->cpu.a);
+	far_decompress(gb, ADDR_GolfFlagGfx, v1Tiles0);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+	far_decompress(gb, ADDR_GolfGfx, v0Tiles1);
+
+	gb->cpu.a = BANK_WarioIdleGfx;
+	wr8(gb, wTempBank, gb->cpu.a);
+	SET_HL(gb, ADDR_WarioIdleGfx);
+	SET_DE(gb, v0Tiles0);
+	SET_BC(gb, 0x80 * TILE_SIZE);
+	CALL(FarCopyHLToDE_BC2);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rSCY, 0);
+	wr8(gb, rSCX, 0);
+	wr8(gb, wSCY, 0);
+	wr8(gb, wSCX, 0);
+	wr8(gb, rWY, 0);
+	gb->cpu.a = 159 + WX_OFS;
+	wr8(gb, rWX, gb->cpu.a);
+	wr8(gb, wGolfWX, gb->cpu.a);
+
+	gb_call(gb, SET_UP_GOLF_HOLE);
+	gb_call(gb, ADDR_Func_1c9cf9);
+
+	play_music2(gb, MUSIC_GOLF);
+
+	// setting the LCDC here is unnecessary since we
+	// already set the correct configuration in Func_1c9cf9
+	gb->cpu.a = LCDC_DEFAULT;
+	wr8(gb, rLCDC, gb->cpu.a);
+
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}
+
+PORT_LOCAL_JUMP(InitGolfHole, SetUpGolfHole)
+{
+	gb_call(gb, ADDR_PickAndLoadGolfHole);
+	gb_call(gb, ADDR_ShowGolfHoleFlagAndPar);
+	JUMP_TO(ADDR_SetUpGolfHoleObjects);
 }

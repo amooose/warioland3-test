@@ -868,3 +868,32 @@ PORT_JUMP(InitMapSideForScene_East)
 	// .got_medallion
 	init_map_side_for_scene(gb, ADDR_LoadOverworld6Gfx, ADDR_Func_80b1b);
 }
+
+PORT_JUMP(InitOWScene)
+{
+	CALL(DisableLCD);
+	// stop_music2
+	gb->cpu.a = 0xff;
+	wr8(gb, hMusicIDBackup + 0, 0xff);
+	wr8(gb, hMusicID + 0, 0xff);
+	gb->cpu.a = 0x00;
+	wr8(gb, hMusicIDBackup + 1, 0x00);
+	wr8(gb, hMusicID + 1, 0x00);
+
+	gb_call(gb, ADDR_ClearOWWRAM);
+	gb_call(gb, ADDR_VBlank_OWScene);
+	CALL(ClearVirtualOAM);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d011, 0);
+	wr8(gb, w2d018, rd8(gb, w2d015));
+	wr8(gb, wTempUnlockableConnectionID, rd8(gb, wOWSceneActionParam));
+	wr8(gb, wTempOWSceneAction, rd8(gb, wOWSceneAction));
+	wr8(gb, wTempOWSceneParamsPtr + 0, rd8(gb, wOWSceneParamsPtr + 0));
+	wr8(gb, wTempOWSceneParamsPtr + 1, rd8(gb, wOWSceneParamsPtr + 1));
+
+	gb->cpu.a = rd8(gb, wOWSceneMapSide);
+	wr8(gb, wCurMapSide, gb->cpu.a);
+	JUMP_TO(init_jumptable(gb, ADDR_InitOWScene + 0x41));
+}
