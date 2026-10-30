@@ -1783,3 +1783,169 @@ PORT_JUMP(UpdateState_SplittingAirborne)
 	}
 	JUMP(TriggerDownwardsFloorTransition);
 }
+
+// ld a, [wWarioState] / sub $b0 / rst JumpTable (table after the rst)
+PORT_JUMP(UpdateWarioStates_Group4)
+{
+	gb->cpu.a = alu_sub(gb, rd8(gb, wWarioState), 0xb0);
+	gb_push16(gb, ADDR_UpdateWarioStates_Group4 + 6); // rst JumpTable
+	uint16_t hl = gb_pop16(gb);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0;
+	hl = alu_add16(gb, hl, gb->cpu.e);
+	gb->cpu.a = rd8(gb, hl);
+	gb->cpu.h = rd8(gb, (uint16_t)(hl + 1));
+	gb->cpu.l = gb->cpu.a;
+	JUMP_TO(REG_HL(gb));
+}
+
+PORT(SetState_BlindAirborne)
+{
+	xor_a(gb);
+	wr8(gb, wWarioSlopeInteraction, 0);
+	st(gb, wWarioState, WST_BLIND_AIRBORNE);
+	static const uint16_t zero[] = {wFrameDuration, wAnimationFrame, wWarioStateCounter,
+		wWarioStateCycles, wIsCrouching, wAttackCounter, 0};
+	clear(gb, zero);
+	load_gfx(gb, BANK_WarioAirborneGfx, ADDR_WarioAirborneGfx);
+	set_oam(gb, BANK_OAM_15955, ADDR_OAM_15955);
+	frameset_by_dir(gb, ADDR_Frameset_15f94, ADDR_Frameset_15f97);
+	anim(gb, OAM1);
+	if (!ld_and(gb, wIsOnSteppableObject))
+		return;
+	gb_call_ret(gb, ADDR_UpdateState_BlindAirborne, ADDR_SetState_BlindAirborne + 0x70);
+}
+
+PORT_JUMP(Func_1ed548)
+{
+	xor_a(gb);
+	wr8(gb, wJumpingUpwards, 0);
+	st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	st(gb, wJumpVelTable, JUMP_VEL_HIGH_JUMP);
+	LJUMP(SetState_BlindAirborne);
+}
+
+PORT_JUMP(Func_1ed558)
+{
+	play_sfx(gb, SFX_JUMP);
+	xor_a(gb);
+	wr8(gb, wJumpVelIndex, 0);
+	wr8(gb, wIsSmashAttacking, 0);
+	st(gb, wJumpingUpwards, TRUE);
+	st(gb, wJumpVelTable, JUMP_VEL_NORMAL);
+	LJUMP(SetState_BlindAirborne); // fallthrough
+}
+
+// UpdateState_BlindAirborne stays in asm: one synthetic fuzz variant on
+// yellowbelly takes a garbage path into the native Func_81055 (bank $20),
+// which then differs from the asm (see the batch report).
+
+PORT_JUMP(UpdateState_BlindIdling)
+{
+	port_farcall_ret(gb, OAM1, ADDR_UpdateWarioAnimation, ADDR_UpdateState_BlindIdling + 0x0f);
+	gb_call_ret(gb, ADDR_Func_1edf93, ADDR_UpdateState_BlindIdling + 0x12);
+	ld_cp(gb, wWarioState, WST_BLIND_IDLING);
+	if (!ZF) {
+		RET();
+		return;
+	}
+	FARCALL_RET(CheckCentreCollision, ADDR_UpdateState_BlindIdling + 0x27);
+	if (!b_and(gb)) {
+		LJUMP(Func_1ed548);
+		return;
+	}
+	RET();
+}
+
+PORT_JUMP(UpdateState_BlindWalking)
+{
+	FARCALL_RET(Func_19b25, ADDR_UpdateState_BlindWalking + 0x0f);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return;
+	}
+	port_farcall_ret(gb, OAM1, ADDR_UpdateWarioAnimation, ADDR_UpdateState_BlindWalking + 0x25);
+	FARCALL_RET(CheckFrontCollision, ADDR_UpdateState_BlindWalking + 0x34);
+	ld_cp(gb, wWarioState, WST_BLIND_WALKING);
+	if (!ZF) {
+		RET();
+		return;
+	}
+	if (b_and(gb)) {
+		JUMP(RecoverFromTransformation);
+		return;
+	}
+	gb_call_ret(gb, ADDR_Func_1edfa4, ADDR_UpdateState_BlindWalking + 0x42);
+	ld_cp(gb, wWarioState, WST_BLIND_WALKING);
+	if (!ZF) {
+		RET();
+		return;
+	}
+	FARCALL_RET(CheckCentreCollision, ADDR_UpdateState_BlindWalking + 0x57);
+	if (!b_and(gb)) {
+		LJUMP(Func_1ed548);
+		return;
+	}
+	update_pos_y(gb);
+	RET();
+}
+
+PORT_JUMP(UpdateState_BlindTurning)
+{
+	anim(gb, OAM1);
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		LJUMP(Func_1ed558);
+		return;
+	}
+	if (!anim_ended(gb)) {
+		RET();
+		return;
+	}
+	LJUMP(SetState_BlindWalking);
+}
+
+PORT_JUMP(Func_1edf93)
+{
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		LJUMP(Func_1ed558);
+		return;
+	}
+	if (ld_mask(gb, wJoypadDown, PAD_RIGHT | PAD_LEFT)) {
+		LJUMP(SetState_BlindWalking);
+		return;
+	}
+	RET();
+}
+
+PORT_JUMP(Func_1edfa4)
+{
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		LJUMP(Func_1ed558);
+		return;
+	}
+	uint8_t pad = ld(gb, wJoypadDown);
+	if (alu_bit(gb, pad, B_PAD_RIGHT)) {
+		if (!ld_and(gb, wDirection)) {
+			st(gb, wDirection, DIRECTION_RIGHT);
+			LJUMP(SetState_BlindTurning);
+			return;
+		}
+		FARCALL_RET(WalkIfPossible_Right, ADDR_Func_1edfa4 + 0x2b);
+	} else if (alu_bit(gb, pad, B_PAD_LEFT)) {
+		ld_cp(gb, wDirection, DIRECTION_LEFT);
+		if (!ZF) {
+			st(gb, wDirection, DIRECTION_LEFT);
+			LJUMP(SetState_BlindTurning);
+			return;
+		}
+		FARCALL_RET(WalkIfPossible_Left, ADDR_Func_1edfa4 + 0x56);
+	} else {
+		LJUMP(SetState_BlindIdling);
+		return;
+	}
+	ld_cp(gb, wWalkVelIndex, 0x10);
+	if (!CF)
+		st(gb, wWalkVelIndex, 0x0c);
+	RET();
+}
