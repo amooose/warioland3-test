@@ -4772,3 +4772,245 @@ PORT_LOCAL_JUMP(SOWFunc_CanyonThunder, Func_b6971)
 	wr8(gb, wPalConfig1TotalSteps, 0);
 	JUMP_TO(ADDR_AdvanceOWFunc);
 }
+
+#define FREEZE_SEA_B6F52 (ADDR_EOWFunc_FreezeSea + 0x93) // .Func_b6f52
+#define FREEZE_SEA_B6F77 (ADDR_EOWFunc_FreezeSea + 0xb8) // .Func_b6f77
+#define FREEZE_SEA_B6FAE (ADDR_EOWFunc_FreezeSea + 0xef) // .Func_b6fae
+#define FREEZE_SEA_B6FFE (ADDR_EOWFunc_FreezeSea + 0x13f) // .Func_b6ffe
+#define FREEZE_SEA_B7056 (ADDR_EOWFunc_FreezeSea + 0x197) // .Func_b7056
+#define FREEZE_SEA_DATA (ADDR_EOWFunc_FreezeSea + 0x1ef) // .data
+
+PORT_JUMP(EOWFunc_FreezeSea)
+{
+	gb_call(gb, FREEZE_SEA_B6F77);
+	gb_call(gb, FREEZE_SEA_B6FAE);
+	gb_call(gb, FREEZE_SEA_B7056);
+	gb_call(gb, FREEZE_SEA_B6FFE);
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, ADDR_EOWFunc_FreezeSea + 16));
+}
+
+PORT_LOCAL(EOWFunc_FreezeSea, Func_b6f52)
+{
+	SET_HL(gb, ADDR_Pals_84480 + 4 * PAL_SIZE);
+	SET_DE(gb, wTempPals1 + 4 * PAL_SIZE);
+	gb->cpu.c = 1 * PAL_SIZE;
+	gb->cpu.b = BANK_Pals_84480;
+	CALL(CopyFarBytes);
+	// .asm_b6f64
+	wr8(gb, wPalConfig1 + 0, (uint8_t)rBGPI);
+	wr8(gb, wPalConfig1 + 1, BGPI_AUTOINC | (4 * PAL_SIZE));
+	wr8(gb, wPalConfig1 + 2, 1);
+	wr8(gb, wPalConfig1 + 3, (uint8_t)((wTempPals1 + 4 * PAL_SIZE) >> 8));
+	gb->cpu.a = (uint8_t)(wTempPals1 + 4 * PAL_SIZE);
+	wr8(gb, wPalConfig1 + 4, gb->cpu.a);
+	SET_HL(gb, wPalConfig1 + 5);
+}
+
+PORT_LOCAL(EOWFunc_FreezeSea, Func_b6f77)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wSceneObj1Unk7), rd8(gb, wSceneObj1Unk7));
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) { // .asm_b6f83
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, w2d122, 0);
+		SET_HL(gb, wSceneObj1Unk7);
+		wr8(gb, wSceneObj1Unk7, alu_inc(gb, rd8(gb, wSceneObj1Unk7)));
+		return;
+	}
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	// .asm_b6f8c
+	SET_HL(gb, w2d122);
+	wr8(gb, w2d122, alu_inc(gb, rd8(gb, w2d122)));
+	gb->cpu.c = rd8(gb, w2d122);
+	SET_HL(gb, wSceneObj1XCoord);
+	wr8(gb, wSceneObj1XCoord, alu_inc(gb, rd8(gb, wSceneObj1XCoord)));
+	wr8(gb, wSceneObj1XCoord, alu_inc(gb, rd8(gb, wSceneObj1XCoord)));
+	gb->cpu.a = alu_add(gb, rd8(gb, wSceneObj1XCoord), 0x18);
+	alu_cp(gb, gb->cpu.a, 0xc0);
+	if (!(gb->cpu.f & FLAG_C)) { // .asm_b6fa9
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wSceneObj1Unk7, 0);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x78);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = alu_and(gb, gb->cpu.c, 0x03);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	SET_HL(gb, wSceneObj1YCoord);
+	wr8(gb, wSceneObj1YCoord, alu_dec(gb, rd8(gb, wSceneObj1YCoord)));
+}
+
+// The start of .Func_b6fae / .Func_b6ffe / .Func_b7056: steps the counter
+// at `counter` and reads the next entry of the list it points to (pointer
+// at counter + 1). Returns false if it returned, leaving hl at the entry's
+// second byte otherwise.
+static bool freeze_sea_next(GB *gb, uint16_t counter, uint16_t ptr_lo, uint16_t ptr_hi, uint16_t first)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, counter), rd8(gb, counter));
+	if (gb->cpu.f & FLAG_Z)
+		return false;
+	SET_HL(gb, counter);
+	wr8(gb, counter, alu_inc(gb, rd8(gb, counter)));
+	gb->cpu.a = rd8(gb, counter);
+	alu_cp(gb, gb->cpu.a, 0x05);
+	if (gb->cpu.f & FLAG_C)
+		return false;
+	gb->cpu.a = 0x01;
+	wr8(gb, counter, 0x01);
+	uint16_t hl = (uint16_t)(rd8(gb, ptr_lo) | (rd8(gb, ptr_lo + 1) << 8));
+	gb->cpu.a = rd8(gb, hl++);
+	SET_HL(gb, hl);
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, counter, 0);
+		return false;
+	}
+	(void)ptr_hi;
+	wr8(gb, first, gb->cpu.a);
+	return true;
+}
+
+PORT_LOCAL(EOWFunc_FreezeSea, Func_b6fae)
+{
+	if (!freeze_sea_next(gb, wOWUIObj1YCoord, wOWUIObj1XCoord, wOWUIObj1Frame, wOWUIObj1Attributes))
+		return;
+	uint16_t hl = REG_HL(gb);
+	static const uint16_t dest[] = {
+		wOWUIObj1Duration, wOWUIObj1FramesetOffset, wOWUIObj1State, wOWUIObj1Unk7,
+	};
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, dest[i], gb->cpu.a);
+	}
+	SET_HL(gb, hl);
+	gb->cpu.a = gb->cpu.l;
+	wr8(gb, wOWUIObj1XCoord, gb->cpu.a);
+	gb->cpu.a = gb->cpu.h;
+	wr8(gb, wOWUIObj1Frame, gb->cpu.a);
+	FARCALL(Func_85a68);
+	gb->cpu.a = TRUE;
+	wr8(gb, wOWPendingTileUpdate, TRUE);
+}
+
+// .Func_b6ffe / .Func_b7056 after freeze_sea_next
+static void freeze_sea_entry(GB *gb, const uint16_t *dest, uint16_t ptr_lo, uint16_t ptr_hi,
+	uint16_t offset, uint16_t out_lo, uint16_t out_hi)
+{
+	uint16_t hl = REG_HL(gb);
+	for (int i = 0; i < 2; i++) {
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, dest[i], gb->cpu.a);
+	}
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.d = gb->cpu.a;
+	SET_HL(gb, hl);
+	gb->cpu.a = gb->cpu.l;
+	wr8(gb, ptr_lo, gb->cpu.a);
+	gb->cpu.a = gb->cpu.h;
+	wr8(gb, ptr_hi, gb->cpu.a);
+	SET_HL(gb, alu_add16(gb, offset, REG_DE(gb)));
+	gb->cpu.a = gb->cpu.l;
+	wr8(gb, out_lo, gb->cpu.a);
+	gb->cpu.a = gb->cpu.h;
+	wr8(gb, out_hi, gb->cpu.a);
+}
+
+PORT_LOCAL(EOWFunc_FreezeSea, Func_b6ffe)
+{
+	if (!freeze_sea_next(gb, wOWUIObj2YCoord, wOWUIObj2XCoord, wOWUIObj2Frame, wOWUIObj2Attributes))
+		return;
+	static const uint16_t dest[] = {wOWUIObj2Duration, wOWUIObj2FramesetOffset};
+	freeze_sea_entry(gb, dest, wOWUIObj2XCoord, wOWUIObj2Frame, 0x140, wOWUIObj2State, wOWUIObj2Unk7);
+	FARCALL(Func_85aa2);
+	gb->cpu.a = TRUE;
+	wr8(gb, wOWPendingTileUpdate, TRUE);
+}
+
+PORT_LOCAL(EOWFunc_FreezeSea, Func_b7056)
+{
+	if (!freeze_sea_next(gb, w2d150, w2d151, wd152, wd153))
+		return;
+	static const uint16_t dest[] = {wd154, wd155};
+	freeze_sea_entry(gb, dest, w2d151, wd152, 0x280, wd156 + 0, wd156 + 1);
+	FARCALL(Func_85acb);
+	gb->cpu.a = TRUE;
+	wr8(gb, wOWPendingTileUpdate, TRUE);
+}
+
+// EOWFunc_FreezeSea.asm_b6f31
+static void freeze_sea_b6f31(GB *gb, uint16_t hl)
+{
+	SET_DE(gb, FREEZE_SEA_DATA);
+	wr8(gb, hl, gb->cpu.e);
+	gb->cpu.l = alu_inc(gb, (uint8_t)hl);
+	wr8(gb, REG_HL(gb), gb->cpu.d);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+// ld a, [wOWFuncCounter] / cp 4 / ret nz / ld a, 1 / ld [obj], a /
+// ld hl, obj + 1 / jr .asm_b6f31
+static void freeze_sea_start_obj(GB *gb, uint16_t obj)
+{
+	gb->cpu.a = rd8(gb, wOWFuncCounter);
+	alu_cp(gb, gb->cpu.a, 0x04);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x01;
+	wr8(gb, obj, 0x01);
+	SET_HL(gb, obj + 1);
+	freeze_sea_b6f31(gb, obj + 1);
+}
+
+PORT_LOCAL_JUMP(EOWFunc_FreezeSea, Func_b6ee5) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(EOWFunc_FreezeSea, Func_b6eea) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(EOWFunc_FreezeSea, Func_b6ef4)
+{
+	SET_HL(gb, ADDR_Data_85657);
+	gb_call(gb, ADDR_Func_b5868);
+	gb_call(gb, FREEZE_SEA_B6F52);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_FreezeSea, Func_b6f00)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d046, 0);
+	gb->cpu.a = 0x01;
+	wr8(gb, wSceneObj1Unk7, 0x01);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_FreezeSea, Func_b6f0c) { wait_ow_func(gb, 14); }
+PORT_LOCAL_JUMP(EOWFunc_FreezeSea, Func_b6f11)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d150, 0x01);
+	SET_HL(gb, w2d151);
+	play_sfx(gb, SFX_11C);
+	freeze_sea_b6f31(gb, w2d151);
+}
+PORT_LOCAL_JUMP(EOWFunc_FreezeSea, Func_b6f23) { freeze_sea_start_obj(gb, wOWUIObj1YCoord); }
+PORT_LOCAL_JUMP(EOWFunc_FreezeSea, Func_b6f3a) { freeze_sea_start_obj(gb, wOWUIObj2YCoord); }
+PORT_LOCAL_JUMP(EOWFunc_FreezeSea, Func_b6f4a)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wSceneObj1Unk7), rd8(gb, wSceneObj1Unk7));
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
