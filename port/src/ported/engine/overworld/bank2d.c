@@ -5020,3 +5020,524 @@ PORT_LOCAL_JUMP(EOWFunc_FreezeSea, Func_b6f4a)
 	}
 	JUMP_TO(ADDR_AdvanceOWFunc);
 }
+
+// WOWFunc_VulcanoEruption: hand-computed local offsets, checked against the ROM
+#define WOW_VULC (ADDR_WOWFunc_VulcanoEruption)
+#define WOW_VULC_B5F58 (WOW_VULC + 0x1f5)
+#define WOW_VULC_B5FB9 (WOW_VULC + 0x256)
+#define WOW_VULC_B601A (WOW_VULC + 0x2b7)
+
+PORT_JUMP(WOWFunc_VulcanoEruption)
+{
+	gb_call(gb, ADDR_Func_b71fc);
+	gb_call(gb, WOW_VULC_B5F58);
+	gb_call(gb, WOW_VULC_B5FB9);
+	gb_call(gb, WOW_VULC_B601A);
+	gb_call(gb, ADDR_Func_b6055);
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, WOW_VULC + 0x13));
+}
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Wait1) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5da7) { wait_ow_func(gb, 24); }
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5dd2) { wait_ow_func(gb, 58); }
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5f10) { wait_ow_func(gb, 16); }
+
+// ld a, $01 / ld [w2d049], a / ld a, $03 / ld hl, w2d03e / ld [hli], a /
+// xor a / ld [hli], a / ld [hli], a / jp AdvanceOWFunc
+static void vulc_shake_on(GB *gb)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d049, 0x01);
+	gb->cpu.a = 0x03;
+	set_2d03e(gb, 0x03);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5dac)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, wOWUIObj1YCoord, 0x01);
+	set_state(gb, 0x17, wSceneObj11State);
+	set_state(gb, 0x19, wSceneObj10State);
+	vulc_shake_on(gb);
+}
+
+// ld hl, wSceneObj11 / ld a, $10 / ld [hli], a / ld a, x / ld [hl], a
+static void vulc_obj11_pos(GB *gb, uint8_t x)
+{
+	gb->cpu.a = 0x10;
+	wr8(gb, wSceneObj11, 0x10);
+	gb->cpu.a = x;
+	wr8(gb, wSceneObj11 + 1, x);
+	SET_HL(gb, wSceneObj11 + 1);
+}
+
+// ld a, v / ld [hli], a for each of the n bytes in v
+static void write_bytes(GB *gb, uint16_t hl, const uint8_t *v, int n)
+{
+	for (int i = 0; i < n; i++) {
+		gb->cpu.a = v[i];
+		wr8(gb, hl++, v[i]);
+	}
+	SET_HL(gb, hl);
+}
+
+// sets wPalConfig1 / wPalConfig2 to copy one BG / OB pal from bg / ob
+static void vulc_pal_configs(GB *gb, uint16_t bg, uint16_t ob)
+{
+	const uint8_t c1[] = {(uint8_t)(rBGPI), BGPI_AUTOINC | 0, 1 * PAL_SIZE, (uint8_t)((bg) >> 8), (uint8_t)(bg)};
+	write_bytes(gb, wPalConfig1, c1, 5);
+	const uint8_t c2[] = {(uint8_t)(rOBPI), OBPI_AUTOINC | 0, 1 * PAL_SIZE, (uint8_t)((ob) >> 8), (uint8_t)(ob)};
+	write_bytes(gb, wPalConfig2, c2, 5);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5dd7)
+{
+	set_state(gb, 0x1f, wSceneObj11State);
+	vulc_obj11_pos(gb, 0x52);
+	const uint8_t c[] = {BGPI_AUTOINC | (5 * PAL_SIZE), 1, 0xc1, 0x28};
+	write_bytes(gb, wPalConfig1Index, c, 4);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5dfa)
+{
+	if (nonzero(gb, wSceneObj11State)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5e02)
+{
+	if (counter_below(gb, 6)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x04;
+	wr8(gb, wOWUIObj1YCoord, 0x04);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5e10)
+{
+	set_state(gb, 0x1a, wSceneObj10State);
+	gb->cpu.a = 0x0e;
+	set_2d03e(gb, 0x0e);
+	wr8(gb, w2d049, 0);
+
+	SET_HL(gb, wTempBGPals + 0 * PAL_SIZE);
+	gb->cpu.b = 3 * PAL_SIZE;
+	gb_call(gb, ADDR_Func_b69a6);
+
+	SET_HL(gb, wTempPals1 + 6 * PAL_SIZE);
+	SET_DE(gb, wTempBGPals + 6 * PAL_SIZE);
+	gb->cpu.b = 1 * PAL_SIZE;
+	CALL(CopyHLToDE);
+
+	SET_HL(gb, wTempBGPals + 7 * PAL_SIZE);
+	gb->cpu.b = 4;
+	gb_call(gb, ADDR_Func_b69a6);
+
+	SET_HL(gb, wTempOBPals + 0 * PAL_SIZE);
+	gb->cpu.b = 4 * PAL_SIZE;
+	gb_call(gb, ADDR_Func_b69a6);
+
+	vulc_pal_configs(gb, wTempBGPals, wTempOBPals);
+
+	gb->cpu.a = 0x01;
+	wr8(gb, wOWUIObj2Attributes, 0x01);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5e73)
+{
+	if (counter_below(gb, 8)) {
+		RET();
+		return;
+	}
+	set_state(gb, 0x1b, wSceneObj11State);
+	vulc_obj11_pos(gb, 0x54);
+	SET_HL(gb, ADDR_Data_85536);
+	gb_call(gb, ADDR_Func_b5868);
+	vulc_pal_configs(gb, wTempPals1, wTempPals2);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+// ld a, v / ld [addr], a / .asm_b5ebc: play_sfx SFX_TEMPLE_ROCK /
+// jp AdvanceOWFunc
+static void vulc_rock(GB *gb, uint16_t addr, uint8_t v)
+{
+	gb->cpu.a = v;
+	wr8(gb, addr, v);
+	sfx_advance(gb, SFX_TEMPLE_ROCK);
+}
+
+// ld a, [wOWFuncCounter] / cp n / ret c / then vulc_rock
+static void vulc_rock_after(GB *gb, uint8_t n, uint16_t addr, uint8_t v)
+{
+	if (counter_below(gb, n)) {
+		RET();
+		return;
+	}
+	vulc_rock(gb, addr, v);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5eb7) { vulc_rock(gb, w2d126, 0x03); }
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5ec7) { vulc_rock_after(gb, 12, w2d122, 0x03); }
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5ed4) { vulc_rock_after(gb, 36, w2d12c, 0x01); }
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5ee1) { vulc_rock_after(gb, 12, w2d126, 0x03); }
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5eee) { vulc_rock_after(gb, 20, w2d122, 0x03); }
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5efb) { vulc_rock_after(gb, 38, w2d126, 0x01); }
+
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5f08)
+{
+	if (nonzero(gb, w2d126)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5f15)
+{
+	gb->cpu.a = 0x08;
+	wr8(gb, wOWUIObj1YCoord, 0x08);
+	set_state(gb, 0x19, wSceneObj10State);
+	vulc_shake_on(gb);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5f33)
+{
+	gb->cpu.a = rd8(gb, wOWUIObj1Frame);
+	alu_cp(gb, gb->cpu.a, 0x1b);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	set_state(gb, 0x1a, wSceneObj10State);
+	shake_end(gb);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5f50)
+{
+	if (nonzero(gb, wOWUIObj1YCoord)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+// ld hl, addr / ld a, [hl] / and a / ret z / dec a / jumptable
+static void vulc_rocks_jumptable(GB *gb, uint16_t addr, uint16_t table)
+{
+	SET_HL(gb, addr);
+	gb->cpu.a = rd8(gb, addr);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	JUMP_TO(jumptable(gb, table));
+}
+
+// lb de, d, e / ld b, b / ld hl, obj / ld a, d / ld [hli], a / ld a, e /
+// ld [hli], a / set 2, l / ld a, b / call SetSceneObjState / xor a /
+// ld hl, ctr + 1 / ld [hld], a / inc [hl]
+static void vulc_rock_start(GB *gb, uint8_t d, uint8_t e, uint8_t b, uint16_t obj, uint16_t ctr)
+{
+	gb->cpu.d = d;
+	gb->cpu.e = e;
+	gb->cpu.b = b;
+	gb->cpu.a = d;
+	wr8(gb, obj, d);
+	gb->cpu.a = e;
+	wr8(gb, (uint16_t)(obj + 1), e);
+	SET_HL(gb, (uint16_t)((obj + 2) | (1 << 2)));
+	gb->cpu.a = b;
+	CALL(SetSceneObjState);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, (uint16_t)(ctr + 1), 0);
+	SET_HL(gb, ctr);
+	wr8(gb, ctr, alu_inc(gb, rd8(gb, ctr)));
+}
+
+// ld hl, x / (x_n times inc or dec [hl]) / dec l / (y_n times inc [hl]) /
+// ld a, [hl] / cp $88 / ret c / xor a / ld hl, ctr + 1 / ld [hld], a /
+// ld [hl], a
+static void vulc_rock_move(GB *gb, uint16_t x, int x_n, int y_n, uint16_t ctr)
+{
+	bump(gb, x, x_n);
+	uint16_t hl = (uint16_t)((x & 0xff00) | (uint8_t)(x - 1)); // dec l
+	bump(gb, hl, y_n);
+	gb->cpu.a = rd8(gb, hl);
+	alu_cp(gb, gb->cpu.a, 0x88);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, (uint16_t)(ctr + 1), 0);
+	wr8(gb, ctr, 0);
+	SET_HL(gb, ctr);
+}
+
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5f58)
+{
+	vulc_rocks_jumptable(gb, w2d122, WOW_VULC + 0x1fd);
+}
+PORT_LOCAL(WOWFunc_VulcanoEruption, Func_b5f70) { vulc_rock_start(gb, 8, 46, 0x1c, wSceneObj1, w2d122); }
+PORT_LOCAL(WOWFunc_VulcanoEruption, Func_b5f9c) { vulc_rock_start(gb, 8, 75, 0x1c, wSceneObj1, w2d122); }
+PORT_LOCAL(WOWFunc_VulcanoEruption, Func_b5fad) { vulc_rock_start(gb, 8, 46, 0x1f, wSceneObj1, w2d122); }
+PORT_LOCAL(WOWFunc_VulcanoEruption, Func_b5fb4) { vulc_rock_start(gb, 8, 75, 0x1f, wSceneObj1, w2d122); }
+PORT_LOCAL(WOWFunc_VulcanoEruption, Func_b5f89) { vulc_rock_move(gb, wSceneObj1XCoord, -2, 2, w2d122); }
+PORT_LOCAL(WOWFunc_VulcanoEruption, Func_b5fa1) { vulc_rock_move(gb, wSceneObj1XCoord, -2, 4, w2d122); }
+
+PORT_LOCAL_JUMP(WOWFunc_VulcanoEruption, Func_b5fb9)
+{
+	vulc_rocks_jumptable(gb, w2d126, WOW_VULC + 0x25e);
+}
+PORT_LOCAL(WOWFunc_VulcanoEruption, Func_b5fd1) { vulc_rock_start(gb, 8, 98, 0x1d, wSceneObj3YCoord, w2d126); }
+PORT_LOCAL(WOWFunc_VulcanoEruption, Func_b5ffd) { vulc_rock_start(gb, 8, 93, 0x1d, wSceneObj3YCoord, w2d126); }
+PORT_LOCAL(WOWFunc_VulcanoEruption, Func_b600e) { vulc_rock_start(gb, 8, 98, 0x20, wSceneObj3YCoord, w2d126); }
+PORT_LOCAL(WOWFunc_VulcanoEruption, Func_b6015) { vulc_rock_start(gb, 8, 93, 0x20, wSceneObj3YCoord, w2d126); }
+PORT_LOCAL(WOWFunc_VulcanoEruption, Func_b5fea) { vulc_rock_move(gb, wSceneObj3XCoord, 2, 2, w2d126); }
+PORT_LOCAL(WOWFunc_VulcanoEruption, Func_b6002) { vulc_rock_move(gb, wSceneObj3XCoord, 2, 4, w2d126); }
+
+PORT_LOCAL(WOWFunc_VulcanoEruption, Func_b601a)
+{
+	SET_HL(gb, w2d12c);
+	gb->cpu.a = rd8(gb, w2d12c);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) {
+		// .asm_b6027
+		gb->cpu.a = 0x08;
+		wr8(gb, wSceneObj6, 0x08);
+		gb->cpu.a = 0x2e;
+		wr8(gb, wSceneObj6 + 1, 0x2e);
+		set_state(gb, 0x1c, wSceneObj6State);
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, w2d12d, 0);
+		SET_HL(gb, w2d12c);
+		wr8(gb, w2d12c, alu_inc(gb, rd8(gb, w2d12c)));
+		return;
+	}
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	// .asm_b603f
+	bump(gb, wSceneObj6YCoord, 2);
+	gb->cpu.b = rd8(gb, wSceneObj6YCoord);
+	bump(gb, wSceneObj6XCoord, -2);
+	gb->cpu.a = gb->cpu.b;
+	alu_cp(gb, gb->cpu.a, 0x88);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d12d, 0);
+	wr8(gb, w2d12c, 0);
+	SET_HL(gb, w2d12c);
+}
+
+// EOWFunc_VulcanoEruption: hand-computed local offsets, checked against the ROM
+#define EOW_VULC (ADDR_EOWFunc_VulcanoEruption)
+
+PORT_JUMP(EOWFunc_VulcanoEruption)
+{
+	gb_call(gb, EOW_VULC + 0x1cc); // .Func_b774c
+	gb_call(gb, ADDR_Func_b71fc);
+	gb_call(gb, EOW_VULC + 0xad);  // .Func_b762d
+	gb_call(gb, EOW_VULC + 0xec);  // .Func_b766c
+	gb_call(gb, EOW_VULC + 0x129); // .Func_b76a9
+	gb_call(gb, EOW_VULC + 0x166); // .Func_b76e6
+	gb_call(gb, EOW_VULC + 0x199); // .Func_b7719
+	gb_call(gb, ADDR_Func_b6055);
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, EOW_VULC + 0x1c));
+}
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b75b6)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, wOWUIObj2Attributes, 0x01);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b75be) { wait_ow_func(gb, 180); }
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b75d8) { wait_ow_func(gb, 56); }
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b75c3)
+{
+	gb->cpu.a = 0x0a;
+	wr8(gb, wOWUIObj1YCoord, 0x0a);
+	gb->cpu.a = 0x01;
+	wr8(gb, wOWUIObj1State, 0x01);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b75d0)
+{
+	if (nonzero(gb, wOWUIObj1YCoord)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b75dd)
+{
+	play_sfx(gb, SFX_127);
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d134, 0x01);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+// ld a, [wOWFuncCounter] / cp n / ret c / ld a, $01 / ld [addr], a /
+// jp AdvanceOWFunc
+static void erupt_set_after(GB *gb, uint8_t n, uint16_t addr)
+{
+	if (counter_below(gb, n)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x01;
+	wr8(gb, addr, 0x01);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b75ed) { erupt_set_after(gb, 0x08, w2d13a); }
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b75fb) { erupt_set_after(gb, 0x3c, w2d13c); }
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b7609) { erupt_set_after(gb, 0x08, w2d138); }
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b7617) { erupt_set_after(gb, 0x08, w2d13e); }
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b7625)
+{
+	if (nonzero(gb, w2d13e)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+// ld hl, addr / ld a, [hli] / and a / ret z / inc [hl] / dec a / jumptable
+static void erupt_jumptable(GB *gb, uint16_t addr, uint16_t table)
+{
+	gb->cpu.a = rd8(gb, addr);
+	SET_HL(gb, (uint16_t)(addr + 1));
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	wr8(gb, (uint16_t)(addr + 1), alu_inc(gb, rd8(gb, (uint16_t)(addr + 1))));
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	JUMP_TO(jumptable(gb, table));
+}
+
+// ld hl, ctr / .asm_b7649: inc [hl] / inc l / xor a / ld [hl], a
+static void erupt_next(GB *gb, uint16_t ctr)
+{
+	wr8(gb, ctr, alu_inc(gb, rd8(gb, ctr)));
+	SET_HL(gb, (uint16_t)((ctr & 0xff00) | (uint8_t)(ctr + 1))); // inc l
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, REG_HL(gb), 0);
+}
+
+// ld a, state / ld hl, obj_state / call SetSceneObjState / then erupt_next
+static void erupt_start(GB *gb, uint8_t state, uint16_t obj_state, uint16_t ctr)
+{
+	set_state(gb, state, obj_state);
+	erupt_next(gb, ctr);
+}
+
+// ld a, [obj_state] / cp n / ret nz / then erupt_next
+static void erupt_wait_state(GB *gb, uint16_t obj_state, uint8_t n, uint16_t ctr)
+{
+	gb->cpu.a = rd8(gb, obj_state);
+	alu_cp(gb, gb->cpu.a, n);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	erupt_next(gb, ctr);
+}
+
+// ld a, $5a / ld hl, ctr + 1 / cp [hl] / ret nc / then erupt_next
+static void erupt_timer(GB *gb, uint16_t ctr)
+{
+	gb->cpu.a = 0x5a;
+	SET_HL(gb, (uint16_t)(ctr + 1));
+	alu_cp(gb, 0x5a, rd8(gb, (uint16_t)(ctr + 1)));
+	if (!(gb->cpu.f & FLAG_C))
+		return;
+	erupt_next(gb, ctr);
+}
+
+// ld a, $00 / ld hl, obj_state / call SetSceneObjState / xor a /
+// ld [ctr], a
+static void erupt_end(GB *gb, uint16_t obj_state, uint16_t ctr)
+{
+	set_state(gb, 0x00, obj_state);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, ctr, 0);
+}
+
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b762d) { erupt_jumptable(gb, w2d134, EOW_VULC + 0xb6); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b763e) { erupt_start(gb, 0x0a, wSceneObj10State, w2d134); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b764e) { erupt_wait_state(gb, wSceneObj10State, 0x0b, w2d134); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b7656) { erupt_timer(gb, w2d134); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b765f) { erupt_end(gb, wSceneObj10State, w2d134); }
+
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b766c) { erupt_jumptable(gb, w2d138, EOW_VULC + 0xf5); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b767d) { erupt_start(gb, 0x0d, wSceneObj12State, w2d138); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b768b) { erupt_wait_state(gb, wSceneObj12State, 0x0e, w2d138); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b7693) { erupt_timer(gb, w2d138); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b769c) { erupt_end(gb, wSceneObj12State, w2d138); }
+
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b76a9) { erupt_jumptable(gb, w2d13a, EOW_VULC + 0x132); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b76ba) { erupt_start(gb, 0x0d, wSceneObj13State, w2d13a); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b76c8) { erupt_wait_state(gb, wSceneObj13State, 0x0e, w2d13a); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b76d0) { erupt_timer(gb, w2d13a); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b76d9) { erupt_end(gb, wSceneObj13State, w2d13a); }
+
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b76e6) { erupt_jumptable(gb, w2d13c, EOW_VULC + 0x16f); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b76f5) { erupt_start(gb, 0x0e, wSceneObj14State, w2d13c); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b7703) { erupt_timer(gb, w2d13c); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b770c) { erupt_end(gb, wSceneObj14State, w2d13c); }
+
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b7719) { erupt_jumptable(gb, w2d13e, EOW_VULC + 0x1a2); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b7728) { erupt_start(gb, 0x0e, wSceneObj15State, w2d13e); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b7736) { erupt_timer(gb, w2d13e); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b773f) { erupt_end(gb, wSceneObj15State, w2d13e); }
+
+PORT_LOCAL_JUMP(EOWFunc_VulcanoEruption, Func_b774c)
+{
+	gb_call(gb, WOW_VULC_B5F58);
+	gb_call(gb, WOW_VULC_B5FB9);
+	erupt_jumptable(gb, wOWUIObj1State, EOW_VULC + 0x1db);
+}
+
+// ld a, [wSceneWarioUnk7] / cp n / ret c / ld a, v / ld [addr], a /
+// .Func_b7763: play_sfx SFX_TEMPLE_ROCK / ld hl, wSceneWarioUnk7 / xor a /
+// ld [hld], a / inc [hl]
+static void erupt_rock(GB *gb, uint8_t n, uint16_t addr, uint8_t v)
+{
+	gb->cpu.a = rd8(gb, wSceneWarioUnk7);
+	alu_cp(gb, gb->cpu.a, n);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = v;
+	wr8(gb, addr, v);
+	play_sfx(gb, SFX_TEMPLE_ROCK);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSceneWarioUnk7, 0);
+	SET_HL(gb, (uint16_t)(wSceneWarioUnk7 - 1));
+	wr8(gb, (uint16_t)(wSceneWarioUnk7 - 1), alu_inc(gb, rd8(gb, (uint16_t)(wSceneWarioUnk7 - 1))));
+}
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b7772) { erupt_rock(gb, 0x50, w2d122, 0x05); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b777f) { erupt_rock(gb, 0x3c, w2d126, 0x07); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b778c) { erupt_rock(gb, 0x50, w2d122, 0x07); }
+PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b77a6)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWUIObj1State, 0);
+}
