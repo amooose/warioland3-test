@@ -101,3 +101,62 @@ PORT(LoadGolfSprite)
 	gb->cpu.l = gb->cpu.a;
 	CALL(LoadSprite);
 }
+
+// updates Golf Wario sprite, given its state
+// and which direction it is facing
+PORT(UpdateGolfWarioAnimation)
+{
+	gb->cpu.a = rd8(gb, wGolfWarioState);
+	gb->cpu.b = 0x00;
+	gb->cpu.c = gb->cpu.a;
+	uint16_t hl = alu_add16(gb, ADDR_UpdateGolfWarioAnimation + 0x75, REG_BC(gb)); // .OAMBanks
+	gb->cpu.a = rd8(gb, hl);
+	wr8(gb, wTempBank, gb->cpu.a);
+
+	gb->cpu.a = rd8(gb, wGolfWarioDir);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		// dir left
+		gb->cpu.a = alu_add(gb, gb->cpu.c, NUM_GOLF_WARIO_STATES);
+		gb->cpu.c = gb->cpu.a;
+	}
+	// .dir_right
+	gb->cpu.b = 0x00;
+	gb->cpu.c = alu_sla(gb, gb->cpu.c);
+	hl = alu_add16(gb, ADDR_UpdateGolfWarioAnimation + 0x81, REG_BC(gb)); // .OAMTable
+	gb->cpu.a = rd8(gb, hl++);
+	wr8(gb, wGolfOAMPtr + 1, gb->cpu.a);
+	gb->cpu.a = rd8(gb, hl);
+	wr8(gb, wGolfOAMPtr + 0, gb->cpu.a);
+
+	hl = alu_add16(gb, ADDR_UpdateGolfWarioAnimation + 0xb1, REG_BC(gb)); // .Framesets
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.d = rd8(gb, hl);
+	gb->cpu.e = gb->cpu.a;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, wROMBank);
+	push_af(gb);
+	gb->cpu.a = rd8(gb, wTempBank);
+	bankswitch(gb, gb->cpu.a);
+	SET_HL(gb, wGolfWarioDuration);
+	CALL(UpdateGolfObjectAnimation);
+	gb->cpu.a = gb->cpu.c;
+	wr8(gb, wHasGolfWarioAnimationFinished, gb->cpu.a);
+	pop_af(gb);
+	bankswitch(gb, gb->cpu.a);
+
+	gb->cpu.a = rd8(gb, wHasGolfWarioAnimationFinished);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z))
+		gb_call(gb, ADDR_HoldGolfWarioLastFrame); // whatever bank is mapped
+	gb->cpu.a = rd8(gb, wGolfWarioCurrentFrame);
+	wr8(gb, wGolfWarioFrame, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wROMBank);
+	push_af(gb);
+	gb->cpu.a = rd8(gb, wTempBank);
+	bankswitch(gb, gb->cpu.a);
+	SET_HL(gb, wGolfWarioSprite);
+	CALL(LoadGolfSprite);
+	pop_af(gb);
+	bankswitch(gb, gb->cpu.a);
+}

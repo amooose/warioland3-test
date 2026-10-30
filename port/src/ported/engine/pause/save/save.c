@@ -252,3 +252,123 @@ PORT(Save)
 	SET_HL(gb, wSubState);
 	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
 }
+
+// SaveLevel: the check values at de, then the progress and level WRAM, the
+// WRAM2 treasures and level data and the level objects WRAM after them
+static void save_level_data(GB *gb, uint16_t checkvals)
+{
+	static const uint8_t vals[4] = {CHECKVAL2_1, CHECKVAL2_2, CHECKVAL2_3, CHECKVAL2_4};
+	SET_DE(gb, checkvals);
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = vals[i];
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+		gb->cpu.e = alu_inc(gb, gb->cpu.e);
+	}
+	SET_HL(gb, 0xca00); // STARTOF("Progress WRAM")
+	gb->cpu.b = 0xca;   // SIZEOF("Progress WRAM") + SIZEOF("Level WRAM")
+	CALL(CopyHLToDE);
+	// push_wram BANK("WRAM2")
+	gb->cpu.a = rd8(gb, rWBK);
+	push_af(gb);
+	gb->cpu.a = BANK_wTreasuresCollected;
+	wr8(gb, rWBK, gb->cpu.a);
+	SET_HL(gb, wTreasuresCollected);
+	gb->cpu.b = (uint8_t)((wOWLevel - wTreasuresCollected) + 2);
+	CALL(CopyHLToDE);
+	pop_af(gb);
+	wr8(gb, rWBK, gb->cpu.a);
+	// push_wram BANK("Level Objects WRAM")
+	gb->cpu.a = rd8(gb, rWBK);
+	push_af(gb);
+	gb->cpu.a = 0x01;
+	wr8(gb, rWBK, gb->cpu.a);
+	SET_HL(gb, 0xd000); // STARTOF("Level Objects WRAM")
+	SET_BC(gb, 0x14a);  // SIZEOF("Level Objects WRAM")
+	CALL(CopyHLToDE_BC);
+	pop_af(gb);
+	wr8(gb, rWBK, gb->cpu.a);
+}
+
+// call CalculateWRAMDataChecksum, and store it (in de) at sum and wChecksum
+static void save_level_checksum(GB *gb, uint16_t calc, uint16_t sum)
+{
+	gb_call(gb, calc);
+	gb->cpu.a = gb->cpu.d;
+	wr8(gb, sum + 0, gb->cpu.a);
+	wr8(gb, wChecksum + 0, gb->cpu.a);
+	gb->cpu.a = gb->cpu.e;
+	wr8(gb, sum + 1, gb->cpu.a);
+	wr8(gb, wChecksum + 1, gb->cpu.a);
+}
+
+PORT(SaveLevel)
+{
+	CALL(DisableLCD);
+	// push_wram BANK(w3d280)
+	gb->cpu.a = rd8(gb, rWBK);
+	push_af(gb);
+	gb->cpu.a = BANK_w3d280;
+	wr8(gb, rWBK, gb->cpu.a);
+	SET_HL(gb, w3d280 + 12 * 8); // palette 12
+	SET_DE(gb, wcaa1);
+	gb->cpu.b = 4 * 8;
+	CALL(CopyHLToDE);
+	pop_af(gb);
+	wr8(gb, rWBK, gb->cpu.a);
+
+	gb_call(gb, ADDR_IncrementSaveCounter);
+
+	gb->cpu.a = rd8(gb, wSRAMBank);
+	push_af(gb);
+	gb->cpu.a = 0; // BANK("SRAM0")
+	sramswitch(gb, 0);
+
+	save_marker(gb, 0x30);
+	save_level_data(gb, s0a000);
+	save_marker(gb, 0x31);
+	save_level_checksum(gb, ADDR_CalculateWRAMDataChecksum, sWRAMChecksum);
+	save_echoes(gb, 0x32, sWRAMChecksumEcho1, sWRAMChecksumEcho2);
+
+	save_marker(gb, 0x41);
+	save_level_checksum(gb, ADDR_CalculateBackupSRAMChecksum1, s0a79d);
+	save_echoes(gb, 0x42, s0a7ed, s0afad);
+
+	save_marker(gb, 0x50);
+	save_level_data(gb, s0a800);
+	save_marker(gb, 0x51);
+	save_level_checksum(gb, ADDR_CalculateWRAMDataChecksum, sBackup1WRAMChecksum);
+	save_echoes(gb, 0x52, sBackup1WRAMChecksumEcho1, sBackup1WRAMChecksumEcho2);
+
+	save_marker(gb, 0x60);
+	save_level_data(gb, s0a400);
+	save_marker(gb, 0x61);
+	save_level_checksum(gb, ADDR_CalculateWRAMDataChecksum, sBackup2WRAMChecksum);
+	save_echoes(gb, 0x62, sBackup2WRAMChecksumEcho1, sBackup2WRAMChecksumEcho2);
+
+	gb_call(gb, ADDR_Func_1f14c6);
+	save_marker(gb, 0x80);
+	save_level_data(gb, s0ac00);
+	save_marker(gb, 0x81);
+	save_level_checksum(gb, ADDR_CalculateWRAMDataChecksum, sBackup3WRAMChecksum);
+	save_echoes(gb, 0x82, sBackup3WRAMChecksumEcho1, sBackup3WRAMChecksumEcho2);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	save_marker(gb, 0);
+	wr8(gb, wResetDisabled, 0);
+	pop_af(gb);
+	sramswitch(gb, gb->cpu.a);
+
+	gb_call(gb, ADDR_VBlank_Saving);
+	FARCALL(LoadSaveScreenPals);
+	FARCALL(DrawSaveCompleteBox);
+	gb->cpu.a = LCDC_DEFAULT;
+	wr8(gb, rLCDC, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wTimer + 0, 0);
+	gb->cpu.a = 2;
+	wr8(gb, wTimer + 1, 2);
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}
