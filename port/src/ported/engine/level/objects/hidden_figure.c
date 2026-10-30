@@ -963,3 +963,765 @@ PORT_LOCAL_JUMP(HiddenFigureLeftHandFunc, Func_4d39b)
 	}
 	RET();
 }
+
+// --- Hidden Figure's palettes ---
+
+PORT_JUMP(Func_4cfe0)
+{
+	uint16_t hl;
+	gb->cpu.a = alu_and(gb, rd8(gb, wGlobalCounter), 0x0f);
+	if (gb->cpu.a) {
+		alu_cp(gb, gb->cpu.a, 0x08);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			RET();
+			return;
+		}
+		hl = ADDR_Pals_4d04b;
+	} else {
+		gb->cpu.a = rd8(gb, w1d15a);
+		alu_cp(gb, gb->cpu.a, 0x02);
+		hl = (gb->cpu.f & FLAG_C) ? ADDR_Pals_4d01b : ADDR_Pals_4d07b;
+	}
+	SET_HL(gb, hl);
+	gb->cpu.c = 0;
+	gb->cpu.b = 6;
+	JUMP(SetBGPals);
+}
+
+PORT_JUMP(Func_4d005)
+{
+	gb->cpu.a = rd8(gb, w1d15a);
+	alu_cp(gb, gb->cpu.a, 0x02);
+	SET_HL(gb, (gb->cpu.f & FLAG_C) ? ADDR_Pals_4d01b : ADDR_Pals_4d07b);
+	gb->cpu.c = 0;
+	gb->cpu.b = 6;
+	JUMP(SetBGPals);
+}
+
+// --- Hidden Figure's right hand ---
+
+#define RH(addr) ((uint16_t)(ADDR_HiddenFigureRightHandFunc + ((addr) - 0x4d3ac)))
+#define RH_FUNC_4D3C8 RH(0x4d3c8)
+#define RH_FUNC_4D465 RH(0x4d465)
+#define RH_FUNC_4D49F RH(0x4d49f)
+#define RH_FUNC_4D4B2 RH(0x4d4b2)
+#define RH_FUNC_4D571 RH(0x4d571)
+#define RH_FUNC_4D622 RH(0x4d622)
+#define RH_FUNC_4D628 RH(0x4d628)
+#define RH_FUNC_4D644 RH(0x4d644)
+#define RH_JUMPTABLE RH(0x4d67e) // after .asm_4d67c's rst JumpTable
+
+// .asm_4d5f5: back to the resting state (.Func_4d3c8)
+static void rh_rest(GB *gb)
+{
+	static const uint8_t box[4] = {0xe8, 0xf8, 0xf8, 0x07};
+	hf_set_update(gb, wCurObjUpdateFunction + 1, RH_FUNC_4D3C8);
+	uint16_t hl = hf_interaction_box(gb, OBJ_INTERACTION_0B, box);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCurObjState, 0);
+	hl = LO(hl, OBJ_FLAGS);
+	SET_HL(gb, hl);
+	hf_res_bit(gb, hl, OBJFLAG_NO_COLLISION_F);
+	hf_res_bit(gb, hl, 4);
+	SET_DE(gb, ADDR_Frameset_6a131);
+	JUMP(SetObjectFramesetPtr);
+}
+
+PORT(HiddenFigureRightHandFunc)
+{
+	uint16_t hl = hf_set_update(gb, wCurObjUpdateFunction + 1, RH_FUNC_4D3C8);
+	hl = LO(hl, OBJ_Y_POS);
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, (uint16_t)(w1d156 + i), gb->cpu.a);
+	}
+	SET_HL(gb, hl);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d3c8)
+{
+	hf_no_actions(gb);
+	uint16_t hl = wCurObjFlags;
+	SET_HL(gb, hl);
+	hf_res_bit(gb, hl, OBJFLAG_NO_COLLISION_F);
+	uint16_t update, frameset = ADDR_Frameset_6a0fe;
+	gb->cpu.a = rd8(gb, w1d14b);
+	switch (gb->cpu.a) {
+	case 0x02:
+		gb->cpu.a = 0x01;
+		wr8(gb, w1d151, 0x01);
+		update = RH_FUNC_4D571;
+		frameset = ADDR_Frameset_6a145;
+		break;
+	case 0x03:
+	case 0x07:
+	case 0x08: {
+		static const uint8_t box[4] = {0xe0, 0x00, 0xff, 0x0b};
+		hf_interaction_box(gb, OBJ_INTERACTION_4F, box);
+		update = RH_FUNC_4D4B2;
+		frameset = ADDR_Frameset_6a0c8;
+		break;
+	}
+	case 0x04:
+		hl = wCurObjInteractionType;
+		hf_interaction(gb, hl, OBJ_INTERACTION_FULL_STING);
+		SET_HL(gb, hl + 1);
+		gb->cpu.a = 0x01;
+		wr8(gb, w1d15b, 0x01);
+		gb->cpu.a = alu_dec(gb, rd8(gb, w1d15a));
+		gb->cpu.a = (gb->cpu.f & FLAG_Z) ? 0x1e : 0x3c;
+		wr8(gb, wCurObjStateDuration, gb->cpu.a);
+		update = RH_FUNC_4D465;
+		break;
+	case 0x06:
+		hf_set_bit(gb, hl, 3);
+		update = RH_FUNC_4D628;
+		break;
+	default:
+		gb->cpu.a = rd8(gb, w1d151);
+		alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z) {
+			RET();
+			return;
+		}
+		update = RH_FUNC_4D49F;
+		break;
+	}
+	SET_BC(gb, update);
+	SET_DE(gb, frameset);
+	// .asm_4d455
+	hl = wCurObjUpdateFunction + 1;
+	gb->cpu.a = gb->cpu.b;
+	wr8(gb, hl--, gb->cpu.a);
+	wr8(gb, hl, gb->cpu.c);
+	hl = LO(hl, OBJ_VAR_2);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hl++, 0);
+	wr8(gb, hl, 0); // ld [hl], a (not hli)
+	hl = LO(hl, alu_inc(gb, (uint8_t)hl));
+	wr8(gb, hl, 0);
+	SET_HL(gb, hl);
+	JUMP(SetObjectFramesetPtr);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d465)
+{
+	uint16_t hl = wCurObjStateDuration;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+		gb->cpu.a = rd8(gb, w1d15a);
+		alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			gb->cpu.a = rd8(gb, w1d14b);
+			alu_cp(gb, gb->cpu.a, 0x00);
+			if (!(gb->cpu.f & FLAG_Z)) {
+				RET();
+				return;
+			}
+		}
+	} else {
+		SET_BC(gb, ADDR_Data_4c540);
+		gb_call(gb, ADDR_Func_4cf9e);
+		gb->cpu.a = rd8(gb, wCurObjVar3);
+		alu_cp(gb, gb->cpu.a, 0x0a);
+		if (gb->cpu.f & FLAG_Z) {
+			play_sfx(gb, SFX_063);
+			gb->cpu.b = 0x18;
+			JUMP(DoGroundShake);
+			return;
+		}
+		alu_cp(gb, gb->cpu.a, 0x3f);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			RET();
+			return;
+		}
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w1d15b, 0);
+	rh_rest(gb);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d49f)
+{
+	SET_BC(gb, ADDR_Data_4c500);
+	gb_call(gb, ADDR_Func_4cf9e);
+	gb->cpu.a = rd8(gb, wCurObjVar3);
+	alu_cp(gb, gb->cpu.a, 0x3a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w1d151, 0);
+	rh_rest(gb);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d4b2)
+{
+	uint16_t hl = w1d150;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		alu_cp(gb, gb->cpu.a, 0x80);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+			RET();
+			return;
+		}
+		// .asm_4d4bf
+		hl = hf_set_update(gb, wCurObjUpdateFunction + 1, RH_FUNC_4D622);
+		hl = LO(hl, OBJ_FLAGS);
+		SET_HL(gb, hl);
+		hf_set_bit(gb, hl, OBJFLAG_PRIORITY_F);
+		SET_DE(gb, ADDR_Frameset_6a11c);
+		JUMP(SetObjectFramesetPtr);
+		return;
+	}
+
+	// .asm_4d4d2
+	hl = wCurObjState;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		gb->cpu.a = alu_and(gb, gb->cpu.a, 0xfe);
+		alu_cp(gb, gb->cpu.a, 0x04);
+		if (gb->cpu.f & FLAG_Z) {
+			gb->cpu.a = 0x0a;
+			wr8(gb, w1d14e, gb->cpu.a);
+			wr8(gb, w1d14f, gb->cpu.a);
+			wr8(gb, w1d150, gb->cpu.a);
+			gb->cpu.a = 0;
+			gb->cpu.f = FLAG_Z; // xor a
+			wr8(gb, hl, 0);
+			RET();
+			return;
+		}
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, hl, 0);
+	}
+
+	// .asm_4d4ef
+	gb->cpu.a = rd8(gb, w1d14b);
+	alu_cp(gb, gb->cpu.a, 0x08);
+	if (gb->cpu.f & FLAG_Z) {
+		// .asm_4d540
+		SET_BC(gb, ADDR_Data_4c760);
+		gb_call(gb, ADDR_Func_4cfbf);
+		SET_BC(gb, ADDR_Data_4c800);
+		gb_call(gb, ADDR_Func_4cf9e);
+		gb->cpu.a = rd8(gb, wCurObjVar2);
+		alu_cp(gb, gb->cpu.a, 0x13);
+		if (gb->cpu.f & FLAG_Z) {
+			play_sfx(gb, SFX_0D0);
+			SET_DE(gb, ADDR_Frameset_6a119);
+			JUMP(SetObjectFramesetPtr);
+			return;
+		}
+		alu_cp(gb, gb->cpu.a, 0x4e);
+		if (gb->cpu.f & FLAG_Z) {
+			SET_DE(gb, ADDR_Frameset_6a0cf);
+			JUMP(SetObjectFramesetPtr);
+			return;
+		}
+		alu_cp(gb, gb->cpu.a, 0x5f);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			RET();
+			return;
+		}
+		rh_rest(gb);
+		return;
+	}
+	SET_BC(gb, ADDR_Data_4c480);
+	gb_call(gb, ADDR_Func_4cfbf);
+	gb->cpu.a = rd8(gb, w1d14b);
+	alu_cp(gb, gb->cpu.a, 0x07);
+	SET_BC(gb, (gb->cpu.f & FLAG_Z) ? ADDR_Data_4c600 : ADDR_Data_4c400);
+	gb_call(gb, ADDR_Func_4cf9e);
+	gb->cpu.a = rd8(gb, wCurObjVar2);
+	alu_cp(gb, gb->cpu.a, 0x13);
+	if (gb->cpu.f & FLAG_Z) {
+		play_sfx(gb, SFX_0D1);
+		SET_DE(gb, ADDR_Frameset_6a119);
+		JUMP(SetObjectFramesetPtr);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x62);
+	if (gb->cpu.f & FLAG_Z) {
+		SET_DE(gb, ADDR_Frameset_6a0cf);
+		JUMP(SetObjectFramesetPtr);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x32);
+	if (gb->cpu.f & FLAG_Z) {
+		play_sfx(gb, SFX_0D0);
+		RET();
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x7f);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	rh_rest(gb);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d571)
+{
+	uint16_t hl = wCurObjState;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		alu_cp(gb, gb->cpu.a, 0x0a);
+		if (gb->cpu.f & FLAG_Z) {
+			static const uint8_t box[4] = {0xec, 0xfe, 0xf8, 0x07};
+			gb->cpu.a = 0x2e;
+			wr8(gb, hl, 0x2e);
+			hl = LO(hl, OBJ_FLAGS);
+			hf_set_bit(gb, hl, OBJFLAG_PRIORITY_F);
+			hf_set_update(gb, hl, RH_FUNC_4D655);
+			hf_interaction_box(gb, OBJ_INTERACTION_00, box);
+			gb->cpu.a = 0;
+			gb->cpu.f = FLAG_Z; // xor a
+			wr8(gb, wCurObjVar3, 0);
+			gb->cpu.a = alu_inc(gb, gb->cpu.a);
+			wr8(gb, w1d14d, gb->cpu.a);
+			wr8(gb, wCurObjStateDuration, gb->cpu.a);
+			// stop_sfx
+			gb->cpu.a = 0xff;
+			wr8(gb, hSFXID + 0, 0xff);
+			gb->cpu.a = 0x00;
+			wr8(gb, hSFXID + 1, 0x00);
+			SET_DE(gb, ADDR_Frameset_6a0b7);
+			JUMP(SetObjectFramesetPtr);
+			return;
+		}
+		gb->cpu.a = 0x01;
+		wr8(gb, w1d15e, 0x01);
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, hl, 0);
+	}
+	SET_BC(gb, ADDR_Data_4c300);
+	gb_call(gb, ADDR_Func_4cfbf);
+	SET_BC(gb, ADDR_Data_4c280);
+	gb_call(gb, ADDR_Func_4cf9e);
+	gb->cpu.a = rd8(gb, wCurObjVar2);
+	alu_cp(gb, gb->cpu.a, 0x10);
+	if (gb->cpu.f & FLAG_Z) {
+		hl = wCurObjInteractionType;
+		hf_interaction(gb, hl, OBJ_INTERACTION_48);
+		SET_HL(gb, hl - 1);
+		RET();
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x3c);
+	if (gb->cpu.f & FLAG_Z) {
+		hl = wCurObjInteractionType;
+		hf_interaction(gb, hl, OBJ_INTERACTION_52);
+		SET_HL(gb, hl - 1);
+		play_sfx(gb, SFX_0CB);
+		RET();
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x7f);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	rh_rest(gb);
+}
+
+PORT_LOCAL(HiddenFigureRightHandFunc, Func_4d622)
+{
+	hf_no_actions(gb);
+}
+
+PORT_LOCAL(HiddenFigureRightHandFunc, Func_4d628)
+{
+	hf_no_actions(gb);
+	gb->cpu.a = rd8(gb, w1d15f);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	SET_DE(gb, ADDR_Frameset_6a0c8);
+	CALL(SetObjectFramesetPtr);
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = 0x1e;
+	wr8(gb, hl++, 0x1e);
+	hf_set_update(gb, hl, RH_FUNC_4D644);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d644)
+{
+	hf_no_actions(gb);
+	uint16_t hl = wCurObjStateDuration;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) {
+		RET();
+		return;
+	}
+	wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+	gb->cpu.a = alu_rra(gb, gb->cpu.a);
+	if (gb->cpu.f & FLAG_C) {
+		JUMP(MoveObjectDown);
+		return;
+	}
+	RET();
+}
+
+// Both hands' update while they're stunned or carried
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d655)
+{
+	SET_HL(gb, wSCYShake);
+	gb->cpu.a = alu_add(gb, rd8(gb, wc08a), rd8(gb, wSCYShake));
+	wr8(gb, wSCY, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wc08c);
+	wr8(gb, wSCX, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wCurObjState);
+	gb->cpu.e = gb->cpu.a;
+	alu_cp(gb, gb->cpu.a, 0x2d);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		gb->cpu.a = alu_and(gb, rd8(gb, wGlobalCounter), 0x0f);
+		if (!gb->cpu.a)
+			play_sfx(gb, SFX_06A);
+	}
+	// .asm_4d67c
+	gb->cpu.a = gb->cpu.e;
+	gb_push16(gb, RH_JUMPTABLE); // rst JumpTable
+	uint16_t hl = gb_pop16(gb); // pop hl
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0;
+	hl = alu_add16(gb, hl, gb->cpu.e);
+	gb->cpu.a = rd8(gb, hl);
+	gb->cpu.h = rd8(gb, (uint16_t)(hl + 1));
+	gb->cpu.l = gb->cpu.a;
+	JUMP_TO(REG_HL(gb));
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d73e)
+{
+	uint16_t hl = wCurObjStateDuration;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP(ObjState_Fall);
+		return;
+	}
+	wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
+	play_sfx(gb, SFX_VANISH);
+	RET();
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d750)
+{
+	hf_no_actions(gb);
+	gb->cpu.a = rd8(gb, wCurObjId);
+	alu_cp(gb, gb->cpu.a, HIDDEN_FIGURE_RIGHT_HAND);
+	bool right = gb->cpu.f & FLAG_Z;
+	uint16_t hl = right ? w1d156 : w1d152;
+	gb->cpu.e = rd8(gb, hl++);
+	gb->cpu.d = rd8(gb, hl++);
+	gb->cpu.c = rd8(gb, hl++);
+	gb->cpu.b = rd8(gb, hl);
+	const uint8_t target[4] = {gb->cpu.e, gb->cpu.d, gb->cpu.c, gb->cpu.b};
+	hl = wCurObjYPos;
+	bool same = true;
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = rd8(gb, hl++);
+		alu_cp(gb, gb->cpu.a, target[i]);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			same = false;
+			break;
+		}
+	}
+	SET_HL(gb, hl);
+	if (same) {
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		if (right) {
+			wr8(gb, w1d14d, 0);
+			rh_rest(gb);
+		} else {
+			wr8(gb, w1d14c, 0);
+			lh_rest(gb);
+		}
+		return;
+	}
+
+	// .asm_4d7a4
+	hl = LO(hl, OBJ_Y_POS);
+	gb->cpu.a = rd8(gb, hl++);
+	SET_HL(gb, hl);
+	alu_cp(gb, gb->cpu.a, gb->cpu.e);
+	bool move_up = !(gb->cpu.f & FLAG_Z);
+	if (!move_up) {
+		gb->cpu.a = rd8(gb, hl);
+		alu_cp(gb, gb->cpu.a, gb->cpu.d);
+		move_up = !(gb->cpu.f & FLAG_Z);
+	}
+	if (move_up)
+		CALL(MoveObjectUp);
+	// .asm_4d7b1
+	hl = LO(REG_HL(gb), OBJ_X_POS + 1);
+	gb->cpu.a = rd8(gb, hl--);
+	SET_HL(gb, hl);
+	alu_cp(gb, gb->cpu.a, gb->cpu.b);
+	bool move = true;
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = rd8(gb, hl);
+		alu_cp(gb, gb->cpu.a, gb->cpu.c);
+		if (gb->cpu.f & FLAG_Z)
+			move = false;
+	}
+	if (move) {
+		if (gb->cpu.f & FLAG_C)
+			CALL(MoveObjectRight);
+		else
+			CALL(MoveObjectLeft);
+	}
+	// .asm_4d7c9
+	gb->cpu.a = alu_and(gb, rd8(gb, wGlobalCounter), 0x03);
+	bool nz = gb->cpu.a != 0;
+	hl = wCurObjFlags;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	if (nz)
+		gb->cpu.a &= ~(1 << 4);
+	else
+		gb->cpu.a |= 1 << 4;
+	wr8(gb, hl, gb->cpu.a);
+	RET();
+}
+
+PORT_LOCAL(HiddenFigureRightHandFunc, Func_4d7dc)
+{
+	uint16_t hl = wCurObjState;
+	gb->cpu.a = 0x30;
+	wr8(gb, hl--, 0x30);
+	hl = DEC_L(hl);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hl--, 0);
+	SET_HL(gb, hl);
+}
+
+// .Func_4d7fd
+static void rh_wait_release(GB *gb)
+{
+	uint16_t hl = wCurObjStateDuration;
+	SET_HL(gb, hl);
+	uint8_t d = alu_dec(gb, rd8(gb, hl));
+	wr8(gb, hl, d);
+	if (d) {
+		RET();
+		return;
+	}
+	hf_no_actions(gb);
+	hl = LO(hl, OBJ_FLAGS);
+	hf_res_bit(gb, hl, OBJFLAG_PRIORITY_F);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w1d15d, 0);
+	hl = LO(hl, OBJ_STATE);
+	gb->cpu.a = 0x2d;
+	wr8(gb, hl--, 0x2d);
+	gb->cpu.a = rd8(gb, hl--);
+	SET_HL(gb, hl);
+	gb->cpu.a = alu_rlca(gb, gb->cpu.a);
+	SET_DE(gb, (gb->cpu.f & FLAG_C) ? ADDR_Frameset_6a0d4 : ADDR_Frameset_6a0fe);
+	JUMP(SetObjectFramesetPtr);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d7e6)
+{
+	uint16_t hl = wCurObjState;
+	gb->cpu.a = 0x31;
+	wr8(gb, hl--, 0x31);
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, w1d15d);
+	alu_cp(gb, gb->cpu.a, 0x01);
+	if (!(gb->cpu.f & FLAG_Z))
+		gb->cpu.a = 0x46;
+	wr8(gb, wCurObjStateDuration, gb->cpu.a);
+	hl = wCurObjFlags;
+	SET_HL(gb, hl);
+	hf_res_bit(gb, hl, OBJFLAG_GRABBED_F);
+	rh_wait_release(gb);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d7fd)
+{
+	rh_wait_release(gb);
+}
+
+// .Func_4d83a / .Func_4d844
+static void rh_bump(GB *gb, uint8_t state)
+{
+	uint16_t hl = wCurObjAction;
+	gb->cpu.a = (1 << NO_ACTIONS_F) | 15; // no_actions_for 15
+	wr8(gb, hl--, gb->cpu.a);
+	gb->cpu.a = state;
+	wr8(gb, hl--, state);
+	hl = LO(hl, OBJ_STATE_DURATION);
+	gb->cpu.a = 0x04;
+	wr8(gb, hl++, 0x04);
+	hl = INC_L(hl);
+	gb->cpu.a = 0x02;
+	wr8(gb, hl++, 0x02);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hl++, 0);
+	SET_HL(gb, hl);
+}
+
+PORT_LOCAL(HiddenFigureRightHandFunc, Func_4d824)
+{
+	play_sfx(gb, SFX_VANISH);
+	gb->cpu.a = alu_add(gb, rd8(gb, wWarioScreenXPos), 0x2a);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_add(gb, rd8(gb, wCurObjScreenXPos), 0x2a);
+	alu_cp(gb, gb->cpu.a, gb->cpu.b);
+	rh_bump(gb, (gb->cpu.f & FLAG_C) ? 0x39 : 0x38);
+}
+
+PORT_LOCAL(HiddenFigureRightHandFunc, Func_4d83a) { rh_bump(gb, 0x38); }
+PORT_LOCAL(HiddenFigureRightHandFunc, Func_4d844) { rh_bump(gb, 0x39); }
+
+// .Func_4d859 / .Func_4d861
+static void rh_set_state_var2(GB *gb, uint8_t state)
+{
+	uint16_t hl = wCurObjState;
+	gb->cpu.a = state;
+	wr8(gb, hl--, state);
+	hl = LO(hl, OBJ_VAR_2);
+	gb->cpu.a = 0x02;
+	wr8(gb, hl++, 0x02);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hl++, 0);
+	SET_HL(gb, hl);
+}
+
+PORT_LOCAL(HiddenFigureRightHandFunc, Func_4d859) { rh_set_state_var2(gb, 0x44); }
+PORT_LOCAL(HiddenFigureRightHandFunc, Func_4d861) { rh_set_state_var2(gb, 0x45); }
+
+// ld hl, wCurObjState / ld a, state / ld [hld], a
+static void rh_set_state(GB *gb, uint8_t state)
+{
+	uint16_t hl = wCurObjState;
+	gb->cpu.a = state;
+	wr8(gb, hl--, state);
+	SET_HL(gb, hl);
+}
+
+PORT_LOCAL(HiddenFigureRightHandFunc, Func_4d86f) { rh_set_state(gb, 0x46); }
+PORT_LOCAL(HiddenFigureRightHandFunc, Func_4d876) { rh_set_state(gb, 0x47); }
+
+// .Func_4d87d / .Func_4d88b
+static void rh_var2_or_state(GB *gb, uint16_t target)
+{
+	uint16_t hl = wCurObjVar2;
+	SET_HL(gb, hl);
+	gb->cpu.a = rd8(gb, hl);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		JUMP_TO(target);
+		return;
+	}
+	gb->cpu.a = 0x0f;
+	wr8(gb, wCurObjState, 0x0f);
+	RET();
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d87d) { rh_var2_or_state(gb, ADDR_Func_32ae); }
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d88b) { rh_var2_or_state(gb, ADDR_Func_32bd); }
+
+// .Func_4d899 / .Func_4d8b1
+static void rh_throw(GB *gb, uint8_t state, uint8_t v, uint16_t target)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, w1d15d, 0x01);
+	uint16_t hl = wCurObjState;
+	gb->cpu.a = state;
+	wr8(gb, hl--, state);
+	hl = DEC_L(hl);
+	gb->cpu.a = 0x41;
+	wr8(gb, hl--, 0x41);
+	gb->cpu.a = v;
+	wr8(gb, hl--, v);
+	gb->cpu.a = 0x01;
+	wr8(gb, hl--, 0x01);
+	SET_HL(gb, hl);
+	JUMP_TO(target);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d899) { rh_throw(gb, 0x36, 0xc0, ADDR_Func_3335); }
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d8b1) { rh_throw(gb, 0x37, 0xe0, ADDR_Func_3344); }
+
+// .Func_4d8c9 / .Func_4d8e1: ld a, 1 / ld [w1d15d], a, the state, set 2
+static void rh_set_carry_state(GB *gb, uint8_t state)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, w1d15d, 0x01);
+	uint16_t hl = wCurObjState;
+	gb->cpu.a = state;
+	wr8(gb, hl--, state);
+	hl = LO(hl, OBJ_FLAGS);
+	SET_HL(gb, hl);
+	hf_set_bit(gb, hl, 2);
+}
+
+// .Func_4d8d8 (right = false) / .Func_4d8f0 (right = true), going through
+// .Func_4d8e1 / .Func_4d8c9 until wDirection matches
+static void rh_carry(GB *gb, bool right)
+{
+	for (;;) {
+		gb->cpu.a = rd8(gb, wDirection);
+		alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (!right) {
+			if (!(gb->cpu.f & FLAG_Z)) {
+				JUMP(Func_3353);
+				return;
+			}
+			rh_set_carry_state(gb, 0x48);
+		} else {
+			if (gb->cpu.f & FLAG_Z) {
+				JUMP(Func_3362);
+				return;
+			}
+			rh_set_carry_state(gb, 0x49);
+		}
+		right = !right;
+	}
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d8c9)
+{
+	rh_set_carry_state(gb, 0x49);
+	rh_carry(gb, false);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d8d8) { rh_carry(gb, false); }
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d8e1)
+{
+	rh_set_carry_state(gb, 0x48);
+	rh_carry(gb, true);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRightHandFunc, Func_4d8f0) { rh_carry(gb, true); }
