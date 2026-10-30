@@ -2323,3 +2323,263 @@ PORT_JUMP(Func_ac0b6)
 		return;
 	}
 }
+
+PORT_JUMP(Func_ac074)
+{
+	SET_BC(gb, wCurSceneObjState);
+	gb_call(gb, ADDR_Func_ac0b6);
+	SET_BC(gb, wSceneObj1State);
+	JUMP_TO(ADDR_Func_ac0b6);
+}
+
+PORT_JUMP(Func_ac080)
+{
+	static const uint16_t objs[] = {
+		wSceneObj5State, wSceneObj6State, wSceneObj7State, wSceneObj8State,
+		wSceneObj9State, wSceneObj10State, wSceneObj11State, wSceneObj12State,
+	};
+	for (unsigned i = 0; i < sizeof(objs) / sizeof(objs[0]); i++) {
+		SET_BC(gb, objs[i]);
+		gb_call(gb, ADDR_Func_ac0b6);
+	}
+	SET_BC(gb, wSceneObj13State);
+	JUMP_TO(ADDR_Func_ac0b6);
+}
+
+// ld hl, w2d891 / inc [hl] / ld c, l / ld b, h / dec l / ld a, [hl] /
+// jumptable (the table at `table`)
+static void temple_scene_jumptable(GB *gb, uint16_t table)
+{
+	SET_HL(gb, w2d891);
+	wr8(gb, w2d891, alu_inc(gb, rd8(gb, w2d891)));
+	gb->cpu.c = gb->cpu.l;
+	gb->cpu.b = gb->cpu.h;
+	gb->cpu.l = alu_dec(gb, gb->cpu.l);
+	gb->cpu.a = rd8(gb, REG_HL(gb)); // w2d890
+	JUMP_TO(jumptable(gb, table));
+}
+
+// ld a, state / call SetSceneWarioState / jp Func_ad335
+static void wario_state_advance(GB *gb, uint8_t state)
+{
+	gb->cpu.a = state;
+	gb_call(gb, ADDR_SetSceneWarioState);
+	JUMP_TO(ADDR_Func_ad335);
+}
+
+// ld a, [bc] / cp n: true (ret c) if below n
+static bool bc_below(GB *gb, uint8_t n)
+{
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	alu_cp(gb, gb->cpu.a, n);
+	return gb->cpu.f & FLAG_C;
+}
+
+// ld c, n / jp Func_ad330
+static void wait_ad330(GB *gb, uint8_t n)
+{
+	gb->cpu.c = n;
+	JUMP_TO(ADDR_Func_ad330);
+}
+
+// ld b, state / jp Func_ad329
+static void wait_wario_state(GB *gb, uint8_t state)
+{
+	gb->cpu.b = state;
+	JUMP_TO(ADDR_Func_ad329);
+}
+
+PORT_JUMP(HandleHiddenFigureReveal)
+{
+	gb_call(gb, ADDR_HandleTempleWarioPanic);
+	temple_scene_jumptable(gb, ADDR_HandleHiddenFigureReveal + 0xc);
+}
+PORT_LOCAL_JUMP(HandleHiddenFigureReveal, PlayHiddenFigureRevealMusic)
+{
+	gb->cpu.a = (uint8_t)(MUSIC_HIDDEN_FIGURE_REVEAL >> 8);
+	wr8(gb, hMusicIDBackup + 0, gb->cpu.a);
+	wr8(gb, hMusicID + 0, gb->cpu.a);
+	gb->cpu.a = (uint8_t)MUSIC_HIDDEN_FIGURE_REVEAL;
+	wr8(gb, hMusicIDBackup + 1, gb->cpu.a);
+	wr8(gb, hMusicID + 1, gb->cpu.a);
+	JUMP_TO(ADDR_Func_ad335);
+}
+PORT_LOCAL_JUMP(HandleHiddenFigureReveal, StopPanicRun)
+{
+	gb->cpu.a = 0x03;
+	wr8(gb, w2d892, 0x03);
+	JUMP_TO(ADDR_Func_ad335);
+}
+PORT_LOCAL_JUMP(HandleHiddenFigureReveal, WaitForPanicRunStop)
+{
+	gb->cpu.a = rd8(gb, w2d894);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_Func_ad335);
+}
+PORT_LOCAL_JUMP(HandleHiddenFigureReveal, SetWarioPanic)
+{
+	if (bc_below(gb, 20)) {
+		RET();
+		return;
+	}
+	wario_state_advance(gb, SCENEWARIO_PANIC);
+}
+PORT_LOCAL_JUMP(HandleHiddenFigureReveal, SetWarioPanicJump)
+{
+	if (bc_below(gb, 40)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = SCENEWARIO_PANIC_JUMP;
+	wr8(gb, wSceneWarioState, SCENEWARIO_PANIC_JUMP);
+	JUMP_TO(ADDR_Func_ad335);
+}
+PORT_LOCAL_JUMP(HandleHiddenFigureReveal, WaitUntilLookBack)
+{
+	gb->cpu.a = rd8(gb, wSceneWarioState);
+	alu_cp(gb, gb->cpu.a, SCENEWARIO_LOOK_BACK);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_Func_ad335);
+}
+
+PORT_JUMP(HandleEnterTempleWithAllMusicBoxesScene)
+{
+	temple_scene_jumptable(gb, ADDR_HandleEnterTempleWithAllMusicBoxesScene + 9);
+}
+PORT_LOCAL_JUMP(HandleEnterTempleWithAllMusicBoxesScene, Wait1) { wait_ad330(gb, 8); }
+PORT_LOCAL_JUMP(HandleEnterTempleWithAllMusicBoxesScene, WalkRight)
+{
+	wario_state_advance(gb, SCENEWARIO_WALK_RIGHT);
+}
+PORT_LOCAL_JUMP(HandleEnterTempleWithAllMusicBoxesScene, MoveRight)
+{
+	gb_call(gb, ADDR_ApplySceneWarioMovementRight);
+	alu_cp(gb, gb->cpu.a, 0x50);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	wr8(gb, REG_HL(gb), gb->cpu.a);
+	wario_state_advance(gb, SCENEWARIO_IDLE_RIGHT);
+}
+PORT_LOCAL_JUMP(HandleEnterTempleWithAllMusicBoxesScene, Wait2) { wait_ad330(gb, 30); }
+PORT_LOCAL_JUMP(HandleEnterTempleWithAllMusicBoxesScene, TurnToBack)
+{
+	wario_state_advance(gb, SCENEWARIO_TURN_BACK_RIGHT);
+}
+PORT_LOCAL_JUMP(HandleEnterTempleWithAllMusicBoxesScene, LookBack)
+{
+	wait_wario_state(gb, SCENEWARIO_LOOK_BACK);
+}
+PORT_LOCAL_JUMP(HandleEnterTempleWithAllMusicBoxesScene, CheckTimeAttack)
+{
+	gb->cpu.a = rd8(gb, wGameModeFlags);
+	if (!alu_bit(gb, gb->cpu.a, MODE_TIME_ATTACK_F))
+		JUMP_TO(ADDR_Func_ad33c); // skips rest of the sequence
+	else
+		JUMP_TO(ADDR_Func_ad335); // continues
+}
+PORT_LOCAL_JUMP(HandleEnterTempleWithAllMusicBoxesScene, Bow)
+{
+	if (bc_below(gb, 20)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = SCENEWARIO_BOW;
+	gb_call(gb, ADDR_SetSceneWarioState);
+	// draw text prompt arrow
+	wr8(gb, wSceneObj1, 0x8e); // y
+	gb->cpu.a = 0x98;
+	wr8(gb, wSceneObj1 + 1, 0x98); // x
+	SET_HL(gb, wSceneObj1State);
+	gb->cpu.a = 0x01;
+	CALL(SetSceneObjState);
+	JUMP_TO(ADDR_Func_ad335);
+}
+PORT_LOCAL_JUMP(HandleEnterTempleWithAllMusicBoxesScene, WaitInput)
+{
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_A)) {
+		// .a_btn
+		gb->cpu.a = SCENEWARIO_LOOK_BACK;
+		gb_call(gb, ADDR_SetSceneWarioState);
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wSceneObj1State, 0);
+		JUMP_TO(ADDR_Func_ad33c);
+		return;
+	}
+	gb->cpu.a = alu_and(gb, gb->cpu.a, PAD_B | PAD_LEFT);
+	if (gb->cpu.f & FLAG_Z) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSceneObj1State, 0);
+	gb->cpu.a = TEMPLE_SCENE_EXITING;
+	wr8(gb, wTempleScene, TEMPLE_SCENE_EXITING);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wTempleSceneCounter, 0);
+	RET();
+}
+
+PORT_JUMP(Func_ad445)
+{
+	gb_call(gb, ADDR_HandleTempleMusicBoxes);
+	temple_scene_jumptable(gb, ADDR_Func_ad445 + 0xc);
+}
+PORT_LOCAL_JUMP(Func_ad445, Wait1) { wait_ad330(gb, 60); }
+PORT_LOCAL_JUMP(Func_ad445, ShowMusicBoxes)
+{
+	wario_state_advance(gb, SCENEWARIO_SHOW_MUSIC_BOXES_1);
+}
+PORT_LOCAL_JUMP(Func_ad445, WaitUntilRaiseHands)
+{
+	wait_wario_state(gb, SCENEWARIO_SHOW_MUSIC_BOXES_3);
+}
+PORT_LOCAL_JUMP(Func_ad445, SpawnMusicBoxes)
+{
+	if (bc_below(gb, 16)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d8a0, 0x01);
+	JUMP_TO(ADDR_Func_ad335);
+}
+PORT_LOCAL_JUMP(Func_ad445, WaitMusicBoxSequenceFinish)
+{
+	gb->cpu.a = rd8(gb, w2d8a0);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_Func_ad335);
+}
+PORT_LOCAL_JUMP(Func_ad445, LowerHands)
+{
+	if (bc_below(gb, 60)) {
+		RET();
+		return;
+	}
+	wario_state_advance(gb, SCENEWARIO_SHOW_MUSIC_BOXES_4);
+}
+PORT_LOCAL_JUMP(Func_ad445, WaitUntilLookBack)
+{
+	wait_wario_state(gb, SCENEWARIO_LOOK_BACK);
+}
+PORT_LOCAL_JUMP(Func_ad445, Wait2) { wait_ad330(gb, 240); }
+PORT_LOCAL_JUMP(Func_ad445, DespawnMusicBoxes)
+{
+	gb->cpu.a = 0x08;
+	wr8(gb, w2d8a0, 0x08);
+	JUMP_TO(ADDR_Func_ad335);
+}
