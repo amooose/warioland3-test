@@ -1273,7 +1273,7 @@ static void noncracked_multi(GB *gb, uint8_t n)
 			if (ld_and(gb, wAttackCounter))
 				overalls = false;
 			else if (ld_and(gb, wIsRolling))
-				overalls = true;
+				overalls = n == 1; // only Func_190fe checks them when rolling
 			else
 				GOTO(SOLID);
 		} else if (coll_bit(gb, COLLISION_UNK5_F) || coll_bit(gb, COLLISION_UNK3_F)) {
