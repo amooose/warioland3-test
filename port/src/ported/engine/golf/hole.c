@@ -411,15 +411,9 @@ PORT_LOCAL_JUMP(VBlank_1c9f36, Func)
 	vb_transfer_oam(gb);
 }
 
-PORT_LOCAL_JUMP(VBlank_1c9f7a, Func)
-{
-	vb_golf_wbk(gb);
-	vb_xor_a(gb);
-	wr8(gb, wGolfVBlankMode, gb->cpu.a);
-	vb_scx(gb);
-	vb_wario_tiles_dma(gb, 0x7f); // $80 dma_tiles
-	vb_transfer_oam(gb);
-}
+// VBlank_1c9f7a.Func stays asm: no recording reaches it, and it switches the
+// ROM bank, so every fuzz check of it at its ROM address is inconclusive;
+// nothing would verify a port.
 
 PORT_LOCAL_JUMP(VBlank_1c9fe1, Func)
 {
