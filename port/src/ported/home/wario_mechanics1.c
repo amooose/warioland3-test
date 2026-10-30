@@ -196,3 +196,17 @@ PORT_JUMP(ResetLevelMusicWarioPalsAndState)
 		FARCALL(StartFall); // .fall
 	JUMP(PlayRecoverySFX);
 }
+
+PORT_JUMP(RecoverFromTransformation)
+{
+	CALL(ClearTransformationValues);
+	gb->cpu.a = 0x10;
+	wr8(gb, wInvincibleCounter, 0x10);
+	JUMP(ResetLevelMusicWarioPalsAndState);
+}
+
+PORT_JUMP(RecoverFromTransformation_WithoutInvincibility)
+{
+	CALL(ClearTransformationValues);
+	JUMP(ResetLevelMusicWarioPalsAndState); // fallthrough
+}

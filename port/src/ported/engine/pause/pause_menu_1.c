@@ -196,3 +196,31 @@ PORT_JUMP(UpdatePauseMenu)
 	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
 	RET();
 }
+
+PORT(ExitPauseMenu)
+{
+	CALL(DisableLCD);
+	CALL(ClearVirtualOAM);
+	gb_call(gb, ADDR_DrawLevelObjectsAfterLevelReturn);
+	CALL(LoadBackupVRAM);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wUnused_IsPaused, 0);
+	gb->cpu.a = rd8(gb, wTempAnimatedTilesFrameDuration);
+	wr8(gb, wAnimatedTilesFrameDuration, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wTempAnimatedTilesGroup);
+	wr8(gb, wAnimatedTilesGfx, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wAnimatedTilesFrameCount, 0);
+	wr8(gb, wAnimatedTilesFrame, 0);
+	gb->cpu.a = TRUE;
+	wr8(gb, wRoomAnimatedTilesEnabled, TRUE);
+
+	CALL(UpdateLevelMusic);
+	gb->cpu.a = LCDC_DEFAULT;
+	wr8(gb, rLCDC, gb->cpu.a);
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}
