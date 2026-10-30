@@ -3781,3 +3781,28 @@ PORT_JUMP(HandleTopBarDPad)
 
 PORT(GolfBuilding) { FARCALL(_GolfBuilding); }
 PORT(InitEpilogue) { FARCALL(_InitEpilogue); }
+
+// unreferenced
+PORT(Func_8143d)
+{
+	SET_HL(gb, w2d88e);
+	gb->cpu.a = rd8(gb, w2d100);
+	wr8(gb, w2d88e, gb->cpu.a);
+	gb->cpu.a = rd8(gb, w2d101);
+	wr8(gb, w2d88f, gb->cpu.a);
+	gb->cpu.a = rd8(gb, w2d069);
+	wr8(gb, wOWYCoord1, gb->cpu.a);
+	wr8(gb, w2d100, gb->cpu.a);
+	gb->cpu.a = rd8(gb, w2d06a);
+	wr8(gb, wOWXCoord1, gb->cpu.a);
+	wr8(gb, w2d101, gb->cpu.a);
+	SET_HL(gb, w2d88f);
+	gb_call_ret(gb, ADDR_Func_8143d + 0x32, ADDR_Func_8143d + 0x20); // call .Func_8146f
+	SET_HL(gb, w2d88f);
+	gb->cpu.a = rd8(gb, w2d88e);
+	wr8(gb, wOWYCoord1, gb->cpu.a);
+	wr8(gb, w2d100, gb->cpu.a);
+	gb->cpu.a = rd8(gb, w2d88f);
+	wr8(gb, wOWXCoord1, gb->cpu.a);
+	wr8(gb, w2d101, gb->cpu.a);
+}

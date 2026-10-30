@@ -2466,3 +2466,97 @@ PORT_JUMP(GolfHoleState_SpecialTerrain)
 	wr8(gb, wGolfHoleState, gb->cpu.a);
 	RET();
 }
+
+// ld hl, src / ld bc, dest / call FarDecompress
+static void far_decompress(GB *gb, uint16_t src, uint16_t dest)
+{
+	SET_HL(gb, src);
+	SET_BC(gb, dest);
+	CALL(FarDecompress);
+}
+
+// if there's a golf hole already loaded in wPredeterminedGolfHole
+// then pick that one, otherwise, determine the golf hole tier
+// given the number of collected treasures, and select a random
+// hole up to that tier
+PORT(PickAndLoadGolfHole)
+{
+	gb->cpu.a = BANK_GolfGfx;
+	wr8(gb, wTempBank, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wPredeterminedGolfHole);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		gb->cpu.c = gb->cpu.a;
+	} else {
+		// .no_predetermined_golf_hole: tier 3
+		gb->cpu.a = GOLF_HOLE_TIER_3;
+		wr8(gb, wGolfHoleTier, gb->cpu.a);
+		gb->cpu.a = rd8(gb, wNumCollectedTreasures + 0);
+		if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+			gb->cpu.a = rd8(gb, wNumCollectedTreasures + 1);
+			alu_cp(gb, gb->cpu.a, GOLF_TREASURES_TIER_3);
+			if (gb->cpu.f & FLAG_C) {
+				alu_cp(gb, gb->cpu.a, GOLF_TREASURES_TIER_2);
+				gb->cpu.a = (gb->cpu.f & FLAG_C) ? GOLF_HOLE_TIER_1 : GOLF_HOLE_TIER_2;
+				wr8(gb, wGolfHoleTier, gb->cpu.a);
+			}
+		}
+		// .got_tier: golf hole = rDIV % wGolfHoleTier
+		gb->cpu.a = rd8(gb, wGolfHoleTier);
+		gb->cpu.b = gb->cpu.a;
+		gb->cpu.a = rd8(gb, rDIV);
+		gb->cpu.c = gb->cpu.a;
+		for (;;) { // .loop_division
+			gb->cpu.a = alu_sub(gb, gb->cpu.a, gb->cpu.b);
+			if (gb->cpu.f & FLAG_C)
+				break;
+			gb->cpu.c = gb->cpu.a; // remainder
+		}
+	}
+
+	// .got_golf_hole
+	uint16_t hl = ADDR_GolfHoles;
+	gb->cpu.a = gb->cpu.c;
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		SET_DE(gb, 5 * 2);
+		do { // .loop_get_data
+			hl = alu_add16(gb, hl, REG_DE(gb));
+			gb->cpu.c = alu_dec(gb, gb->cpu.c);
+		} while (!(gb->cpu.f & FLAG_Z));
+	}
+	// .got_golf_hole_data
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = rd8(gb, hl++);
+		gb->cpu.e = gb->cpu.a;
+		gb->cpu.a = rd8(gb, hl++);
+		gb->cpu.d = gb->cpu.a;
+		gb_push16(gb, REG_DE(gb));
+	}
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.h = rd8(gb, hl);
+	gb->cpu.l = gb->cpu.a;
+
+	gb->cpu.a = BANK_v1Tiles0; // BANK("VRAM1")
+	wr8(gb, rVBK, gb->cpu.a);
+	far_decompress(gb, REG_HL(gb), 7 * TILEMAP_WIDTH + v0BGMap0);
+	far_decompress(gb, ADDR_GolfBackground1Attrmap, v1BGMap0);
+	far_decompress(gb, gb_pop16(gb), 7 * TILEMAP_WIDTH + v1BGMap1);
+	far_decompress(gb, ADDR_GolfBackground2Attrmap, v1BGMap1);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+	far_decompress(gb, gb_pop16(gb), 7 * TILEMAP_WIDTH + v0BGMap0);
+	far_decompress(gb, ADDR_GolfBackground1Tilemap, v0BGMap0);
+	far_decompress(gb, gb_pop16(gb), 7 * TILEMAP_WIDTH + v0BGMap1);
+	far_decompress(gb, ADDR_GolfBackground2Tilemap, v0BGMap1);
+	SET_HL(gb, gb_pop16(gb));
+
+	SET_DE(gb, wGolfHoleData);
+	SET_BC(gb, wGolfHoleDataEnd - wGolfHoleData);
+	CALL(FarCopyHLToDE_BC2);
+	gb->cpu.a = rd8(gb, w1db82 + 0);
+	wr8(gb, wGolfHoleHoleXPos + 0, gb->cpu.a);
+	gb->cpu.a = rd8(gb, w1db82 + 1);
+	wr8(gb, wGolfHoleHoleXPos + 1, gb->cpu.a);
+}
