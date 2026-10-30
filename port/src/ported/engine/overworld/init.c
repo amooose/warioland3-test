@@ -278,3 +278,26 @@ PORT(Func_80bd9)
 	}
 	SET_HL(gb, hl);
 }
+
+PORT_JUMP(Func_803e6)
+{
+	gb->cpu.a = rd8(gb, wTransitionParam);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = rd8(gb, wOWBarsState);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = rd8(gb, wMapSideLevelID);
+	alu_cp(gb, gb->cpu.a, OW_EXITS);
+	if (!(gb->cpu.f & FLAG_C)) {
+		RET();
+		return;
+	}
+	JUMP(SaveGameOrEnterPerfectScreen);
+}
+
+PORT(LoadCloudAndSeaGfx) { FARCALL(_LoadCloudAndSeaGfx); }

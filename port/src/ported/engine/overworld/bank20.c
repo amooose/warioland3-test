@@ -3203,3 +3203,185 @@ PORT_JUMP(Func_817b1)
 	wr8(gb, wStoredTransitionParam, gb->cpu.a);
 	JUMP_TO(ADDR_SetCutsceneButtonSelectable_GotTransitionParam);
 }
+
+PORT_JUMP(Func_8137a)
+{
+	SET_HL(gb, w2d0e5);
+	wr8(gb, w2d0e5, alu_inc(gb, rd8(gb, w2d0e5)));
+	gb->cpu.a = rd8(gb, w2d0e4);
+	JUMP_TO(jumptable(gb, ADDR_Func_8137a + 8));
+}
+
+// ld hl, duration / call Func_82521 / ld b, BANK(OAM_a9fe2) / ld de, OAM_a9fe2 /
+// ld hl, obj / call LoadOWSpriteWithScroll
+static void update_top_bar_ui_obj(GB *gb, uint16_t duration, uint16_t obj)
+{
+	SET_HL(gb, duration);
+	gb_call(gb, ADDR_Func_82521);
+	gb->cpu.b = BANK_OAM_a9fe2;
+	SET_DE(gb, ADDR_OAM_a9fe2);
+	SET_HL(gb, obj);
+	CALL(LoadOWSpriteWithScroll);
+}
+
+PORT(Func_824f1)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWAnimationFinished, 0);
+	gb->cpu.a = rd8(gb, wOWUIObj1State);
+	update_top_bar_ui_obj(gb, wOWUIObj1Duration, wOWUIObj1);
+}
+
+PORT(Func_8250a)
+{
+	gb->cpu.a = rd8(gb, wOWUIObj2State);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	update_top_bar_ui_obj(gb, wOWUIObj2Duration, wOWUIObj2);
+}
+
+// add $1e / ld e, a / ld c, $00 / ld d, x / call LoadSpriteInsideWindow_High
+static void load_digit_sprite(GB *gb, uint8_t nybble, uint8_t x)
+{
+	gb->cpu.a = alu_add(gb, nybble, 0x1e);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.c = 0x00;
+	gb->cpu.d = x;
+	gb_call(gb, ADDR_LoadSpriteInsideWindow_High);
+}
+
+PORT(Func_829a1)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d0ee), 0xf0);
+	load_digit_sprite(gb, alu_swap(gb, gb->cpu.a), 0x50);
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d0ee), 0x0f);
+	load_digit_sprite(gb, gb->cpu.a, 0x58);
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d0ef), 0xf0);
+	load_digit_sprite(gb, alu_swap(gb, gb->cpu.a), 0x68);
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d0ef), 0x0f);
+	load_digit_sprite(gb, gb->cpu.a, 0x70);
+}
+
+#define TOP_BAR_ATTR(x) (wAttrmap + 19 * TILEMAP_WIDTH + (x))
+
+// LoadTopBarButtonAttributes.LoadSelectedAttrs
+static void load_selected_attrs(GB *gb)
+{
+	gb->cpu.b = alu_srl(gb, gb->cpu.b);
+	if (!(gb->cpu.f & FLAG_C))
+		return;
+	gb_call(gb, ADDR_Func_8269f);
+}
+
+// LoadTopBarButtonAttributes.LoadSelectableAttrs
+static void load_selectable_attrs(GB *gb)
+{
+	gb->cpu.b = alu_srl(gb, gb->cpu.b);
+	if (!(gb->cpu.f & FLAG_C))
+		SET_HL(gb, ADDR_Data_826be); // non-selectable
+	gb_call(gb, ADDR_Func_8269f);
+}
+
+PORT_LOCAL(LoadTopBarButtonAttributes, LoadSelectedAttrs) { load_selected_attrs(gb); }
+PORT_LOCAL(LoadTopBarButtonAttributes, LoadSelectableAttrs) { load_selectable_attrs(gb); }
+
+PORT(LoadTopBarButtonAttributes)
+{
+	gb->cpu.a = rd8(gb, wTopBarSelectableButtons);
+	gb->cpu.b = gb->cpu.a;
+	SET_HL(gb, ADDR_Data_826c6);
+	SET_DE(gb, TOP_BAR_ATTR(11)); // Day/Night Spell
+	load_selectable_attrs(gb);
+	SET_HL(gb, ADDR_Data_826ce);
+	SET_DE(gb, TOP_BAR_ATTR(9)); // Cutscene
+	load_selectable_attrs(gb);
+	SET_HL(gb, ADDR_Data_826d6);
+	SET_DE(gb, TOP_BAR_ATTR(7)); // Collection
+	load_selectable_attrs(gb);
+
+	gb->cpu.a = rd8(gb, wTopBarSelection);
+	gb->cpu.b = gb->cpu.a;
+	SET_HL(gb, ADDR_Data_826de);
+	SET_DE(gb, TOP_BAR_ATTR(11)); // Day/Night Spell
+	load_selected_attrs(gb);
+	SET_HL(gb, ADDR_Data_826de);
+	SET_DE(gb, TOP_BAR_ATTR(9)); // Cutscene
+	load_selected_attrs(gb);
+	SET_HL(gb, ADDR_Data_826e6);
+	SET_DE(gb, TOP_BAR_ATTR(7)); // Collection
+	load_selected_attrs(gb);
+}
+
+// HandleTopBarSelection.ShowPressedButton / .ShowNextMapIndicatorFlash
+static void adv_obj_state(GB *gb, uint16_t hl)
+{
+	gb->cpu.a = alu_inc(gb, rd8(gb, hl));
+	wr8(gb, hl--, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hl--, 0);
+	wr8(gb, hl, 0);
+	SET_HL(gb, hl);
+}
+
+// HandleTopBarSelection.ApplyPressedButtonAttrs
+static void apply_pressed_button_attrs(GB *gb, uint16_t de)
+{
+	SET_DE(gb, de);
+	SET_HL(gb, ADDR_Data_826ee);
+	gb_call(gb, ADDR_Func_8269f);
+	gb_call(gb, ADDR_ApplyTopBarButtonAttributes);
+}
+
+// ld [wOWBarsState], a (a = state) / xor a / ld [wOWBarsStateCounter], a
+static void set_bars_state_reset_counter(GB *gb, uint8_t state)
+{
+	gb->cpu.a = state;
+	wr8(gb, wOWBarsState, state);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWBarsStateCounter, 0);
+}
+
+// output: carry set if a button was selected
+PORT(HandleTopBarSelection)
+{
+	gb->cpu.f = FLAG_Z; // xor a
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (!alu_bit(gb, gb->cpu.a, B_PAD_A))
+		return; // no A button
+
+	gb->cpu.a = rd8(gb, wTopBarSelection);
+	if (alu_bit(gb, gb->cpu.a, TOPBAR_DAY_NIGHT_F)) {
+		adv_obj_state(gb, wOWUIObj1State);
+		apply_pressed_button_attrs(gb, TOP_BAR_ATTR(11));
+		gb->cpu.a = OWBARS_DAY_NIGHT;
+		wr8(gb, wOWBarsState, OWBARS_DAY_NIGHT);
+	} else if (alu_bit(gb, gb->cpu.a, TOPBAR_CUTSCENE_F)) {
+		gb->cpu.a = rd8(gb, wStoredTransitionParam);
+		if (!alu_and(gb, gb->cpu.a, gb->cpu.a))
+			return;
+		adv_obj_state(gb, wOWUIObj1State);
+		apply_pressed_button_attrs(gb, TOP_BAR_ATTR(9));
+		set_bars_state_reset_counter(gb, OWBARS_EVENT);
+	} else if (alu_bit(gb, gb->cpu.a, TOPBAR_COLLECTION_F)) {
+		adv_obj_state(gb, wOWUIObj1State);
+		apply_pressed_button_attrs(gb, TOP_BAR_ATTR(7));
+		set_bars_state_reset_counter(gb, OWBARS_COLLECTION);
+		gb->cpu.a = FALSE;
+		wr8(gb, wIsCollectionOpen, FALSE);
+	} else if (alu_bit(gb, gb->cpu.a, TOPBAR_NEXT_MAP_F) ||
+		alu_bit(gb, gb->cpu.a, TOPBAR_PREV_MAP_F)) {
+		adv_obj_state(gb, wOWUIObj1State);
+		adv_obj_state(gb, wOWUIObj2State);
+		set_bars_state_reset_counter(gb, OWBARS_NEXT_MAP);
+	} else {
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		return;
+	}
+	// .play_selection_sfx
+	play_sfx(gb, SFX_SELECTION);
+	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_Z) | FLAG_C); // scf
+}
