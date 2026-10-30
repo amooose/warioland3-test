@@ -589,6 +589,14 @@ void gb_call_ret(GB *gb, uint16_t addr, uint16_t ret)
 	uint16_t saved_pc = PC;
 	gb_push16(gb, ret);
 	PC = addr;
+	// Under test, a push below the stack's bottom is unrealistic (see
+	// test_access). Stop there: native code that recurses (a fuzzed jump
+	// table leading back into its caller) would otherwise nest host stack
+	// frames until the host stack overflows.
+	if (gb->test.active && gb->test.stack_lo && SP < gb->test.stack_lo) {
+		gb->test.unrealistic = true;
+		gb->test.crashed = true;
+	}
 	gb->call_depth++;
 	while (!(PC == ret && SP == saved_sp) && !gb->test.crashed) {
 		// Under test, steps count against the budget too: a halted CPU

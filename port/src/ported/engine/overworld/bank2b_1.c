@@ -1241,10 +1241,15 @@ PORT_JUMP(Func_ac2b2)
 	for_each_obj_state(gb, ADDR_Func_ac2b2, ADDR_UpdateTempleSceneObjAnimation, states, 3);
 }
 
-// UpdateTempleSceneObjs stays asm: fuzzed UpdateTempleSceneObjAnimation
-// jumptables can jump back into it, recursing without end. The asm just
-// overflows its stack (inconclusive), but native code nests a C frame per
-// level and overflows the host stack.
+PORT_JUMP(UpdateTempleSceneObjs)
+{
+	static const uint16_t states[] = {
+		wSceneObj3State, wSceneObj4State, wSceneObj7State, wSceneObj8State,
+		wSceneObj9State, wSceneObj10State, wSceneObj11State, wSceneObj12State,
+		wSceneObj13State, wSceneObj14State, wSceneObj15State,
+	};
+	for_each_obj_state(gb, ADDR_UpdateTempleSceneObjs, ADDR_UpdateTempleSceneObjAnimation, states, 11);
+}
 
 PORT_JUMP(Func_acae7)
 {
