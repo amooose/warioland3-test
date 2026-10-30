@@ -1544,3 +1544,194 @@ PORT_JUMP(UpdateGolfHoleUI)
 	GOLF_OBJ(GolfObj5, SCREEN_HEIGHT_PX, gb->cpu.a, ADDR_Frameset_1caf87);
 	JUMP(LoadGolfSprite);
 }
+
+// ld hl, pos / ld a, [hli] / ld d, [hl] / ld e, a / srl d / rr e (x2):
+// de = [pos] / 4
+static void load_pos_div4(GB *gb, uint16_t pos)
+{
+	uint16_t hl = pos;
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.d = rd8(gb, hl);
+	gb->cpu.e = gb->cpu.a;
+	SET_HL(gb, hl);
+	for (int i = 0; i < 2; i++) {
+		gb->cpu.d = alu_srl(gb, gb->cpu.d);
+		gb->cpu.e = alu_rr(gb, gb->cpu.e);
+	}
+}
+
+PORT_JUMP(UpdateGolfParaGoom)
+{
+	gb->cpu.a = rd8(gb, w1dc20);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = rd8(gb, wGolfParaGoomState);
+	alu_cp(gb, gb->cpu.a, GOLF_PARAGOOM_8);
+	if (!(gb->cpu.f & FLAG_C)) {
+		RET();
+		return;
+	}
+	load_pos_div4(gb, wGolfParaGoomXPos);
+	gb_push16(gb, REG_DE(gb));
+	gb_call(gb, ADDR_Func_1c8f56);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	SET_DE(gb, gb_pop16(gb));
+	if (gb->cpu.f & FLAG_Z) {
+		RET();
+		return;
+	}
+	// .asm_1c8d96: calculate ParaGoom's coordinates in the screen
+	gb->cpu.a = rd8(gb, wSCX);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_add(gb, gb->cpu.e, OAM_X_OFS);
+	gb->cpu.a = alu_sub(gb, gb->cpu.a, gb->cpu.b);
+	wr8(gb, wGolfParaGoomXCoord, gb->cpu.a);
+	gb->cpu.b = 0x12;
+	gb->cpu.a = rd8(gb, wGolfParaGoomState);
+	gb->cpu.c = gb->cpu.a;
+	alu_cp(gb, gb->cpu.a, GOLF_PARAGOOM_8);
+	if (!(gb->cpu.f & FLAG_C)) {
+		RET();
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, GOLF_PARAGOOM_5);
+	if (gb->cpu.f & FLAG_Z)
+		gb->cpu.b = 0x13;
+	// .asm_1c8db1
+	load_pos_div4(gb, wGolfParaGoomYPos);
+	gb->cpu.a = alu_add(gb, gb->cpu.e, gb->cpu.b);
+	wr8(gb, wGolfParaGoomYCoord, gb->cpu.a);
+
+	gb->cpu.b = 0x00;
+	gb->cpu.c = alu_sla(gb, gb->cpu.c);
+	uint16_t hl = alu_add16(gb, ADDR_UpdateGolfParaGoom + 0xa1, REG_BC(gb)); // .Framesets
+	gb->cpu.a = rd8(gb, hl++);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = rd8(gb, hl);
+	SET_HL(gb, wGolfParaGoomDuration);
+	CALL(UpdateGolfObjectAnimation);
+
+	gb->cpu.b = FALSE;
+	if (alu_bit(gb, gb->cpu.c, 0))
+		gb_call(gb, ADDR_HandleGolfParaGoomRespawn);
+	if (alu_bit(gb, gb->cpu.b, 0)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = rd8(gb, wGolfParaGoomState);
+	alu_cp(gb, gb->cpu.a, 0x02);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = rd8(gb, wGolfParaGoomDuration);
+		alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z) {
+			gb->cpu.a = rd8(gb, wGolfParaGoomFramesetOffset);
+			alu_cp(gb, gb->cpu.a, 0x1e);
+			if (gb->cpu.f & FLAG_Z) {
+				play_sfx(gb, SFX_0E5); // .asm_1c8e01
+			} else {
+				alu_cp(gb, gb->cpu.a, 0x14);
+				if (gb->cpu.f & FLAG_Z)
+					play_sfx(gb, SFX_00F);
+			}
+		}
+	}
+	// .add_sprite
+	gb->cpu.a = rd8(gb, wGolfParaGoomCurrentFrame);
+	wr8(gb, wGolfParaGoomFrame, gb->cpu.a);
+	SET_HL(gb, wGolfParaGoomSprite);
+	JUMP(LoadGolfSprite);
+}
+
+PORT(UpdateGolfWario)
+{
+	load_pos_div4(gb, wGolfWarioXPos);
+	gb_push16(gb, REG_DE(gb));
+	gb_call(gb, ADDR_Func_1c8f56);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) {
+		SET_DE(gb, gb_pop16(gb));
+		gb->cpu.a = rd8(gb, w1dc21);
+		alu_and(gb, gb->cpu.a, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z)
+			return;
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, w1dc21, 0);
+
+		gb->cpu.a = rd8(gb, wGolfWarioDir);
+		alu_and(gb, gb->cpu.a, gb->cpu.a);
+		bool left = !(gb->cpu.f & FLAG_Z);
+		uint16_t hl = wGolfXScroll;
+		gb->cpu.a = rd8(gb, hl++);
+		gb->cpu.d = rd8(gb, hl);
+		gb->cpu.e = gb->cpu.a;
+		for (int i = 0; i < 2; i++) {
+			gb->cpu.e = alu_sla(gb, gb->cpu.e);
+			gb->cpu.d = alu_rl(gb, gb->cpu.d);
+		}
+		if (!left) {
+			gb->cpu.a = alu_sub(gb, gb->cpu.e, 40);
+			gb->cpu.e = gb->cpu.a;
+			gb->cpu.a = alu_sbc(gb, gb->cpu.d, 0);
+			gb->cpu.d = gb->cpu.a;
+		} else {
+			// .asm_1c8ee5
+			gb->cpu.a = alu_add(gb, gb->cpu.e, (uint8_t)680);
+			gb->cpu.e = gb->cpu.a;
+			gb->cpu.a = alu_adc(gb, gb->cpu.d, (uint8_t)(680 >> 8));
+			gb->cpu.d = gb->cpu.a;
+		}
+		// .asm_1c8efb
+		hl = wGolfWarioXPos;
+		gb->cpu.a = gb->cpu.e;
+		wr8(gb, hl++, gb->cpu.a);
+		wr8(gb, hl, gb->cpu.d);
+		SET_HL(gb, hl);
+		return;
+	}
+	// .asm_1c8f02
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w1dc21, 0);
+	SET_DE(gb, gb_pop16(gb));
+	gb->cpu.a = rd8(gb, wSCX);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_add(gb, gb->cpu.e, OAM_X_OFS);
+	gb->cpu.a = alu_sub(gb, gb->cpu.a, gb->cpu.b);
+	wr8(gb, wGolfWarioXCoord, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, rd8(gb, wGolfWarioYPos), 0x11);
+	wr8(gb, wGolfWarioYCoord, gb->cpu.a);
+	CALL(UpdateGolfWarioAnimation);
+	gb->cpu.a = rd8(gb, wGolfWarioState);
+	alu_cp(gb, gb->cpu.a, GOLF_WARIO_WALKING);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = rd8(gb, wGolfWarioFramesetOffset);
+	alu_cp(gb, gb->cpu.a, 0x2);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = rd8(gb, wGolfWarioDuration);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	play_sfx(gb, SFX_WALK);
+}
+
+PORT_JUMP(HandleGolfHole)
+{
+	gb->cpu.a = (uint8_t)(ADDR_OAM_1ca6cf >> 8);
+	wr8(gb, wGolfOAMPtr + 0, gb->cpu.a);
+	gb->cpu.a = (uint8_t)ADDR_OAM_1ca6cf;
+	wr8(gb, wGolfOAMPtr + 1, gb->cpu.a);
+
+	gb_call(gb, ADDR_GolfHoleStateTable);
+	gb_call(gb, ADDR_UpdateGolfHoleUI);
+	gb_call(gb, ADDR_UpdateGolfParaGoom);
+	gb_call(gb, ADDR_UpdateGolfWario);
+	CALL(ClearUnusedVirtualOAM);
+	gb_call(gb, ADDR_LoadGolfWarioStateGfx);
+	JUMP_TO(ADDR_Func_1c9cf9); // same bank
+}
