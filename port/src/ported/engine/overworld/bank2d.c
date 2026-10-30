@@ -651,6 +651,18 @@ PORT_JUMP(SouthOWFunctions)
 	JUMP_TO(jumptable(gb, ADDR_SouthOWFunctions + 5));
 }
 
+PORT_JUMP(WestOWFunctions)
+{
+	gb->cpu.a = alu_dec(gb, rd8(gb, wOWSceneActionParam));
+	JUMP_TO(jumptable(gb, ADDR_WestOWFunctions + 5));
+}
+
+PORT_JUMP(EastOWFunctions)
+{
+	gb->cpu.a = alu_dec(gb, rd8(gb, wOWSceneActionParam));
+	JUMP_TO(jumptable(gb, ADDR_EastOWFunctions + 5));
+}
+
 PORT_JUMP(_InitOWObjects)
 {
 	gb->cpu.a = rd8(gb, w2d065);
