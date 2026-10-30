@@ -2898,3 +2898,477 @@ PORT_LOCAL_JUMP(HandleTempleShakeScene, StopShake)
 	wr8(gb, w2d894, 0x01);
 	JUMP_TO(ADDR_Func_ad335);
 }
+
+// HiddenFigureRevealScene: hand-computed local offsets, checked against the ROM
+#define HF_REVEAL (ADDR_HiddenFigureRevealScene)
+
+PORT_JUMP(HiddenFigureRevealScene)
+{
+	gb->cpu.a = rd8(gb, w2d013);
+	alu_cp(gb, gb->cpu.a, 0x02);
+	if (!(gb->cpu.f & FLAG_C)) {
+		gb->cpu.a = rd8(gb, wGameModeFlags);
+		if (alu_bit(gb, gb->cpu.a, MODE_FOUGHT_A_HIDDEN_FIGURE_F)) {
+			gb->cpu.a = rd8(gb, wJoypadPressed);
+			if (alu_bit(gb, gb->cpu.a, B_PAD_B)) {
+				JUMP_TO(ADDR_SetFightAgainstAHiddenFigure);
+				return;
+			}
+		}
+	}
+	// .cant_skip
+	gb_call(gb, ADDR_DoHiddenFigureLeftHandMovement);
+	gb_call(gb, ADDR_DoHiddenFigureRightHandMovement);
+	SET_HL(gb, w2d014);
+	wr8(gb, w2d014, alu_inc(gb, rd8(gb, w2d014)));
+	gb->cpu.a = rd8(gb, w2d013);
+	JUMP_TO(jumptable(gb, HF_REVEAL + 0x24));
+}
+
+// ld c, n / jp Func_ad011
+static void hidden_figure_wait(GB *gb, uint8_t n)
+{
+	gb->cpu.c = n;
+	JUMP_TO(ADDR_Func_ad011);
+}
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Wait1) { hidden_figure_wait(gb, 40); }
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Wait2) { hidden_figure_wait(gb, 30); }
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Wait3) { hidden_figure_wait(gb, 40); }
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad0bd) { JUMP_TO(ADDR_Func_acaf3); }
+
+// ld a, [w2d014] / cp n: true (ret c) if below n
+static bool hidden_figure_counter_below(GB *gb, uint8_t n)
+{
+	gb->cpu.a = rd8(gb, w2d014);
+	alu_cp(gb, gb->cpu.a, n);
+	return gb->cpu.f & FLAG_C;
+}
+
+// ld a, [wJoypadPressed] / bit B_PAD_A, a: true (ret z) if A isn't pressed
+static bool a_not_pressed(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	return !alu_bit(gb, gb->cpu.a, B_PAD_A);
+}
+
+// ld hl, wSceneObj1State / ld a, $01 / call SetSceneObjState /
+// jp Func_ad016
+static void show_text_arrow(GB *gb)
+{
+	SET_HL(gb, wSceneObj1State);
+	gb->cpu.a = 0x01;
+	CALL(SetSceneObjState);
+	JUMP_TO(ADDR_Func_ad016);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, WaitThenShowTextArrow)
+{
+	if (hidden_figure_counter_below(gb, 30)) {
+		RET();
+		return;
+	}
+	show_text_arrow(gb);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, WaitAButtonThenClearTextbox)
+{
+	if (a_not_pressed(gb)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, wSceneObj1State);
+	CALL(SetSceneObjState);
+	gb_call(gb, ADDR_ClearTextbox);
+	JUMP_TO(ADDR_Func_ad016);
+}
+
+// .Func_ad16a: call HandleTempleWarioPanic / jp Func_ad016
+static void hidden_figure_panic_advance(GB *gb)
+{
+	gb_call(gb, ADDR_HandleTempleWarioPanic);
+	JUMP_TO(ADDR_Func_ad016);
+}
+
+// ld a, n / ld [w2d880], a / xor a / ld [wPalConfig1TotalSteps], a /
+// ld [wPalConfig2TotalSteps], a
+static void hidden_figure_start_fade(GB *gb, uint8_t n)
+{
+	gb->cpu.a = n;
+	wr8(gb, w2d880, n);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wPalConfig1TotalSteps, 0);
+	wr8(gb, wPalConfig2TotalSteps, 0);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad0e4)
+{
+	gb_call(gb, ADDR_HandleTempleShakeAndRocks);
+	hidden_figure_start_fade(gb, 0x03);
+	hidden_figure_panic_advance(gb);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad0f6)
+{
+	gb_call(gb, ADDR_HandleTempleWarioPanic);
+	gb_call(gb, ADDR_HandleTempleShakeAndRocks);
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d014), 0x0f);
+	if (gb->cpu.a) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_PrologueFade);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, InitShakeAndRocks)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d896, 0x01);
+	gb_call(gb, ADDR_HandleTempleShakeAndRocks);
+	gb->cpu.a = 0x00; // ld a, $00 keeps the flags
+	static const uint16_t sizes[] = {
+		wTempleRock1Size, wTempleRock2Size, wTempleRock3Size, wTempleRock4Size,
+		wTempleRock5Size, wTempleRock6Size, wTempleRock7Size, wTempleRock8Size,
+		wTempleRock9Size, wTempleRock10Size,
+	};
+	for (int i = 0; i < 10; i++)
+		wr8(gb, sizes[i], 0);
+	hidden_figure_panic_advance(gb);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad12f)
+{
+	gb_call(gb, ADDR_HandleTempleWarioPanic);
+	gb_call(gb, ADDR_HandleTempleShakeAndRocks);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_DE(gb, TEMPLE_ROCK_STRUCT_LENGTH);
+	uint16_t hl = wTempleRocks;
+	gb->cpu.b = NUM_TEMPLE_ROCKS;
+	do {
+		gb->cpu.a = alu_add(gb, gb->cpu.a, rd8(gb, hl));
+		hl = alu_add16(gb, hl, REG_DE(gb));
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (!(gb->cpu.f & FLAG_Z));
+	SET_HL(gb, hl);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = LCDC_BG_MAP;
+	wr8(gb, wLCDCFlagsToFlip, LCDC_BG_MAP);
+	JUMP_TO(ADDR_Func_ad016);
+}
+
+// ld [wHDMADestVRAMBank], a (a = vram_bank) / ld de, src / ld b, dest /
+// ld c, mode / ld a, BANK(HiddenFigure1Gfx) / ld [wHDMABank], a /
+// .SetHDMA / .Func_ad16a
+static void hidden_figure_hdma(GB *gb, uint8_t vram_bank, uint16_t src, uint8_t dest)
+{
+	wr8(gb, wHDMADestVRAMBank, vram_bank);
+	SET_DE(gb, src);
+	gb->cpu.b = dest;
+	gb->cpu.c = 0x7f; // $80 dma_tiles
+	gb->cpu.a = BANK_HiddenFigure1Gfx;
+	wr8(gb, wHDMABank, gb->cpu.a);
+	// .SetHDMA
+	gb->cpu.a = gb->cpu.d;
+	wr8(gb, wHDMA + 0, gb->cpu.d); // source ptr
+	gb->cpu.a = gb->cpu.e;
+	wr8(gb, wHDMA + 1, gb->cpu.e);
+	gb->cpu.a = gb->cpu.b;
+	wr8(gb, wHDMA + 2, gb->cpu.b); // dest ptr
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wHDMA + 3, 0);
+	gb->cpu.a = gb->cpu.c;
+	wr8(gb, wHDMA + 4, gb->cpu.c); // mode
+	SET_HL(gb, wHDMA + 4);
+	hidden_figure_panic_advance(gb);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, LoadHiddenFigureGfx1)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	hidden_figure_hdma(gb, 0, (uint16_t)(ADDR_HiddenFigure1Gfx + 0x80 * 0x10), 0x08);
+}
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, LoadHiddenFigureGfx2)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	hidden_figure_hdma(gb, 0, (uint16_t)(ADDR_HiddenFigure1Gfx + 0x100 * 0x10), 0x10);
+}
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, LoadHiddenFigureGfx3)
+{
+	gb->cpu.a = 0x01; // BANK("VRAM1")
+	hidden_figure_hdma(gb, 0x01, ADDR_HiddenFigure2Gfx, 0x00);
+}
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, SetHDMA)
+{
+	gb->cpu.a = gb->cpu.d;
+	wr8(gb, wHDMA + 0, gb->cpu.d);
+	gb->cpu.a = gb->cpu.e;
+	wr8(gb, wHDMA + 1, gb->cpu.e);
+	gb->cpu.a = gb->cpu.b;
+	wr8(gb, wHDMA + 2, gb->cpu.b);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wHDMA + 3, 0);
+	gb->cpu.a = gb->cpu.c;
+	wr8(gb, wHDMA + 4, gb->cpu.c);
+	SET_HL(gb, wHDMA + 4);
+	hidden_figure_panic_advance(gb);
+}
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad16a) { hidden_figure_panic_advance(gb); }
+
+// ld hl, obj / ld a, y / ld [hli], a / ld [hl], x
+static void hidden_figure_obj_pos(GB *gb, uint16_t obj, uint8_t y, uint8_t x)
+{
+	gb->cpu.a = y;
+	wr8(gb, obj, y);
+	wr8(gb, (uint16_t)(obj + 1), x);
+	SET_HL(gb, (uint16_t)(obj + 1));
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad195)
+{
+	gb_call(gb, ADDR_HandleTempleWarioPanic);
+	if (hidden_figure_counter_below(gb, 30)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x0d;
+	SET_HL(gb, wSceneObj7State);
+	CALL(SetSceneObjState);
+	gb->cpu.a = 0x11;
+	SET_HL(gb, wSceneObj3State);
+	CALL(SetSceneObjState);
+	gb->cpu.a = 0x12;
+	SET_HL(gb, wSceneObj4State);
+	CALL(SetSceneObjState);
+	hidden_figure_obj_pos(gb, wSceneObj7, 0x38, 0x50);
+	hidden_figure_obj_pos(gb, wSceneObj3, 0x58, 0x20);
+	hidden_figure_obj_pos(gb, wSceneObj4, 0x58, 0x80);
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d8da, 0x01);
+	wr8(gb, w2d8dc, 0x01);
+	hidden_figure_start_fade(gb, 0x04);
+	JUMP_TO(ADDR_Func_ad016);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad1e3)
+{
+	gb_call(gb, ADDR_HandleTempleWarioPanic);
+	gb->cpu.c = 0x07;
+	gb->cpu.a = rd8(gb, wPalConfig1TotalSteps);
+	alu_cp(gb, gb->cpu.a, 0x14);
+	if (!(gb->cpu.f & FLAG_C))
+		gb->cpu.c = 0x03;
+	// .asm_ad1f1
+	gb->cpu.a = alu_and(gb, rd8(gb, w2d014), gb->cpu.c);
+	if (gb->cpu.a) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_PrologueFade);
+}
+
+PORT_LOCAL(HiddenFigureRevealScene, InitTextPrintOnBGMap1)
+{
+	gb_call(gb, ADDR_InitTextPrinting);
+	gb->cpu.a = 0x01;
+	wr8(gb, wBGMapToPrintText, 0x01);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad207)
+{
+	if (hidden_figure_counter_below(gb, 30)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x04;
+	wr8(gb, wCurTextBufferPage, 0x04);
+	JUMP_TO(ADDR_Func_ad016);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, StartHiddenFigureMouthMovement)
+{
+	gb->cpu.a = 0x10;
+	wr8(gb, wSceneObj7State, 0x10);
+	JUMP_TO(ADDR_Func_ad016);
+}
+
+// ld a, [wSceneObj7State] / cp n: true (ret nz) if it isn't n
+static bool obj7_state_isnt(GB *gb, uint8_t n)
+{
+	gb->cpu.a = rd8(gb, wSceneObj7State);
+	alu_cp(gb, gb->cpu.a, n);
+	return !(gb->cpu.f & FLAG_Z);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, PlayHiddenFigureLaughSFX)
+{
+	if (obj7_state_isnt(gb, 0x0e)) {
+		RET();
+		return;
+	}
+	play_sfx(gb, SFX_HIDDEN_FIGURE_LAUGH);
+	JUMP_TO(ADDR_Func_ad016);
+}
+
+// ld a, [wCurTextLine] / cp $80: true (ret nz) if it isn't $80
+static bool text_line_isnt_80(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wCurTextLine);
+	alu_cp(gb, gb->cpu.a, 0x80);
+	return !(gb->cpu.f & FLAG_Z);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, PrintTextUntilNextPage)
+{
+	gb_call(gb, ADDR_PrintTextWithoutHeader);
+	if (text_line_isnt_80(gb)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_Func_ad016);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad23a)
+{
+	gb->cpu.a = rd8(gb, w2d014);
+	alu_cp(gb, gb->cpu.a, 40);
+	if (gb->cpu.f & FLAG_Z) {
+		// .finish_mouth_movement
+		gb->cpu.a = 0x0f;
+		wr8(gb, wSceneObj7State, 0x0f);
+		RET();
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 70);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	SET_HL(gb, wCurTextBufferPage);
+	wr8(gb, wCurTextBufferPage, alu_inc(gb, rd8(gb, wCurTextBufferPage)));
+	show_text_arrow(gb);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad259)
+{
+	if (a_not_pressed(gb)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, wSceneObj1State);
+	CALL(SetSceneObjState);
+	gb_call(gb, ADDR_ClearTextboxExceptHeader);
+	gb->cpu.a = 0x10;
+	wr8(gb, wSceneObj7State, 0x10);
+	JUMP_TO(ADDR_Func_aca6d);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad271)
+{
+	if (obj7_state_isnt(gb, 0x0e)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_Func_aca6d);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad27a)
+{
+	gb_call(gb, ADDR_PrintTextWithoutHeader);
+	gb_call(gb, HF_REVEAL + 0x24e); // .HandleHiddenFigureMouthClosing
+	if (text_line_isnt_80(gb)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_Func_af135);
+}
+
+PORT_LOCAL(HiddenFigureRevealScene, HandleHiddenFigureMouthClosing)
+{
+	gb->cpu.a = rd8(gb, wPendingCharDest);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	gb->cpu.a = rd8(gb, wCurTextBufferLine);
+	alu_cp(gb, gb->cpu.a, 1);
+	if (gb->cpu.f & FLAG_Z)
+		return;
+	gb->cpu.a = rd8(gb, wLanguage);
+	bool english = alu_and(gb, gb->cpu.a, gb->cpu.a) != 0;
+	// positions for pages 5 to 9
+	static const uint8_t jp_pos[] = {1, 8, 8, 12, 1};
+	static const uint8_t en_pos[] = {10, 12, 5, 11, 12};
+	gb->cpu.a = rd8(gb, wCurTextBufferPage);
+	int pos = -1;
+	for (int page = 5; page <= 9; page++) {
+		alu_cp(gb, gb->cpu.a, (uint8_t)page);
+		if (gb->cpu.f & FLAG_Z) {
+			pos = english ? en_pos[page - 5] : jp_pos[page - 5];
+			break;
+		}
+	}
+	if (pos < 0)
+		return;
+	gb->cpu.b = (uint8_t)pos;
+	// .check_pos
+	gb->cpu.a = rd8(gb, wCurTextLinePos);
+	alu_cp(gb, gb->cpu.a, gb->cpu.b);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = rd8(gb, wCurTextBufferLine);
+	alu_cp(gb, gb->cpu.a, 2);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = 0x0f;
+	wr8(gb, wSceneObj7State, 0x0f);
+	SET_HL(gb, wSceneObj9State);
+}
+
+PORT_LOCAL(HiddenFigureRevealScene, Func_ad2f4)
+{
+	if (obj7_state_isnt(gb, 0x0d))
+		return;
+	gb_call(gb, ADDR_Func_acaf3);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	wr8(gb, REG_HL(gb), alu_dec(gb, rd8(gb, REG_HL(gb))));
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad300)
+{
+	gb->cpu.a = SCENEWARIO_PANIC_JUMP;
+	gb_call(gb, ADDR_SetSceneWarioState);
+	JUMP_TO(ADDR_Func_ad016);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad308)
+{
+	if (hidden_figure_counter_below(gb, 30)) {
+		RET();
+		return;
+	}
+	show_text_arrow(gb);
+}
+
+PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad319)
+{
+	if (a_not_pressed(gb)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSceneObj1State, 0);
+	gb_call(gb, ADDR_ClearTextbox);
+	JUMP_TO(ADDR_Func_ad016);
+}
