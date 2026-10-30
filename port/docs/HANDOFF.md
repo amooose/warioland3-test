@@ -231,7 +231,57 @@ Four agents ported 512 routines at once this way:
   Likewise, when the native run never finishes, an asm run that finishes
   only after turning unrealistic is inconclusive, not a FAIL.
 
+### Per-frame traces (src/trace.c)
+
+These test the port as a whole, not one routine at a time, and they are
+what checks later steps once the interpreter is gone.
+
+```
+build/wl3 --headless --input tests/inputs/X.input --trace-write X.trace
+build/wl3 --headless --input tests/inputs/X.input --trace-check X.trace
+```
+
+- **What's recorded.** Write replays the input in pure asm and records a
+  hash of every part of the machine state each game frame, that is, each
+  pass through `InitWithoutDemoPowerUpReset.GameLoop`. Check replays it
+  with the native routines and compares every frame. At the first
+  mismatch it reruns the asm and prints the differing bytes with their
+  labels.
+- **Timing.** Native code is far faster than the asm, so:
+  - Frames are compared per game frame, not per video frame, leaving out
+    LY, STAT, the timers, IF and the dead stack below SP.
+  - Buttons are fed per game frame.
+  - Reads that depend on timing are replayed from the trace: every DIV
+    read, plus the reads listed in `sites[]` in trace.c. Add a site there
+    when a trace shows a read like `UpdateRoomAnimatedTiles`'s LY check.
+  - A difference in the screen alone is counted but doesn't fail.
+- **Results (2026-10-30).** 9 of the 10 recordings match on every game
+  frame. `yellowbelly` diverges at game frame 16296: one VRAM attribute
+  byte ($9929, bank 1) while a room loads during a door transition. The
+  asm's load spans about 54 video frames, so V-Blank interrupts
+  (LevelVBlankFunc, VBlank_DoorTransition) interleave with
+  `DrawRoom_FromStart`'s use of the BG map queues. The native load is
+  much shorter. It isn't settled whether this is purely timing or a port
+  bug.
+- **Not in ctest yet,** because of the yellowbelly divergence. A trace
+  depends only on the recording and the ROM, so write it once while the
+  interpreter exists, and keep it next to the recording.
+
 ## Open issues
+
+- **After a game over, native code stays one call deep.** The game
+  restarts its main loop by jumping to `InitWithoutDemoPowerUpReset` from
+  inside a native routine's `gb_call`, which then never returns, so
+  `call_depth` stays at 1. main.c only takes save states at depth 0, so
+  in the native port save states stop working after a game over until the
+  game is restarted.
+- **`Func_19706` fails one synthetic fuzz variant on `yellowbelly`.** The
+  variant mutates `wBlockPtr` to point into ROM, and the
+  `wBlockFunctionTable` entry it reaches points into the middle of
+  `UpdateRoomAnimatedPals` ($2b20). The callees pass on their own. This
+  is probably a garbage path the harness should call unrealistic, but
+  the exact path isn't pinned down. It fails the local
+  `fuzz_yellowbelly_1` test.
 
 1. **`Prologue_WarioFallFromPlane`** (may be stale) (`src/ported/engine/overworld/bank2b_2.c`,
    ported by a parallel agent with `PORT_NESTED` and `dispatch` /
