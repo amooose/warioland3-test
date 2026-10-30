@@ -182,3 +182,17 @@ PORT_JUMP(ApplyWalkVelocity_Left)
 	}
 	JUMP(ApplySlopedWalkVelocity);
 }
+
+PORT_JUMP(ResetLevelMusicWarioPalsAndState)
+{
+	CALL(UpdateLevelMusic);
+	SET_HL(gb, ADDR_WarioDefaultPal);
+	CALL(SetWarioPal);
+	gb->cpu.a = rd8(gb, wJumpVelTable);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z)
+		FARCALL(SetState_Idling);
+	else
+		FARCALL(StartFall); // .fall
+	JUMP(PlayRecoverySFX);
+}

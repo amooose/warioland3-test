@@ -90,3 +90,38 @@ PORT(SetPerfectState)
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wSubState, 0);
 }
+
+PORT(SaveGameOrEnterPerfectScreen)
+{
+	bool perfect = false;
+	gb->cpu.a = rd8(gb, wGameModeFlags);
+	if (!alu_bit(gb, gb->cpu.a, MODE_TIME_ATTACK_F)) {
+		gb->cpu.a = rd8(gb, wTransitionParam);
+		alu_cp(gb, gb->cpu.a, TRANSITION_EPILOGUE_NOT_PERFECT);
+		if (gb->cpu.f & FLAG_Z) goto dont_set_perfect;
+		alu_cp(gb, gb->cpu.a, TRANSITION_EPILOGUE_PERFECT);
+		if (gb->cpu.f & FLAG_Z) goto dont_set_perfect;
+		alu_cp(gb, gb->cpu.a, TRANSITION_GAME_OVER);
+		if (gb->cpu.f & FLAG_Z) goto dont_set_perfect;
+		gb->cpu.a = alu_and(gb, rd8(gb, wGameModeFlags), MODE_GAME_CLEARED);
+		if (gb->cpu.f & FLAG_Z) goto dont_set_perfect;
+		gb->cpu.a = alu_dec(gb, rd8(gb, wNumCollectedTreasures));
+		perfect = (gb->cpu.f & FLAG_Z) != 0;
+	}
+	if (perfect) {
+		// SetPerfectState
+		SET_HL(gb, wState);
+		wr8(gb, wState, ST_PERFECT);
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wSubState, 0);
+		return;
+	}
+dont_set_perfect:
+	gb->cpu.a = rd8(gb, wSubState);
+	wr8(gb, wPendingSubState, gb->cpu.a);
+	gb->cpu.a = ST_PAUSE_MENU;
+	wr8(gb, wState, gb->cpu.a);
+	gb->cpu.a = SST_PAUSE_18;
+	wr8(gb, wSubState, gb->cpu.a);
+}

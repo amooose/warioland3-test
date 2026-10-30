@@ -22,3 +22,16 @@ PORT_JUMP(ReturnToMapFromLevel)
 	wr8(gb, wDayNight, (uint8_t)(rd8(gb, wDayNight) | 0x80));
 	JUMP(ReturnToMap); // fallthrough
 }
+
+PORT(ReturnToPauseMenuFromActionHelp)
+{
+	// push_wram $03
+	gb->cpu.a = rd8(gb, rWBK);
+	push_af(gb);
+	gb->cpu.a = 0x03;
+	wr8(gb, rWBK, gb->cpu.a);
+	FARCALL(_ReturnToPauseMenuFromActionHelp);
+	// pop_wram
+	pop_af(gb);
+	wr8(gb, rWBK, gb->cpu.a);
+}

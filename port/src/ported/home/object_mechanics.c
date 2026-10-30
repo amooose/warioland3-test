@@ -681,3 +681,62 @@ PORT(ProcessBlockOnLeft) { homecall_process_block(gb, ADDR_ProcessBlockOnLeft, B
 PORT(ProcessBlockOnRight) { homecall_process_block(gb, ADDR_ProcessBlockOnRight, BANK__ProcessBlockOnRight, ADDR__ProcessBlockOnRight); }
 PORT(Func_358b) { homecall_process_block(gb, ADDR_Func_358b, BANK_Func_19b9b, ADDR_Func_19b9b); }
 PORT(Func_35a3) { homecall_process_block(gb, ADDR_Func_35a3, BANK_Func_19b8b, ADDR_Func_19b8b); }
+
+// ld a, c / add a / add a / add a / or autoinc / ldh [index], a /
+// ld c, LOW(data)
+static void select_pal(GB *gb, uint16_t index_reg, uint8_t autoinc, uint16_t data_reg)
+{
+	gb->cpu.a = alu_add(gb, gb->cpu.c, gb->cpu.c);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a); // *8
+	gb->cpu.a = alu_or(gb, gb->cpu.a, autoinc);
+	wr8(gb, index_reg, gb->cpu.a);
+	gb->cpu.c = (uint8_t)data_reg;
+}
+
+// wait_not_hblank / wait_hblank
+static void wait_next_hblank(GB *gb)
+{
+	while (!(gb->cpu.a = alu_and(gb, rd8(gb, rSTAT), STAT_MODE)))
+		idle(gb, 32);
+	while ((gb->cpu.a = alu_and(gb, rd8(gb, rSTAT), STAT_MODE)))
+		idle(gb, 32);
+}
+
+// copies b palettes from hl, one per H-Blank
+static void set_pals(GB *gb, uint16_t index_reg, uint8_t autoinc, uint16_t data_reg)
+{
+	select_pal(gb, index_reg, autoinc, data_reg);
+	uint16_t hl = REG_HL(gb);
+	do {
+		wait_next_hblank(gb);
+		for (int i = 0; i < PAL_SIZE; i++) {
+			gb->cpu.a = rd8(gb, hl++);
+			wr8(gb, (uint16_t)(0xff00 + gb->cpu.c), gb->cpu.a);
+		}
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (gb->cpu.b);
+	SET_HL(gb, hl);
+}
+
+// blacks out b palettes, one per H-Blank
+static void black_out_pals(GB *gb, uint16_t index_reg, uint8_t autoinc, uint16_t data_reg)
+{
+	select_pal(gb, index_reg, autoinc, data_reg);
+	do {
+		wait_next_hblank(gb);
+		gb->cpu.a = alu_xor(gb, gb->cpu.a, gb->cpu.a);
+		for (int i = 0; i < PAL_SIZE; i++)
+			wr8(gb, (uint16_t)(0xff00 + gb->cpu.c), gb->cpu.a);
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (gb->cpu.b);
+}
+
+// c = OB pal index, b = num of pals, hl = pals
+PORT(SetOBPals) { set_pals(gb, rOBPI, OBPI_AUTOINC, rOBPD); }
+// c = BG pal index, b = num of pals, hl = pals
+PORT(SetBGPals) { set_pals(gb, rBGPI, BGPI_AUTOINC, rBGPD); }
+// blacks out b OB palettes starting from OB palette index c
+PORT(BlackOutOBPals) { black_out_pals(gb, rOBPI, OBPI_AUTOINC, rOBPD); }
+// blacks out b BG palettes starting from BG palette index c
+PORT(BlackOutBGPals) { black_out_pals(gb, rBGPI, BGPI_AUTOINC, rBGPD); }
