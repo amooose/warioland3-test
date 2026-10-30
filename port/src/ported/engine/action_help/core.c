@@ -156,3 +156,78 @@ finish:
 	SET_HL(gb, wSubState);
 	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
 }
+
+// hl = obj frameset pointer + 1 / farcall $79, UpdateObjAnim /
+// hl = obj / farcall LoadActionHelpSprite
+static void update_menu_obj(GB *gb, uint16_t frameset_ptr, uint16_t obj)
+{
+	SET_HL(gb, frameset_ptr + 1);
+	FARCALL_BANK(0x79, UpdateObjAnim);
+	SET_HL(gb, obj);
+	FARCALL(LoadActionHelpSprite);
+}
+
+PORT_JUMP(UpdateActionHelp)
+{
+	// lower overall volume
+	gb->cpu.a = AUDIOMOD_VOLUME;
+	gb->cpu.b = 0x20; // 0.5q6
+	gb->cpu.d = SFX_CHANNELS;
+	gb->cpu.e = MUSIC_CHANNELS >> 4;
+	CALL(ExecuteAudioMod);
+
+	gb->cpu.a = alu_and(gb, rd8(gb, wPowerUpLevel), 0x80);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = alu_and(gb, rd8(gb, wJoypadPressed), PAD_A | PAD_B | PAD_START);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			// .CloseActionHelp
+			gb->cpu.a = alu_and(gb, rd8(gb, wPowerUpLevel), ACTION_HELP_TITLE_SCREEN);
+			if (!(gb->cpu.f & FLAG_Z)) {
+				JUMP(InitWithoutDemoPowerUpReset);
+				return;
+			}
+			// return to Pause Menu
+			gb->cpu.a = 0;
+			gb->cpu.f = FLAG_Z; // xor a
+			wr8(gb, wAnimatedTilesFrameDuration, 0);
+			wr8(gb, wAnimatedTilesGfx, 0);
+			wr8(gb, wAnimatedTilesFrameCount, 0);
+			wr8(gb, wAnimatedTilesFrame, 0);
+			wr8(gb, w3d50d, 0);
+			CALL(ResumeNormalVolume);
+			SET_HL(gb, wSubState);
+			wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+			RET();
+			return;
+		}
+	}
+	// .skip_handle_input
+	SET_HL(gb, wActionHelpCounter);
+	wr8(gb, wActionHelpCounter, alu_inc(gb, rd8(gb, wActionHelpCounter)));
+
+	gb->cpu.a = alu_and(gb, rd8(gb, wActionHelpPowerUp), POWER_UP_MASK);
+	alu_cp(gb, gb->cpu.a, NUM_MAIN_POWER_UPS);
+	if (!(gb->cpu.f & FLAG_C)) {
+		FARCALL(ExecuteSpecialPowerUpActionHelp);
+	} else {
+		// .main_power_up
+		CALL(ProcessDPadRepeat);
+		gb->cpu.a = alu_and(gb, rd8(gb, wPowerUpLevel),
+			ACTION_HELP_TITLE_SCREEN | ACTION_HELP_LEVEL_CLEAR);
+		if (gb->cpu.f & FLAG_Z)
+			gb_call_ret(gb, ADDR_Func_1fb6f7, ADDR_UpdateActionHelp + 0x45);
+		// .asm_1f81d9
+		gb_call_ret(gb, ADDR_ExecuteMainPowerUpActionHelp, ADDR_UpdateActionHelp + 0x48);
+
+		// bottom cursor
+		update_menu_obj(gb, wMenuObj1FramesetPtr, wMenuObj1);
+	}
+	// .update_input_anim
+	// d-pad animation
+	update_menu_obj(gb, wMenuObj2FramesetPtr, wMenuObj2);
+	// buttons animation
+	update_menu_obj(gb, wMenuObj3FramesetPtr, wMenuObj3);
+
+	CALL(ClearUnusedVirtualOAM);
+	RET();
+}

@@ -3377,3 +3377,91 @@ PORT_LOCAL_JUMP(HiddenFigureRevealScene, Func_ad319)
 	gb_call(gb, ADDR_ClearTextbox);
 	JUMP_TO(ADDR_Func_ad016);
 }
+
+// hl = music box counter: clears it and advances the music box's action
+// (xor a / ld [hld], a / inc [hl])
+static void func_ad557(GB *gb)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hl, 0);
+	hl--;
+	wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+	SET_HL(gb, hl);
+}
+
+PORT(Func_ad557) { func_ad557(gb); }
+
+// The temple_music_box_hover macro. off_up / off_circle are the offsets of
+// .MoveUpLeft / .MoveCircle from the routine (.Init is always at +$f).
+static void music_box_hover(GB *gb, uint16_t base, uint16_t box, uint16_t obj,
+	uint8_t state, uint16_t off_up, uint16_t off_circle, bool last)
+{
+	SET_HL(gb, box + 1);
+	gb->cpu.a = rd8(gb, box); // ld a, [hli]
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	uint16_t target = jumptable(gb, base + 7);
+	uint16_t off = (uint16_t)(target - base);
+	if (off == 0x0f) {
+		// .Init
+		SET_HL(gb, obj);
+		gb->cpu.a = state;
+		gb_call(gb, ADDR_InitTempleSceneMusicBox);
+	} else if (off == off_up) {
+		// .MoveUpLeft
+		SET_HL(gb, obj + 1); // XCoord
+		gb_call(gb, ADDR_MoveMusicBoxUpLeft);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			RET();
+			return;
+		}
+		if (last) {
+			// play_music2 MUSIC_MUSIC_BOXES
+			gb->cpu.a = (uint8_t)(MUSIC_MUSIC_BOXES >> 8);
+			wr8(gb, hMusicIDBackup + 0, gb->cpu.a);
+			wr8(gb, hMusicID + 0, gb->cpu.a);
+			gb->cpu.a = (uint8_t)MUSIC_MUSIC_BOXES;
+			wr8(gb, hMusicIDBackup + 1, gb->cpu.a);
+			wr8(gb, hMusicID + 1, gb->cpu.a);
+		}
+	} else if (off == off_circle) {
+		// .MoveCircle
+		SET_HL(gb, obj);
+		SET_DE(gb, ADDR_Data_ad654);
+		CALL(ApplyOWMovement);
+		RET();
+		return;
+	} else {
+		JUMP_TO(target); // InvalidMusicBoxAction, or out of the table
+		return;
+	}
+	// .Next
+	SET_HL(gb, box + 1); // wTempleMusicBoxNCounter
+	func_ad557(gb);
+	RET();
+}
+
+PORT_JUMP(HandleTempleMusicBox1Hover)
+{
+	music_box_hover(gb, ADDR_HandleTempleMusicBox1Hover, wTempleMusicBox1, wSceneObj8, 0x3, 0x1c, 0x25, false);
+}
+PORT_JUMP(HandleTempleMusicBox2Hover)
+{
+	music_box_hover(gb, ADDR_HandleTempleMusicBox2Hover, wTempleMusicBox2, wSceneObj9, 0x4, 0x1c, 0x25, false);
+}
+PORT_JUMP(HandleTempleMusicBox3Hover)
+{
+	music_box_hover(gb, ADDR_HandleTempleMusicBox3Hover, wTempleMusicBox3, wSceneObj10, 0x5, 0x1c, 0x25, false);
+}
+PORT_JUMP(HandleTempleMusicBox4Hover)
+{
+	music_box_hover(gb, ADDR_HandleTempleMusicBox4Hover, wTempleMusicBox4, wSceneObj11, 0x6, 0x1d, 0x26, false);
+}
+PORT_JUMP(HandleTempleMusicBox5Hover)
+{
+	music_box_hover(gb, ADDR_HandleTempleMusicBox5Hover, wTempleMusicBox5, wSceneObj12, 0x7, 0x1d, 0x32, true);
+}
