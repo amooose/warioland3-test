@@ -51,6 +51,9 @@ bool hook_register(const char *name, HookFn fn, unsigned flags, unsigned clobber
 Hook *hook_find(GB *gb, uint16_t pc);
 // Same, but ignores whether hooks are enabled (used by the difftest).
 Hook *hook_find_any(GB *gb, uint16_t pc);
+// The enabled hook for a routine in a given bank, whatever is mapped; NULL
+// if none (or hooks are off).
+Hook *hook_at(int bank, uint16_t addr);
 int hook_count(void);
 Hook *hook_get(int i);
 // Disable all hooks (pure interpreter), or re-enable them.

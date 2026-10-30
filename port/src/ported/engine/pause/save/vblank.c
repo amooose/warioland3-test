@@ -23,3 +23,13 @@ PORT(VBlank_SaveScreen)
 {
 	set_vblank_func(gb, ADDR_VBlank_SaveScreen + 0x0c, 0x23);
 }
+
+// VBlank_Saving.Func, as copied to wVBlankFunc (see ram_code.c). Its calls
+// return to gb->cpu.pc + n, the block's start wherever it runs from.
+PORT_LOCAL_JUMP(VBlank_Saving, Func)
+{
+	uint16_t base = gb->cpu.pc;
+	gb->cpu.a = (uint8_t)(wVirtualOAM >> 8);
+	gb_call_ret(gb, hTransferVirtualOAM, (uint16_t)(base + 0x05));
+	RET();
+}

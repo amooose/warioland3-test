@@ -6,6 +6,10 @@
 // interpreter. See ram_hook_register in hooks.h.
 #include "ported.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 // Does RAM at addr hold `code` (len bytes), ignoring the bytes where `wild`
 // is set?
 static bool ram_is(GB *gb, uint16_t addr, const uint8_t *code, const uint8_t *wild, int len)
@@ -69,9 +73,68 @@ static bool transfer_virtual_oam(GB *gb)
 // ld [de], a / inc c once per queued tile, then a jp.
 static const uint8_t tile_copy_code[] = {0x2a, 0x57, 0x2a, 0x5f, 0x0a, 0x12, 0x0c};
 
+// The V-Blank functions the screens copy into wVBlankFunc: each is an
+// X.Func ... X.end block in ROM (found in the .sym file), and runs from RAM
+// byte for byte as it would from ROM. One whose ROM block has a native
+// routine (PORT_LOCAL(X, Func)) runs that instead.
+typedef struct {
+	int bank;
+	uint16_t addr;
+	size_t off; // into the ROM
+	int len;
+} CopiedFunc;
+
+static CopiedFunc *copied;
+static int ncopied = -1;
+
+static void find_copied_funcs(void)
+{
+	ncopied = 0;
+	copied = malloc((size_t)(sym_count() ? sym_count() : 1) * sizeof(CopiedFunc));
+	for (int i = 0; i < sym_count(); i++) {
+		const char *name;
+		int bank, end_bank;
+		uint16_t addr, end;
+		if (!sym_get(i, &name, &bank, &addr))
+			continue;
+		size_t len = strlen(name);
+		if (len < 6 || (strcmp(name + len - 5, ".Func") && strcmp(name + len - 5, ".func")) || addr >= 0x8000)
+			continue;
+		char end_name[128];
+		snprintf(end_name, sizeof(end_name), "%.*s.end", (int)(len - 5), name);
+		if (!sym_lookup(end_name, &end_bank, &end) || end_bank != bank || end <= addr || end - addr > 0x200)
+			continue;
+		size_t off = addr < 0x4000 ? addr : (size_t)bank * 0x4000 + (addr - 0x4000);
+		copied[ncopied++] = (CopiedFunc){bank, addr, off, end - addr};
+	}
+}
+
+static bool copied_func(GB *gb)
+{
+	if (ncopied < 0)
+		find_copied_funcs();
+	for (int i = 0; i < ncopied; i++) {
+		const CopiedFunc *c = &copied[i];
+		if (c->off + (size_t)c->len > gb->rom_size ||
+			!ram_is(gb, gb->cpu.pc, gb->rom + c->off, NULL, c->len))
+			continue;
+		Hook *h = hook_at(c->bank, c->addr);
+		if (!h)
+			continue;
+		h->calls++;
+		h->fn(gb);
+		if (!(h->flags & HOOK_MANUAL_RET))
+			RET();
+		return true;
+	}
+	return false;
+}
+
 static bool vblank_code(GB *gb)
 {
 	uint16_t pc = gb->cpu.pc;
+	if (pc == wVBlankFunc && copied_func(gb))
+		return true;
 	int n = 0;
 	while (n < 0x100 && ram_is(gb, (uint16_t)(pc + n * 7), tile_copy_code, NULL, sizeof(tile_copy_code)))
 		n++;

@@ -185,6 +185,17 @@ Hook *hook_find_any(GB *gb, uint16_t pc)
 	return NULL;
 }
 
+Hook *hook_at(int bank, uint16_t addr)
+{
+	if (!all_enabled)
+		return NULL;
+	int b = addr < 0x4000 ? 0 : bank;
+	for (int i = 0; i < nhooks; i++)
+		if (hooks[i].addr == addr && hooks[i].bank == b && hooks[i].enabled)
+			return &hooks[i];
+	return NULL;
+}
+
 int hook_count(void)
 {
 	return nhooks;
