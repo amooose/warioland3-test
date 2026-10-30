@@ -26,9 +26,12 @@ scripting and expansion on top. The approach:
 ## Current state
 
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`.
-- **Progress (2026-10-30):** about 96% of the routines and 97% of the
-  instructions are ported, including `VBlank`, `JumpTable` and
-  `HandleSound`. Ordinary porting is done: "Ready to port" only lists
+- **Progress (2026-10-30):** 3438 / 3491 routines (98.5%) and 99.7% of
+  the instructions are ported, including the level frame loop
+  (`UpdateLevel`, `UpdateObject`, `ProcessInteractions`), `VBlank`,
+  `JumpTable` and `HandleSound`. While the port plays the recordings, the
+  interpreter now runs 12.4M instructions in all, down from 169M (see
+  "What still runs as asm"). Ordinary porting is done: "Ready to port" only lists
   routines that can't or needn't be ported (see "Good next batches"). Run
   `cmake --build build --target progress` and read `build/progress.md` for
   the per-directory numbers.
