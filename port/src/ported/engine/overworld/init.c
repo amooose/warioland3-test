@@ -301,3 +301,363 @@ PORT_JUMP(Func_803e6)
 }
 
 PORT(LoadCloudAndSeaGfx) { FARCALL(_LoadCloudAndSeaGfx); }
+
+#define OW_LCDC_WIN (LCDC_ON | LCDC_WIN_9C00 | LCDC_WIN_ON | LCDC_OBJ_16 | LCDC_OBJ_ON | LCDC_BG_ON)
+
+// xor a / ld hl, wTempPals1 palette 7 color 1 / ld bc, $6 / call WriteAToHL_BCTimes
+static void clear_pal7_colors(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, wTempPals1 + PAL_SIZE * 7 + COLOR_SIZE * 1);
+	SET_BC(gb, 0x6);
+	CALL(WriteAToHL_BCTimes);
+}
+
+// ld hl, src / ld de, dest / ld b, n / call CopyHLToDE
+static void copy_bytes(GB *gb, uint16_t hl, uint16_t de, uint8_t b)
+{
+	SET_HL(gb, hl);
+	SET_DE(gb, de);
+	gb->cpu.b = b;
+	CALL(CopyHLToDE);
+}
+
+static void set_vbk1(GB *gb)
+{
+	gb->cpu.a = 1; // BANK("VRAM1")
+	wr8(gb, rVBK, 1);
+}
+
+static void set_vbk0(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+}
+
+PORT(Func_8065e)
+{
+	gb->cpu.a = gb->cpu.c = rd8(gb, wGameModeFlags);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, MODE_GAME_CLEARED);
+	if (alu_bit(gb, gb->cpu.c, MODE_TIME_ATTACK_F)) {
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+	}
+	wr8(gb, wMissingTreasureIndicatorsEnabled, gb->cpu.a);
+	gb_call(gb, ADDR_Func_80b54);
+
+	decompress_tiles0(gb, BANK_OverworldTopBarTilemap, ADDR_OverworldTopBarTilemap,
+		v0BGMap0 + 29 * TILEMAP_WIDTH);
+	decompress_tiles1(gb, BANK_OverworldTopBarAttrmap, ADDR_OverworldTopBarAttrmap,
+		v1BGMap0 + 29 * TILEMAP_WIDTH);
+
+	gb->cpu.a = rd8(gb, wOWBarsState);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a) ? 0xec : 0x04;
+	wr8(gb, rSCY, gb->cpu.a);
+	wr8(gb, wSCY, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rSCX, 0);
+	wr8(gb, wSCX, 0);
+	wr8(gb, wVirtualOAMByteSize, 0);
+
+	gb->cpu.a = rd8(gb, wCurMapSide); // a gets overwritten
+	gb_call(gb, ADDR_Func_81dce);
+	gb_call(gb, ADDR_ShowMissingTreasureIndicators);
+	gb_call(gb, ADDR_Func_80bd9);
+	gb_call(gb, ADDR_WriteBGMapFromWRAM);
+
+	gb_call(gb, ADDR_Func_8212c);
+	gb->cpu.a = rd8(gb, wMapSideLevelID);
+	wr8(gb, wLevel2, gb->cpu.a);
+	wr8(gb, w2d068, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wLevelArrowDirections1, 0);
+
+	gb->cpu.a = OWWARIO_DOWN;
+	gb_call(gb, ADDR_SetOWWarioOAM);
+	FARCALL(Func_b4a3d);
+	gb_call(gb, ADDR_Func_82041);
+	FARCALL(Func_b4aa9);
+	gb_call(gb, ADDR_LoadCloudAndSeaGfx);
+
+	gb->cpu.a = rd8(gb, wGameModeFlags);
+	if (!alu_bit(gb, gb->cpu.a, MODE_TIME_ATTACK_F)) {
+		decompress_tiles0(gb, BANK_OverworldBottomBarTreasuresTilemap,
+			ADDR_OverworldBottomBarTreasuresTilemap, v0BGMap1);
+		decompress_tiles1(gb, BANK_OverworldBottomBarTreasuresAttrmap,
+			ADDR_OverworldBottomBarTreasuresAttrmap, v1BGMap1);
+	} else {
+		decompress_tiles0(gb, BANK_OverworldBottomBarTimeAttackTilemap,
+			ADDR_OverworldBottomBarTimeAttackTilemap, v0BGMap1);
+		decompress_tiles1(gb, BANK_OverworldBottomBarTimeAttackAttrmap,
+			ADDR_OverworldBottomBarTimeAttackAttrmap, v1BGMap1);
+	}
+	// .asm_80790
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wWX, 0);
+	wr8(gb, rWX, 0);
+	gb->cpu.a = SCREEN_HEIGHT_PX;
+	wr8(gb, wWY, gb->cpu.a);
+	wr8(gb, rWY, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wBottomBarAction, 0); // BOTBAR_CLOSED
+
+	gb->cpu.a = MAGNIFYING_GLASS;
+	CALL(IsTreasureCollected);
+	wr8(gb, wHasMagnifyingGlass, gb->cpu.a);
+
+	// collection button is always selectable
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, wTopBarSelectableButtons);
+	wr8(gb, wTopBarSelectableButtons, 0);
+	wr8(gb, wTopBarSelectableButtons, 1 << TOPBAR_COLLECTION_F);
+
+	gb_call(gb, ADDR_SetDayNightSpellSelectable);
+	gb_call(gb, ADDR_SetCutsceneButtonSelectable);
+	gb_call(gb, ADDR_SetNextPrevMapButtonsSelectable);
+	gb_call(gb, ADDR_UpdateNextPrevMapButtonsSelectable);
+
+	copy_bytes(gb, v0BGMap0 + 30 * TILEMAP_WIDTH, wAttrmap + 21 * TILEMAP_WIDTH, 2 * TILEMAP_WIDTH);
+	set_vbk1(gb);
+	copy_bytes(gb, v0BGMap0 + 30 * TILEMAP_WIDTH, wAttrmap + 19 * TILEMAP_WIDTH, 2 * TILEMAP_WIDTH);
+	set_vbk0(gb);
+
+	gb->cpu.a = rd8(gb, wOWBarsState);
+	alu_cp(gb, gb->cpu.a, OWBARS_INPUT_TOP);
+	if (gb->cpu.f & FLAG_Z) {
+		gb_call(gb, ADDR_UpdateTopBar + 0x72); // .InitTopBarButtons
+		copy_bytes(gb, wAttrmap + 21 * TILEMAP_WIDTH, v0BGMap0 + 30 * TILEMAP_WIDTH, 2 * TILEMAP_WIDTH);
+		set_vbk1(gb);
+		copy_bytes(gb, wAttrmap + 19 * TILEMAP_WIDTH, v0BGMap0 + 30 * TILEMAP_WIDTH, 2 * TILEMAP_WIDTH);
+		set_vbk0(gb);
+
+		gb->cpu.a = rd8(gb, w2d02c);
+		wr8(gb, wTransitionParam, gb->cpu.a);
+		CALL(PlayOverworldMusic);
+	}
+	// .asm_80809
+	gb_call(gb, ADDR_LoadLevelNameIfValid);
+	gb->cpu.a = rd8(gb, wMapSideLevelID);
+	alu_cp(gb, gb->cpu.a, OW_EXITS);
+	gb->cpu.b = 0x01;
+	if (!(gb->cpu.f & FLAG_C)) {
+		clear_pal7_colors(gb);
+		gb->cpu.b = 0x00;
+	}
+	// .asm_80821
+	gb->cpu.a = gb->cpu.b;
+	wr8(gb, w2d0e0, gb->cpu.a);
+	FARCALL(DrawCoinCount);
+	gb_call(gb, ADDR_SetCompassSprite);
+
+	gb->cpu.a = rd8(gb, wOWBarsState);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a))
+		gb_call(gb, ADDR_DrawBottomBar);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wLevelArrowDirections1, 0);
+	wr8(gb, wOWPalTransitionState, 0);
+	wr8(gb, w2d013, 0);
+
+	gb->cpu.a = OW_LCDC_WIN;
+	wr8(gb, rLCDC, gb->cpu.a);
+
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}
+
+PORT(InitOverworld)
+{
+	gb->cpu.a = 2; // BANK("WRAM2")
+	wr8(gb, rWBK, 2);
+	// stop_music2
+	gb->cpu.a = 0xff;
+	wr8(gb, hMusicIDBackup + 0, 0xff);
+	wr8(gb, hMusicID + 0, 0xff);
+	gb->cpu.a = 0x00;
+	wr8(gb, hMusicIDBackup + 1, 0x00);
+	wr8(gb, hMusicID + 1, 0x00);
+
+	gb->cpu.a = rd8(gb, wTransitionParam);
+	wr8(gb, wLastTransitionParam, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wRoomAnimatedTilesEnabled, 0);
+
+	// if transition was from New Game,
+	// set 0th treasure as collected
+	gb->cpu.a = alu_inc(gb, rd8(gb, wLastTransitionParam));
+	if (gb->cpu.f & FLAG_Z) {
+		// TRANSITION_NEW_GAME
+		SET_HL(gb, wTreasuresCollected);
+		wr8(gb, wTreasuresCollected, rd8(gb, wTreasuresCollected) | 1);
+	}
+
+	// load crayon flags from collected treasures
+	gb_call(gb, ADDR_GetCrayonFlags);
+
+	gb->cpu.a = rd8(gb, wOWBarsState);
+	alu_cp(gb, gb->cpu.a, OWBARS_INPUT_TOP);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		gb->cpu.a = rd8(gb, wOWLevel);
+		alu_cp(gb, gb->cpu.a, LEVEL_GOLF_BUILDING);
+		if (!(gb->cpu.f & FLAG_C)) {
+			// .golf_building
+			gb->cpu.a = 0;
+			gb->cpu.f = FLAG_Z; // xor a
+			wr8(gb, wNextMapSide, 0);
+			wr8(gb, wMapSideLevelID, 0);
+			gb->cpu.a = SST_OVERWORLD_GOLF_BUILDING;
+			wr8(gb, wSubState, gb->cpu.a);
+			gb_call(gb, ADDR_Func_803e6);
+			return;
+		}
+		gb->cpu.b = gb->cpu.a;
+		gb_call(gb, ADDR_GetMapLevelID);
+		gb->cpu.a = gb->cpu.b;
+		wr8(gb, wNextMapSide, gb->cpu.a);
+		gb->cpu.a = gb->cpu.d;
+		wr8(gb, wMapSideLevelID, gb->cpu.a);
+	}
+	// .skip_get_level_index
+	gb_call(gb, ADDR_ClearOWWRAM);
+
+	// jump to corresponding handler depending
+	// on what transition to map it is
+	enum { NO_SCENE, OW_SCENE, CUTSCENE } next;
+	gb->cpu.a = rd8(gb, wLastTransitionParam);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a))
+		goto load_map_without_scene;
+	alu_cp(gb, gb->cpu.a, TRANSITION_RETURN_TO_MAP);
+	if (gb->cpu.f & FLAG_Z)
+		goto load_map_without_scene;
+	alu_cp(gb, gb->cpu.a, TRANSITION_EPILOGUE_NOT_PERFECT);
+	if (gb->cpu.f & FLAG_Z)
+		goto epilogue;
+	alu_cp(gb, gb->cpu.a, TRANSITION_EPILOGUE_PERFECT);
+	if (gb->cpu.f & FLAG_Z)
+		goto epilogue;
+	alu_cp(gb, gb->cpu.a, TRANSITION_GAME_OVER);
+	if (gb->cpu.f & FLAG_Z) {
+		// .game_over
+		gb_call(gb, ADDR_Func_803e6);
+		return;
+	}
+	gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) {
+		// TRANSITION_NEW_GAME
+		gb->cpu.a = EVENT_PROLOGUE;
+		wr8(gb, wCurEvent, gb->cpu.a);
+	} else {
+		// .check_if_unlocked_event
+		// transition was from collected treasure
+		// if an event is unlocked, play cutscene
+		gb_call(gb, ADDR_CheckIfTreasureUnlocksEvent);
+		if (gb->cpu.f & FLAG_Z)
+			goto load_map_without_scene;
+	}
+	// .cutscene_check
+	gb_call(gb, ADDR_SetStoredTransitionParamAsReturnToMap);
+	FARCALL(CheckIfEventHasCutscene);
+	gb->cpu.a = rd8(gb, wEventWithCutscene);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		next = CUTSCENE;
+		goto play;
+	}
+after_cutscene:
+	// check if there's a OW scene to play
+	gb->cpu.a = rd8(gb, wCurEvent);
+	gb_call(gb, ADDR_GetOWSceneParams);
+	if (gb->cpu.f & FLAG_Z)
+		goto load_map_without_scene;
+	next = OW_SCENE;
+play:
+	gb_call(gb, ADDR_UpdateStoredTransitionParam);
+	gb->cpu.a = next == OW_SCENE ? SST_OVERWORLD_OW_SCENE : SST_OVERWORLD_CUTSCENE;
+	wr8(gb, wSubState, gb->cpu.a);
+	return;
+
+epilogue:
+	// plays epilogue sequence
+	gb->cpu.a = TRANSITION_RETURN_TO_MAP;
+	wr8(gb, wStoredTransitionParam, gb->cpu.a);
+	gb->cpu.a = EVENT_EPILOGUE;
+	wr8(gb, wCurEvent, gb->cpu.a);
+	goto after_cutscene;
+
+load_map_without_scene:
+	// simply loads and shows the overworld map
+	// for player to navigate
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCurEvent, 0); // EVENT_00
+	gb->cpu.a = SST_OVERWORLD_09;
+	wr8(gb, wSubState, gb->cpu.a);
+	gb_call(gb, ADDR_Func_803e6);
+}
+
+// call LoadMapSidePals / call gfx / call LoadOverworldCommonGfx /
+// call LoadOverworldArrowsGfx
+static void init_map_side_gfx(GB *gb, uint16_t gfx)
+{
+	gb_call(gb, ADDR_LoadMapSidePals);
+	gb_call(gb, gfx);
+	gb_call(gb, ADDR_LoadOverworldCommonGfx);
+	gb_call(gb, ADDR_LoadOverworldArrowsGfx);
+}
+
+PORT_JUMP(InitNorthMapSide)
+{
+	init_map_side_gfx(gb, ADDR_LoadOverworld1Gfx);
+	load_bg_maps(gb, BANK_OverworldNorthTilemap, ADDR_OverworldNorthTilemap,
+		BANK_OverworldNorthAttrmap, ADDR_OverworldNorthAttrmap);
+	JUMP_TO(ADDR_Func_8065e);
+}
+
+PORT_JUMP(InitWestMapSide)
+{
+	init_map_side_gfx(gb, ADDR_LoadOverworld2Gfx);
+	gb_call(gb, ADDR_Func_80ae7);
+	JUMP_TO(ADDR_Func_8065e);
+}
+
+PORT_JUMP(InitSouthMapSide)
+{
+	init_map_side_gfx(gb, ADDR_LoadOverworld5Gfx);
+	gb_call(gb, ADDR_Func_80af5);
+	JUMP_TO(ADDR_Func_8065e);
+}
+
+PORT_JUMP(InitEastMapSide)
+{
+	gb->cpu.a = EVENT_SUMMON_SUN;
+	gb_call(gb, ADDR_Func_819c6);
+	wr8(gb, wGotSunMedallion, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wGotSunMedallion); // unnecessary
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.a = 0x01;
+		wr8(gb, w2d011, 0x01);
+		SET_HL(gb, wDayNight);
+		wr8(gb, wDayNight, (uint8_t)((rd8(gb, wDayNight) | 1) & ~0x80)); // set 0 / res 7
+	}
+	// .got_medallion
+	gb->cpu.a = rd8(gb, wTransitionParam);
+	alu_cp(gb, gb->cpu.a, KEY_CARD_BLUE);
+	if (gb->cpu.f & FLAG_Z) {
+		// .Func_80655
+		gb->cpu.a = KEY_CARD_RED;
+		CALL(IsTreasureCollected);
+		if (gb->cpu.f & FLAG_Z)
+			gb_call(gb, ADDR_SetStoredTransitionParamAsReturnToMap);
+	}
+	init_map_side_gfx(gb, ADDR_LoadOverworld6Gfx);
+	gb_call(gb, ADDR_Func_80b1b);
+	JUMP_TO(ADDR_Func_8065e);
+}

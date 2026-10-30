@@ -3385,3 +3385,399 @@ PORT(HandleTopBarSelection)
 	play_sfx(gb, SFX_SELECTION);
 	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_Z) | FLAG_C); // scf
 }
+
+// applies palette 7 and bank1 bit to wAttrToPlaceInOW
+// if w2d07f is TRUE
+PORT_JUMP(Func_81feb)
+{
+	gb->cpu.a = rd8(gb, w2d07f);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	// this load to hl and a is never used
+	gb->cpu.h = rd8(gb, wOWTilemapPtr + 1);
+	gb->cpu.l = rd8(gb, wOWTilemapPtr + 0);
+	gb->cpu.a = rd8(gb, REG_HL(gb));
+	gb->cpu.c = 0x7; // .GetTilePalIndex
+	gb->cpu.a = alu_and(gb, rd8(gb, wAttrToPlaceInOW), 0xff ^ BG_PALMASK);
+	gb->cpu.a = alu_or(gb, gb->cpu.a, gb->cpu.c);
+	gb->cpu.a = alu_or(gb, gb->cpu.a, BG_BANK1);
+	wr8(gb, wAttrToPlaceInOW, gb->cpu.a);
+	gb->cpu.a = alu_dec(gb, rd8(gb, w2d07f));
+	if (gb->cpu.f & FLAG_Z) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_Func_81feb + 0x21); // debug_nop: loops forever, in asm
+}
+
+// .Func_815b6: hl = w2d800 struct a
+static void func_815b6(GB *gb)
+{
+	gb->cpu.a = alu_rlca(gb, gb->cpu.a);
+	gb->cpu.a = alu_swap(gb, gb->cpu.a); // *32
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0x00;
+	SET_HL(gb, alu_add16(gb, w2d800, REG_DE(gb)));
+}
+
+static void copy_hl_de(GB *gb, uint8_t b)
+{
+	gb->cpu.b = b;
+	CALL(CopyHLToDE);
+}
+
+// .Func_81576
+static void func_81576(GB *gb)
+{
+	wr8(gb, w2d88b, gb->cpu.a);
+	func_815b6(gb);
+	SET_DE(gb, w2d880);
+	copy_hl_de(gb, 9);
+	SET_DE(gb, w2d0a0);
+	copy_hl_de(gb, 7);
+	SET_DE(gb, wOWCoords1);
+	copy_hl_de(gb, 8);
+}
+
+// .Func_81595
+static void func_81595(GB *gb)
+{
+	gb->cpu.a = rd8(gb, w2d88b);
+	func_815b6(gb);
+	gb->cpu.e = gb->cpu.l;
+	gb->cpu.d = gb->cpu.h;
+	SET_HL(gb, w2d880);
+	copy_hl_de(gb, 9);
+	SET_HL(gb, w2d0a0);
+	copy_hl_de(gb, 7);
+	SET_HL(gb, wOWCoords1);
+	copy_hl_de(gb, 8);
+}
+
+// .Func_815c1 / .Func_815e5
+static void copy_4_structs(GB *gb, uint16_t de)
+{
+	SET_HL(gb, w2d800);
+	SET_DE(gb, de);
+	copy_hl_de(gb, 8);
+	SET_HL(gb, w2d820);
+	copy_hl_de(gb, 8);
+	SET_HL(gb, w2d840);
+	copy_hl_de(gb, 8);
+	SET_HL(gb, w2d860);
+	copy_hl_de(gb, 8);
+}
+
+// .Func_81609
+static void func_81609(GB *gb)
+{
+	SET_DE(gb, 0x8);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	uint16_t hl = REG_HL(gb);
+	wr8(gb, hl, 0);
+	for (int i = 0; i < 3; i++) {
+		hl = alu_add16(gb, hl, 0x8);
+		wr8(gb, hl, 0);
+	}
+	SET_HL(gb, hl);
+}
+
+// .asm_8167a
+static void inc_81615_state(GB *gb)
+{
+	SET_HL(gb, w2d880 + 0x7);
+	wr8(gb, w2d880 + 0x7, alu_inc(gb, rd8(gb, w2d880 + 0x7)));
+}
+
+// .Func_816f6
+static void func_816f6(GB *gb)
+{
+	SET_HL(gb, w2d0a0);
+	uint8_t v = rd8(gb, w2d0a0);
+	if (alu_bit(gb, v, 0)) {
+		gb->cpu.a = 0x01;
+		if (alu_bit(gb, v, 2))
+			gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	} else {
+		gb->cpu.a = 0x03;
+		if (!alu_bit(gb, v, 1))
+			gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	}
+	// .asm_8170c
+	wr8(gb, w2d880 + 0x6, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d880 + 0x5, 0);
+	wr8(gb, w2d880 + 0x4, 0);
+	SET_HL(gb, w2d880 + 0x4);
+}
+
+// .Func_81615; false if the table sent it somewhere else (pc is then set,
+// with ret pushed as the asm's return address)
+static bool func_81615(GB *gb, uint16_t ret)
+{
+	gb->cpu.a = rd8(gb, w2d880 + 0x7);
+	uint16_t target = jumptable(gb, ADDR_Func_8150c + 0x10d);
+	switch (target - ADDR_Func_8150c) {
+	case 0x119: { // .Func_81625
+		gb->cpu.d = rd8(gb, w2d100);
+		gb->cpu.e = rd8(gb, w2d101);
+		gb->cpu.b = 0x08;
+		gb->cpu.a = alu_inc(gb, rd8(gb, w2d88b));
+		if (alu_bit(gb, gb->cpu.a, 1))
+			gb->cpu.b = 0xf8;
+		alu_cp(gb, gb->cpu.a, 0x03);
+		if (gb->cpu.f & FLAG_C) {
+			gb->cpu.a = alu_add(gb, gb->cpu.e, gb->cpu.b);
+			gb->cpu.e = gb->cpu.a;
+		} else {
+			gb->cpu.a = alu_add(gb, gb->cpu.d, gb->cpu.b);
+			gb->cpu.d = gb->cpu.a;
+		}
+		gb->cpu.a = gb->cpu.d;
+		wr8(gb, w2d880 + 0x0, gb->cpu.a);
+		wr8(gb, wOWYCoord1, gb->cpu.a);
+		wr8(gb, wOWYCoord2, gb->cpu.a);
+		wr8(gb, w2d06f, gb->cpu.a);
+		gb->cpu.a = gb->cpu.e;
+		wr8(gb, w2d880 + 0x1, gb->cpu.a);
+		wr8(gb, wOWXCoord1, gb->cpu.a);
+		wr8(gb, wOWXCoord2, gb->cpu.a);
+		wr8(gb, w2d070, gb->cpu.a);
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, w2d880 + 0x4, 0);
+		wr8(gb, w2d880 + 0x5, 0);
+		gb->cpu.a = alu_inc(gb, rd8(gb, w2d88b));
+		gb->cpu.b = gb->cpu.a;
+		gb->cpu.c = gb->cpu.a;
+		gb->cpu.a = alu_swap(gb, rd8(gb, wOWAllowedDPadInput));
+		do {
+			gb->cpu.a = rrca(gb, gb->cpu.a);
+			gb->cpu.b = alu_dec(gb, gb->cpu.b);
+		} while (!(gb->cpu.f & FLAG_Z));
+		gb->cpu.a = (gb->cpu.f & FLAG_C) ? gb->cpu.c : 0x00;
+		SET_HL(gb, w2d880 + 0x6);
+		wr8(gb, w2d880 + 0x6, gb->cpu.a);
+		inc_81615_state(gb);
+		return true;
+	}
+	case 0x173: // .Func_8167f
+		gb->cpu.a = rd8(gb, w2d880 + 0x6);
+		if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+			uint16_t hl = rd16(gb, w2d880 + 0x9);
+			gb->cpu.a = gb->cpu.e = rd8(gb, w2d88b);
+			gb->cpu.d = 0x00;
+			hl = alu_add16(gb, hl, REG_DE(gb));
+			gb->cpu.b = rd8(gb, hl);
+			SET_DE(gb, 0x4);
+			hl = alu_add16(gb, hl, 0x4);
+			gb->cpu.a = rd8(gb, hl);
+			wr8(gb, wOWPathShape, gb->cpu.a);
+			gb->cpu.a = gb->cpu.b;
+			SET_HL(gb, hl);
+			alu_cp(gb, gb->cpu.a, 0x80);
+			if (!(gb->cpu.f & FLAG_Z)) {
+				gb_call(gb, ADDR_GetMapLevelCoords);
+				hl = REG_HL(gb);
+				gb->cpu.a = rd8(gb, hl++);
+				wr8(gb, w2d06f, gb->cpu.a);
+				gb->cpu.a = rd8(gb, hl);
+				wr8(gb, w2d070, gb->cpu.a);
+				inc_81615_state(gb);
+				return true;
+			}
+		}
+		// .asm_816ad
+		gb->cpu.a = 0x05;
+		wr8(gb, w2d880 + 0x7, 0x05);
+		return true;
+	case 0x1a7: // .Func_816b3
+		SET_BC(gb, wOWPathShape);
+		gb_call(gb, ADDR_Func_810fc);
+		gb_call(gb, ADDR_Func_821a1);
+		inc_81615_state(gb);
+		return true;
+	case 0x1b2: // .Func_816be
+		gb_call(gb, ADDR_Func_82208);
+		gb->cpu.a = rd8(gb, wOWYCoord1);
+		wr8(gb, w2d880 + 0x0, gb->cpu.a);
+		gb->cpu.a = rd8(gb, wOWXCoord1);
+		wr8(gb, w2d880 + 0x1, gb->cpu.a);
+		gb->cpu.a = rd8(gb, w2d0a1);
+		if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+			return true;
+		SET_BC(gb, wOWPathShape);
+		gb_call(gb, ADDR_Func_810fc);
+		alu_cp(gb, gb->cpu.a, 0xff);
+		if (gb->cpu.f & FLAG_Z) {
+			gb->cpu.a = 0;
+			gb->cpu.f = FLAG_Z; // xor a
+			wr8(gb, w2d880 + 0x8, 0);
+			inc_81615_state(gb);
+			return true;
+		}
+		gb_call(gb, ADDR_Func_821a1);
+		func_816f6(gb);
+		return true;
+	case 0x1de: // .Func_816ea
+		SET_HL(gb, w2d880 + 0x8);
+		gb->cpu.a = alu_inc(gb, rd8(gb, w2d880 + 0x8));
+		wr8(gb, w2d880 + 0x8, gb->cpu.a);
+		alu_cp(gb, gb->cpu.a, 0x08);
+		if (gb->cpu.f & FLAG_C)
+			return true;
+		inc_81615_state(gb);
+		return true;
+	case 0x1e9: // .Func_816f5
+		return true;
+	default:
+		gb_push16(gb, ret);
+		JUMP_TO(target);
+		return false;
+	}
+}
+
+PORT_JUMP(Func_8150c)
+{
+	// return addresses of the four call .Func_81615
+	static const uint8_t rets[4] = {0x08, 0x13, 0x1e, 0x29};
+	for (uint8_t i = 0; i < 4; i++) {
+		gb->cpu.a = i;
+		func_81576(gb);
+		if (!func_81615(gb, ADDR_Func_8150c + rets[i]))
+			return;
+		func_81595(gb);
+	}
+
+	gb->cpu.a = rd8(gb, w2d0e2);
+	alu_cp(gb, gb->cpu.a, 0x14);
+	if (gb->cpu.f & FLAG_Z)
+		copy_4_structs(gb, wOWUIObj1); // .Func_815c1
+	gb->cpu.a = rd8(gb, w2d0e2);
+	alu_cp(gb, gb->cpu.a, 0x28);
+	if (gb->cpu.f & FLAG_Z)
+		copy_4_structs(gb, w2d160); // .Func_815e5
+	gb->cpu.a = rd8(gb, w2d0e2);
+	alu_cp(gb, gb->cpu.a, 0x2c);
+	SET_HL(gb, wOWUIObj1State);
+	if (gb->cpu.f & FLAG_Z)
+		func_81609(gb);
+	gb->cpu.a = rd8(gb, w2d0e2);
+	alu_cp(gb, gb->cpu.a, 0x40);
+	SET_HL(gb, w2d160 + 0x6);
+	if (gb->cpu.f & FLAG_Z)
+		func_81609(gb);
+	gb_call(gb, ADDR_Func_81714);
+
+	uint16_t hl = w2d800 + 0x7;
+	gb->cpu.c = 0x04;
+	for (;;) {
+		gb->cpu.a = rd8(gb, hl);
+		alu_cp(gb, gb->cpu.a, 0x05);
+		if (!(gb->cpu.f & FLAG_Z)) {
+			SET_HL(gb, hl);
+			RET();
+			return;
+		}
+		SET_DE(gb, 0x20);
+		hl = alu_add16(gb, hl, 0x20);
+		gb->cpu.c = alu_dec(gb, gb->cpu.c);
+		if (gb->cpu.f & FLAG_Z)
+			break;
+	}
+	SET_HL(gb, w2d0e3);
+	wr8(gb, w2d0e3, alu_dec(gb, rd8(gb, w2d0e3)));
+	RET();
+}
+
+PORT(Func_80e85)
+{
+	gb_call(gb, ADDR_Func_803e6);
+}
+
+PORT(Func_81346)
+{
+	FARCALL(Func_852e5);
+	gb_call(gb, ADDR_Func_8137a);
+	FARCALL(Func_b4a3d);
+	gb_call(gb, ADDR_Func_8208d);
+	FARCALL(Func_b4aa9);
+}
+
+PORT(DrawTopBar)
+{
+	gb_call(gb, ADDR_Func_824f1);
+	gb_call(gb, ADDR_Func_8250a);
+}
+
+PORT(Func_82997)
+{
+	gb_call(gb, ADDR_Func_829a1);
+	gb_call(gb, ADDR_DrawBottomBarButtonPrompt);
+	gb_call(gb, ADDR_DrawBottomBar8Coin);
+}
+
+// rrc r (the CB one, which sets z)
+static uint8_t alu_rrc(GB *gb, uint8_t v)
+{
+	uint8_t r = (uint8_t)(v >> 1 | v << 7);
+	gb->cpu.f = (uint8_t)((r ? 0 : FLAG_Z) | ((v & 1) ? FLAG_C : 0));
+	return r;
+}
+
+PORT_JUMP(HandleTopBarDPad)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	gb->cpu.b = rd8(gb, wTopBarSelection);
+	SET_HL(gb, wTopBarSelection);
+	gb->cpu.c = rd8(gb, wJoypadPressed);
+	gb->cpu.a = gb->cpu.d = rd8(gb, wTopBarSelectableButtons);
+	if (alu_bit(gb, gb->cpu.c, B_PAD_RIGHT)) {
+		// .d_right
+		do {
+			if (!gb->cpu.b) {
+				JUMP_TO(ADDR_HandleTopBarDPad + 0x19); // loops forever, in asm
+				return;
+			}
+			gb->cpu.a = gb->cpu.d;
+			gb->cpu.b = alu_rrc(gb, gb->cpu.b);
+			if (gb->cpu.f & FLAG_C) {
+				RET();
+				return;
+			}
+		} while (!alu_and(gb, gb->cpu.a, gb->cpu.b));
+	} else if (alu_bit(gb, gb->cpu.c, B_PAD_LEFT)) {
+		// .d_left
+		do {
+			if (!gb->cpu.b) {
+				JUMP_TO(ADDR_HandleTopBarDPad + 0x34); // loops forever, in asm
+				return;
+			}
+			gb->cpu.a = gb->cpu.d;
+			gb->cpu.b = alu_sla(gb, gb->cpu.b);
+			if (alu_bit(gb, gb->cpu.b, TOPBAR_PREV_MAP_F + 1)) {
+				RET();
+				return;
+			}
+		} while (!alu_and(gb, gb->cpu.a, gb->cpu.b));
+	} else {
+		RET();
+		return;
+	}
+	// .got_selection
+	wr8(gb, wTopBarSelection, gb->cpu.b);
+	gb_call(gb, ADDR_ShowTopBarSelectedButton);
+	gb_call(gb, ADDR_LoadTopBarButtonAttributes);
+	gb_call(gb, ADDR_ApplyTopBarButtonAttributes);
+	play_sfx(gb, SFX_0E2);
+	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_Z) | FLAG_C); // scf
+	RET();
+}
+
+PORT(GolfBuilding) { FARCALL(_GolfBuilding); }
+PORT(InitEpilogue) { FARCALL(_InitEpilogue); }
