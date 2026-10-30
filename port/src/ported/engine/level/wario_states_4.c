@@ -1042,3 +1042,373 @@ static void jump_and_walk(GB *gb, uint8_t bank, uint16_t walk, uint8_t max, uint
 
 PORT(Func_1ee00f) { jump_and_walk(gb, BANK_Func_2b17a, ADDR_Func_2b17a, 0x10, 0x0c); }
 PORT(Func_1ee02e) { jump_and_walk(gb, BANK_HandleWalk, ADDR_HandleWalk, 0x08, 0x04); }
+
+// ld a, [wWarioState] / cp state: true if still in that state
+static bool still_in(GB *gb, uint8_t state)
+{
+	ld_cp(gb, wWarioState, state);
+	return ZF;
+}
+
+// farcall Func_19b25 / room transition check; true if it jumped
+static bool room_transition_check(GB *gb)
+{
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return true;
+	}
+	return false;
+}
+
+// move by direction with the walk velocity, then cap it at max (to v)
+static void walk_move(GB *gb, uint8_t max, uint8_t v)
+{
+	if (facing_right(gb)) {
+		CALL(ApplyWalkVelocity_Right);
+		CALL(MoveWarioRight);
+	} else {
+		CALL(ApplyWalkVelocity_Left);
+		CALL(MoveWarioLeft);
+	}
+	ld_cp(gb, wWalkVelIndex, max);
+	if (!CF)
+		st(gb, wWalkVelIndex, v);
+}
+
+PORT_JUMP(UpdateState_IceSkatin)
+{
+	if (room_transition_check(gb))
+		return;
+	FARCALL(CheckFrontCollision);
+	if (b_and(gb)) {
+		LJUMP(Func_1ec215);
+		return;
+	}
+	sfx_loop(gb, 0x0c, SFX_ZIP_LINE_SLIDE);
+	anim(gb, OAM2);
+	walk_move(gb, 0x14, 0x10);
+	FARCALL(CheckCentreCollision);
+	if (b_and(gb)) {
+		update_pos_y(gb);
+		RET();
+		return;
+	}
+	st(gb, wWarioState, WST_ICE_SKATIN_AIRBORNE);
+	st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	st(gb, wJumpVelTable, JUMP_VEL_NORMAL);
+	RET();
+}
+
+PORT_JUMP(UpdateState_IceSkatinAirborne)
+{
+	if (room_transition_check(gb))
+		return;
+	if (ld_and(gb, wWaterInteraction)) {
+		LJUMP(SetState_IceSkatinCrash);
+		return;
+	}
+	FARCALL(CheckFrontCollision);
+	if (b_and(gb)) {
+		LJUMP(Func_1ec215);
+		return;
+	}
+	anim(gb, OAM2);
+	CALL(ApplyJumpVelocity);
+	FARCALL(HandleWalk);
+	ld_cp(gb, wWalkVelIndex, 0x14);
+	if (!CF)
+		st(gb, wWalkVelIndex, 0x10);
+	if (!still_in(gb, WST_ICE_SKATIN_AIRBORNE)) {
+		RET();
+		return;
+	}
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb)) {
+		if (!still_in(gb, WST_ICE_SKATIN_AIRBORNE)) {
+			RET();
+			return;
+		}
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	CALL(TriggerFloorTransition);
+	if (!still_in(gb, WST_ICE_SKATIN_AIRBORNE)) {
+		RET();
+		return;
+	}
+	st(gb, wWalkVelIndex, 0x10);
+	LJUMP(SetState_IceSkatin);
+}
+
+// the start of UpdateState_OwlSlow / UpdateState_OwlFast; true if it jumped
+static bool owl_start(GB *gb, uint8_t state)
+{
+	if (ld_bit(gb, wJoypadPressed, B_PAD_B)) {
+		LJUMP(Func_1ec64d);
+		return true;
+	}
+	if (room_transition_check(gb))
+		return true;
+	if (ld_and(gb, wWaterInteraction)) {
+		LJUMP(Func_1ec64d);
+		return true;
+	}
+	if (!still_in(gb, state)) {
+		RET();
+		return true;
+	}
+	return false;
+}
+
+// farcall coll / state check / ld a, b / and a; true if it returned
+// (*blocked: b was nz)
+static bool owl_coll(GB *gb, uint8_t state, uint8_t bank, uint16_t coll, bool *blocked)
+{
+	port_farcall(gb, bank, coll);
+	if (!still_in(gb, state)) {
+		RET();
+		return true;
+	}
+	*blocked = b_and(gb);
+	return false;
+}
+
+PORT_JUMP(UpdateState_OwlSlow)
+{
+	if (owl_start(gb, WST_OWL_SLOW))
+		return;
+	if (ld_mask(gb, wJoypadDown, PAD_CTRL_PAD)) {
+		LJUMP(HandleWarioOwlInput);
+		return;
+	}
+	sfx_loop(gb, 0x20, SFX_FLAP);
+	anim(gb, OAM2);
+	bool blocked;
+	gb->cpu.a = rd8(gb, wSwimmingDirectionInput);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_RIGHT)) {
+		if (owl_coll(gb, WST_OWL_SLOW, BANK_Func_19741, ADDR_Func_19741, &blocked))
+			return;
+		if (blocked) {
+			st(gb, wDirection, DIRECTION_LEFT);
+			LJUMP(UpdateWarioOwlDirection);
+			return;
+		}
+		gb->cpu.b = 1;
+		CALL(MoveWarioRight);
+	} else if (alu_bit(gb, gb->cpu.a, B_PAD_UP)) {
+		if (owl_coll(gb, WST_OWL_SLOW, BANK_CheckUpCollision, ADDR_CheckUpCollision, &blocked))
+			return;
+		if (blocked) {
+			st(gb, wSwimmingDirectionInput, PAD_DOWN);
+			LJUMP(SetState_OwlWario);
+			return;
+		}
+		gb->cpu.b = 1;
+		CALL(MoveWarioUp);
+	} else if (alu_bit(gb, gb->cpu.a, B_PAD_DOWN)) {
+		if (owl_coll(gb, WST_OWL_SLOW, BANK_CheckCentreCollision, ADDR_CheckCentreCollision, &blocked))
+			return;
+		if (blocked) {
+			st(gb, wSwimmingDirectionInput, PAD_UP);
+			LJUMP(SetState_OwlWario);
+			return;
+		}
+		gb->cpu.b = 1;
+		CALL(MoveWarioDown);
+	} else {
+		// go left
+		if (owl_coll(gb, WST_OWL_SLOW, BANK_Func_197b1, ADDR_Func_197b1, &blocked))
+			return;
+		if (blocked) {
+			st(gb, wDirection, DIRECTION_RIGHT);
+			LJUMP(UpdateWarioOwlDirection);
+			return;
+		}
+		gb->cpu.b = 1;
+		CALL(MoveWarioLeft);
+	}
+	RET();
+}
+
+PORT_JUMP(UpdateState_OwlFast)
+{
+	if (owl_start(gb, WST_OWL_FAST))
+		return;
+	if (!ld_mask(gb, wJoypadDown, PAD_CTRL_PAD)) {
+		LJUMP(SetState_OwlWario);
+		return;
+	}
+	sfx_loop(gb, 0x10, SFX_FLAP);
+	anim(gb, OAM2);
+	uint8_t pad;
+	uint8_t bank;
+	uint16_t coll, move;
+	gb->cpu.a = rd8(gb, wSwimmingDirectionInput);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_RIGHT)) {
+		pad = PAD_RIGHT, bank = BANK_Func_19741, coll = ADDR_Func_19741, move = ADDR_MoveWarioRight;
+	} else if (alu_bit(gb, gb->cpu.a, B_PAD_UP)) {
+		pad = PAD_UP, bank = BANK_CheckUpCollision, coll = ADDR_CheckUpCollision, move = ADDR_MoveWarioUp;
+	} else if (alu_bit(gb, gb->cpu.a, B_PAD_DOWN)) {
+		pad = PAD_DOWN, bank = BANK_CheckCentreCollision, coll = ADDR_CheckCentreCollision,
+		move = ADDR_MoveWarioDown;
+	} else {
+		pad = PAD_LEFT, bank = BANK_Func_197b1, coll = ADDR_Func_197b1, move = ADDR_MoveWarioLeft;
+	}
+	if (!ld_mask(gb, wJoypadDown, pad)) {
+		LJUMP(HandleWarioOwlInput);
+		return;
+	}
+	bool blocked;
+	if (owl_coll(gb, WST_OWL_FAST, bank, coll, &blocked))
+		return;
+	if (blocked) {
+		if (pad == PAD_DOWN)
+			update_pos_y(gb);
+		RET();
+		return;
+	}
+	gb->cpu.b = 2;
+	gb_call(gb, move);
+	RET();
+}
+
+PORT_JUMP(UpdateState_SnowmanWalking)
+{
+	if (room_transition_check(gb))
+		return;
+	sfx_loop(gb, 0x1c, SFX_FAT_WALK);
+	anim(gb, OAM2);
+	LCALL(Func_1ede96);
+	if (!still_in(gb, WST_SNOWMAN_WALKING)) {
+		RET();
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (!b_and(gb)) {
+		LJUMP(SetState_SnowmanAirborne_Fall);
+		return;
+	}
+	if (!ld_and(gb, wWarioSlopeInteraction)) {
+		RET();
+		return;
+	}
+	update_pos_y(gb);
+	LJUMP(TurnIntoSmallSnowball);
+}
+
+PORT_JUMP(UpdateState_SnowballRolling)
+{
+	if (room_transition_check(gb))
+		return;
+	gb->cpu.a = rd8(gb, wTransformationProgress);
+	alu_cp(gb, gb->cpu.a, 2);
+	if (ZF) {
+		// .medium_snowball
+		ld_cp(gb, wWarioStateCounter, 0xe0);
+		if (!CF) {
+			st(gb, wTransformationProgress, 3);
+			xor_a(gb);
+			wr8(gb, wFrameDuration, 0);
+			gb->cpu.a = alu_add(gb, rd8(gb, wAnimationFrame), 0x02);
+			wr8(gb, wAnimationFrame, gb->cpu.a);
+			frameset_by_dir(gb, ADDR_Frameset_1ff970, ADDR_Frameset_1ff945);
+		}
+	} else {
+		alu_cp(gb, gb->cpu.a, 3);
+		if (!ZF) {
+			// small snowball
+			ld_cp(gb, wWarioStateCounter, 0x70);
+			if (!CF) {
+				st(gb, wTransformationProgress, 2);
+				xor_a(gb);
+				wr8(gb, wFrameDuration, 0);
+				frameset_by_dir(gb, ADDR_Frameset_1ff963, ADDR_Frameset_1ff938);
+			}
+		}
+	}
+	// .no_size_change
+	sfx_loop(gb, 0x0c, SFX_ROLL);
+	anim(gb, OAM2);
+	if (facing_right(gb)) {
+		CALL(ApplyWalkVelocity_Right);
+		CALL(MoveWarioRight);
+	} else {
+		CALL(ApplyWalkVelocity_Left);
+		CALL(MoveWarioLeft);
+	}
+	// .increment_counter_if_not_big
+	ld_cp(gb, wTransformationProgress, 3);
+	if (CF) {
+		SET_HL(gb, wWarioStateCounter);
+		gb->cpu.a = rd8(gb, wWarioStateCounter);
+		alu_cp(gb, gb->cpu.a, 0xf8);
+		if (CF) {
+			gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.b);
+			wr8(gb, wWarioStateCounter, gb->cpu.a);
+		}
+	}
+	ld_cp(gb, wWalkVelIndex, 0x18);
+	if (!CF)
+		st(gb, wWalkVelIndex, 0x14);
+	FARCALL(CheckFrontCollision);
+	gb->cpu.a = alu_and(gb, gb->cpu.b, 0x0f);
+	if (gb->cpu.a) {
+		LJUMP(SetState_SnowballCrash);
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (b_and(gb)) {
+		update_pos_y(gb);
+		RET();
+		return;
+	}
+	st(gb, wWarioState, WST_SNOWBALL_AIRBORNE);
+	st(gb, wJumpVelIndex, 0x18);
+	st(gb, wJumpVelTable, 0x03);
+	RET();
+}
+
+PORT_JUMP(UpdateStart_FanLifting)
+{
+	FARCALL(Func_19b25);
+	if (!ld_and(gb, wIsInAirCurrent)) {
+		LJUMP(SetState_FanRecovering);
+		return;
+	}
+	sfx_loop(gb, 0x0c, SFX_07D);
+	anim(gb, OAM3);
+	LCALL(Func_1edf2b);
+	if (!still_in(gb, WST_FAN_LIFTING)) {
+		RET();
+		return;
+	}
+	LCALL(Func_1edf47);
+	RET();
+}
+
+PORT_JUMP(UpdateState_FanSpinning)
+{
+	FARCALL(Func_19b25);
+	if (!ld_and(gb, wIsInAirCurrent)) {
+		LJUMP(SetState_FanRecovering);
+		return;
+	}
+	sfx_loop(gb, 0x0c, SFX_07D);
+	anim(gb, OAM3);
+	LCALL(Func_1edf47);
+	RET();
+}
+
+PORT(Func_1edf01)
+{
+	CALL(ApplyJumpVelocity);
+	FARCALL(Func_2b17a);
+	ld_cp(gb, wWalkVelIndex, 0x08);
+	if (!CF)
+		st(gb, wWalkVelIndex, 0x04);
+	ld_cp(gb, wJumpVelIndex, 0x18);
+	if (!ZF)
+		return;
+	st(gb, wIsSmashAttacking, TRUE);
+}

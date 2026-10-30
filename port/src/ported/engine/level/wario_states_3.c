@@ -2105,3 +2105,383 @@ PORT(Func_2b3dd)
 	LCALL(Func_2b17a);
 	cap_walk_vel(gb, 0x04, 0x00);
 }
+
+// ld a, [wWarioState] / cp state: true if still in that state
+static bool still_in(GB *gb, uint8_t state)
+{
+	ld_cp(gb, wWarioState, state);
+	return ZF;
+}
+
+// farcall Func_19b25 / room transition check; true if it jumped
+static bool room_transition_check(GB *gb)
+{
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return true;
+	}
+	return false;
+}
+
+// farcall CheckCentreCollision / ld a, b / and a / jp z, fall / update_pos_y / ret
+static void ground_check(GB *gb, uint16_t fall)
+{
+	FARCALL(CheckCentreCollision);
+	if (!b_and(gb)) {
+		JUMP_TO(fall);
+		return;
+	}
+	update_pos_y(gb);
+	RET();
+}
+
+PORT_JUMP(UpdateState_OnFire)
+{
+	if (room_transition_check(gb))
+		return;
+	sfx_loop(gb, 14, SFX_01E);
+	if (!ld_and(gb, wWarioStateCounter) && anim_ended(gb)) {
+		st(gb, wWarioStateCounter, 0x01);
+		frameset_by_dir(gb, ADDR_Frameset_16b14, ADDR_Frameset_16b1d);
+	}
+	anim(gb, OAM1);
+	LCALL(DecrementTransformationDuration);
+	SET_HL(gb, wTransformationDuration + 1);
+	ld_cp(gb, wTransformationDuration, (uint8_t)(HOT_WARIO_TRANSITION_DURATION >> 8));
+	if (ZF) {
+		ld_cp(gb, wTransformationDuration + 1, (uint8_t)HOT_WARIO_TRANSITION_DURATION);
+		if (ZF) {
+			LJUMP(SetState_Hot);
+			return;
+		}
+	}
+	LCALL(Func_2ae8a);
+	if (!still_in(gb, WST_ON_FIRE)) {
+		RET();
+		return;
+	}
+	ground_check(gb, ADDR_Func_2af75);
+}
+
+PORT_JUMP(UpdateState_FatWalking)
+{
+	if (room_transition_check(gb))
+		return;
+	sfx_loop(gb, 28, SFX_FAT_WALK);
+	anim(gb, OAM1);
+	LCALL(DecrementTransformationDuration);
+	SET_HL(gb, wTransformationDuration + 1);
+	gb->cpu.a = rd8(gb, wTransformationDuration);
+	alu_cp(gb, gb->cpu.a, (uint8_t)((FAT_WARIO_DURATION >> 8) + 1)); // in case it underflowed
+	if (!CF) {
+		LJUMP(SetState_FatRecovering);
+		return;
+	}
+	gb->cpu.a = alu_or(gb, gb->cpu.a, rd8(gb, wTransformationDuration + 1));
+	if (ZF) {
+		LJUMP(SetState_FatRecovering);
+		return;
+	}
+	LCALL(Func_2b239);
+	if (!still_in(gb, WST_FAT_WALKING)) {
+		RET();
+		return;
+	}
+	ground_check(gb, ADDR_Func_290d6);
+}
+
+PORT_JUMP(UpdateState_ZombieWalking)
+{
+	if (room_transition_check(gb))
+		return;
+	sfx_loop(gb, 36, SFX_ZOMBIE_WALK);
+	anim(gb, OAM2);
+	LCALL(Func_2b381);
+	if (!still_in(gb, WST_ZOMBIE_WALKING)) {
+		RET();
+		return;
+	}
+	ground_check(gb, ADDR_Func_29bb9);
+}
+
+PORT_JUMP(UpdateState_FlatJumping)
+{
+	if (room_transition_check(gb))
+		return;
+	CALL(ApplyJumpVelocity);
+	LCALL(Func_2b17a);
+	CALL(Func_1762);
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (CF) {
+		FARCALL(CheckUpCollision);
+		if (!b_and(gb)) {
+			RET();
+			return;
+		}
+	}
+	LJUMP(SetState_FlatFalling);
+}
+
+PORT_JUMP(UpdateState_FlatFalling)
+{
+	if (room_transition_check(gb))
+		return;
+	if (ld_and(gb, wWaterInteraction)) {
+		LJUMP(SetState_FlatSinking);
+		return;
+	}
+	if (!anim_ended(gb)) {
+		anim(gb, OAM1);
+		if (anim_ended(gb)) {
+			reset_anim(gb);
+			set_frameset(gb, ADDR_Frameset_17190);
+			anim(gb, OAM1);
+			st(gb, wWarioAnimationEnded, 0x01);
+		}
+	}
+	// .asm_287ff
+	SET_HL(gb, wWalkVelIndex);
+	gb->cpu.e = rd8(gb, wWalkVelIndex);
+	gb->cpu.d = 0x00;
+	wr8(gb, wWalkVelIndex, alu_inc(gb, gb->cpu.e));
+	gb_push16(gb, REG_DE(gb));
+	bool right = facing_right(gb);
+	uint16_t hl = alu_add16(gb, ADDR_Data_2b68c, REG_DE(gb));
+	SET_HL(gb, hl);
+	gb->cpu.b = rd8(gb, hl);
+	if (right)
+		CALL(MoveWarioRight);
+	else
+		CALL(MoveWarioLeft);
+
+	// .asm_28816
+	ld_cp(gb, wWalkVelIndex, 0x28);
+	if (CF) {
+		FARCALL(CheckFrontCollision);
+		if (!b_and(gb)) {
+			// .asm_288b8
+			SET_DE(gb, gb_pop16(gb));
+			hl = alu_add16(gb, ADDR_Data_2b664, REG_DE(gb));
+			SET_HL(gb, hl);
+			gb->cpu.b = rd8(gb, hl);
+			CALL(MoveWarioDown);
+			FARCALL(CheckAirborneCollision);
+			if (!b_and(gb)) {
+				JUMP(TriggerDownwardsFloorTransition);
+				return;
+			}
+			play_sfx(gb, SFX_020);
+			CALL(TriggerFloorTransition);
+			LJUMP(SetState_FlatIdling);
+			return;
+		}
+		play_sfx(gb, SFX_BUMP);
+		flip_dir(gb);
+		gb->cpu.b = 0x03;
+		move_by_dir(gb);
+		gb->cpu.a = 0x00;
+	} else {
+		// .asm_28857
+		bool held;
+		if (facing_right(gb))
+			held = ld_bit(gb, wJoypadDown, B_PAD_RIGHT);
+		else
+			held = ld_bit(gb, wJoypadDown, B_PAD_LEFT);
+		if (!held) {
+			// .asm_2886d
+			xor_a(gb);
+			wr8(gb, wFrameDuration, 0);
+			wr8(gb, wAnimationFrame, 0);
+			wr8(gb, wWarioAnimationEnded, 0);
+			set_frameset(gb, flip_dir_and(gb) ? ADDR_Frameset_17186 : ADDR_Frameset_171b8);
+			anim(gb, OAM1);
+		}
+		xor_a(gb);
+	}
+	// .asm_288a8
+	wr8(gb, wWalkVelIndex, gb->cpu.a);
+	SET_DE(gb, gb_pop16(gb));
+	RET();
+}
+
+PORT_JUMP(UpdateState_PuffyRising)
+{
+	if (room_transition_check(gb))
+		return;
+	sfx_loop(gb, 32, SFX_PUFF_RAISE);
+	anim(gb, ld(gb, wWarioOAMBank));
+	LCALL(Func_2b2c2);
+	RET();
+}
+
+PORT_JUMP(UpdateState_VampireIdling)
+{
+	FARCALL(CheckCentreCollision);
+	if (!still_in(gb, WST_VAMPIRE_IDLING)) {
+		RET();
+		return;
+	}
+	if (!b_and(gb)) {
+		LJUMP(Func_2a8a7);
+		return;
+	}
+	anim(gb, OAM2);
+	LCALL(Func_2b4f3);
+	RET();
+}
+
+PORT_JUMP(UpdateState_VampireWalking)
+{
+	if (room_transition_check(gb))
+		return;
+	if (!still_in(gb, WST_VAMPIRE_WALKING)) {
+		RET();
+		return;
+	}
+	anim(gb, OAM2);
+	LCALL(Func_2b509);
+	if (!still_in(gb, WST_VAMPIRE_WALKING)) {
+		RET();
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (!still_in(gb, WST_VAMPIRE_WALKING) || b_and(gb)) {
+		RET();
+		return;
+	}
+	LJUMP(Func_2a8a7);
+}
+
+PORT_JUMP(UpdateState_BatIdling)
+{
+	FARCALL(CheckCentreCollision);
+	if (!still_in(gb, WST_BAT_IDLING)) {
+		RET();
+		return;
+	}
+	if (!b_and(gb)) {
+		LJUMP(SetState_BatFalling);
+		return;
+	}
+	sfx_loop(gb, 0x20, SFX_FLAP);
+	anim(gb, OAM2);
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (!alu_bit(gb, gb->cpu.a, B_PAD_B)) {
+		if (alu_bit(gb, gb->cpu.a, B_PAD_A)) {
+			LJUMP(SetState_BatFlying);
+			return;
+		}
+		RET();
+		return;
+	}
+	// .asm_2aa55
+	st(gb, wCollisionBoxTop, (uint8_t)-27);
+	FARCALL(CheckUpCollision);
+	if (!still_in(gb, WST_BAT_IDLING)) {
+		RET();
+		return;
+	}
+	if (!b_and(gb)) {
+		LJUMP(SetState_VampireTransforming);
+		return;
+	}
+	st(gb, wCollisionBoxTop, (uint8_t)-15);
+	play_sfx(gb, SFX_0E5);
+	RET();
+}
+
+PORT(Func_2b027)
+{
+	CALL(ApplyJumpVelocity);
+	SET_HL(gb, wWarioStateCounter);
+	if (ld_and(gb, wWarioStateCounter)) {
+		wr8(gb, wWarioStateCounter, alu_dec(gb, gb->cpu.a));
+		return;
+	}
+	LCALL(Func_2b17a);
+	cap_walk_vel(gb, 0x08, 0x04);
+	if (!ld_and(gb, wIsTurning))
+		return;
+	reset_anim(gb);
+	frameset_by_dir(gb, ADDR_Frameset_16b26, ADDR_Frameset_16b2f);
+	anim(gb, OAM1);
+}
+
+PORT_JUMP(Func_2b10a)
+{
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		LJUMP(SetState_FlatJumping);
+		return;
+	}
+	if (ld_mask(gb, wJoypadDown, PAD_RIGHT | PAD_LEFT)) {
+		LJUMP(SetState_FlatWalking);
+		return;
+	}
+	RET();
+}
+
+PORT_JUMP(Func_2b11b)
+{
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		LJUMP(SetState_FlatJumping);
+		return;
+	}
+	gb->cpu.a = rd8(gb, wJoypadDown);
+	bool right;
+	if (alu_bit(gb, gb->cpu.a, B_PAD_LEFT)) {
+		right = false;
+	} else if (alu_bit(gb, gb->cpu.a, B_PAD_RIGHT)) {
+		right = true;
+	} else {
+		LJUMP(SetState_FlatIdling);
+		return;
+	}
+	st(gb, wDirection, right ? DIRECTION_RIGHT : DIRECTION_LEFT);
+	FARCALL(CheckFrontCollision);
+	if (b_and(gb)) {
+		RET();
+		return;
+	}
+	if (right) {
+		CALL(ApplyWalkVelocity_Right);
+		CALL(MoveWarioRight);
+	} else {
+		CALL(ApplyWalkVelocity_Left);
+		CALL(MoveWarioLeft);
+	}
+	cap_walk_vel(gb, 0x04, 0x00);
+	RET();
+}
+
+PORT(Func_2b55c)
+{
+	CALL(ApplyJumpVelocity);
+	LCALL(Func_2b17a);
+	cap_walk_vel(gb, 0x10, 0x0c);
+}
+
+PORT_JUMP(Func_2b3f9)
+{
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		LJUMP(Func_2a675);
+		return;
+	}
+	LCALL(Func_2b42b);
+	if (!still_in(gb, WST_CRAZY) || !anim_ended(gb)) {
+		RET(); // done if not crazy any more
+		return;
+	}
+	bool held;
+	if (facing_right(gb))
+		held = ld_bit(gb, wJoypadDown, B_PAD_RIGHT);
+	else
+		held = ld_bit(gb, wJoypadDown, B_PAD_LEFT);
+	if (!held) {
+		LJUMP(SetState_CrazyTurning);
+		return;
+	}
+	xor_a(gb);
+	wr8(gb, wWalkVelIndex, 0);
+	RET();
+}

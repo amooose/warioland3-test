@@ -1007,3 +1007,99 @@ PORT(Func_217a9)
 {
 	FARCALL(DoJumpingBump);
 }
+
+PORT_JUMP(Func_20d8c)
+{
+	if (!ld_and(gb, wWaterInteraction)) {
+		RET();
+		return;
+	}
+	if (ld_bit(gb, wInteractionSide, INTERACTION_UP_F)) {
+		LJUMP(Func_207ed);
+		return;
+	}
+	if (ld_and(gb, wTransformation)) {
+		RET();
+		return;
+	}
+	if (ld_bit(gb, wInteractionSide, INTERACTION_DOWN_F)) {
+		FARCALL(StartDive);
+		RET();
+		return;
+	}
+	gb->cpu.b = ld(gb, wWarioScreenXPos);
+	alu_cp(gb, ld(gb, wObjScreenXPos), gb->cpu.b);
+	bool left = CF;
+	gb->cpu.a = alu_or(gb, rd8(gb, wInteractionSide), left ? INTERACTION_LEFT : INTERACTION_RIGHT);
+	wr8(gb, wInteractionSide, gb->cpu.a);
+	st(gb, wDirection, left ? DIRECTION_RIGHT : DIRECTION_LEFT);
+	FARCALL(SetState_SwimKnockBack);
+	RET();
+}
+
+// ld a, [wInteractionSide] / bit side, a / jp nz, Func_207ed / jp Func_208f2
+static void sting_or_bump(GB *gb, int side)
+{
+	if (ld_bit(gb, wInteractionSide, side))
+		LJUMP(Func_207ed);
+	else
+		LJUMP(Func_208f2);
+}
+
+PORT_JUMP(Func_20deb)
+{
+	if (ld_mask(gb, wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
+		LJUMP(Func_20899);
+		return;
+	}
+	if (!ld_and(gb, wObjDirection))
+		sting_or_bump(gb, INTERACTION_RIGHT_F);
+	else
+		sting_or_bump(gb, INTERACTION_LEFT_F);
+}
+
+PORT_JUMP(ObjInteraction_Haridama)
+{
+	gb->cpu.a = rd8(gb, wInteractionSide);
+	if (alu_bit(gb, gb->cpu.a, INTERACTION_DOWN_F)) {
+		LJUMP(Func_20899);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, INTERACTION_UP_F)) {
+		LJUMP(Func_207ed);
+		return;
+	}
+	ld_cp(gb, wObjDirection, DIRECTION_RIGHT);
+	if (ZF)
+		sting_or_bump(gb, INTERACTION_LEFT_F);
+	else
+		sting_or_bump(gb, INTERACTION_RIGHT_F);
+}
+
+PORT_JUMP(ObjInteraction_Pesce)
+{
+	ld_cp(gb, wObjDirection, DIRECTION_RIGHT);
+	bool swallow = ld_bit(gb, wInteractionSide, ZF ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F);
+	if (!swallow) {
+		LJUMP(Func_207ed);
+		return;
+	}
+	gb->cpu.b = OBJACTION_11;
+	LCALL(SetObjAction);
+	FARCALL(SetState_Swallowed);
+	RET();
+}
+
+PORT_JUMP(ObjInteraction_Scowler)
+{
+	gb->cpu.a = rd8(gb, wInteractionSide);
+	if (alu_bit(gb, gb->cpu.a, INTERACTION_UP_F)) {
+		LJUMP(Func_20899);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, INTERACTION_DOWN_F)) {
+		LJUMP(ObjInteraction_WaterTeleporting);
+		return;
+	}
+	LJUMP(Func_208f2);
+}
