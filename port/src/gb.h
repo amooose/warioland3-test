@@ -160,8 +160,8 @@ typedef struct GB {
 	// read of tap_addr: it returns tap_value instead if tap_override, then
 	// leaves the value it returned in tap_value and clears tap_addr.
 	void (*pc_cb)(struct GB *gb);
-	// sees (and may replace) every read of DIV
-	uint8_t (*div_cb)(struct GB *gb, uint8_t value);
+	// sees (and may replace) every read of memory
+	uint8_t (*read_cb)(struct GB *gb, uint16_t addr, uint8_t value);
 	uint16_t tap_addr;
 	bool tap_override;
 	uint8_t tap_value;

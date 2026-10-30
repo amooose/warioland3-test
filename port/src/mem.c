@@ -91,8 +91,8 @@ uint8_t gb_read(GB *gb, uint16_t addr)
 		gb->tap_value = v;
 		return v;
 	}
-	if (addr == 0xff04 && gb->div_cb)
-		return gb->div_cb(gb, gb_read_mem(gb, addr));
+	if (gb->read_cb)
+		return gb->read_cb(gb, addr, gb_read_mem(gb, addr));
 	return gb_read_mem(gb, addr);
 }
 

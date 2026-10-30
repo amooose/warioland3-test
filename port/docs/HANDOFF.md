@@ -33,13 +33,15 @@ scripting and expansion on top. The approach:
   `cmake --build build --target progress` and read `build/progress.md` for
   the per-directory numbers.
 - **Tests:** `ctest --test-dir build -j12` takes about 35 minutes with all
-  the recordings, so run it in the background. It runs a difftest for
-  each input in `tests/inputs/` and a fuzz pass split into 4 shards
-  (`fuzz_<input>_0` to `_3`, each fuzzing every 4th hook with
-  `--fuzz-shard I/4`). Three inputs are committed. `action_help2`,
-  `coin_bug`, `boss` (the Hidden Figure fight) and `golf` are the user's
-  local recordings and aren't committed, but a local ctest picks them up
-  (35 tests).
+  the recordings, so run it in the background. For each input in
+  `tests/inputs/` it runs a difftest, a per-frame trace test
+  (`trace_<input>`, see "Per-frame traces"), and a fuzz pass split into 4
+  shards (`fuzz_<input>_0` to `_3`, each fuzzing every 4th hook with
+  `--fuzz-shard I/4`). Three inputs are committed. The user's local
+  recordings aren't committed, but a local ctest picks them up:
+  `action_help2`, `coin_bug`, `boss` (the Hidden Figure fight), `golf`,
+  `yellowbelly`, `gameover` and `fresh_save_cutscene`. That makes 60
+  tests.
 
 ## Building
 
@@ -251,21 +253,27 @@ build/wl3 --headless --input tests/inputs/X.input --trace-check X.trace
   - Frames are compared per game frame, not per video frame, leaving out
     LY, STAT, the timers, IF and the dead stack below SP.
   - Buttons are fed per game frame.
-  - Reads that depend on timing are replayed from the trace: every DIV
-    read, plus the reads listed in `sites[]` in trace.c. Add a site there
-    when a trace shows a read like `UpdateRoomAnimatedTiles`'s LY check.
+  - Reads the native code can't get the same value from are replayed from
+    the trace:
+    - every DIV read;
+    - every data read of the stack area, $cf00-$cfff (not push, pop, call
+      or ret);
+    - the reads listed in `sites[]` in trace.c. Add a site there when a
+      trace shows a read like `UpdateRoomAnimatedTiles`'s LY check.
   - A difference in the screen alone is counted but doesn't fail.
-- **Results (2026-10-30).** 9 of the 10 recordings match on every game
-  frame. `yellowbelly` diverges at game frame 16296: one VRAM attribute
-  byte ($9929, bank 1) while a room loads during a door transition. The
-  asm's load spans about 54 video frames, so V-Blank interrupts
-  (LevelVBlankFunc, VBlank_DoorTransition) interleave with
-  `DrawRoom_FromStart`'s use of the BG map queues. The native load is
-  much shorter. It isn't settled whether this is purely timing or a port
-  bug.
-- **Not in ctest yet,** because of the yellowbelly divergence. A trace
-  depends only on the recording and the ROM, so write it once while the
-  interpreter exists, and keep it next to the recording.
+- **Stack reads are the original game's bugs.**
+  `QueueBlockTilesAlongRow_*` writes one byte past the tile queue, into
+  the first attribute queue entry, and reads that byte from the stack:
+  its callers' return addresses. The port copies the overrun exactly, but
+  native routines don't push the return addresses the asm does, so the
+  byte differed. In the original, one tile attribute is wrong until the
+  room redraws (`yellowbelly`, game frame 16296, $9929 in VRAM bank 1).
+- **Results (2026-10-30).** All 10 recordings match on every game frame,
+  more than 200,000 game frames in all.
+- **In ctest:** `trace_<input>` writes the trace into `build/traces/` and
+  checks it (tools/trace_test.cmake). A trace depends only on the
+  recording and the ROM, so it can also be kept next to the recording
+  once the interpreter is gone.
 
 ## Open issues
 

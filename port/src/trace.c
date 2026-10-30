@@ -197,28 +197,44 @@ static void replay_tap(GB *gb)
 	}
 }
 
-// DIV is only ever read as a random number, never waited on, so the native
-// code reads it at the same points as the asm, in the same order: a trace
-// logs every read, and a check hands them back in turn.
+// Two kinds of read the native code makes at the same points as the asm,
+// in the same order, but can't get the same value from, so a trace logs
+// every one and a check hands them back in turn:
+// - DIV, only ever read as a random number (never waited on);
+// - the stack as data (not by push, pop, call or ret), which only the
+//   original's own bugs do: the tile queue overrun in
+//   QueueBlockTilesAlongRow_* reads its callers' return addresses. What's
+//   there differs, since native routines don't push what the asm does.
 #define SITE_DIV 0xffff
-static size_t div_pos;
+#define SITE_STACK 0xfffe
+static size_t stream_pos[2]; // per kind: the next log entry to look from
 
-static uint8_t trace_div(GB *gb, uint8_t value)
+static uint8_t stream_read(uint16_t kind, uint8_t value)
 {
 	if (!checking) {
 		if (ntaps == taps_cap)
 			taps = realloc(taps, (taps_cap = taps_cap ? taps_cap * 2 : 1024) * sizeof(Tap));
-		taps[ntaps++] = (Tap){cur_frame, SITE_DIV, value, 0};
+		taps[ntaps++] = (Tap){cur_frame, kind, value, 0};
 		return value;
 	}
-	while (div_pos < ntaps && (taps[div_pos].frame < cur_frame || (taps[div_pos].frame == cur_frame &&
-		(taps[div_pos].site != SITE_DIV || taps[div_pos].used))))
-		div_pos++;
-	if (div_pos < ntaps && taps[div_pos].frame == cur_frame) {
-		taps[div_pos].used = 1;
-		return taps[div_pos].value;
+	size_t *pos = &stream_pos[kind == SITE_STACK];
+	while (*pos < ntaps && (taps[*pos].frame < cur_frame || (taps[*pos].frame == cur_frame &&
+		(taps[*pos].site != kind || taps[*pos].used))))
+		(*pos)++;
+	if (*pos < ntaps && taps[*pos].frame == cur_frame) {
+		taps[*pos].used = 1;
+		return taps[*pos].value;
 	}
 	return value; // more reads than the asm made: the runs have diverged
+}
+
+static uint8_t trace_read(GB *gb, uint16_t addr, uint8_t value)
+{
+	if (addr == 0xff04)
+		return stream_read(SITE_DIV, value);
+	if (addr >= stack_bottom && addr < 0xd000 && !gb->test.in_stack_op)
+		return stream_read(SITE_STACK, value);
+	return value;
 }
 
 static void check_frame_end(GB *gb);
@@ -293,7 +309,7 @@ static bool setup(void)
 	cur_frame = 0;
 	pending_site = -1;
 	tap_pos = 0;
-	div_pos = 0;
+	stream_pos[0] = stream_pos[1] = 0;
 	return true;
 }
 
@@ -313,7 +329,7 @@ bool trace_write(GB *gb, const InputScript *input, int end_frame, const char *pa
 	hooks_set_enabled(false);
 	gb->frame_cb = trace_frame;
 	gb->pc_cb = trace_pc;
-	gb->div_cb = trace_div;
+	gb->read_cb = trace_read;
 
 	size_t n = 0, cap = 1024;
 	Record *recs = malloc(cap * sizeof(Record));
@@ -480,7 +496,7 @@ bool trace_check(GB *gb, const InputScript *input, const char *path)
 	hooks_set_enabled(true);
 	gb->frame_cb = trace_frame;
 	gb->pc_cb = trace_pc;
-	gb->div_cb = trace_div;
+	gb->read_cb = trace_read;
 	chk_recs = recs;
 	chk_n = n;
 	chk_i = 0;

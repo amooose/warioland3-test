@@ -134,6 +134,10 @@ set(COVERAGE_ARGS)
 foreach(input ${TEST_INPUTS})
 	get_filename_component(name ${input} NAME_WE)
 	add_test(NAME difftest_${name} COMMAND wl3 --difftest --input ${input})
+	# The whole port against the asm, frame by frame.
+	file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/traces)
+	add_test(NAME trace_${name} COMMAND ${CMAKE_COMMAND} -DWL3=$<TARGET_FILE:wl3> -DINPUT=${input}
+		-DTRACE=${CMAKE_CURRENT_BINARY_DIR}/traces/${name}.trace -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/trace_test.cmake)
 	# The fuzz run of one input takes far longer than its replay, so it is
 	# split into shards that ctest -j can run side by side.
 	foreach(shard RANGE 0 3)
