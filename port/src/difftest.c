@@ -201,11 +201,15 @@ static bool is_ret(uint8_t op)
 	return op == 0xc9 || op == 0xd9 || op == 0xc0 || op == 0xc8 || op == 0xd0 || op == 0xd8;
 }
 
+static bool stop_if_unrealistic;
+
 static bool run_asm_until(GB *gb, uint16_t pc, uint16_t sp, uint16_t entry_sp, bool *left)
 {
 	*left = false;
 	asm_gen++;
 	for (asm_steps_taken = 0; asm_steps_taken < asm_step_limit && !gb->test.crashed; asm_steps_taken++) {
+		if (stop_if_unrealistic && gb->test.unrealistic)
+			break;
 		uint16_t at = gb->cpu.pc;
 		if (at == pc && gb->cpu.sp == sp)
 			return true;
@@ -327,9 +331,14 @@ static CheckResult check_once(const GB *base, Hook *h, Report *r, const char **w
 	ref->test.read_log = read_log;
 	ref->test.read_log_cap = read_log_cap;
 	ref->test.exec_map = exec_map;
+	// Either run turning out unrealistic makes the check inconclusive, so the
+	// asm needn't run (on) then.
 	bool left = false;
-	bool reached = !native_stuck && !nat->test.crashed &&
+	asm_steps_taken = 0;
+	stop_if_unrealistic = true;
+	bool reached = !native_stuck && !nat->test.crashed && !nat->test.unrealistic &&
 		run_asm_until(ref, nat->cpu.pc, nat->cpu.sp, entry_sp, &left);
+	stop_if_unrealistic = false;
 	if (read_log_len)
 		*read_log_len = ref->test.read_log_len;
 
