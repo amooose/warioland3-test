@@ -3606,3 +3606,103 @@ PORT_JUMP(Func_1f24c)
 	anim(gb, OAM1);
 	RET();
 }
+
+PORT(SetState_AttackingAirborne)
+{
+	xor_a(gb);
+	wr8(gb, wWarioSlopeInteraction, 0);
+	st(gb, wWarioState, WST_ATTACKING_AIRBORNE);
+	reset_anim(gb);
+	ld_cp(gb, wPowerUpLevel, HIGH_JUMP_BOOTS);
+	gb->cpu.a = JUMP_VEL_NORMAL;
+	if (!CF)
+		gb->cpu.a = alu_inc(gb, gb->cpu.a); // JUMP_VEL_HIGH_JUMP
+	wr8(gb, wJumpVelTable, gb->cpu.a);
+	ld_cp(gb, wPowerUpLevel, GARLIC);
+	if (CF)
+		frameset_by_dir(gb, ADDR_Frameset_15216, ADDR_Frameset_15219);
+	else
+		frameset_by_dir(gb, ADDR_Frameset_1523e, ADDR_Frameset_15249);
+	anim(gb, OAM1);
+	if (!ld_and(gb, wIsOnSteppableObject))
+		return;
+	LCALL(UpdateState_AttackingAirborne);
+}
+
+PORT_JUMP(Func_1edd3)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wGrabState), GRAB_FLAGS_MASK);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, GRAB_IDLE);
+	wr8(gb, wGrabState, gb->cpu.a);
+	st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	st(gb, wJumpVelTable, JUMP_VEL_HIGH_JUMP);
+	LJUMP(SetState_GrabAirborne);
+}
+
+PORT_JUMP(Func_1ede9)
+{
+	play_sfx(gb, SFX_JUMP);
+	xor_a(gb);
+	wr8(gb, wJumpVelIndex, 0);
+	wr8(gb, wIsSmashAttacking, 0);
+	ld_cp(gb, wPowerUpLevel, HIGH_JUMP_BOOTS);
+	gb->cpu.a = JUMP_VEL_NORMAL;
+	if (!CF) {
+		SET_HL(gb, wJoypadDown);
+		if (alu_bit(gb, rd8(gb, wJoypadDown), B_PAD_UP))
+			gb->cpu.a = JUMP_VEL_HIGH_JUMP;
+	}
+	wr8(gb, wJumpVelTable, gb->cpu.a);
+	LJUMP(SetState_GrabAirborne); // fallthrough
+}
+
+PORT_JUMP(Func_1f1a9)
+{
+	bool skip = true;
+	ld_cp(gb, wWaterInteraction, NON_SUBMERSIBLE_WATER);
+	if (!ZF) {
+		ld_cp(gb, wPowerUpLevel, SWIMMING_FLIPPERS);
+		if (!CF) {
+			gb->cpu.a = rd8(gb, wJoypadPressed);
+			if (alu_bit(gb, gb->cpu.a, B_PAD_B)) {
+				LJUMP(StartUnderwaterThrusting);
+				return;
+			}
+			if (alu_bit(gb, gb->cpu.a, B_PAD_A)) {
+				LJUMP(StartUpwardsUnderwaterThrusting);
+				return;
+			}
+			if (ld_mask(gb, wJoypadDown, PAD_CTRL_PAD)) {
+				LJUMP(Func_1f24c);
+				return;
+			}
+			skip = ld_and(gb, wWarioStateCycles);
+		}
+	}
+	if (!skip) {
+		reset_anim(gb);
+		frameset_by_dir(gb, ADDR_Frameset_15569, ADDR_Frameset_15573);
+	}
+	// .asm_1f1f5
+	anim(gb, OAM1);
+	st(gb, wWarioStateCycles, 0x01);
+	FARCALL(CheckUpCollision);
+	if (b_and(gb)) {
+		st(gb, wc0e1, PAD_UP);
+		RET();
+		return;
+	}
+	FARCALL(Func_19acd);
+	if (!ld_and(gb, wWaterInteraction)) {
+		LJUMP(SurfaceFromUnderwater);
+		return;
+	}
+	gb->cpu.a = alu_and(gb, rd8(gb, wGlobalCounter), 0x1);
+	if (!ZF || water_current_mask(gb, CURRENT_UP | CURRENT_DOWN)) {
+		RET();
+		return;
+	}
+	gb->cpu.b = 0x01;
+	CALL(MoveWarioUp);
+	RET();
+}
