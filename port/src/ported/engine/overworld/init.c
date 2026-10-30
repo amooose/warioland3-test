@@ -739,3 +739,132 @@ PORT_JUMP(InitMapSide)
 	wr8(gb, wCurMapSide, gb->cpu.a);
 	JUMP_TO(init_jumptable(gb, ADDR_InitMapSide + 0x70));
 }
+
+static void copy_level_name_gfx(GB *gb, uint16_t de)
+{
+	gb->cpu.b = 0x24;
+	gb->cpu.a = alu_add(gb, rd8(gb, wLanguage), gb->cpu.b);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.c = 0x00; // $10 tiles
+	SET_HL(gb, ADDR_LevelNamesNorthJPGfx + (7 * 0x20 * TILE_SIZE));
+	SET_DE(gb, de);
+	CALL(CopyFarBytes);
+}
+
+PORT(Func_8086f)
+{
+	gb_call(gb, ADDR_Func_80b54);
+
+	gb->cpu.a = rd8(gb, wCurMapSide); // a gets overwritten
+	gb_call(gb, ADDR_Func_81dce);
+	gb_call(gb, ADDR_WriteBGMapFromWRAM);
+
+	gb->cpu.a = 0x04;
+	wr8(gb, rSCY, 0x04);
+	wr8(gb, wSCY, 0x04);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rSCX, 0);
+	wr8(gb, wSCX, 0);
+	wr8(gb, w2d015, rd8(gb, w2d018));
+	wr8(gb, wOWSceneActionParam, rd8(gb, wTempUnlockableConnectionID));
+	wr8(gb, wOWSceneAction, rd8(gb, wTempOWSceneAction));
+	wr8(gb, wOWSceneMapSide, rd8(gb, wCurMapSide));
+	wr8(gb, wOWSceneParamsPtr + 0, rd8(gb, wTempOWSceneParamsPtr + 0));
+	gb->cpu.a = rd8(gb, wTempOWSceneParamsPtr + 1);
+	wr8(gb, wOWSceneParamsPtr + 1, gb->cpu.a);
+
+	FARCALL(Func_b4a37);
+	gb_call(gb, ADDR_LoadCloudAndSeaGfx);
+
+	clear_pal7_colors(gb);
+
+	set_vbk1(gb);
+	copy_level_name_gfx(gb, v1Tiles2 + TILE_SIZE * 0x50);
+	copy_level_name_gfx(gb, v1Tiles2 + TILE_SIZE * 0x60);
+	set_vbk0(gb);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d0e0, 0);
+	gb_call(gb, ADDR_SetCompassSprite);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wLevelArrowDirections1, 0);
+	wr8(gb, wOWPalTransitionState, 0);
+	wr8(gb, w2d013, 0);
+
+	gb->cpu.a = rd8(gb, wCurMapSide);
+	bool window = false;
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.a = rd8(gb, wCurEvent);
+		alu_cp(gb, gb->cpu.a, EVENT_MAGNIFYING_GLASS);
+		window = (gb->cpu.f & FLAG_Z) != 0;
+	}
+	gb->cpu.a = window ? OW_LCDC_WIN : LCDC_DEFAULT;
+	wr8(gb, rLCDC, gb->cpu.a); // .apply_lcd
+
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}
+
+
+// call LoadPalsForOWScene / call gfx / call LoadOverworldCommonGfx /
+// call LoadOverworldGlowGfx / call func / jp Func_8086f
+static void init_map_side_for_scene(GB *gb, uint16_t gfx, uint16_t func)
+{
+	gb_call(gb, ADDR_LoadPalsForOWScene);
+	gb_call(gb, gfx);
+	gb_call(gb, ADDR_LoadOverworldCommonGfx);
+	gb_call(gb, ADDR_LoadOverworldGlowGfx);
+	gb_call(gb, func);
+	JUMP_TO(ADDR_Func_8086f);
+}
+
+PORT_JUMP(InitMapSideForScene_North)
+{
+	gb_call(gb, ADDR_LoadPalsForOWScene);
+	gb_call(gb, ADDR_LoadOverworldCommonGfx);
+	gb_call(gb, ADDR_LoadOverworld1Gfx);
+	gb->cpu.a = rd8(gb, wCurEvent);
+	alu_cp(gb, gb->cpu.a, EVENT_DAY_OR_NIGHT_SPELL);
+	if (!(gb->cpu.f & FLAG_Z))
+		gb_call(gb, ADDR_LoadOverworldGlowGfx);
+	SET_BC(gb, ADDR_OverworldNorthTilemap);
+	gb->cpu.d = BANK_OverworldNorthTilemap;
+	SET_HL(gb, ADDR_OverworldNorthAttrmap);
+	gb->cpu.e = BANK_OverworldNorthAttrmap;
+	gb_call(gb, ADDR_LoadBGMapsToWRAM);
+	JUMP_TO(ADDR_Func_8086f); // fallthrough
+}
+
+PORT_JUMP(InitMapSideForScene_West)
+{
+	init_map_side_for_scene(gb, ADDR_LoadOverworld2Gfx, ADDR_Func_80ae7);
+}
+
+PORT_JUMP(InitMapSideForScene_South)
+{
+	gb->cpu.a = rd8(gb, wCurEvent);
+	alu_cp(gb, gb->cpu.a, EVENT_SUMMON_MOON);
+	if (gb->cpu.f & FLAG_Z) {
+		gb->cpu.a = 0x01;
+		wr8(gb, w2d011, 0x01);
+	}
+	// .asm_8093c
+	init_map_side_for_scene(gb, ADDR_LoadOverworld5Gfx, ADDR_Func_80af5);
+}
+
+PORT_JUMP(InitMapSideForScene_East)
+{
+	gb->cpu.a = EVENT_SUMMON_SUN;
+	gb_call(gb, ADDR_Func_819c6);
+	wr8(gb, wGotSunMedallion, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wGotSunMedallion); // unnecessary
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.a = 0x01;
+		wr8(gb, w2d011, 0x01);
+	}
+	// .got_medallion
+	init_map_side_for_scene(gb, ADDR_LoadOverworld6Gfx, ADDR_Func_80b1b);
+}
