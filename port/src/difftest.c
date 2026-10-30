@@ -349,6 +349,11 @@ static CheckResult check_once(const GB *base, Hook *h, Report *r, const char **w
 	// address on its way.
 	if ((h->flags & HOOK_MANUAL_RET) && !native_stuck && jumps_into_itself(nat, h))
 		return CHECK_INCONCLUSIVE;
+	// Nor does a jump into the rst and interrupt vectors, which only a
+	// fuzzed table entry makes: one into JumpTable's code ($28) is passed
+	// through by the asm's own rst JumpTable.
+	if ((h->flags & HOOK_MANUAL_RET) && !native_stuck && nat->cpu.pc < 0x0100)
+		return CHECK_INCONCLUSIVE;
 	if (native_stuck) {
 		// Fine if the asm loops forever too; otherwise the native code is
 		// stuck where the original isn't. An asm run that turned

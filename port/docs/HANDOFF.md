@@ -32,13 +32,14 @@ scripting and expansion on top. The approach:
   routines that can't or needn't be ported (see "Good next batches"). Run
   `cmake --build build --target progress` and read `build/progress.md` for
   the per-directory numbers.
-- **Tests:** `ctest --test-dir build -j12` takes about 20-30 minutes, and the
-  fuzz passes grow with every port, so run it in the background. It runs a
-  difftest for each input in `tests/inputs/` and a fuzz pass split into 4
-  shards (`fuzz_<input>_0` to `_3`, each fuzzing every 4th hook with
-  `--fuzz-shard I/4`). Three inputs are committed. `action_help2` and
-  `coin_bug` are the user's local recordings and aren't committed, but a
-  local ctest picks them up (25 tests).
+- **Tests:** `ctest --test-dir build -j12` takes about 35 minutes with all
+  the recordings, so run it in the background. It runs a difftest for
+  each input in `tests/inputs/` and a fuzz pass split into 4 shards
+  (`fuzz_<input>_0` to `_3`, each fuzzing every 4th hook with
+  `--fuzz-shard I/4`). Three inputs are committed. `action_help2`,
+  `coin_bug`, `boss` (the Hidden Figure fight) and `golf` are the user's
+  local recordings and aren't committed, but a local ctest picks them up
+  (35 tests).
 
 ## Building
 
