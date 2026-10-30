@@ -1232,3 +1232,20 @@ PORT_JUMP(Func_21aac)
 	gb->cpu.b = OBJACTION_SMASH_ATTACK_WALKABLE;
 	LJUMP(SetObjAction);
 }
+
+PORT_JUMP(ObjInteraction_Stove)
+{
+	gb->cpu.a = rd8(gb, wInteractionSide);
+	if (alu_bit(gb, gb->cpu.a, INTERACTION_UP_F)) {
+		LJUMP(Func_21aac);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, INTERACTION_DOWN_F)) {
+		LJUMP(Func_2168b);
+		return;
+	}
+	if (ld_and(gb, wAttackCounter))
+		LJUMP(Func_21abb);
+	else
+		LJUMP(Func_20a6f);
+}

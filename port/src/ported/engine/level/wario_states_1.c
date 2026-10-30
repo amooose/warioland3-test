@@ -3919,3 +3919,76 @@ PORT_JUMP(UpdateState_GrabWalking)
 	update_pos_y(gb);
 	RET();
 }
+
+PORT_JUMP(UpdateState_Attacking)
+{
+	ld_cp(gb, wPowerUpLevel, GARLIC);
+	sfx_loop(gb, 6, CF ? SFX_ATTACK : SFX_ATTACK_POWERED_UP);
+	anim(gb, OAM1);
+	LCALL(HandleInput_Attacking);
+	if (!still_in(gb, WST_ATTACKING)) {
+		RET();
+		return;
+	}
+	if (room_transition_check(gb))
+		return;
+	if (!still_in(gb, WST_ATTACKING)) {
+		RET();
+		return;
+	}
+	FARCALL(CheckFrontCollision);
+	if (!still_in(gb, WST_ATTACKING)) {
+		RET();
+		return;
+	}
+	if (b_low_nibble(gb)) {
+		LJUMP(DoBumpWithSmallBackOffset);
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (!b_and(gb)) {
+		LJUMP(StartFallingAirborneAttack);
+		return;
+	}
+	if (!still_in(gb, WST_ATTACKING)) {
+		RET();
+		return;
+	}
+	ld_cp(gb, wAttackCounter, CHARGE_ATTACK_COUNTER);
+	if (CF) {
+		if (facing_right(gb)) {
+			CALL(ApplyWalkVelocity_Right);
+			CALL(MoveWarioRight);
+		} else {
+			CALL(ApplyWalkVelocity_Left);
+			CALL(MoveWarioLeft);
+		}
+		ld_cp(gb, wWalkVelIndex, 0x14);
+		if (!CF)
+			st(gb, wWalkVelIndex, 0x10);
+	}
+	// .check_collision
+	FARCALL(CheckCentreCollision);
+	update_pos_y(gb);
+	if (!still_in(gb, WST_ATTACKING)) {
+		RET();
+		return;
+	}
+	SET_HL(gb, wAttackCounter);
+	wr8(gb, wAttackCounter, alu_dec(gb, rd8(gb, wAttackCounter)));
+	if (!ZF) {
+		RET();
+		return;
+	}
+	CALL(IsOnSlipperyGround);
+	if (!ZF) {
+		FARCALL(SetState_Slipping);
+		RET();
+		return;
+	}
+	if (ld_mask(gb, wJoypadDown, PAD_RIGHT | PAD_LEFT)) {
+		LJUMP(SetState_Walking_ResetWalkVel);
+		return;
+	}
+	LJUMP(SetState_Idling);
+}
