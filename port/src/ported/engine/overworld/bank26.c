@@ -987,3 +987,11 @@ PORT_JUMP(HandleTreasureCollectionInput)
 	wr8(gb, REG_DE(gb), 0);
 	JUMP_TO(ADDR_GetCollectionCellCoords);
 }
+
+PORT(_TreasureCollection)
+{
+	CALL(ProcessDPadRepeat);
+	gb_call(gb, ADDR_HandleTreasureCollectionInput);
+	gb_call(gb, ADDR_AnimateTreasureCollection);
+	CALL(ClearUnusedVirtualOAM);
+}
