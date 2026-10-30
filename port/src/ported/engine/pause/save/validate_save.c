@@ -679,3 +679,50 @@ PORT(Func_1f1246)
 		CALL(WriteAToHL_BTimes);
 	}
 }
+
+PORT(ValidateSaveData)
+{
+	push_sram(gb, 0x00); // BANK("SRAM0")
+
+	static const struct { uint16_t vals; bool backup_vals1; } checks[6] = {
+		{ sCheckVals, true }, { s0a000, false }, { s0a400, false },
+		{ sBackupCheckVals, true }, { s0a800, false }, { s0ac00, false },
+	};
+	bool found = false;
+	for (int i = 0; i < 6 && !found; i++) {
+		SET_HL(gb, checks[i].vals);
+		gb_call(gb, checks[i].backup_vals1 ? ADDR_CheckSaveVals1 : ADDR_CheckSaveVals2);
+		found = !(gb->cpu.f & FLAG_C);
+	}
+
+	bool ok = false;
+	if (found) {
+		// .checkvals_ok
+		gb->cpu.b = rd8(gb, s0a790);
+		gb->cpu.c = rd8(gb, s0a7e0);
+		gb->cpu.d = gb->cpu.a = rd8(gb, s0afa0);
+		alu_cp(gb, gb->cpu.a, gb->cpu.b); // s0afa0 == s0a790?
+		if (gb->cpu.f & FLAG_Z) {
+			alu_cp(gb, gb->cpu.a, gb->cpu.c); // both branches are the same
+			ok = true;
+		} else {
+			// .asm_1f0d08
+			alu_cp(gb, gb->cpu.a, gb->cpu.c); // s0afa0 == s0a7e0?
+			if (gb->cpu.f & FLAG_Z) {
+				ok = true;
+			} else {
+				gb->cpu.a = gb->cpu.b;
+				alu_cp(gb, gb->cpu.a, gb->cpu.c); // s0a790 == s0a7e0?
+				ok = (gb->cpu.f & FLAG_Z) != 0;
+			}
+		}
+	}
+	if (!ok)
+		gb->cpu.a = 0xff; // .asm_1f0d0f
+	wr8(gb, wcef1, gb->cpu.a);
+
+	// .asm_1f0d20
+	gb_call(gb, ADDR_Func_1f0d60);
+	gb_call(gb, ADDR_Func_1f1246);
+	pop_sram(gb);
+}
