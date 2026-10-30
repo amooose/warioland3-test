@@ -133,7 +133,11 @@ set(COVERAGE_ARGS)
 foreach(input ${TEST_INPUTS})
 	get_filename_component(name ${input} NAME_WE)
 	add_test(NAME difftest_${name} COMMAND wl3 --difftest --input ${input})
-	add_test(NAME fuzz_${name} COMMAND wl3 --fuzz --input ${input})
+	# The fuzz run of one input takes far longer than its replay, so it is
+	# split into shards that ctest -j can run side by side.
+	foreach(shard RANGE 0 3)
+		add_test(NAME fuzz_${name}_${shard} COMMAND wl3 --fuzz --input ${input} --fuzz-shard ${shard}/4)
+	endforeach()
 	list(APPEND COVERAGE_COMMANDS COMMAND wl3 --coverage ${CMAKE_CURRENT_BINARY_DIR}/coverage/${name}.txt --input ${input})
 	list(APPEND COVERAGE_ARGS --coverage ${CMAKE_CURRENT_BINARY_DIR}/coverage/${name}.txt)
 endforeach()

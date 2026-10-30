@@ -664,7 +664,8 @@ static void readset_clear(ReadSet *rs)
 
 static FuzzStats *fstats;
 static int fuzz_variants = 200;
-static const char *fuzz_only;
+static const char *fuzz_only; // comma-separated labels, or NULL for all
+static int fuzz_shard_i, fuzz_shard_n = 1;
 static bool fuzz_verbose;
 static GB *variant;
 static ReadSet readset;
@@ -789,7 +790,21 @@ static void fuzz_seed_done(void)
 
 static bool fuzz_this(Hook *h)
 {
-	return !fuzz_only || !strcmp(fuzz_only, h->name);
+	if ((int)(h - hook_get(0)) % fuzz_shard_n != fuzz_shard_i)
+		return false;
+	if (!fuzz_only)
+		return true;
+	size_t len = strlen(h->name);
+	for (const char *p = fuzz_only; *p;) {
+		const char *end = strchr(p, ',');
+		size_t n = end ? (size_t)(end - p) : strlen(p);
+		if (n == len && !strncmp(p, h->name, n))
+			return true;
+		if (!end)
+			break;
+		p = end + 1;
+	}
+	return false;
 }
 
 // Seeds per routine from the replay, at these call numbers.
@@ -798,11 +813,15 @@ static bool fuzz_seed_call(uint64_t n)
 	return n == 1 || n == 2 || n == 8 || n == 64 || n == 512 || n == 4096;
 }
 
-void fuzz_configure(int variants, const char *only, bool verbose)
+void fuzz_configure(int variants, const char *only, int shard_i, int shard_n, bool verbose)
 {
 	if (variants > 0)
 		fuzz_variants = variants;
 	fuzz_only = only;
+	if (shard_n > 0 && shard_i >= 0 && shard_i < shard_n) {
+		fuzz_shard_i = shard_i;
+		fuzz_shard_n = shard_n;
+	}
 	fuzz_verbose = verbose;
 }
 

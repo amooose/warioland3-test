@@ -15,12 +15,14 @@ bool difftest_run(GB *gb, const InputScript *input, int end_frame);
 // times each global ROM label was entered, one "<name> <count>" per line.
 bool coverage_run(GB *gb, const InputScript *input, int end_frame, const char *out_path);
 
-// Fuzz every ported routine (or just `only`): replay the input in the pure
+// Fuzz every ported routine (or just those in `only`, a comma-separated list
+// of labels; and of those, only every `shard_n`-th hook starting at
+// `shard_i`): replay the input in the pure
 // interpreter, and from a few real calls of each routine (or a synthetic
 // call, for routines the replay never reaches) check many variations with
 // random registers and mutated memory. Reports how much of each routine's
 // asm the checks executed. Returns true if every check matched.
-void fuzz_configure(int variants, const char *only, bool verbose);
+void fuzz_configure(int variants, const char *only, int shard_i, int shard_n, bool verbose);
 bool fuzz_run(GB *gb, const InputScript *input, int end_frame);
 
 #endif

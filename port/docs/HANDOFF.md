@@ -38,12 +38,13 @@ scripting and expansion on top. The approach:
     and the overworld 41% (22k).
   - Little: title 34%, clear 31%, pause 27%, save 16%.
   - Not started: golf, credits, game over, perfect.
-- **Tests:** `ctest --test-dir build -j6` takes about 20 minutes, and the
+- **Tests:** `ctest --test-dir build -j12` takes about 17 minutes, and the
   fuzz passes grow with every port, so run it in the background. It runs a
-  difftest and a fuzz pass for each input in `tests/inputs/`. Three inputs
-  are committed. `action_help2` and `coin_bug` are the user's local
-  recordings and aren't committed, but a local ctest picks them up (10
-  tests).
+  difftest for each input in `tests/inputs/` and a fuzz pass split into 4
+  shards (`fuzz_<input>_0` to `_3`, each fuzzing every 4th hook with
+  `--fuzz-shard I/4`). Three inputs are committed. `action_help2` and
+  `coin_bug` are the user's local recordings and aren't committed, but a
+  local ctest picks them up (25 tests).
 
 ## Building
 
@@ -63,7 +64,7 @@ scripting and expansion on top. The approach:
 ```sh
 cmake -B build -S .            # rerun after adding new .c files (CONFIGURE_DEPENDS usually catches it)
 cmake --build build -j8
-ctest --test-dir build -j6     # ~20 min
+ctest --test-dir build -j12    # ~17 min
 ```
 
 A local Claude Code session on Windows usually runs Git Bash, which lacks
@@ -99,8 +100,11 @@ Each step that worked in the cloud session:
      `pack_cur_rgb`.
 3. **Build.**
 4. **Fuzz each new routine on every input:** `tools/fuzz_batch.sh A B C ...`
-   from `port/`. It prints a line per (routine, input) and the first lines
-   of any failure. A batch of about 30 routines takes about 10 minutes.
+   from `port/`. It replays each input once for the whole list
+   (`--fuzz-routine A,B,C`): the replay takes 2-70 s, far longer than
+   fuzzing one routine. It prints `R input: PASS (passed/failed/inconclusive,
+   cover n/m)` per (routine, input) and the first lines of any failure. A
+   batch of 10 routines takes about a minute and a half.
 5. **Fix any FAIL.** The report shows the entry registers and the first
    differences. For more detail, run `./build/wl3 --fuzz --input X
    --fuzz-routine R --fuzz-verbose`.
@@ -116,10 +120,10 @@ Each step that worked in the cloud session:
   its update pointer. Fuzz them as `--fuzz-routine Parent.local`.
 - **Stashes:** `git stash` is shared by every worktree, so an agent can pop
   another agent's stash. Have agents commit WIP to their own branch instead.
-- **Fuzz results:** when a script generates the routine names, make sure they
-  have no trailing `
-`. A name that matches no hook still prints
-  `fuzz: PASS`.
+- **Fuzz results:** a routine name that matches no hook prints `NOT FOUND`
+  (check for typos and a trailing CR). A PASS with 0 passed checks, or a
+  low asm cover, verified little: a missing `RET()` once hid behind an
+  all-inconclusive PASS.
 - **Commit early:** agents must commit verified work often. A session that
   hits the usage limit leaves everything uncommitted stranded.
 - **Few agents:** six large agents at once used up a whole session's usage
@@ -141,8 +145,8 @@ Four agents ported 512 routines at once this way:
 - Give each agent a disjoint set of files (objects; Wario states and
   mechanics; overworld; everything else), and forbid edits to `ported.h`
   and the docs, so the commits cherry-pick cleanly.
-- Limit each agent to `cmake --build -j2`, `JOBS=1` fuzzing and `ctest -j1`:
-  four agents at full parallelism peg the machine.
+- Limit each agent to `cmake --build -j2`, `JOBS=2` fuzzing and
+  `ctest -R difftest -j2`: five agents at full parallelism peg the machine.
 - Verify after merging with the full ctest here: the worktrees lack the
   local `action_help2` recording, which caught a bug the agents' runs
   missed.

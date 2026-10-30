@@ -364,7 +364,8 @@ static void usage(const char *argv0)
 		"  --fuzz                fuzz every ported routine against the original asm,\n"
 		"                        seeded from an --input replay\n"
 		"  --fuzz-variants N     variations per seed (default 200)\n"
-		"  --fuzz-routine LABEL  fuzz only this routine\n"
+		"  --fuzz-routine LABELS fuzz only these routines (comma-separated)\n"
+		"  --fuzz-shard I/N      fuzz only every Nth ported routine, from the Ith\n"
 		"  --fuzz-verbose        list the asm instructions the fuzzing never executed\n"
 		"  --trace               print CPU state every frame\n"
 		"  --break LABEL         print recent instructions whenever LABEL is reached\n"
@@ -411,7 +412,7 @@ int main(int argc, char **argv)
 	bool no_hooks = false, force_hooks = false, difftest = false;
 	const char *coverage_path = NULL, *fuzz_routine = NULL;
 	bool fuzz = false, fuzz_verbose = false;
-	int fuzz_variants = 0;
+	int fuzz_variants = 0, fuzz_shard_i = 0, fuzz_shard_n = 1;
 	static Frontend fe;
 
 	for (int i = 1; i < argc; i++) {
@@ -437,6 +438,13 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--fuzz")) fuzz = true;
 		else if (!strcmp(a, "--fuzz-variants") && next) fuzz_variants = atoi(argv[++i]);
 		else if (!strcmp(a, "--fuzz-routine") && next) fuzz_routine = argv[++i];
+		else if (!strcmp(a, "--fuzz-shard") && next) {
+			if (sscanf(argv[++i], "%d/%d", &fuzz_shard_i, &fuzz_shard_n) != 2 || fuzz_shard_n < 1
+				|| fuzz_shard_i < 0 || fuzz_shard_i >= fuzz_shard_n) {
+				fprintf(stderr, "--fuzz-shard wants I/N with 0 <= I < N\n");
+				return 1;
+			}
+		}
 		else if (!strcmp(a, "--fuzz-verbose")) fuzz_verbose = true;
 		else if (!strcmp(a, "--trace")) fe.trace = true;
 		else if (!strcmp(a, "--break") && next) break_sym = argv[++i];
@@ -516,7 +524,7 @@ int main(int argc, char **argv)
 		if (coverage_path)
 			return coverage_run(&gb, script, end, coverage_path) ? 0 : 1;
 		if (fuzz) {
-			fuzz_configure(fuzz_variants, fuzz_routine, fuzz_verbose);
+			fuzz_configure(fuzz_variants, fuzz_routine, fuzz_shard_i, fuzz_shard_n, fuzz_verbose);
 			return fuzz_run(&gb, script, end) ? 0 : 1;
 		}
 		return difftest_run(&gb, script, end) ? 0 : 1;
