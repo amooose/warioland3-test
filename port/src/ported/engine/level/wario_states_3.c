@@ -2485,3 +2485,186 @@ PORT_JUMP(Func_2b3f9)
 	wr8(gb, wWalkVelIndex, 0);
 	RET();
 }
+
+// ld a, [wWarioStateCounter] / and a / jr nz / ld a, [wWarioAnimationEnded] /
+// and a / jr z: true if counter is 0 and the animation ended
+static bool first_anim_ended(GB *gb)
+{
+	return !ld_and(gb, wWarioStateCounter) && anim_ended(gb);
+}
+
+PORT_JUMP(UpdateState_OnFireAirborne)
+{
+	if (room_transition_check(gb))
+		return;
+	if (ld_and(gb, wWaterInteraction)) {
+		LJUMP(Func_2ade4);
+		return;
+	}
+	if (first_anim_ended(gb)) {
+		st(gb, wWarioStateCounter, 0x01);
+		frameset_by_dir(gb, ADDR_Frameset_16b14, ADDR_Frameset_16b1d);
+	}
+	anim(gb, OAM1);
+	LCALL(Func_2af9c);
+	if (!still_in(gb, WST_ON_FIRE_AIRBORNE)) {
+		RET();
+		return;
+	}
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (CF) {
+		FARCALL(CheckUpCollision);
+		if (!b_and(gb) || !still_in(gb, WST_ON_FIRE_AIRBORNE)) {
+			RET();
+			return;
+		}
+		LJUMP(Func_2af75);
+		return;
+	}
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb)) {
+		if (!still_in(gb, WST_ON_FIRE_AIRBORNE)) {
+			RET();
+			return;
+		}
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	CALL(TriggerFloorTransition);
+	if (still_in(gb, WST_ON_FIRE_AIRBORNE))
+		FARCALL(SetState_OnFire);
+	RET();
+}
+
+PORT_JUMP(UpdateState_HotAirborne)
+{
+	if (room_transition_check(gb))
+		return;
+	if (ld_and(gb, wWaterInteraction)) {
+		LJUMP(Func_2ade4);
+		return;
+	}
+	anim(gb, OAM1);
+	LCALL(Func_2b027);
+	if (!still_in(gb, WST_HOT_AIRBORNE)) {
+		RET();
+		return;
+	}
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (CF) {
+		// rising
+		FARCALL(CheckUpCollision);
+		if (!b_and(gb) || !still_in(gb, WST_HOT_AIRBORNE)) {
+			RET();
+			return;
+		}
+		LJUMP(Func_2838a);
+		return;
+	}
+	// .falling
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb)) {
+		if (!still_in(gb, WST_HOT_AIRBORNE)) {
+			RET();
+			return;
+		}
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	CALL(TriggerFloorTransition);
+	if (!still_in(gb, WST_HOT_AIRBORNE)) {
+		RET();
+		return;
+	}
+	LJUMP(SetState_Hot);
+}
+
+PORT_JUMP(UpdateState_FlatIdling)
+{
+	anim(gb, OAM1);
+	LCALL(Func_2b10a);
+	FARCALL(CheckCentreCollision);
+	if (b_and(gb)) {
+		RET();
+		return;
+	}
+	LJUMP(SetState_FlatFalling);
+}
+
+PORT_JUMP(UpdateState_FlatWalking)
+{
+	if (room_transition_check(gb))
+		return;
+	sfx_loop(gb, 10, SFX_FLAT_WALK);
+	anim(gb, OAM1);
+	LCALL(Func_2b11b);
+	ground_check(gb, ADDR_SetState_FlatFalling);
+}
+
+PORT_JUMP(UpdateState_Crazy)
+{
+	if (room_transition_check(gb))
+		return;
+	anim(gb, OAM2);
+	LCALL(Func_2b3f9);
+	if (!still_in(gb, WST_CRAZY)) {
+		RET();
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (!b_and(gb)) {
+		LJUMP(Func_2a67b);
+		return;
+	}
+	RET();
+}
+
+PORT_JUMP(UpdateState_FatAirborne)
+{
+	if (room_transition_check(gb))
+		return;
+	if (ld_and(gb, wWaterInteraction)) {
+		LJUMP(Func_2926a);
+		return;
+	}
+	LCALL(DecrementTransformationDuration);
+	SET_HL(gb, wTransformationDuration + 1);
+	gb->cpu.a = alu_or(gb, rd8(gb, wTransformationDuration), rd8(gb, wTransformationDuration + 1));
+	if (ZF)
+		wr8(gb, wTransformationDuration + 1, alu_inc(gb, rd8(gb, wTransformationDuration + 1)));
+	anim(gb, OAM1);
+	if (first_anim_ended(gb)) {
+		reset_anim(gb);
+		st(gb, wWarioStateCounter, 0x01);
+		frameset_by_dir(gb, ADDR_Frameset_1783e, ADDR_Frameset_17841);
+		anim(gb, OAM1);
+	}
+	LCALL(Func_2b2a4);
+	if (!still_in(gb, WST_FAT_AIRBORNE)) {
+		RET();
+		return;
+	}
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (CF) {
+		FARCALL(CheckUpCollision);
+		if (!b_and(gb) || !still_in(gb, WST_FAT_AIRBORNE)) {
+			RET();
+			return;
+		}
+		LJUMP(Func_290d6);
+		return;
+	}
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb)) {
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	CALL(TriggerFloorTransition);
+	if (!ld_and(gb, wGroundShakeCounter)) {
+		st(gb, wGroundShakeCounter, 0x20);
+		st(gb, wIsWarioGroundShaking, TRUE);
+	}
+	if (!ld_and(gb, wFloorTransitionDir))
+		play_sfx(gb, SFX_024);
+	LJUMP(SetState_FatLanding); // fallthrough
+}

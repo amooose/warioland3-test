@@ -1412,3 +1412,21 @@ PORT(Func_1edf01)
 		return;
 	st(gb, wIsSmashAttacking, TRUE);
 }
+
+PORT_JUMP(UpdateState_BallAirborne)
+{
+	anim(gb, OAM3);
+	LCALL(Func_1ee02e);
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (CF) {
+		RET();
+		return;
+	}
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb)) {
+		RET();
+		return;
+	}
+	update_pos_y(gb);
+	LJUMP(Func_1edaf8);
+}

@@ -1103,3 +1103,88 @@ PORT_JUMP(ObjInteraction_Scowler)
 	}
 	LJUMP(Func_208f2);
 }
+
+// the chest interactions: open it with the matching key
+static void obj_treasure(GB *gb, int key, int treasure, uint8_t screen)
+{
+	if (ld_bit(gb, wInteractionSide, INTERACTION_UP_F)) {
+		LJUMP(Func_209ca);
+		return;
+	}
+	if (ld_and(gb, wTransformation)) {
+		LJUMP(Func_20a6f);
+		return;
+	}
+	SET_HL(gb, wKeyAndTreasureFlags);
+	if (!alu_bit(gb, rd8(gb, wKeyAndTreasureFlags), key)) {
+		LJUMP(Func_20a6f);
+		return;
+	}
+	wr8(gb, wKeyAndTreasureFlags, (uint8_t)(rd8(gb, wKeyAndTreasureFlags) | (1 << treasure)));
+	st(gb, wLevelEndScreen, screen);
+	LJUMP(GetTreasure);
+}
+
+PORT_JUMP(ObjInteraction_GreyTreasure) { obj_treasure(gb, GREY_KEY_F, GREY_TREASURE_F, LVLEND_GREY_TREASURE); }
+PORT_JUMP(ObjInteraction_RedTreasure) { obj_treasure(gb, RED_KEY_F, RED_TREASURE_F, LVLEND_RED_TREASURE); }
+PORT_JUMP(ObjInteraction_GreenTreasure) { obj_treasure(gb, GREEN_KEY_F, GREEN_TREASURE_F, LVLEND_GREEN_TREASURE); }
+PORT_JUMP(ObjInteraction_BlueTreasure) { obj_treasure(gb, BLUE_KEY_F, BLUE_TREASURE_F, LVLEND_BLUE_TREASURE); }
+
+// stepped on from above: Func_209ca; attacked: Func_217a9; else Func_20a6f.
+// Returns true if it jumped (false: touched from below).
+static bool solid_side(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wInteractionSide);
+	if (alu_bit(gb, gb->cpu.a, INTERACTION_UP_F)) {
+		LJUMP(Func_209ca);
+		return true;
+	}
+	if (alu_bit(gb, gb->cpu.a, INTERACTION_DOWN_F))
+		return false;
+	if (ld_and(gb, wAttackCounter))
+		LJUMP(Func_217a9);
+	else
+		LJUMP(Func_20a6f);
+	return true;
+}
+
+PORT_JUMP(ObjInteraction_Solid)
+{
+	if (solid_side(gb))
+		return;
+	LJUMP(Func_2168b);
+}
+
+PORT_JUMP(ObjInteraction_Omodon)
+{
+	if (solid_side(gb))
+		return;
+	if (ld_and(gb, wInvincibleCounter) || ld_bit(gb, wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
+		RET();
+		return;
+	}
+	gb->cpu.b = OBJACTION_FLATTEN;
+	LCALL(SetObjAction);
+	FARCALL(SetState_FlatAirborne);
+	RET();
+}
+
+PORT_JUMP(Func_21abb)
+{
+	gb->cpu.b = OBJACTION_ATTACK;
+	LCALL(SetObjAction);
+	LJUMP(Func_20a6f);
+}
+
+PORT_JUMP(Func_21f01)
+{
+	if (!ld_bit(gb, wInteractionSide, INTERACTION_UP_F)) {
+		LJUMP(Func_20d8c);
+		return;
+	}
+	gb->cpu.a = alu_or(gb, rd8(gb, wInteractionSide), INTERACTION_LEFT);
+	wr8(gb, wInteractionSide, gb->cpu.a);
+	st(gb, wDirection, DIRECTION_RIGHT);
+	FARCALL(SetState_SwimKnockBack);
+	RET();
+}
