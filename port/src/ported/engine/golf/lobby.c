@@ -9,6 +9,19 @@ PORT_JUMP(VBlank_1c84e0)
 	JUMP(CopyHLToDE);
 }
 
+// Copied to wVBlankFunc and run from there (see ram_code.c):
+// ld a, BANK("Golf RAM") / ldh [rWBK], a / ld a, [wSCX] / ldh [rSCX], a /
+// ld a, HIGH(wVirtualOAM) / jp hTransferVirtualOAM
+PORT_LOCAL_JUMP(VBlank_1c84e0, Func)
+{
+	gb->cpu.a = 0x01; // BANK("Golf RAM")
+	wr8(gb, rWBK, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wSCX);
+	wr8(gb, rSCX, gb->cpu.a);
+	gb->cpu.a = (uint8_t)(wVirtualOAM >> 8);
+	JUMP_TO(hTransferVirtualOAM);
+}
+
 // rst JumpTable, with the table at `table` (right after the rst). Leaves
 // every register as JumpTable does and returns the target (= hl).
 static uint16_t jumptable(GB *gb, uint16_t table)
