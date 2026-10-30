@@ -1015,7 +1015,7 @@ PORT_JUMP(Func_1c9fae)
 {
 	gb_call(gb, ADDR_Func_1c9fbd);
 	gb->cpu.a = rd8(gb, wGolfVBlankMode);
-	JUMP_TO(jumptable(gb, ADDR_Func_1c9fae + 6));
+	JUMP_TO(jumptable(gb, ADDR_Func_1c9fae + 7));
 }
 
 // ld a, HIGH(v1BGMap0 + 6 * TILEMAP_WIDTH) - $80 / ld [wdc11 + 0], a /
