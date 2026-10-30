@@ -1188,3 +1188,34 @@ PORT_JUMP(Func_21f01)
 	FARCALL(SetState_SwimKnockBack);
 	RET();
 }
+
+PORT_JUMP(Func_20602)
+{
+	gb->cpu.a = rd8(gb, wTransformation);
+	alu_cp(gb, gb->cpu.a, TRANSFORMATION_INVISIBLE_WARIO);
+	if (!ZF && alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		// has transformation except invisible
+		LJUMP(VanishObjectAndKnockBackIfZombie);
+		return;
+	}
+	gb->cpu.a = alu_and(gb, rd8(gb, wGrabState), GRAB_STATE_MASK);
+	alu_cp(gb, gb->cpu.a, GRAB_IDLE);
+	if (ZF) {
+		FARCALL(Func_1ede9);
+	} else {
+		xor_a(gb);
+		wr8(gb, wGrabState, 0);
+		FARCALL(StartJump_FromInput);
+	}
+	st(gb, wDoFullJump, TRUE);
+	st(gb, wJumpVelIndex, 0x0a);
+	if (ld_bit(gb, wJoypadDown, B_PAD_A)) {
+		ld_cp(gb, wPowerUpLevel, HIGH_JUMP_BOOTS);
+		if (!CF) {
+			xor_a(gb);
+			wr8(gb, wJumpVelIndex, 0);
+		}
+	}
+	gb->cpu.b = OBJACTION_VANISH_TOUCH;
+	LJUMP(SetObjAction); // fallthrough
+}

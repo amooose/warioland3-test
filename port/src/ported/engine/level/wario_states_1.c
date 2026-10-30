@@ -3706,3 +3706,134 @@ PORT_JUMP(Func_1f1a9)
 	CALL(MoveWarioUp);
 	RET();
 }
+
+PORT_JUMP(StartFallingAirborneAttack)
+{
+	st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	LJUMP(SetState_AttackingAirborne);
+}
+
+PORT_JUMP(StartJumpingAirborneAttack)
+{
+	xor_a(gb);
+	wr8(gb, wJumpVelIndex, 0);
+	st(gb, wJumpingUpwards, TRUE);
+	LJUMP(SetState_AttackingAirborne); // fallthrough
+}
+
+PORT_JUMP(UpdateState_Submerged)
+{
+	xor_a(gb);
+	wr8(gb, wc0e1, 0);
+	if (room_transition_check(gb))
+		return;
+	if (!still_in(gb, WST_SUBMERGED)) {
+		RET();
+		return;
+	}
+	LCALL(ApplyWaterCurrentMovement);
+	LCALL(Func_1f1a9);
+	RET();
+}
+
+PORT_JUMP(Func_1ee88)
+{
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		LJUMP(Func_1ede9);
+		return;
+	}
+	gb->cpu.a = rd8(gb, wJoypadDown);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_B)) {
+		LJUMP(SetState_ThrowCharging);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, B_PAD_DOWN)) {
+		LJUMP(CrouchOrSlide);
+		return;
+	}
+	gb->cpu.a = alu_and(gb, gb->cpu.a, PAD_RIGHT | PAD_LEFT);
+	if (ZF) {
+		RET();
+		return;
+	}
+	st(gb, wWarioState, WST_GRAB_WALKING);
+	static const uint16_t zero[] = {wSFXLoopCounter, wFrameDuration, wAnimationFrame, 0};
+	clear(gb, zero);
+	collision_box(gb, -1, -27, -9, 9);
+	if (ld_bit(gb, wJoypadDown, B_PAD_RIGHT)) {
+		st(gb, wDirection, DIRECTION_RIGHT);
+		set_frameset(gb, ADDR_Frameset_14a0f);
+	} else {
+		st(gb, wDirection, DIRECTION_LEFT);
+		set_frameset(gb, ADDR_Frameset_149fe);
+	}
+	anim(gb, OAM1);
+	RET();
+}
+
+PORT_JUMP(Func_1eefc)
+{
+	gb->cpu.a = rd8(gb, wJoypadPressed);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_B)) {
+		LJUMP(SetState_ThrowCharging);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, B_PAD_A)) {
+		LJUMP(Func_1ede9);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, B_PAD_DOWN)) {
+		// .asm_1efaf
+		CALL(IsOnSlipperyGround);
+		if (ZF) {
+			LJUMP(CrouchOrSlide);
+			return;
+		}
+		FARCALL(SetState_CrouchSlipping);
+		RET();
+		return;
+	}
+	gb->cpu.a = rd8(gb, wJoypadDown);
+	bool right;
+	if (alu_bit(gb, gb->cpu.a, B_PAD_RIGHT)) {
+		right = true;
+	} else if (alu_bit(gb, gb->cpu.a, B_PAD_LEFT)) {
+		right = false;
+	} else {
+		CALL(IsOnSlipperyGround);
+		if (!ZF) {
+			FARCALL(SetState_GrabSlipping);
+			RET();
+			return;
+		}
+		LJUMP(SetState_GrabIdling);
+		return;
+	}
+	if (facing_right(gb) != right) {
+		LJUMP(SetState_GrabIdling);
+		return;
+	}
+	FARCALL(CheckFrontCollision);
+	if (b_low_nibble(gb)) {
+		RET();
+		return;
+	}
+	if (right) {
+		CALL(ApplyWalkVelocity_Right);
+		CALL(MoveWarioRight);
+	} else {
+		CALL(ApplyWalkVelocity_Left);
+		CALL(MoveWarioLeft);
+	}
+	// uphill: .asm_1efc5, else .asm_1ef8d
+	bool uphill = false;
+	if (ld_and(gb, wWarioSlopeInteraction)) {
+		bool right_slope = alu_bit(gb, gb->cpu.a, RIGHT_SLOPE_F);
+		uphill = right ? right_slope : !right_slope;
+	}
+	bool heavy = ld_bit(gb, wGrabState, GRAB_HEAVY_F);
+	ld_cp(gb, wWalkVelIndex, uphill ? (heavy ? 0x04 : 0x08) : (heavy ? 0x08 : 0x10));
+	if (!CF)
+		st(gb, wWalkVelIndex, uphill ? (heavy ? 0x00 : 0x04) : (heavy ? 0x04 : 0x0c));
+	RET();
+}
