@@ -124,3 +124,71 @@ PORT(DoorTransition)
 	pop_af(gb);
 	wr8(gb, rWBK, gb->cpu.a);
 }
+
+// one tile of the door transition effect: set the attribute's palette to 7
+// (and $7f / or $0f, in VRAM1), then overwrite the tile with $7f
+static void cover_tile(GB *gb, uint16_t hl)
+{
+	wr8(gb, rVBK, 1); // BANK("VRAM1")
+	wr8(gb, hl, (uint8_t)((rd8(gb, hl) & 0x7f) | 0x0f));
+	wr8(gb, rVBK, 0); // BANK("VRAM0")
+	wr8(gb, hl, 0x7f);
+}
+
+// do b tiles up (add hl, -TILEMAP_WIDTH, wrapping down below v0BGMap0)
+static uint16_t fill_upwards(GB *gb, uint16_t hl, uint8_t b)
+{
+	do {
+		cover_tile(gb, hl);
+		hl = (uint16_t)(hl - TILEMAP_WIDTH);
+		if ((hl >> 8) < (v0BGMap0 >> 8))
+			hl = (uint16_t)((((hl >> 8) + 0x04) & 0xff) << 8 | (hl & 0xff)); // wrap down
+	} while (--b);
+	return hl;
+}
+
+// do b tiles left (ld [hli], wrapping a row back when l reaches a multiple of 32)
+static uint16_t fill_left(GB *gb, uint16_t hl, uint8_t b)
+{
+	do {
+		cover_tile(gb, hl);
+		hl++;
+		if (!(hl & 0x1f))
+			hl = (uint16_t)(hl - TILEMAP_WIDTH); // wrap left
+	} while (--b);
+	return hl;
+}
+
+// reached from wVBlankFunc's jp
+PORT_LOCAL(VBlank_DoorTransition, DoTransitionEffect)
+{
+	// apply scroll
+	wr8(gb, rSCY, rd8(gb, wSCY));
+	gb->cpu.a = rd8(gb, wSCX);
+	wr8(gb, rSCX, gb->cpu.a);
+
+	// push_wram $03
+	gb->cpu.a = rd8(gb, rWBK);
+	push_af(gb);
+	wr8(gb, rWBK, 0x03);
+	SET_DE(gb, (uint16_t)-TILEMAP_WIDTH);
+	uint8_t orientation = rd8(gb, wDoorTransitionOrientation);
+	uint8_t step = rd8(gb, wTransitionEffectStep);
+	uint16_t hl = (uint16_t)(rd8(gb, wDoorTransitionEffectBGPtr + 0) |
+		rd8(gb, wDoorTransitionEffectBGPtr + 1) << 8);
+	gb->cpu.c = step;
+	if (orientation) {
+		// up then left
+		hl = fill_upwards(gb, hl, step);
+		hl = fill_left(gb, hl, (uint8_t)(step + 1));
+	} else {
+		// .left_then_up
+		hl = fill_left(gb, hl, step);
+		hl = fill_upwards(gb, hl, step);
+	}
+	gb->cpu.b = 0;
+	SET_HL(gb, hl);
+	// .asm_a8e: pop_wram
+	pop_af(gb);
+	wr8(gb, rWBK, gb->cpu.a);
+}

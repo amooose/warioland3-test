@@ -3465,3 +3465,127 @@ PORT_JUMP(HandleTempleMusicBox5Hover)
 {
 	music_box_hover(gb, ADDR_HandleTempleMusicBox5Hover, wTempleMusicBox5, wSceneObj12, 0x7, 0x1d, 0x32, true);
 }
+
+// ld [$ff00+c], a
+static void vbf_ldh_c(GB *gb)
+{
+	wr8(gb, (uint16_t)(0xff00 + gb->cpu.c), gb->cpu.a);
+}
+
+// ld a, [hli]
+static void vbf_ld_a_hli(GB *gb)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = rd8(gb, hl);
+	SET_HL(gb, (uint16_t)(hl + 1));
+}
+
+// ld a, [wROMBank] / push af / ld a, b / bankswitch
+static void vbf_push_bank_switch(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wROMBank);
+	push_af(gb);
+	gb->cpu.a = gb->cpu.b;
+	bankswitch(gb, gb->cpu.a);
+}
+
+// pop af / bankswitch
+static void vbf_pop_bank(GB *gb)
+{
+	pop_af(gb);
+	bankswitch(gb, gb->cpu.a);
+}
+
+// ld a, [wLCDCFlagsToFlip] / and a / jr z, .skip / ld hl, rLCDC / xor [hl] /
+// ld [hl], a / xor a / ld [wLCDCFlagsToFlip], a
+static void vbf_flip_lcdc(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wLCDCFlagsToFlip);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!gb->cpu.a)
+		return;
+	SET_HL(gb, rLCDC);
+	gb->cpu.a = alu_xor(gb, gb->cpu.a, rd8(gb, rLCDC));
+	wr8(gb, rLCDC, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wLCDCFlagsToFlip, 0);
+}
+
+// ld a, $02 / ldh [rWBK], a / apply wSCY and wSCX
+static void vbf_wram2_scroll(GB *gb)
+{
+	gb->cpu.a = 0x02; // BANK("WRAM2")
+	wr8(gb, rWBK, gb->cpu.a);
+	wr8(gb, rSCY, rd8(gb, wSCY));
+	gb->cpu.a = rd8(gb, wSCX);
+	wr8(gb, rSCX, gb->cpu.a);
+}
+
+// VBlank_PrologueEpilogue.Func, as copied to wVBlankFunc (see ram_code.c).
+// Its calls return to base + n, the block's start wherever it runs from.
+PORT_LOCAL_JUMP(VBlank_PrologueEpilogue, Func)
+{
+	uint16_t base = gb->cpu.pc;
+	vbf_wram2_scroll(gb);
+
+	gb->cpu.a = alu_and(gb, rd8(gb, wHDMABank), rd8(gb, wHDMABank));
+	if (gb->cpu.a) {
+		gb->cpu.b = gb->cpu.a;
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wHDMABank, 0);
+		vbf_push_bank_switch(gb);
+		gb->cpu.a = rd8(gb, wHDMADestVRAMBank);
+		wr8(gb, rVBK, gb->cpu.a);
+		SET_HL(gb, wHDMA);
+		vbf_ld_a_hli(gb);
+		gb->cpu.c = (uint8_t)rVDMA_SRC_HIGH;
+		vbf_ldh_c(gb);
+		for (int i = 0; i < 4; i++) {
+			vbf_ld_a_hli(gb);
+			gb->cpu.c = alu_inc(gb, gb->cpu.c);
+			vbf_ldh_c(gb);
+		}
+		vbf_pop_bank(gb);
+	}
+
+	// .skip_hdma_config
+	SET_HL(gb, wPendingCharDest);
+	gb->cpu.a = alu_and(gb, rd8(gb, wPendingCharDest), rd8(gb, wPendingCharDest));
+	if (gb->cpu.a) {
+		gb->cpu.e = gb->cpu.a;
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wPendingCharDest, 0);
+		SET_HL(gb, wPendingCharDest + 1);
+		vbf_ld_a_hli(gb);
+		gb->cpu.d = gb->cpu.a;
+		vbf_ld_a_hli(gb);
+		wr8(gb, REG_DE(gb), gb->cpu.a); // wPendingCharTile
+		gb->cpu.a = 0x01; // BANK("VRAM1")
+		wr8(gb, rVBK, gb->cpu.a);
+		gb->cpu.a = rd8(gb, REG_HL(gb)); // wPendingCharAttr
+		wr8(gb, REG_DE(gb), gb->cpu.a);
+	}
+
+	// .skip_char
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+	SET_HL(gb, wPalConfig1);
+	gb->cpu.a = alu_and(gb, rd8(gb, wPalConfig1), rd8(gb, wPalConfig1));
+	if (gb->cpu.a)
+		gb_call_ret(gb, ADDR_ApplyPalConfig, (uint16_t)(base + 0x62));
+
+	SET_HL(gb, wPalConfig2);
+	gb->cpu.a = alu_and(gb, rd8(gb, wPalConfig2), rd8(gb, wPalConfig2));
+	if (gb->cpu.a)
+		gb_call_ret(gb, ADDR_ApplyPalConfig, (uint16_t)(base + 0x6a));
+
+	vbf_flip_lcdc(gb);
+
+	// .dma_transfer
+	gb->cpu.a = (uint8_t)(wVirtualOAM >> 8);
+	JUMP_TO(hTransferVirtualOAM);
+}

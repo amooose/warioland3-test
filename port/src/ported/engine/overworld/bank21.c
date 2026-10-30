@@ -1394,3 +1394,80 @@ static void copy_ow_ui_tiles(GB *gb, uint16_t ptrs, uint16_t count)
 PORT(Func_85a68) { copy_ow_ui_tiles(gb, wOWUIObj1Duration, wOWUIObj1Attributes); }
 PORT(Func_85aa2) { copy_ow_ui_tiles(gb, wOWUIObj2Duration, wOWUIObj2Attributes); }
 PORT(Func_85acb) { copy_ow_ui_tiles(gb, wd154, wd153); }
+
+// ld [$ff00+c], a
+static void vbf_ldh_c(GB *gb)
+{
+	wr8(gb, (uint16_t)(0xff00 + gb->cpu.c), gb->cpu.a);
+}
+
+// ld a, [hli]
+static void vbf_ld_a_hli(GB *gb)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = rd8(gb, hl);
+	SET_HL(gb, (uint16_t)(hl + 1));
+}
+
+// ld a, [wROMBank] / push af / ld a, b / bankswitch
+static void vbf_push_bank_switch(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wROMBank);
+	push_af(gb);
+	gb->cpu.a = gb->cpu.b;
+	bankswitch(gb, gb->cpu.a);
+}
+
+// pop af / bankswitch
+static void vbf_pop_bank(GB *gb)
+{
+	pop_af(gb);
+	bankswitch(gb, gb->cpu.a);
+}
+
+
+// ld a, $02 / ldh [rWBK], a / apply wSCY and wSCX
+static void vbf_wram2_scroll(GB *gb)
+{
+	gb->cpu.a = 0x02; // BANK("WRAM2")
+	wr8(gb, rWBK, gb->cpu.a);
+	wr8(gb, rSCY, rd8(gb, wSCY));
+	gb->cpu.a = rd8(gb, wSCX);
+	wr8(gb, rSCX, gb->cpu.a);
+}
+
+// VBlank_OWPalTransition.Func, as copied to wVBlankFunc (see ram_code.c).
+// Its calls return to base + n, the block's start wherever it runs from.
+PORT_LOCAL_JUMP(VBlank_OWPalTransition, Func)
+{
+	uint16_t base = gb->cpu.pc;
+	vbf_wram2_scroll(gb);
+	wr8(gb, rWY, rd8(gb, wWY));
+	gb->cpu.a = alu_add(gb, rd8(gb, wWX), WX_OFS);
+	wr8(gb, rWX, gb->cpu.a);
+
+	gb->cpu.b = BANK_Func_1d8c2c;
+	vbf_push_bank_switch(gb);
+	gb_call_ret(gb, ADDR_Func_1d8c2c, (uint16_t)(base + 0x2a));
+	vbf_pop_bank(gb);
+
+	SET_HL(gb, wTempBGPals);
+	gb->cpu.c = (uint8_t)rBGPI;
+	gb->cpu.a = BGPI_AUTOINC | 0; // palette 0
+	vbf_ldh_c(gb);
+	gb->cpu.c = alu_inc(gb, gb->cpu.c);
+	gb->cpu.b = 8; // num pals
+	do {
+		// .loop_pals
+		for (int i = 0; i < 8; i++) {
+			vbf_ld_a_hli(gb);
+			vbf_ldh_c(gb);
+		}
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (gb->cpu.b);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+	gb->cpu.a = (uint8_t)(wVirtualOAM >> 8);
+	JUMP_TO(hTransferVirtualOAM);
+}

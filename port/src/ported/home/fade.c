@@ -349,3 +349,28 @@ PORT(Func_7cf)
 	gb->cpu.e = e;
 	fade_end_unref(gb);
 }
+
+// VBlank_88d.Func's jp target: apply the scroll, the pals in wTempBGPals /
+// wTempOBPals and the OAM
+PORT_LOCAL(VBlank_88d, asm_8a9)
+{
+	wr8(gb, rSCY, rd8(gb, wSCY));
+	gb->cpu.a = rd8(gb, wSCX);
+	wr8(gb, rSCX, gb->cpu.a);
+	CALL(StoreBGPals);
+	CALL(StoreOBPals);
+	gb->cpu.a = (uint8_t)(wVirtualOAM >> 8);
+	gb_call(gb, hTransferVirtualOAM);
+}
+
+// VBlank_8bf.Func's jp target: same, with the pals from WRAM
+PORT_LOCAL(VBlank_8bf, asm_8d0)
+{
+	wr8(gb, rSCY, rd8(gb, wSCY));
+	gb->cpu.a = rd8(gb, wSCX);
+	wr8(gb, rSCX, gb->cpu.a);
+	CALL(LoadBGPalettesFromWRAM);
+	CALL(LoadOBPalettesFromWRAM);
+	gb->cpu.a = (uint8_t)(wVirtualOAM >> 8);
+	gb_call(gb, hTransferVirtualOAM);
+}

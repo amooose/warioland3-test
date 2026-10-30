@@ -52,3 +52,15 @@ PORT(VBlank_TimeAttackDescription)
 {
 	set_vblank_func(gb, ADDR_VBlank_TimeAttackDescription + 0x0c, 0x10);
 }
+
+// VBlank_TimeAttackDescription.Func, as copied to wVBlankFunc (see
+// ram_code.c). Its call returns to base + n, the block's start wherever it
+// runs from.
+PORT_LOCAL(VBlank_TimeAttackDescription, Func)
+{
+	uint16_t base = gb->cpu.pc;
+	wr8(gb, rSCY, rd8(gb, wSCY));
+	wr8(gb, rSCX, rd8(gb, wSCX));
+	gb->cpu.a = (uint8_t)(wVirtualOAM >> 8);
+	gb_call_ret(gb, hTransferVirtualOAM, (uint16_t)(base + 0x0f));
+}
