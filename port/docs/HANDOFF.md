@@ -232,6 +232,11 @@ Four agents ported 512 routines at once this way:
   inconclusive. This cut the cutscene dispatchers from minutes to seconds.
   Likewise, when the native run never finishes, an asm run that finishes
   only after turning unrealistic is inconclusive, not a FAIL.
+- **Computed jumps.** A `jp hl` to a ROM address with no label is
+  unrealistic. Every one the game makes, 14,000+ per recording, goes to a
+  label. A fuzzed pointer into the middle of an instruction otherwise ran
+  `push bc / ret` into whatever bc held, and native code only promises
+  exact registers at its exits.
 
 ### Per-frame traces (src/trace.c)
 
@@ -275,21 +280,36 @@ build/wl3 --headless --input tests/inputs/X.input --trace-check X.trace
   recording and the ROM, so it can also be kept next to the recording
   once the interpreter is gone.
 
+### What still runs as asm
+
+`--asm-profile PATH` (with `--trace-check`) counts every instruction the
+interpreter runs while the port plays a recording and writes the counts
+per label, most run first. It's the real list of work left before the
+interpreter can go. The progress report counts routines, and it treats
+anything calling `hCallFunc` as blocked.
+
+- **RAM hooks** (`ram_hook_register` in hooks.h, the code is in
+  src/ported/home/ram_code.c) cover what the game runs from RAM:
+  - `hCallFunc`, the HRAM trampoline behind every farcall and hcall;
+  - `hTransferVirtualOAM`, the OAM DMA routine;
+  - the WRAM V-Blank code, including the tile queue copy loops.
+
+  A RAM hook first checks that the bytes are the code it stands for, and
+  otherwise leaves them to the interpreter.
+- **The main loop** (`InitWithoutDemoPowerUpReset.GameLoop`) stays asm on
+  purpose. As a hook it would call `MainStateTable`, a whole game frame,
+  so the fuzzer would run 200 variants of whole frames per seed. It's also
+  the traces' sync point. Port it as plain C when the interpreter goes.
+- **Deliberate fallbacks.** The collision helpers (`Func_19b5c` and
+  siblings) hand back to asm when `ProcessBlock` returns with another
+  bank mapped, as the game does.
+
 ## Open issues
 
-- **After a game over, native code stays one call deep.** The game
-  restarts its main loop by jumping to `InitWithoutDemoPowerUpReset` from
-  inside a native routine's `gb_call`, which then never returns, so
-  `call_depth` stays at 1. main.c only takes save states at depth 0, so
-  in the native port save states stop working after a game over until the
-  game is restarted.
-- **`Func_19706` fails one synthetic fuzz variant on `yellowbelly`.** The
-  variant mutates `wBlockPtr` to point into ROM, and the
-  `wBlockFunctionTable` entry it reaches points into the middle of
-  `UpdateRoomAnimatedPals` ($2b20). The callees pass on their own. This
-  is probably a garbage path the harness should call unrealistic, but
-  the exact path isn't pinned down. It fails the local
-  `fuzz_yellowbelly_1` test.
+- **Objects with states still in asm.** These states have no hook:
+  `SeeingEyeDoorFunc` (.CheckWarioDistance, .Default, .LookAround),
+  `SpearBotFunc` (13 states), `ZombieFunc.OnUnderground`, and parts of
+  `SmallLeafFunc`. Each costs about 0.1% of the interpreted instructions.
 
 1. **`Prologue_WarioFallFromPlane`** (may be stale) (`src/ported/engine/overworld/bank2b_2.c`,
    ported by a parallel agent with `PORT_NESTED` and `dispatch` /
