@@ -3315,3 +3315,125 @@ PORT_NESTED(Func_af13c)
 		return;
 	RET();
 }
+
+// ---------------------------------------------------------------------------
+// _InitEpilogue
+
+// decompress_tiles0 / decompress_tilemap: decompresses src (in bank) to dest
+static void epi_decompress(GB *gb, uint8_t bank, uint16_t src, uint16_t dest)
+{
+	gb->cpu.a = bank;
+	wr8(gb, wTempBank, bank);
+	SET_HL(gb, src);
+	SET_BC(gb, dest);
+	gb->cpu.a = rd8(gb, wTempBank);
+	wr8(gb, hCallFuncBank, gb->cpu.a);
+	HCALL(Decompress);
+}
+
+// decompress_tiles1 / decompress_attrmap: the same, into VRAM bank 1
+static void epi_decompress_vram1(GB *gb, uint8_t bank, uint16_t src, uint16_t dest)
+{
+	gb->cpu.a = 1; // BANK("VRAM1")
+	wr8(gb, rVBK, 1);
+	epi_decompress(gb, bank, src, dest);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+}
+
+// call DisableLCD / call FillBGMap0_With7f / call ClearVirtualOAM
+static void epi_clear_screen(GB *gb)
+{
+	CALL(DisableLCD);
+	CALL(FillBGMap0_With7f);
+	CALL(ClearVirtualOAM);
+}
+
+// ld a, [wCollectionRow] / ld b, a / and a / ld a, LCDC / jr z / xor b /
+// ldh [rLCDC], a / xor a / ld [wCollectionRow], a
+static void epi_apply_lcdc(GB *gb)
+{
+	gb->cpu.a = gb->cpu.b = rd8(gb, wCollectionRow);
+	bool z = !alu_and(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = LCDC_BG_ON | LCDC_OBJ_ON | LCDC_OBJ_16 | LCDC_WIN_9C00 | LCDC_ON;
+	if (!z)
+		gb->cpu.a = alu_xor(gb, gb->cpu.a, gb->cpu.b);
+	wr8(gb, rLCDC, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCollectionRow, 0);
+}
+
+PORT(_InitEpilogue)
+{
+	epi_clear_screen(gb);
+	stop_music2(gb);
+
+	gb->cpu.a = 0x02;
+	wr8(gb, rWBK, 0x02);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rSCX, 0);
+	wr8(gb, wSCX, 0);
+	wr8(gb, rSCY, 0);
+	wr8(gb, wSCY, 0);
+
+	CALL_2B(VBlank_PrologueEpilogue);
+	CALL_2B(ClearGeneralSceneRAM);
+	CALL_2B(ClearSceneObjsRAM);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, wTempPals1);
+	SET_BC(gb, 8 * PAL_SIZE);
+	CALL(WriteAToHL_BCTimes);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, wTempPals2);
+	SET_BC(gb, 8 * PAL_SIZE);
+	CALL(WriteAToHL_BCTimes);
+
+	epi_decompress(gb, BANK_EpilogueGfx, ADDR_EpilogueGfx, v0Tiles0);
+	epi_decompress_vram1(gb, BANK_FontGfx, ADDR_FontGfx, v1Tiles0);
+
+	gb->cpu.a = 1; // BANK("VRAM1")
+	wr8(gb, rVBK, 1);
+	SET_HL(gb, v0Tiles1);
+	SET_DE(gb, wAttrmap);
+	SET_BC(gb, 0x50 * TILE_SIZE);
+	CALL(CopyHLToDE_BC);
+	SET_HL(gb, ADDR_EpilogueStarGfx);
+	SET_DE(gb, v1Tiles1 + TILE_SIZE * 0x40);
+	gb->cpu.c = 0x00; // aka $100 bytes
+	gb->cpu.b = BANK_EpilogueStarGfx;
+	CALL(CopyFarBytes);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+
+	epi_decompress_vram1(gb, BANK_SpearheadGfx, ADDR_SpearheadGfx, v1Tiles0);
+	epi_decompress_vram1(gb, BANK_HammerBotGfx, ADDR_HammerBotGfx, v1Tiles0 + TILE_SIZE * 0x40);
+	epi_decompress_vram1(gb, BANK_DoughnuteerGfx, ADDR_DoughnuteerGfx, v1Tiles1);
+
+	epi_decompress_vram1(gb, BANK_EpilogueTransformationAttrmap, ADDR_EpilogueTransformationAttrmap, v1BGMap0);
+	epi_decompress(gb, BANK_EpilogueTransformationTilemap, ADDR_EpilogueTransformationTilemap, v0BGMap0);
+	epi_decompress_vram1(gb, BANK_PrologueAttrmap, ADDR_PrologueAttrmap, v1BGMap1);
+	epi_decompress(gb, BANK_PrologueTilemap, ADDR_PrologueTilemap, v0BGMap1);
+
+	CALL_2B(FillClearedTextBuffer);
+	gb->cpu.a = rd8(gb, wLanguage);
+	uint16_t text = alu_and(gb, gb->cpu.a, gb->cpu.a) ? ADDR_TextEN_OldManThankYou : ADDR_TextJP_OldManThankYou;
+	epi_decompress(gb, BANK_TextJP_OldManThankYou, text, wTextBuffer);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, w2d013, 0);
+	wr8(gb, w2d014, 0);
+	wr8(gb, wPalConfig1TotalSteps, 0);
+	wr8(gb, wPalConfig2TotalSteps, 0);
+
+	epi_apply_lcdc(gb);
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}

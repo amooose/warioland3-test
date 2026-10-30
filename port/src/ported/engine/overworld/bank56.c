@@ -938,3 +938,123 @@ PORT(_InitBestTimeList)
 	SET_HL(gb, wSubState);
 	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
 }
+
+// ld hl, addr / inc [hl]: returns the new value
+static uint8_t btl_inc(GB *gb, uint16_t addr)
+{
+	SET_HL(gb, addr);
+	uint8_t v = alu_inc(gb, rd8(gb, addr));
+	wr8(gb, addr, v);
+	return v;
+}
+
+// .asm_158a96
+static void btl_next_scroll_state(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCollectionLinkStateCounter, 0);
+	btl_inc(gb, wColourFadeDiff);
+}
+
+PORT_JUMP(_BestTimeList)
+{
+	gb->cpu.a = rd8(gb, wCollectionRow);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		SET_HL(gb, wSCY);
+		gb->cpu.a = rd8(gb, wJoypadDown);
+		if (alu_bit(gb, gb->cpu.a, B_PAD_UP)) {
+			// .d_up
+			gb->cpu.a = rd8(gb, wSCY);
+			if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+				RET();
+				return;
+			}
+			wr8(gb, wSCY, alu_dec(gb, rd8(gb, wSCY)));
+		} else if (alu_bit(gb, gb->cpu.a, B_PAD_DOWN)) {
+			// .d_down
+			gb->cpu.a = rd8(gb, wSCY);
+			alu_cp(gb, gb->cpu.a, 0x70);
+			if (gb->cpu.f & FLAG_Z) {
+				RET();
+				return;
+			}
+			wr8(gb, wSCY, alu_inc(gb, rd8(gb, wSCY)));
+		} else {
+			// no input
+			gb->cpu.a = btl_inc(gb, wCollectionCol);
+			if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+				btl_inc(gb, wCollectionRow);
+				gb->cpu.a = 0;
+				gb->cpu.f = FLAG_Z; // xor a
+				wr8(gb, wColourFadeDiff, 0);
+			}
+			// .asm_158a5a
+			gb->cpu.a = alu_and(gb, rd8(gb, wJoypadPressed), PAD_B | PAD_START);
+			if (gb->cpu.f & FLAG_Z) {
+				RET();
+				return;
+			}
+			gb->cpu.a = 0x08;
+			wr8(gb, wSubState, 0x08);
+			RET();
+			return;
+		}
+		// .asm_158a6a
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wCollectionCol, 0);
+		RET();
+		return;
+	}
+
+	// .asm_158a76
+	// .Func_158ac2
+	gb->cpu.a = alu_and(gb, rd8(gb, wJoypadPressed), PAD_A | PAD_B | PAD_START | PAD_UP | PAD_DOWN);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		gb->cpu.a = 0;
+		wr8(gb, wCollectionRow, 0);
+		gb->cpu.f = FLAG_Z | FLAG_C; // xor a / scf
+		RET();
+		return;
+	}
+	gb->cpu.a = rd8(gb, wColourFadeDiff);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		// .asm_158a8c
+		SET_HL(gb, wSCY);
+		gb->cpu.a = rd8(gb, wSCY);
+		alu_cp(gb, gb->cpu.a, 0x70);
+		if (gb->cpu.f & FLAG_C)
+			wr8(gb, wSCY, alu_inc(gb, rd8(gb, wSCY)));
+		else
+			btl_next_scroll_state(gb);
+	} else if (!(gb->cpu.a = alu_dec(gb, gb->cpu.a))) {
+		// .asm_158a9f
+		gb->cpu.a = btl_inc(gb, wCollectionLinkStateCounter);
+		alu_cp(gb, gb->cpu.a, 0xb4);
+		if (!(gb->cpu.f & FLAG_C))
+			btl_next_scroll_state(gb);
+	} else if (!(gb->cpu.a = alu_dec(gb, gb->cpu.a))) {
+		// .asm_158aa9
+		SET_HL(gb, wSCY);
+		gb->cpu.a = rd8(gb, wSCY);
+		if (!alu_and(gb, gb->cpu.a, gb->cpu.a))
+			btl_next_scroll_state(gb);
+		else
+			wr8(gb, wSCY, alu_dec(gb, rd8(gb, wSCY)));
+	} else if (!(gb->cpu.a = alu_dec(gb, gb->cpu.a))) {
+		// .asm_158ab2
+		gb->cpu.a = btl_inc(gb, wCollectionLinkStateCounter);
+		alu_cp(gb, gb->cpu.a, 0xb4);
+		if (!(gb->cpu.f & FLAG_C)) {
+			gb->cpu.a = 0;
+			gb->cpu.f = FLAG_Z; // xor a
+			wr8(gb, wCollectionLinkStateCounter, 0);
+			wr8(gb, wColourFadeDiff, 0);
+		}
+	} else {
+		JUMP_TO(ADDR__BestTimeList + 0x53); // debug_nop: loops forever, in asm
+		return;
+	}
+	RET();
+}

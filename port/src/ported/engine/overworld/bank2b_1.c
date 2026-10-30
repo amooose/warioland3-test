@@ -2583,3 +2583,318 @@ PORT_LOCAL_JUMP(Func_ad445, DespawnMusicBoxes)
 	wr8(gb, w2d8a0, 0x08);
 	JUMP_TO(ADDR_Func_ad335);
 }
+
+// _GolfBuilding.Func_ada4a
+static void golf_building_func_ada4a(GB *gb)
+{
+	SET_DE(gb, wOWUIObj1YCoord);
+	gb->cpu.a = 0x58;
+	wr8(gb, REG_DE(gb), 0x58);
+	gb->cpu.e = alu_inc(gb, gb->cpu.e);
+	gb->cpu.a = alu_add(gb, rd8(gb, wNextMapSide), rd8(gb, wNextMapSide));
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.c = gb->cpu.a; // *4
+	gb->cpu.b = 0x00;
+	uint16_t hl = alu_add16(gb, ADDR__GolfBuilding + 0xbc, REG_BC(gb)); // .data
+	gb->cpu.a = rd8(gb, hl++);
+	wr8(gb, REG_DE(gb), gb->cpu.a);
+	gb->cpu.a = rd8(gb, hl++); // useless
+	gb->cpu.a = rd8(gb, hl);
+	SET_HL(gb, hl);
+	wr8(gb, wPalFade6Colour2GreenCurrent, gb->cpu.a);
+	gb->cpu.a = 0xff;
+	wr8(gb, wOWUIObj2YCoord, 0xff);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	gb_call(gb, ADDR_SetSceneWarioState);
+}
+
+// _GolfBuilding.FillBGPalettes
+static void golf_building_fill_bg_pals(GB *gb)
+{
+	SET_HL(gb, ADDR_Pals_addc9);
+	CALL(LoadPalsToTempPals1);
+	copy_bytes(gb, wTempPals1, wTempBGPals, 8 * PAL_SIZE);
+
+	const uint16_t src = ADDR_Pals_ade09, dst = wTempBGPals;
+#define FILL(off, n) copy_bytes(gb, src + (off), dst + (off), (n))
+	gb->cpu.a = rd8(gb, wCrayonFlags);
+	if (alu_bit(gb, gb->cpu.a, CRAYON_RED_F)) { // .FillRed
+		FILL(7 * PAL_SIZE, PAL_SIZE);
+	}
+	gb->cpu.a = rd8(gb, wCrayonFlags);
+	if (alu_bit(gb, gb->cpu.a, CRAYON_BROWN_F)) { // .FillBrown
+		FILL(0 * PAL_SIZE + 2, 2);
+		FILL(1 * PAL_SIZE, 2);
+		FILL(2 * PAL_SIZE, 6);
+		FILL(3 * PAL_SIZE + 2, 2);
+	}
+	gb->cpu.a = rd8(gb, wCrayonFlags);
+	if (alu_bit(gb, gb->cpu.a, CRAYON_YELLOW_F)) { // .FillYellow
+		FILL(4 * PAL_SIZE + 2, 6);
+	}
+	gb->cpu.a = rd8(gb, wCrayonFlags);
+	if (alu_bit(gb, gb->cpu.a, CRAYON_GREEN_F)) { // .FillGreen
+		FILL(1 * PAL_SIZE + 2, 6);
+		FILL(5 * PAL_SIZE + 2, 6);
+	}
+	gb->cpu.a = rd8(gb, wCrayonFlags);
+	if (alu_bit(gb, gb->cpu.a, CRAYON_CYAN_F)) { // .FillCyan
+		FILL(0 * PAL_SIZE + 4, 2);
+		FILL(3 * PAL_SIZE, 2);
+		FILL(4 * PAL_SIZE, 2);
+		FILL(5 * PAL_SIZE, 2);
+	}
+	gb->cpu.a = rd8(gb, wCrayonFlags);
+	if (alu_bit(gb, gb->cpu.a, CRAYON_BLUE_F)) { // .FillBlue
+		FILL(0 * PAL_SIZE + 6, 2);
+		FILL(2 * PAL_SIZE + 6, 2);
+		FILL(3 * PAL_SIZE + 4, 4);
+	}
+	gb->cpu.a = rd8(gb, wCrayonFlags);
+	if (alu_bit(gb, gb->cpu.a, CRAYON_PINK_F)) { // .FillPink
+		FILL(6 * PAL_SIZE, PAL_SIZE);
+	}
+#undef FILL
+	copy_bytes(gb, wTempBGPals, wTempPals1, 8 * PAL_SIZE);
+}
+
+PORT(_GolfBuilding)
+{
+	CALL(DisableLCD);
+	CALL(FillBGMap0_With7f);
+	CALL(ClearVirtualOAM);
+	// stop_music2
+	gb->cpu.a = 0xff;
+	wr8(gb, hMusicIDBackup + 0, 0xff);
+	wr8(gb, hMusicID + 0, 0xff);
+	gb->cpu.a = 0x00;
+	wr8(gb, hMusicIDBackup + 1, 0x00);
+	wr8(gb, hMusicID + 1, 0x00);
+
+	gb->cpu.a = 2; // BANK("WRAM2")
+	wr8(gb, rWBK, 2);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rSCX, 0);
+	wr8(gb, wSCX, 0);
+	wr8(gb, rSCY, 0);
+	wr8(gb, wSCY, 0);
+	// .VBlank_GolfBuilding
+	copy_bytes(gb, ADDR__GolfBuilding + 0xfa, wVBlankFunc, 0x46); // .func
+
+	gb_call(gb, ADDR_ClearGeneralSceneRAM);
+	gb_call(gb, ADDR_ClearSceneObjsRAM);
+
+	golf_building_fill_bg_pals(gb);
+
+	SET_HL(gb, ADDR_Pals_84900);
+	SET_DE(gb, wTempPals2);
+	gb->cpu.b = BANK_Pals_84900;
+	gb->cpu.c = 8 * PAL_SIZE;
+	CALL(CopyFarBytes);
+	SET_HL(gb, ADDR_PrologueBackgroundGfx);
+	gb->cpu.b = BANK_PrologueBackgroundGfx;
+	CALL(LoadFarTiles);
+
+	decompress_vram1(gb, BANK_GolfBuildingAttrmap, ADDR_GolfBuildingAttrmap, v1BGMap0);
+	decompress(gb, BANK_GolfBuildingTilemap, ADDR_GolfBuildingTilemap, v0BGMap0);
+
+	// .Func_ada43
+	gb->cpu.a = rd8(gb, wCrayonFlags);
+	alu_cp(gb, gb->cpu.a, ALL_CRAYONS);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		golf_building_func_ada4a(gb);
+	} else {
+		// .all_crayons
+		gb->cpu.a = rd8(gb, wOWLevel);
+		alu_cp(gb, gb->cpu.a, LEVEL_GOLF_BUILDING);
+		if (gb->cpu.f & FLAG_Z) {
+			SET_DE(gb, wOWUIObj1YCoord);
+			gb->cpu.a = 0x58;
+			wr8(gb, REG_DE(gb), 0x58);
+			gb->cpu.e = alu_inc(gb, gb->cpu.e);
+			gb->cpu.a = 0x50;
+			wr8(gb, REG_DE(gb), 0x50);
+			gb->cpu.a = 0x04;
+			wr8(gb, wPalFade6Colour2GreenCurrent, 0x04);
+			gb->cpu.a = 0xff;
+			wr8(gb, wOWUIObj2YCoord, 0xff);
+			gb->cpu.a = 0x01;
+			gb_call(gb, ADDR_SetSceneWarioState);
+		} else {
+			// .asm_ada97
+			golf_building_func_ada4a(gb);
+			SET_HL(gb, wPalFade6Colour2GreenCurrent);
+			wr8(gb, wPalFade6Colour2GreenCurrent, alu_inc(gb, rd8(gb, wPalFade6Colour2GreenCurrent)));
+			wr8(gb, wPalFade6Colour2GreenCurrent, alu_inc(gb, rd8(gb, wPalFade6Colour2GreenCurrent)));
+		}
+	}
+	gb_call(gb, ADDR_UpdateSceneWario);
+
+	gb->cpu.a = LCDC_DEFAULT;
+	wr8(gb, rLCDC, LCDC_DEFAULT);
+
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}
+
+PORT_JUMP(HandleTempleShakeScene)
+{
+	gb_call(gb, ADDR_HandleTempleWarioPanic);
+	gb_call(gb, ADDR_HandleTempleShakeAndRocks);
+	temple_scene_jumptable(gb, ADDR_HandleTempleShakeScene + 0xf);
+}
+
+// .InitTempleRock: hl = rock, b = size
+static void init_temple_rock(GB *gb)
+{
+	uint16_t hl = REG_HL(gb);
+	gb->cpu.a = 0x01;
+	wr8(gb, hl++, 0x01); // action
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hl++, 0); // counter
+	wr8(gb, hl, gb->cpu.b); // size
+	SET_HL(gb, hl);
+	JUMP_TO(ADDR_Func_ad335);
+}
+
+// ld a, [bc] / cp n / ret c / ld hl, rock / ld b, size / jp .InitTempleRock
+static void init_rock_after(GB *gb, uint8_t n, uint16_t rock, uint8_t size)
+{
+	if (bc_below(gb, n)) {
+		RET();
+		return;
+	}
+	SET_HL(gb, rock);
+	gb->cpu.b = size;
+	init_temple_rock(gb);
+}
+
+// the same, clearing a scene object's unk7 first
+static void init_large_rock_after(GB *gb, uint8_t n, uint16_t unk7, uint16_t rock)
+{
+	if (bc_below(gb, n)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, unk7, 0);
+	SET_HL(gb, rock);
+	gb->cpu.b = 0x02;
+	init_temple_rock(gb);
+}
+
+// ld a, n / ld [w2d896], a / jp Func_ad335
+static void set_shake_advance(GB *gb, uint8_t n)
+{
+	gb->cpu.a = n;
+	wr8(gb, w2d896, n);
+	JUMP_TO(ADDR_Func_ad335);
+}
+
+PORT_LOCAL_JUMP(HandleTempleShakeScene, StartShake)
+{
+	if (bc_below(gb, 90)) {
+		RET();
+		return;
+	}
+	set_shake_advance(gb, 0x02);
+}
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitSmallRock1) { init_rock_after(gb, 16, wTempleRock1, 0x01); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitSmallRock2) { init_rock_after(gb, 8, wTempleRock2, 0x01); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitSmallRock3) { init_rock_after(gb, 20, wTempleRock3, 0x01); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitSmallRock4) { init_rock_after(gb, 8, wTempleRock4, 0x01); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitSmallRock5) { init_rock_after(gb, 16, wTempleRock5, 0x01); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitSmallRock6) { init_rock_after(gb, 8, wTempleRock6, 0x01); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, ShowExclamationMark)
+{
+	if (bc_below(gb, 60)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = alu_sub(gb, rd8(gb, wSceneWarioYCoord), 0x1c);
+	wr8(gb, wCurSceneObj, gb->cpu.a); // y
+	gb->cpu.a = rd8(gb, wSceneWarioXCoord);
+	wr8(gb, wCurSceneObj + 1, gb->cpu.a); // x
+	gb->cpu.a = 0x02;
+	SET_HL(gb, wCurSceneObjState);
+	CALL(SetSceneObjState);
+	play_sfx(gb, SFX_106);
+	JUMP_TO(ADDR_Func_ad335);
+}
+PORT_LOCAL_JUMP(HandleTempleShakeScene, WaitExclamationMark)
+{
+	gb->cpu.a = rd8(gb, wCurSceneObjState);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_Func_ad335);
+}
+PORT_LOCAL_JUMP(HandleTempleShakeScene, Wait) { wait_ad330(gb, 45); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, LookAround) { wario_state_advance(gb, SCENEWARIO_LOOK_AROUND); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, WaitUntilLookForward) { wait_wario_state(gb, SCENEWARIO_LOOK_FORWARD); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, StopShakeAndDeinitRocks)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d896, 0x01);
+	gb->cpu.a = 0x00;
+	wr8(gb, wTempleRock1Size, 0);
+	wr8(gb, wTempleRock2Size, 0);
+	wr8(gb, wTempleRock3Size, 0);
+	wr8(gb, wTempleRock4Size, 0);
+	wr8(gb, wTempleRock5Size, 0);
+	wr8(gb, wTempleRock6Size, 0);
+	JUMP_TO(ADDR_Func_ad335);
+}
+PORT_LOCAL_JUMP(HandleTempleShakeScene, WaitUntilRocksDeinit)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_DE(gb, TEMPLE_ROCK_STRUCT_LENGTH);
+	uint16_t hl = wTempleRocks;
+	gb->cpu.b = NUM_FALLING_TEMPLE_ROCKS;
+	do {
+		gb->cpu.a = alu_add(gb, gb->cpu.a, rd8(gb, hl));
+		hl = alu_add16(gb, hl, TEMPLE_ROCK_STRUCT_LENGTH);
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (!(gb->cpu.f & FLAG_Z));
+	SET_HL(gb, hl);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_Func_ad335);
+}
+PORT_LOCAL_JUMP(HandleTempleShakeScene, StartBigShake) { set_shake_advance(gb, 0x0b); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitLargeRock1) { init_rock_after(gb, 20, wTempleRock1, 0x02); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitLargeRock2) { init_rock_after(gb, 4, wTempleRock2, 0x02); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitLargeRock3) { init_rock_after(gb, 10, wTempleRock3, 0x02); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitLargeRock4) { init_rock_after(gb, 4, wTempleRock4, 0x02); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitLargeRock5) { init_rock_after(gb, 10, wTempleRock5, 0x02); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitLargeRock6) { init_rock_after(gb, 10, wTempleRock6, 0x02); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitLargeRock7) { init_large_rock_after(gb, 30, wSceneObj8Unk7, wTempleRock7); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitLargeRock8) { init_large_rock_after(gb, 8, wSceneObj9Unk7, wTempleRock8); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitLargeRock9) { init_large_rock_after(gb, 10, wSceneObj10Unk7, wTempleRock9); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, InitLargeRock10) { init_large_rock_after(gb, 8, wSceneObj11Unk7, wTempleRock10); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, PanicJump)
+{
+	gb->cpu.a = TRUE;
+	wr8(gb, wSceneWarioIgnoreScroll, TRUE);
+	wario_state_advance(gb, SCENEWARIO_PANIC_JUMP);
+}
+PORT_LOCAL_JUMP(HandleTempleShakeScene, LookBack) { wait_wario_state(gb, SCENEWARIO_LOOK_BACK); }
+PORT_LOCAL_JUMP(HandleTempleShakeScene, StopShake)
+{
+	if (bc_below(gb, 8)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x01;
+	wr8(gb, w2d894, 0x01);
+	JUMP_TO(ADDR_Func_ad335);
+}
