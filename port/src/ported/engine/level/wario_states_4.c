@@ -1743,3 +1743,43 @@ PORT_JUMP(UpdateState_SnowmanAirborne)
 	anim(gb, OAM2);
 	RET();
 }
+
+PORT_JUMP(UpdateState_Splitting)
+{
+	anim(gb, OAM2);
+	if (anim_ended(gb)) {
+		LJUMP(Func_1ed09b);
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (b_and(gb)) {
+		RET();
+		return;
+	}
+	st(gb, wWarioState, WST_SPLITTING_AIRBORNE);
+	st(gb, wJumpVelTable, JUMP_VEL_NORMAL);
+	st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	RET();
+}
+
+PORT_JUMP(UpdateState_SplittingAirborne)
+{
+	if (room_transition_check(gb))
+		return;
+	if (ld_and(gb, wWaterInteraction)) {
+		JUMP(RecoverFromTransformation);
+		return;
+	}
+	anim(gb, OAM2);
+	if (anim_ended(gb)) {
+		LJUMP(Func_1ed09b);
+		return;
+	}
+	CALL(ApplyJumpVelocity);
+	FARCALL(CheckAirborneCollision);
+	if (b_and(gb)) {
+		LJUMP(SetState_Splitting);
+		return;
+	}
+	JUMP(TriggerDownwardsFloorTransition);
+}

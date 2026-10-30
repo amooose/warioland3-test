@@ -1249,3 +1249,16 @@ PORT_JUMP(ObjInteraction_Stove)
 	else
 		LJUMP(Func_20a6f);
 }
+
+PORT_JUMP(ObjInteraction_WaterDrop)
+{
+	gb->cpu.b = OBJACTION_06;
+	gb_call(gb, ADDR_SetObjAction);
+	gb->cpu.a = rd8(gb, wTransformation);
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP_TO(ProcessInteractions_next_obj);
+		return;
+	}
+	JUMP(RecoverFromTransformation);
+}

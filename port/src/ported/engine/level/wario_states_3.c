@@ -3667,3 +3667,20 @@ PORT_JUMP(UpdateState_CrazySpinning)
 	anim(gb, OAM1);
 	RET();
 }
+
+PORT_JUMP(UpdateState_InBubble)
+{
+	FARCALL(Func_19b25);
+	if (!ld_and(gb, wWaterInteraction)) {
+		// .asm_2ad45
+		get_pos(gb);
+		gb->cpu.b = PARTICLE_BUBBLE_BURST;
+		FARCALL(CreateParticle);
+		JUMP(RecoverFromTransformation);
+		return;
+	}
+	sfx_loop(gb, 0x0e, SFX_023);
+	anim(gb, OAM2);
+	LCALL(Func_2b56f);
+	RET();
+}
