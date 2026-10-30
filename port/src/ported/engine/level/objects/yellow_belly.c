@@ -599,3 +599,757 @@ PORT_LOCAL_JUMP(PumpFunc, Func_51947)
 	res_mhl(gb, OBJFLAG_NO_COLLISION_F);
 	RET();
 }
+
+// YellowBellyBodyFunc. Its local labels are given by their ROM address
+// (warioland3.sym); the assert catches a shifted ROM.
+_Static_assert(ADDR_YellowBellyBodyFunc == 0x5356, "YellowBellyBodyFunc moved");
+#define YB(a) (ADDR_YellowBellyBodyFunc + ((a) - 0x5356))
+
+// stop_music2
+static void stop_music2(GB *gb)
+{
+	A = 0xff;
+	wr8(gb, hMusicIDBackup + 0, A);
+	wr8(gb, hMusicID + 0, A);
+	A = 0x00;
+	wr8(gb, hMusicIDBackup + 1, A);
+	wr8(gb, hMusicID + 1, A);
+}
+
+// stop_sfx
+static void stop_sfx(GB *gb)
+{
+	A = 0xff;
+	wr8(gb, hSFXID + 0, A);
+	A = 0x00;
+	wr8(gb, hSFXID + 1, A);
+}
+
+// ld hl, pals / ld de, wTempPals2 palette 4 / ld c, 4 / ld b, 3 /
+// jp CopyAndApplyOBPals
+static void yb_copy_pals(GB *gb, uint16_t pals)
+{
+	ld_hl(gb, pals);
+	SET_DE(gb, wTempPals2 + 4 * PAL_SIZE);
+	gb->cpu.c = 4;
+	gb->cpu.b = 3;
+	JUMP(CopyAndApplyOBPals);
+}
+
+// Looks for an active object with this id in wObj1..wObj8. Found: hl is
+// just past its OBJ_FLAGS. Not found: where the asm does ret z.
+static bool yb_find_obj(GB *gb, uint8_t id)
+{
+	A = (uint8_t)wObj1;
+	gb->cpu.b = (uint8_t)wObj1;
+	gb->cpu.h = (uint8_t)(wObj1 >> 8);
+	for (;;) {
+		ld_l(gb, OBJ_ID);
+		A = alu_add(gb, A, gb->cpu.l);
+		gb->cpu.l = A;
+		A = rd_hl(gb);
+		alu_cp(gb, A, id);
+		if (ZF) {
+			A = alu_sub(gb, gb->cpu.l, OBJ_ID - OBJ_FLAGS);
+			gb->cpu.l = A;
+			A = alu_rra(gb, rd_hli(gb));
+			if (CF)
+				return true;
+		}
+		A = gb->cpu.b;
+		alu_cp(gb, A, (uint8_t)wObj8);
+		if (ZF)
+			return false;
+		A = alu_add(gb, A, OBJ_STRUCT_LENGTH);
+		gb->cpu.b = A;
+	}
+}
+
+// jp SetObjectFramesetPtr. ret: when the code was reached through a call,
+// that call's return address, which is still on the stack (0 otherwise).
+static void yb_set_frameset_tail(GB *gb, uint16_t de, uint16_t ret)
+{
+	SET_DE(gb, de);
+	if (ret)
+		gb_call_ret(gb, ADDR_SetObjectFramesetPtr, ret);
+	else
+		JUMP(SetObjectFramesetPtr);
+}
+
+PORT(YellowBellyBodyFunc)
+{
+	ld_hl(gb, wCurObjFlags);
+	res_mhl(gb, OBJFLAG_INVISIBLE_F);
+	set_update_l(gb, YB(0x539d));
+	SET_DE(gb, ADDR_Frameset_69780);
+	CALL(SetObjectFramesetPtr);
+	A = 0x3c; wr_hli(gb, A);
+	ld_l(gb, OBJ_SUBSTATE);
+	res_mhl(gb, OBJSUBFLAG_UNINITIALISED_F);
+	A = alu_or(gb, alu_and(gb, rd_hl(gb), 0xf0), 0x04);
+	wr_hl(gb, A);
+	ld_l(gb, OBJ_COLLBOX_RIGHT);
+	A = 0x07; wr_hld(gb, A);
+	A = 0xf8; wr_hld(gb, A);
+	A = 0x0a; wr_hl(gb, A);
+	xor_a(gb);
+	wr8(gb, wDollBoyActiveBarrels, A);
+	wr8(gb, w1d147, A);
+	wr8(gb, wDollBoyHammerRange, A);
+	A = TRUE;
+	wr8(gb, wIsBossBattle, A);
+	stop_music2(gb);
+}
+
+// .Func_5139d / .Func_513bf / .Func_513d9: the palette fade-in steps
+static void yb_fade_step(GB *gb, uint16_t next, uint16_t sfx, uint16_t pals)
+{
+	no_actions(gb);
+	ld_hl(gb, wCurObjStateDuration);
+	if (dec_mhl(gb))
+		RETURN;
+	A = 0x1e;
+	wr_hl(gb, A);
+	set_update_l(gb, next);
+	if (sfx)
+		play_sfx(gb, sfx);
+	yb_copy_pals(gb, pals);
+}
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, Func_5139d) { yb_fade_step(gb, YB(0x53bf), SFX_0CA, ADDR_Pals_51c81); }
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, Func_513bf) { yb_fade_step(gb, YB(0x53d9), 0, ADDR_Pals_51c99); }
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, Func_513d9) { yb_fade_step(gb, YB(0x53fb), 0, ADDR_Pals_51cb1); }
+
+PORT_LOCAL(YellowBellyBodyFunc, Func_513fb)
+{
+	no_actions(gb);
+	ld_hl(gb, wCurObjStateDuration);
+	if (dec_mhl(gb))
+		return;
+	A = 0x20;
+	wr_hl(gb, A);
+	set_update_l(gb, YB(0x5419));
+	A = BOSS_REGULAR;
+	wr8(gb, wBossState, A);
+	CALL(UpdateLevelMusic);
+}
+
+// ld b, $03 / ldh a, [rDIV] / and $01 / add b / ld [hli], a
+static void yb_rand_duration(GB *gb)
+{
+	gb->cpu.b = 0x03;
+	A = alu_add(gb, alu_and(gb, rd8(gb, rDIV), 0x01), gb->cpu.b);
+	wr_hli(gb, A);
+}
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, Func_51419)
+{
+	no_actions(gb);
+	ld_hl(gb, wCurObjStateDuration);
+	if (dec_mhl(gb)) {
+		JUMP(MoveObjectUp_Slow);
+		return;
+	}
+	yb_rand_duration(gb);
+	xor_a(gb); wr_hli(gb, A);
+	A = 0x01; wr_hli(gb, A);
+	xor_a(gb); wr_hli(gb, A);
+	set_update_l(gb, YB(0x5652));
+	SET_BC(gb, ADDR_ObjParams_YellowBellyHead);
+	JUMP(CreateObjectFromCurObjPos);
+}
+
+// call SetObjectFramesetPtr / inc l / ld [hl], $44 / ld l, OBJ_SUBSTATE /
+// ld a, [hl] / xor OBJSUBFLAG_VDIR | OBJSUBFLAG_HDIR / ld [hl], a
+static void yb_turn_frameset(GB *gb, uint16_t de)
+{
+	SET_DE(gb, de);
+	CALL(SetObjectFramesetPtr);
+	inc_l(gb);
+	A = 0x44;
+	wr_hl(gb, A);
+	ld_l(gb, OBJ_SUBSTATE);
+	A = alu_xor(gb, rd_hl(gb), OBJSUBFLAG_VDIR | OBJSUBFLAG_HDIR);
+	wr_hl(gb, A);
+}
+
+// call SetObjectFramesetPtr / ld a, $62 / ld [hli], a
+static void yb_frameset_62(GB *gb, uint16_t de)
+{
+	SET_DE(gb, de);
+	CALL(SetObjectFramesetPtr);
+	A = 0x62;
+	wr_hli(gb, A);
+}
+
+// .asm_51442
+static void yb_51442(GB *gb)
+{
+	set_update_l(gb, YB(0x54a4));
+	A = rd8(gb, wDollBoyHammerRange);
+	if (alu_and(gb, A, A)) {
+		xor_a(gb);
+		wr8(gb, wCurObjVar1, A);
+		ld_l(gb, OBJ_SUBSTATE);
+		if (alu_bit(gb, rd_hl(gb), OBJSUBFLAG_VDIR_F))
+			yb_frameset_62(gb, ADDR_Frameset_697a1);
+		else
+			yb_frameset_62(gb, ADDR_Frameset_69792);
+		RETURN;
+	}
+	// .asm_5145c
+	ld_l(gb, OBJ_X_POS);
+	A = rd_hli(gb);
+	gb->cpu.e = A;
+	gb->cpu.d = rd_hl(gb);
+	A = rd8(gb, wWarioXPos + 0);
+	gb->cpu.b = A;
+	A = rd8(gb, wWarioXPos + 1);
+	gb->cpu.c = A;
+	A = gb->cpu.b;
+	alu_cp(gb, A, gb->cpu.d);
+	bool less = CF;
+	if (!less && ZF) {
+		A = gb->cpu.c;
+		alu_cp(gb, A, gb->cpu.e);
+		less = CF;
+	}
+	ld_l(gb, OBJ_SUBSTATE);
+	bool vdir = alu_bit(gb, rd_hl(gb), OBJSUBFLAG_VDIR_F);
+	if (!less) {
+		// .asm_51473
+		if (vdir)
+			yb_frameset_62(gb, ADDR_Frameset_697a1);
+		else
+			yb_turn_frameset(gb, ADDR_Frameset_697b0);
+	} else {
+		// .asm_51483
+		if (!vdir)
+			yb_frameset_62(gb, ADDR_Frameset_69792);
+		else
+			yb_turn_frameset(gb, ADDR_Frameset_697bb);
+	}
+	RETURN;
+}
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, asm_51442) { yb_51442(gb); }
+
+// .asm_514eb. ret: the return address of a call to it, 0 for a jump.
+static void yb_514eb(GB *gb, uint16_t ret)
+{
+	A = rd8(gb, wDollBoyHammerRange);
+	if (!alu_and(gb, A, A)) {
+		set_update(gb, YB(0x5652));
+		ld_l(gb, OBJ_FLAGS);
+		set_mhl(gb, OBJFLAG_PRIORITY_F);
+		ld_l(gb, OBJ_STATE_DURATION);
+		yb_rand_duration(gb);
+		inc_l(gb);
+		A = 0x01;
+		wr_hli(gb, A);
+		wr_hli(gb, A);
+		xor_a(gb);
+		wr8(gb, wCurObjState, A);
+		ld_l(gb, OBJ_SUBSTATE);
+		if (alu_bit(gb, rd_hl(gb), OBJSUBFLAG_VDIR_F))
+			yb_set_frameset_tail(gb, ADDR_Frameset_697eb, ret);
+		else
+			yb_set_frameset_tail(gb, ADDR_Frameset_697e6, ret);
+		return;
+	}
+	// .asm_51523
+	set_update(gb, YB(0x55dd));
+	ld_l(gb, OBJ_STATE_DURATION);
+	A = 0x03; wr_hli(gb, A);
+	inc_l(gb);
+	A = 0x02; wr_hli(gb, A);
+	A = 0x02; wr_hli(gb, A);
+	xor_a(gb);
+	wr8(gb, wCurObjState, A);
+	ld_l(gb, OBJ_SUBSTATE);
+	if (alu_bit(gb, rd_hl(gb), OBJSUBFLAG_VDIR_F))
+		yb_set_frameset_tail(gb, ADDR_Frameset_69789, ret);
+	else
+		yb_set_frameset_tail(gb, ADDR_Frameset_69780, ret);
+}
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, asm_514eb) { yb_514eb(gb, 0); }
+
+// .asm_5179a: hit
+static void yb_5179a(GB *gb)
+{
+	xor_a(gb);
+	wr8(gb, w1d147, A);
+	set_update(gb, YB(0x57ee));
+	CALL(DecrementRemainingBossHits);
+	A = alu_dec(gb, alu_and(gb, rd_hl(gb), 0x0f));
+	if (!ZF) {
+		SET_DE(gb, ADDR_Frameset_697d5);
+		CALL(SetObjectFramesetPtr);
+		A = 0x64; wr_hli(gb, A);
+		A = 0x01; wr_hl(gb, A);
+		RETURN;
+	}
+	// .asm_517bd: defeated
+	set_update_l(gb, YB(0x584a));
+	SET_DE(gb, ADDR_Frameset_69845);
+	CALL(SetObjectFramesetPtr);
+	A = 0x65; wr_hli(gb, A);
+	A = 0xff; wr_hl(gb, A);
+	ld_l(gb, OBJ_INTERACTION_TYPE);
+	heavy_or(gb, OBJ_INTERACTION_0B);
+	wr_hli(gb, A);
+	play_sfx(gb, SFX_0A9);
+	stop_music2(gb);
+	RETURN;
+}
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, asm_5179a) { yb_5179a(gb); }
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, Func_514a4)
+{
+	A = rd8(gb, w1d147);
+	if (alu_and(gb, A, A)) {
+		yb_5179a(gb);
+		return;
+	}
+	ld_hl(gb, wCurObjVar1);
+	A = rd_hl(gb);
+	if (alu_and(gb, A, A)) {
+		if (dec_mhl(gb))
+			RETURN;
+		ld_l(gb, OBJ_SUBSTATE);
+		if (alu_bit(gb, rd_hl(gb), OBJSUBFLAG_VDIR_F))
+			yb_frameset_62(gb, ADDR_Frameset_697a1);
+		else
+			yb_frameset_62(gb, ADDR_Frameset_69792);
+		RETURN;
+	}
+	// .asm_514c9
+	dec_l(gb);
+	if (!dec_mhl(gb)) {
+		yb_514eb(gb, 0);
+		return;
+	}
+	A = rd_hl(gb);
+	alu_cp(gb, A, 0x2f);
+	if (!ZF)
+		RETURN;
+	play_sfx(gb, SFX_07C);
+	ld_l(gb, OBJ_SUBSTATE);
+	if (alu_bit(gb, rd_hl(gb), OBJSUBFLAG_VDIR_F))
+		SET_BC(gb, ADDR_ObjParams_YellowBellyArrowRight);
+	else
+		SET_BC(gb, ADDR_ObjParams_YellowBellyArrowLeft);
+	JUMP(CreateObjectAtRelativePos);
+}
+
+// .asm_5154e
+static void yb_5154e(GB *gb)
+{
+	stop_sfx(gb);
+	A = 0x01;
+	wr8(gb, wDollBoyHammerRange, A);
+	set_update_l(gb, YB(0x5572));
+	ld_l(gb, OBJ_FLAGS);
+	res_mhl(gb, OBJFLAG_PRIORITY_F);
+	A = 0xa6;
+	wr8(gb, wCurObjVar1, A);
+	SET_DE(gb, ADDR_Frameset_697c6);
+	JUMP(SetObjectFramesetPtr);
+}
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, asm_5154e) { yb_5154e(gb); }
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, Func_51572)
+{
+	no_actions(gb);
+	A = rd8(gb, wCurObjVar1);
+	bool reload = true;
+	alu_cp(gb, A, 0xa6);
+	if (ZF) {
+		play_sfx(gb, SFX_VANISH);
+	} else {
+		alu_cp(gb, A, 0x88);
+		if (ZF) {
+			play_sfx(gb, SFX_0A9);
+		} else {
+			alu_cp(gb, A, 0x25);
+			if (ZF) {
+				play_sfx(gb, SFX_0A5);
+				SET_BC(gb, ADDR_ObjParams_Pump);
+				CALL(CreateObjectFromCurObjPos);
+			} else {
+				reload = false;
+			}
+		}
+	}
+	if (reload)
+		A = rd8(gb, wCurObjVar1); // .asm_515a8
+	// .asm_515ab
+	alu_cp(gb, A, 0x92);
+	if (CF) {
+		A = rd8(gb, wCurObjScreenYPos);
+		alu_cp(gb, A, 0x39);
+		if (!CF)
+			CALL(MoveObjectUp);
+	}
+	// .asm_515b7
+	ld_hl(gb, wCurObjVar1);
+	if (!dec_mhl(gb)) {
+		yb_514eb(gb, 0);
+		return;
+	}
+	A = rd_hl(gb);
+	alu_cp(gb, A, 0x37);
+	if (CF)
+		RETURN;
+	if (!ZF) {
+		A = alu_and(gb, A, 0x0f);
+		if (!ZF) {
+			alu_cp(gb, A, 0x08);
+			if (!ZF)
+				RETURN;
+			yb_copy_pals(gb, ADDR_Pals_51cc9);
+			return;
+		}
+	}
+	yb_copy_pals(gb, ADDR_Pals_51cb1); // .asm_515d0
+}
+
+// .asm_5168e
+static void yb_5168e(GB *gb)
+{
+	ld_hl(gb, wCurObjState);
+	A = rd_hl(gb);
+	if (alu_and(gb, A, A)) {
+		alu_cp(gb, A, 0x0a);
+		if (ZF) {
+			yb_5154e(gb);
+			return;
+		}
+		xor_a(gb);
+		wr_hld(gb, A);
+		gb->cpu.b = alu_add(gb, rd8(gb, wWarioScreenXPos), 0x2a);
+		gb->cpu.c = alu_add(gb, rd8(gb, wCurObjScreenXPos), 0x2a);
+		A = alu_rlca(gb, rd_hl(gb));
+		if (!CF) {
+			A = gb->cpu.c;
+			alu_cp(gb, A, gb->cpu.b);
+		} else {
+			// .asm_516b2
+			A = gb->cpu.b;
+			alu_cp(gb, A, gb->cpu.c);
+		}
+		if (!CF) {
+			// .asm_516b6
+			A = alu_xor(gb, rd_hl(gb), 0x80);
+			wr_hl(gb, A);
+		}
+		// .asm_516ba
+		A = 0x02;
+		wr8(gb, wCurObjVar2, A);
+	}
+	// .asm_516bf
+	ld_l(gb, OBJ_VAR_1);
+	A = rd_hl(gb);
+	if (alu_and(gb, A, A)) {
+		if (dec_mhl(gb))
+			RETURN;
+		A = alu_rra(gb, rd8(gb, wGlobalCounter));
+		if (!CF) {
+			dec_l(gb);
+			A = rd_hl(gb);
+			alu_cp(gb, A, 0x02);
+			if (!CF)
+				dec_mhl(gb);
+		}
+		// .asm_516d4
+		ld_l(gb, OBJ_SUBSTATE);
+		A = alu_dec(gb, rd8(gb, wDollBoyHammerRange));
+		if (!ZF) {
+			if (alu_bit(gb, rd_hl(gb), OBJSUBFLAG_VDIR_F))
+				SET_DE(gb, ADDR_Frameset_697eb);
+			else
+				SET_DE(gb, ADDR_Frameset_697e6);
+		} else {
+			// .asm_516ec
+			play_sfx(gb, SFX_101);
+			if (alu_bit(gb, rd_hl(gb), OBJSUBFLAG_VDIR_F))
+				SET_DE(gb, ADDR_Frameset_69789);
+			else
+				SET_DE(gb, ADDR_Frameset_69780);
+		}
+		JUMP(SetObjectFramesetPtr);
+		return;
+	}
+	// .asm_51704
+	ld_l(gb, OBJ_VAR_3);
+	A = alu_dec(gb, rd_hl(gb));
+	if (ZF) {
+		A = rd8(gb, wTransformation);
+		alu_cp(gb, A, TRANSFORMATION_PUFFY_WARIO);
+		if (!ZF) {
+			gb->cpu.b = rd8(gb, wWarioScreenYPos);
+			A = alu_sub(gb, rd8(gb, wCurObjScreenYPos), gb->cpu.b);
+			if (CF) {
+				ld_l(gb, OBJ_STATE_DURATION);
+				if (!dec_mhl(gb)) {
+					yb_51442(gb);
+					return;
+				}
+				play_sfx(gb, SFX_0A8);
+			}
+		}
+	}
+	// .asm_51729
+	ld_hl(gb, wCurObjYPos);
+	A = alu_sub(gb, rd_hli(gb), 0x04);
+	wr8(gb, hYPosLo, A);
+	A = alu_sbc(gb, rd_hli(gb), 0x00);
+	wr8(gb, hYPosHi, A);
+	A = alu_rlca(gb, rd8(gb, wCurObjSubState));
+	bool right = CF;
+	if (!right) {
+		A = alu_sub(gb, rd_hli(gb), 0x18);
+		wr8(gb, hXPosLo, A);
+		A = alu_sbc(gb, rd_hli(gb), 0x00);
+		wr8(gb, hXPosHi, A);
+		gb_call_ret(gb, ADDR_Func_3513, YB(0x5749));
+		if (!alu_and(gb, A, A)) {
+			JUMP(MoveObjectLeftByVar2);
+			return;
+		}
+	} else {
+		// .asm_51759
+		A = alu_add(gb, rd_hli(gb), 0x18);
+		wr8(gb, hXPosLo, A);
+		A = alu_adc(gb, rd_hli(gb), 0x00);
+		wr8(gb, hXPosHi, A);
+		gb_call_ret(gb, ADDR_Func_3513, YB(0x5766));
+		if (!alu_and(gb, A, A)) {
+			JUMP(MoveObjectRightByVar2);
+			return;
+		}
+	}
+	ld_hl(gb, wCurObjSubState);
+	bool vdir = alu_bit(gb, rd_hl(gb), OBJSUBFLAG_VDIR_F);
+	if (right ? vdir : !vdir) {
+		yb_turn_frameset(gb, right ? ADDR_Frameset_697bb : ADDR_Frameset_697b0);
+	} else {
+		// .asm_51782
+		A = alu_xor(gb, rd_hl(gb), 0x80);
+		wr_hl(gb, A);
+	}
+	// .asm_51785
+	A = 0x01;
+	wr8(gb, wCurObjVar2, A);
+	RETURN;
+}
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, asm_5168e) { yb_5168e(gb); }
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, Func_515dd)
+{
+	A = rd8(gb, wTransformation);
+	alu_cp(gb, A, TRANSFORMATION_PUFFY_WARIO);
+	if (ZF) {
+		xor_a(gb);
+		wr8(gb, wDollBoyHammerRange, A);
+		yb_514eb(gb, 0);
+		return;
+	}
+	A = rd8(gb, w1d147);
+	if (alu_and(gb, A, A)) {
+		yb_5179a(gb);
+		return;
+	}
+	A = rd8(gb, wDollBoyHammerRange);
+	if (!alu_and(gb, A, A)) {
+		yb_514eb(gb, 0);
+		return;
+	}
+	if (!yb_find_obj(gb, PUMP))
+		RETURN;
+	// .asm_51619
+	inc_l(gb); inc_l(gb); inc_l(gb); inc_l(gb);
+	A = alu_and(gb, rd_hli(gb), 0xfe);
+	gb->cpu.e = A;
+	gb->cpu.d = rd_hl(gb);
+	ld_hl(gb, wCurObjXPos);
+	A = alu_and(gb, rd_hli(gb), 0xfe);
+	gb->cpu.c = A;
+	gb->cpu.b = rd_hl(gb);
+	ld_l(gb, OBJ_SUBSTATE);
+	A = alu_rlca(gb, rd_hl(gb));
+	if (!CF) {
+		A = alu_sub(gb, gb->cpu.c, 0x38);
+		gb->cpu.c = A;
+		A = alu_sbc(gb, gb->cpu.b, 0x00);
+		gb->cpu.b = A;
+	} else {
+		A = alu_add(gb, gb->cpu.c, 0x38);
+		gb->cpu.c = A;
+		A = alu_adc(gb, gb->cpu.b, 0x00);
+		gb->cpu.b = A;
+	}
+	// .asm_51642
+	A = gb->cpu.e;
+	alu_cp(gb, A, gb->cpu.c);
+	if (ZF) {
+		A = gb->cpu.d;
+		alu_cp(gb, A, gb->cpu.b);
+		if (ZF) {
+			yb_51442(gb);
+			return;
+		}
+	}
+	// .asm_5164b
+	A = 0x02;
+	wr8(gb, wCurObjVar2, A);
+	yb_5168e(gb);
+}
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, Func_51652)
+{
+	A = rd8(gb, wDollBoyActiveBarrels);
+	if (alu_and(gb, A, A)) {
+		no_actions(gb);
+		xor_a(gb);
+		wr8(gb, wCurObjState, A);
+		RETURN;
+	}
+	// .asm_51662
+	A = rd8(gb, w1d147);
+	if (alu_and(gb, A, A)) {
+		yb_5179a(gb);
+		return;
+	}
+	ld_hl(gb, wCurObjVar1);
+	A = rd_hli(gb);
+	if (!alu_and(gb, A, A)) {
+		inc_l(gb);
+		A = alu_dec(gb, rd_hl(gb));
+		if (ZF) {
+			gb->cpu.b = rd8(gb, wWarioScreenYPos);
+			A = alu_sub(gb, rd8(gb, wCurObjScreenYPos), gb->cpu.b);
+			if (!CF) {
+				set_update_l(gb, YB(0x578c));
+				RETURN;
+			}
+		}
+	}
+	// .asm_51688
+	SET_BC(gb, ADDR_Data_60950);
+	CALL(ApplyObjYMovement_Loop);
+	yb_5168e(gb);
+}
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, Func_5178c)
+{
+	no_actions(gb);
+	A = rd8(gb, wCurObjScreenXPos);
+	alu_cp(gb, A, 0xc8);
+	if (!CF)
+		RETURN;
+	JUMP(MoveObjectDown);
+}
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, Func_517ee)
+{
+	no_actions(gb);
+	ld_hl(gb, wCurObjStateDuration);
+	A = rd_hl(gb);
+	if (alu_and(gb, A, A)) {
+		if (!dec_mhl(gb)) {
+			play_sfx(gb, SFX_0B9); // .asm_5180a
+		} else {
+			A = alu_and(gb, rd_hl(gb), 0x0f);
+			if (!ZF) {
+				alu_cp(gb, A, 0x08);
+				if (!ZF)
+					RETURN;
+				yb_copy_pals(gb, ADDR_Pals_51ce1);
+				return;
+			}
+		}
+		yb_copy_pals(gb, ADDR_Pals_51cb1); // .asm_51812
+		return;
+	}
+	// .asm_5181f
+	dec_l(gb);
+	A = rd_hld(gb);
+	alu_cp(gb, A, 0x10);
+	if (!ZF)
+		RETURN;
+	A = rd_hld(gb);
+	if (alu_and(gb, A, A))
+		RETURN;
+	xor_a(gb);
+	wr8(gb, wCurObjVar1, A);
+	yb_514eb(gb, YB(0x582e)); // call .asm_514eb
+	A = alu_and(gb, rd8(gb, wCurObjSubState), 0x0f);
+	alu_cp(gb, A, 0x03);
+	if (ZF) {
+		SET_DE(gb, ADDR_OAM_191940);
+	} else {
+		alu_cp(gb, A, 0x02);
+		if (!ZF)
+			RETURN;
+		SET_DE(gb, ADDR_OAM_191f04);
+	}
+	// .asm_51844
+	ld_l(gb, OBJ_OAM_PTR);
+	A = gb->cpu.e;
+	wr_hli(gb, A);
+	wr_hl(gb, gb->cpu.d);
+	RETURN;
+}
+
+PORT_LOCAL_JUMP(YellowBellyBodyFunc, Func_5184a)
+{
+	ld_hl(gb, wCurObjStateDuration);
+	A = rd_hl(gb);
+	if (alu_and(gb, A, A)) {
+		if (dec_mhl(gb)) {
+			A = alu_and(gb, rd_hl(gb), 0x0f);
+			if (!ZF) {
+				alu_cp(gb, A, 0x08);
+				if (!ZF)
+					RETURN;
+				yb_copy_pals(gb, ADDR_Pals_51ce1);
+				return;
+			}
+		}
+		yb_copy_pals(gb, ADDR_Pals_51cb1); // .asm_51861
+		return;
+	}
+	// .asm_5186e
+	dec_l(gb);
+	A = rd_hld(gb);
+	alu_cp(gb, A, 0x14);
+	if (ZF) {
+		A = rd_hld(gb);
+		if (!alu_and(gb, A, A))
+			play_sfx(gb, SFX_0AA);
+	}
+	// .asm_51880
+	ld_l(gb, OBJ_FRAMESET_OFFSET);
+	A = rd_hld(gb);
+	alu_cp(gb, A, 0x20);
+	if (!ZF)
+		RETURN;
+	A = rd_hld(gb);
+	if (alu_and(gb, A, A))
+		RETURN;
+	xor_a(gb);
+	wr8(gb, wCurObjFlags, A);
+	if (!yb_find_obj(gb, YELLOW_BELLY_PLATFORM))
+		RETURN;
+	// .asm_518ad
+	A = alu_add(gb, gb->cpu.l, 0x1a);
+	gb->cpu.l = A;
+	A = 0x2f;
+	wr_hl(gb, A);
+	JUMP_TO(ADDR_Func_51c62);
+}
