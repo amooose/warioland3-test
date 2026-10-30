@@ -4821,3 +4821,142 @@ static void bc_fade(GB *gb, uint8_t mask)
 
 PORT_LOCAL_JUMP(Cutscene56Func, Func_9e787) { bc_fade(gb, 0x01); }
 PORT_LOCAL_JUMP(Cutscene56Func, Func_9e793) { bc_fade(gb, 0x03); }
+
+// --- Cutscene08/10/17/1d/25Func: b = scene obj 2's first state ---
+
+PORT_JUMP(Cutscene08Func) { gb->cpu.b = 0x01; JUMP_TO(ADDR_Func_9d6f0); }
+PORT_JUMP(Cutscene10Func) { gb->cpu.b = 0x03; JUMP_TO(ADDR_Func_9d6f0); }
+PORT_JUMP(Cutscene17Func) { gb->cpu.b = 0x05; JUMP_TO(ADDR_Func_9d6f0); }
+PORT_JUMP(Cutscene1dFunc) { gb->cpu.b = 0x07; JUMP_TO(ADDR_Func_9d6f0); }
+PORT_JUMP(Cutscene25Func) { gb->cpu.b = 0x09; JUMP_TO(ADDR_Func_9d6f0); } // fallthrough
+
+// Cutscene57Func
+
+PORT_JUMP(Cutscene57Func)
+{
+	gb_call(gb, ADDR_Cutscene57Func + 0x6); // .Func_9e7b9
+	JUMP_TO(ADDR_Func_9f991);
+}
+
+PORT_LOCAL_JUMP(Cutscene57Func, Func_9e7b9)
+{
+	gb->cpu.a = rd8(gb, w2d013);
+	JUMP_TO(jumptable(gb, ADDR_Cutscene57Func + 0xa));
+}
+
+PORT_LOCAL_JUMP(Cutscene57Func, Func_9e7d9) { CLEAR_LOAD_PALS_ADVANCE(Pals_b8540); }
+
+PORT_LOCAL_JUMP(Cutscene57Func, Func_9e7ef)
+{
+	SET_HL(gb, wSceneObj2YCoord);
+	wr8(gb, wSceneObj2YCoord, alu_inc(gb, rd8(gb, wSceneObj2YCoord)));
+	gb->cpu.a = rd8(gb, wSceneObj2YCoord);
+	sfx_or_advance_at(gb, 0x2c, 0x52);
+}
+
+PORT_LOCAL_JUMP(Cutscene57Func, Func_9e7ff) { bc_state_advance(gb, 0x32, wSceneObj2State, 0x04, -1); }
+
+PORT_LOCAL_JUMP(Cutscene57Func, Func_9e80e)
+{
+	gb->cpu.a = rd8(gb, wSceneObj2State);
+	if (!state_is(gb, 0x03)) {
+		RET();
+		return;
+	}
+	set_state_advance(gb, wSceneObj3State, 0x02, SFX_105);
+}
+
+PORT_LOCAL_JUMP(Cutscene57Func, Func_9e827) { bc_state_advance(gb, 0x30, wSceneObj3State, 0x01, -1); }
+
+// .asm_9e839: hl = pals
+static void cutscene57_pals(GB *gb, uint16_t pals)
+{
+	SET_HL(gb, pals);
+	gb_call(gb, ADDR_Func_9cd74);
+	gb->cpu.b = BANK_Pals_b8580;
+	CALL(LoadFarPalsToTempPals1);
+	advance(gb);
+}
+
+PORT_LOCAL_JUMP(Cutscene57Func, Func_9e836) { cutscene57_pals(gb, ADDR_Pals_b8580); }
+PORT_LOCAL_JUMP(Cutscene57Func, Func_9e84b) { cutscene57_pals(gb, ADDR_Pals_b85c0); }
+PORT_LOCAL_JUMP(Cutscene57Func, Func_9e850) { cutscene57_pals(gb, ADDR_Pals_b8600); }
+PORT_LOCAL_JUMP(Cutscene57Func, Func_9e844) { bc_fade(gb, 0x01); }
+
+PORT_JUMP(Func_9e855)
+{
+	func_9ccf9(gb, wSceneObj2, SCREEN_HEIGHT_PX, 0x48, 0x01);
+	func_9ccf9(gb, wSceneObj3, 0x48, 0x58, 0x01);
+	gb_call(gb, ADDR_Func_9f9c1);
+	JUMP_TO(ADDR_Func_9f9f5);
+}
+
+// Cutscene58Func
+
+PORT_JUMP(Cutscene58Func)
+{
+	gb_call(gb, ADDR_Cutscene58Func + 0x9); // .Func_9e87a
+	gb_call(gb, ADDR_Func_9f9c1);
+	JUMP_TO(ADDR_Func_9f9f5);
+}
+
+PORT_LOCAL_JUMP(Cutscene58Func, Func_9e87a)
+{
+	gb_push16(gb, REG_BC(gb));
+	gb_call(gb, ADDR_Func_9ea9e);
+	gb_call(gb, ADDR_Func_9eab4);
+	SET_BC(gb, gb_pop16(gb));
+	gb->cpu.a = rd8(gb, w2d013);
+	JUMP_TO(jumptable(gb, ADDR_Cutscene58Func + 0x15));
+}
+
+PORT_LOCAL_JUMP(Cutscene58Func, Func_9e89c) { CLEAR_LOAD_PALS_ADVANCE(Pals_b87c0); }
+PORT_LOCAL_JUMP(Cutscene58Func, Func_9e8b2) { wait_cutscene(gb, 30); }
+PORT_LOCAL_JUMP(Cutscene58Func, Func_9e8b7) { dec_obj2_y_sfx(gb, 0x76, 0x50); }
+PORT_LOCAL_JUMP(Cutscene58Func, Func_9e8c7) { bc_state_advance(gb, 0x1a, wSceneObj2State, 0x02, -1); }
+
+// .asm_9e8dc
+static void cutscene58_spawn(GB *gb)
+{
+	func_9ccf9(gb, wSceneObj10, 0x48, 0x54, 0x03);
+	func_9ccf9(gb, wSceneObj11, 0x44, 0x58, 0x03);
+	gb->cpu.a = 0x01;
+	wr8(gb, wSceneObj12YCoord, 0x01);
+	wr8(gb, wSceneObj12XCoord, 0x01);
+	play_sfx(gb, SFX_132);
+	advance(gb);
+}
+
+PORT_LOCAL_JUMP(Cutscene58Func, Func_9e8d6)
+{
+	gb->cpu.a = rd8(gb, wSceneObj2State);
+	if (!state_is(gb, 0x01)) {
+		RET();
+		return;
+	}
+	cutscene58_spawn(gb);
+}
+
+PORT_LOCAL_JUMP(Cutscene58Func, Func_9e905)
+{
+	gb->cpu.a = rd8(gb, wSceneObj2State);
+	if (!state_is(gb, 0x01)) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x08;
+	wr8(gb, wCollectionRow, 0x08);
+	set_scene_obj_state(gb, wSceneObj3State, 0x02);
+	cutscene58_spawn(gb);
+}
+
+PORT_JUMP(Func_9e91a)
+{
+	func_9ccf9(gb, wSceneObj3, 0x58, 0x40, 0x01);
+	func_9ccf9(gb, wSceneObj4, 0x58, 0x50, 0x01);
+	func_9ccf9(gb, wSceneObj5, 0x58, 0x60, 0x01);
+	func_9ccf9(gb, wSceneObj6, 0x58, 0x40, 0x04);
+	func_9ccf9(gb, wSceneObj7, 0x58, 0x50, 0x04);
+	func_9ccf9(gb, wSceneObj8, 0x58, 0x60, 0x04);
+	JUMP_TO(ADDR_Func_9fa48);
+}
