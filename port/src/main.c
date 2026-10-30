@@ -505,6 +505,7 @@ int main(int argc, char **argv)
 		}
 	}
 	ported_register_all();
+	ram_hooks_register_all();
 	hooks_init(&gb);
 	// Ported routines take no emulated time, so with them the game spends
 	// less time on slow frames and loading than the original does, and

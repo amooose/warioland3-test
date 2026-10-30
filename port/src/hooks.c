@@ -181,3 +181,16 @@ void hooks_set_enabled(bool enabled)
 {
 	all_enabled = enabled;
 }
+
+static RamHookFn ram_hooks[0x8000]; // by address - $8000
+
+void ram_hook_register(uint16_t addr, RamHookFn fn)
+{
+	if (addr >= 0x8000)
+		ram_hooks[addr - 0x8000] = fn;
+}
+
+RamHookFn ram_hook_find(uint16_t pc)
+{
+	return all_enabled && pc >= 0x8000 ? ram_hooks[pc - 0x8000] : NULL;
+}

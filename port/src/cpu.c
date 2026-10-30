@@ -590,6 +590,7 @@ int cpu_step(GB *gb)
 		gb->pc_cb(gb);
 
 	Hook *hook = hook_find(gb, PC);
+	RamHookFn ram_hook = hook ? NULL : ram_hook_find(PC);
 	if (hook) {
 		hook->calls++;
 		hook->fn(gb);
@@ -599,6 +600,10 @@ int cpu_step(GB *gb)
 		prev_pc = PREV_NATIVE;
 		// Native code takes no emulated time of its own; charge a token
 		// amount so the hardware keeps moving.
+		cycles = 4;
+	} else if (ram_hook && ram_hook(gb)) {
+		came_from_wram = false;
+		prev_pc = PREV_NATIVE;
 		cycles = 4;
 	} else {
 		unsigned idx = history_pos++ % HISTORY_LEN;
