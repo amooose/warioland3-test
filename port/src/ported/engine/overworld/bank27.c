@@ -1989,3 +1989,589 @@ PORT_LOCAL_JUMP(Cutscene22Func, Func_9d631)
 }
 
 PORT_LOCAL_JUMP(Cutscene22Func, Func_9d642) { advance_if(gb, wSceneObj2State, 0x02); }
+
+// Scene object animations with per-state hooks. A hook is called with
+// a = the state the animation returned; it returns what the asm does next.
+enum { ANIM_SPRITE, ANIM_AGAIN, ANIM_RET };
+typedef int (*anim_hook)(GB *gb);
+
+// .loop: ld a, [bc] / and a / ret z / ld hl, framesets / call Func_9f0a5 /
+// call update / (hook) / ld de, oam / jp sprite
+static void anim_loop(GB *gb, uint16_t framesets, uint16_t update, uint16_t oam, uint16_t sprite, anim_hook hook)
+{
+	for (;;) {
+		if (!scene_obj_anim(gb, framesets, update))
+			return;
+		int r = hook ? hook(gb) : ANIM_SPRITE;
+		if (r == ANIM_AGAIN)
+			continue;
+		if (r == ANIM_RET)
+			return;
+		break;
+	}
+	scene_obj_sprite(gb, oam, sprite);
+}
+
+static void anim_objs(GB *gb, const uint16_t *objs, int n, uint16_t framesets, uint16_t update,
+	uint16_t oam, uint16_t sprite, anim_hook hook)
+{
+	for (int i = 0; i < n; i++) {
+		SET_BC(gb, objs[i]);
+		anim_loop(gb, framesets, update, oam, sprite, hook);
+	}
+}
+
+// cp n (a is the state)
+static bool state_is(GB *gb, uint8_t n)
+{
+	alu_cp(gb, gb->cpu.a, n);
+	return gb->cpu.f & FLAG_Z;
+}
+
+// ld b, n / call Func_9f0d0 / jr z, .loop
+static int next_state(GB *gb, uint8_t b)
+{
+	gb->cpu.b = b;
+	gb_call(gb, ADDR_Func_9f0d0);
+	return (gb->cpu.f & FLAG_Z) ? ANIM_AGAIN : ANIM_SPRITE;
+}
+
+// ld de, addr / ld a, [de] / inc a / ld [de], a /
+// [cp $01 / jr z, .first_sfx] / cp limit / ret c / xor a / ld [de], a /
+// [play_sfx wrap_sfx] / ret
+static void tick_counter(GB *gb, uint16_t addr, int first_sfx, uint8_t limit, int wrap_sfx)
+{
+	SET_DE(gb, addr);
+	gb->cpu.a = alu_inc(gb, rd8(gb, addr));
+	wr8(gb, addr, gb->cpu.a);
+	if (first_sfx >= 0) {
+		alu_cp(gb, gb->cpu.a, 0x01);
+		if (gb->cpu.f & FLAG_Z) {
+			play_sfx(gb, (uint16_t)first_sfx);
+			return;
+		}
+	}
+	alu_cp(gb, gb->cpu.a, limit);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, addr, 0);
+	if (wrap_sfx >= 0)
+		play_sfx(gb, (uint16_t)wrap_sfx);
+}
+
+// ld a, b / xor $1 / ld [addr], a
+static void toggle_b(GB *gb, uint16_t addr)
+{
+	gb->cpu.a = alu_xor(gb, gb->cpu.b, 0x01);
+	wr8(gb, addr, gb->cpu.a);
+}
+
+static const uint16_t objs_2[] = { wSceneObj2State };
+static const uint16_t objs_3[] = { wSceneObj3State };
+static const uint16_t objs_2_4[] = { wSceneObj2State, wSceneObj4State };
+static const uint16_t objs_4_2_3[] = { wSceneObj4State, wSceneObj2State, wSceneObj3State };
+static const uint16_t objs_2_3_4_5_6_7[] = { wSceneObj2State, wSceneObj3State, wSceneObj4State,
+	wSceneObj5State, wSceneObj6State, wSceneObj7State };
+static const uint16_t objs_4_6_2_3_5[] = { wSceneObj4State, wSceneObj6State, wSceneObj2State,
+	wSceneObj3State, wSceneObj5State };
+static const uint16_t objs_10_11_2_3_4_5_6_7_8[] = { wSceneObj10State, wSceneObj11State,
+	wSceneObj2State, wSceneObj3State, wSceneObj4State, wSceneObj5State, wSceneObj6State,
+	wSceneObj7State, wSceneObj8State };
+
+PORT(Func_9f367)
+{
+	SET_DE(gb, wSceneObj3);
+	gb_call(gb, ADDR_Func_9fb4c);
+	anim_objs(gb, objs_2, 1, ADDR_Func_9f367 + 0x24, ADDR_Func_9f0ae, ADDR_OAM_bdc9c, ADDR_Func_9f0bc, NULL);
+	SET_DE(gb, wSceneObj3);
+	gb_call(gb, ADDR_Func_9fb6c);
+}
+
+// Func_9f423.Func_9f45a
+static void func_9f45a(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wSceneObj3Frame);
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.a = rd8(gb, wSceneObj3Unk7);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = (gb->cpu.f & FLAG_Z) ? 0x07 : 0x08;
+	alu_cp(gb, gb->cpu.a, gb->cpu.c);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	toggle_b(gb, wSceneObj3Unk7);
+	play_sfx(gb, SFX_FAT_WALK);
+}
+
+static int hook_9f423(GB *gb)
+{
+	if (state_is(gb, 0x02)) {
+		func_9f45a(gb);
+		return next_state(gb, 0x03);
+	}
+	if (state_is(gb, 0x03))
+		tick_counter(gb, wSceneObj3Unk7, SFX_076, 0x1a, -1);
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f423)
+{
+	anim_objs(gb, objs_2_3, 2, ADDR_Func_9f423 + 0x2f, ADDR_Func_9f0ae, ADDR_OAM_bdfa5, ADDR_Func_9f0bc, hook_9f423);
+}
+
+static int hook_9f49c(GB *gb)
+{
+	if (state_is(gb, 0x01)) {
+		tick_counter(gb, wSceneObj2Unk7, -1, 0x0c, SFX_133);
+	} else if (state_is(gb, 0x02)) {
+		tick_counter(gb, wSceneObj2Unk7, -1, 0x0c, SFX_133);
+		tick_counter(gb, wSceneObj3Unk7, -1, 0x10, SFX_132);
+	}
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f49c)
+{
+	anim_objs(gb, objs_2_3_4_5, 4, ADDR_Func_9f49c + 0x2f, ADDR_Func_9f0ae, ADDR_OAM_be206, ADDR_Func_9f0bc, hook_9f49c);
+}
+
+static int hook_9f508(GB *gb)
+{
+	if (state_is(gb, 0x01))
+		tick_counter(gb, wSceneObj2Unk7, SFX_01E, 0x0e, -1);
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f508)
+{
+	SET_DE(gb, wSceneObj2);
+	gb_call(gb, ADDR_Func_9fb97);
+	anim_objs(gb, objs_2, 1, ADDR_Func_9f508 + 0x1f, ADDR_Func_9f0ae, ADDR_OAM_be2d9, ADDR_Func_9f0bc, hook_9f508);
+}
+
+static int hook_9f547(GB *gb)
+{
+	if (state_is(gb, 0x02))
+		return next_state(gb, 0x03);
+	if (state_is(gb, 0x03))
+		tick_counter(gb, wSceneObj2Unk7, SFX_040, 0x10, -1);
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f547)
+{
+	SET_DE(gb, wSceneObj2);
+	gb_call(gb, ADDR_Func_9fb4c);
+	anim_objs(gb, objs_2, 1, ADDR_Func_9f547 + 0x35, ADDR_Func_9f0ae, ADDR_OAM_be3ce, ADDR_Func_9f0bc, hook_9f547);
+	SET_DE(gb, wSceneObj2);
+	gb_call(gb, ADDR_Func_9fb6c);
+}
+
+// Func_9f5a0.Func_9f5e5
+static void func_9f5e5(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wSceneObj2Frame);
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.a = rd8(gb, wSceneObj2Unk7);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	bool z = gb->cpu.f & FLAG_Z;
+	gb->cpu.a = 0x03;
+	alu_cp(gb, gb->cpu.a, gb->cpu.c);
+	if (z) {
+		if (!(gb->cpu.f & FLAG_Z))
+			return;
+		play_sfx(gb, SFX_0BA);
+	} else if (gb->cpu.f & FLAG_Z) {
+		return;
+	}
+	toggle_b(gb, wSceneObj2Unk7);
+}
+
+static int hook_9f5a0(GB *gb)
+{
+	if (state_is(gb, 0x02)) {
+		func_9f5e5(gb);
+		return next_state(gb, 0x03);
+	}
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f5a0)
+{
+	anim_objs(gb, objs_4_6_2_3_5, 5, ADDR_Func_9f5a0 + 0x3d, ADDR_Func_9f0ae, ADDR_OAM_be807, ADDR_Func_9f0bc, hook_9f5a0);
+}
+
+static int hook_9f607(GB *gb)
+{
+	if (state_is(gb, 0x02))
+		sfx_if_animation_finished(gb, SFX_085);
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f607)
+{
+	anim_objs(gb, objs_2, 1, ADDR_Func_9f607 + 0x19, ADDR_Func_9f0ae, ADDR_OAM_be8fe, ADDR_Func_9f0bc, hook_9f607);
+}
+
+static int hook_9f638(GB *gb)
+{
+	if (state_is(gb, 0x04))
+		return next_state(gb, 0x00);
+	if (state_is(gb, 0x02))
+		tick_counter(gb, wSceneObj3Unk7, SFX_10E, 0x48, -1);
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f638)
+{
+	anim_objs(gb, objs_2_3_4_5_6_7, 6, ADDR_Func_9f638 + 0x44, ADDR_Func_9f0ae, ADDR_OAM_bea06, ADDR_Func_9f0bc, hook_9f638);
+}
+
+static int hook_9f6a2(GB *gb)
+{
+	if (state_is(gb, 0x02)) {
+		gb->cpu.b = 0x03;
+		gb_call(gb, ADDR_Func_9f0d0);
+		if (!(gb->cpu.f & FLAG_Z))
+			return ANIM_SPRITE;
+		gb->cpu.a = 0x04;
+		wr8(gb, wSceneObj3State, 0x04);
+		return ANIM_AGAIN;
+	}
+	if (state_is(gb, 0x05))
+		return next_state(gb, 0x00);
+	if (state_is(gb, 0x06))
+		return next_state(gb, 0x07);
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f6a2)
+{
+	anim_objs(gb, objs_4_2_3, 3, ADDR_Func_9f6a2 + 0x48, ADDR_Func_9f0ae, ADDR_OAM_beafc, ADDR_Func_9f0bc, hook_9f6a2);
+}
+
+static int hook_9f6f8(GB *gb)
+{
+	if (state_is(gb, 0x02))
+		tick_counter(gb, wSceneObj2Unk7, SFX_07D, 0x0c, -1);
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f6f8)
+{
+	anim_objs(gb, objs_2_3, 2, ADDR_Func_9f6f8 + 0x1f, ADDR_Func_9f0ae, ADDR_OAM_bebef, ADDR_Func_9f0bc, hook_9f6f8);
+}
+
+static int hook_9f75c(GB *gb)
+{
+	if (state_is(gb, 0x02))
+		return next_state(gb, 0x00);
+	if (state_is(gb, 0x04))
+		return next_state(gb, 0x00);
+	if (state_is(gb, 0x06))
+		return next_state(gb, 0x07);
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f75c)
+{
+	anim_objs(gb, objs_2_4, 2, ADDR_Func_9f75c + 0x38, ADDR_Func_9f0ae, ADDR_OAM_bed42, ADDR_Func_9f0bc, hook_9f75c);
+}
+
+static int hook_9f7dc(GB *gb)
+{
+	if (state_is(gb, 0x02))
+		return next_state(gb, 0x03);
+	if (state_is(gb, 0x03))
+		tick_counter(gb, wSceneObj2Unk7, -1, 0x1a, SFX_076);
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f7dc)
+{
+	anim_objs(gb, objs_2, 1, ADDR_Func_9f7dc + 0x26, ADDR_Func_9f0ae, ADDR_OAM_befd5, ADDR_Func_9f0bc, hook_9f7dc);
+}
+
+static int hook_9f86a(GB *gb)
+{
+	if (state_is(gb, 0x02)) {
+		tick_counter(gb, wSceneObj2Unk7, SFX_076, 0x1a, -1);
+		return ANIM_SPRITE;
+	}
+	if (state_is(gb, 0x03)) {
+		tick_counter(gb, wSceneObj3Unk7, SFX_0C4, 0x0a, -1);
+		return next_state(gb, 0x05);
+	}
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f86a)
+{
+	anim_objs(gb, objs_2_3, 2, ADDR_Func_9f86a + 0x2f, ADDR_Func_9f0ae, ADDR_OAM_bf157, ADDR_Func_9f0bc, hook_9f86a);
+}
+
+// Func_9f8da.asm_9f8e3: the asm calls .Func_9f912, which can jump back into
+// the loop, so the rest of .asm_9f8f9 runs after that inner run returns.
+static void func_9f8e3(GB *gb)
+{
+	if (!scene_obj_anim(gb, ADDR_Func_9f8da + 0x3f, ADDR_Func_9f0ae))
+		return;
+	if (!state_is(gb, 0x03)) {
+		scene_obj_sprite(gb, ADDR_OAM_bf2ab, ADDR_Func_9f0bc);
+		return;
+	}
+	gb->cpu.b = 0x00;
+	gb_call(gb, ADDR_Func_9f0d0);
+	if (gb->cpu.f & FLAG_Z)
+		func_9f8e3(gb);
+	else
+		scene_obj_sprite(gb, ADDR_OAM_bf2ab, ADDR_Func_9f0bc);
+	SET_HL(gb, wSceneObj2Unk7);
+	gb->cpu.a = rd8(gb, wSceneObj2Unk7);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.a)
+		return;
+	gb->cpu.a = rd8(gb, wSceneObj2Frame);
+	alu_cp(gb, gb->cpu.a, 0x07);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	gb->cpu.a = LCDC_BG_MAP;
+	wr8(gb, wLCDCFlagsToFlip, gb->cpu.a);
+	wr8(gb, wSceneObj2Unk7, 0x01);
+}
+
+PORT(Func_9f8da)
+{
+	SET_BC(gb, wSceneObj2State);
+	func_9f8e3(gb);
+	SET_BC(gb, wSceneObj3State);
+	func_9f8e3(gb);
+}
+
+// Func_9f91f.Func_9f953
+static void func_9f953(GB *gb)
+{
+	gb->cpu.a = rd8(gb, wSceneObj2Frame);
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.a = rd8(gb, wSceneObj2Unk7);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	bool z = gb->cpu.f & FLAG_Z;
+	gb->cpu.a = gb->cpu.c;
+	if (!z) {
+		if (state_is(gb, 0x02) || state_is(gb, 0x04) || state_is(gb, 0x05))
+			return;
+	} else if (state_is(gb, 0x02)) {
+		play_sfx(gb, SFX_011);
+	} else if (state_is(gb, 0x04) || state_is(gb, 0x05)) {
+		play_sfx(gb, SFX_0F1);
+	} else {
+		return;
+	}
+	toggle_b(gb, wSceneObj2Unk7);
+}
+
+static int hook_9f91f(GB *gb)
+{
+	if (state_is(gb, 0x01)) {
+		func_9f953(gb);
+		return next_state(gb, 0x02);
+	}
+	if (state_is(gb, 0x02)) {
+		func_9f953(gb);
+		return next_state(gb, 0x01);
+	}
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f91f)
+{
+	anim_objs(gb, objs_2, 1, ADDR_Func_9f91f + 0x30, ADDR_Func_9f0ae, ADDR_OAM_bf460, ADDR_Func_9f0bc, hook_9f91f);
+}
+
+static int hook_9f9f5(GB *gb)
+{
+	if (state_is(gb, 0x01))
+		tick_counter(gb, wSceneObj3Unk7, -1, 0x1b, SFX_135);
+	else if (state_is(gb, 0x02))
+		tick_counter(gb, wSceneObj3Unk7, -1, 0x1b, SFX_080);
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9f9f5)
+{
+	anim_objs(gb, objs_3, 1, ADDR_Func_9f9f5 + 0x1d, ADDR_Func_9f0b5, ADDR_OAM_18c806, ADDR_Func_9f0cb, hook_9f9f5);
+}
+
+static int hook_9fa48(GB *gb)
+{
+	if (state_is(gb, 0x02))
+		tick_counter(gb, wSceneObj2Unk7, -1, 0x0c, SFX_PLANE1);
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9fa48)
+{
+	anim_objs(gb, objs_10_11_2_3_4_5_6_7_8, 9, ADDR_Func_9fa48 + 0x49, ADDR_Func_9f0ae, ADDR_OAM_bf6f0, ADDR_Func_9f0bc, hook_9fa48);
+}
+
+static int hook_9fab4(GB *gb)
+{
+	if (state_is(gb, 0x01))
+		tick_counter(gb, wSceneObj2Unk7, -1, 0x30, SFX_08E);
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9fab4)
+{
+	anim_objs(gb, objs_2, 1, ADDR_Func_9fab4 + 0x19, ADDR_Func_9f0ae, ADDR_OAM_bf847, ADDR_Func_9f0bc, hook_9fab4);
+}
+
+static int hook_9faea(GB *gb)
+{
+	if (state_is(gb, 0x01)) {
+		tick_counter(gb, wSceneObj4YCoord, -1, 0x28, SFX_08F);
+		return ANIM_SPRITE;
+	}
+	if (state_is(gb, 0x03)) {
+		tick_counter(gb, wSceneObj4YCoord, -1, 0x28, SFX_083);
+		return ANIM_SPRITE;
+	}
+	if (state_is(gb, 0x02))
+		return next_state(gb, 0x03);
+	return ANIM_SPRITE;
+}
+
+PORT(Func_9faea)
+{
+	anim_objs(gb, objs_3, 1, ADDR_Func_9faea + 0x2a, ADDR_Func_9f0b5, ADDR_OAM_18a895, ADDR_Func_9f0c1, hook_9faea);
+}
+
+// Func_9fba9.Func_9fbc5
+static void func_9fbc5(GB *gb)
+{
+	for (;;) {
+		gb->cpu.a = alu_and(gb, rd8(gb, REG_BC(gb)), rd8(gb, REG_BC(gb)));
+		if (!gb->cpu.a)
+			return;
+		bool five = state_is(gb, 0x05);
+		SET_HL(gb, ADDR_Func_9fba9 + 0x45);
+		gb_call(gb, ADDR_Func_9f0a5);
+		gb_call(gb, ADDR_Func_9f0ae);
+		if (!five)
+			break;
+		if (next_state(gb, 0x06) != ANIM_AGAIN)
+			break;
+	}
+	scene_obj_sprite(gb, ADDR_OAM_bcfb3, ADDR_Func_9f0bc);
+}
+
+PORT(Func_9fba9)
+{
+	gb_call(gb, ADDR_Func_9fb87);
+	SET_BC(gb, wSceneObj4State);
+	func_9fbc5(gb);
+	SET_BC(gb, wSceneObj2State);
+	func_9fbc5(gb);
+	SET_BC(gb, wSceneObj3State);
+	func_9fbc5(gb);
+	SET_BC(gb, wSceneObj5State);
+	func_9fbc5(gb);
+}
+
+PORT(Func_9fbfa)
+{
+	SET_DE(gb, wSceneObj2);
+	gb_call(gb, ADDR_Func_9fb4c);
+	// .Func_9fc09
+	gb->cpu.a = rd8(gb, wSceneObj2State);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.a) {
+		SET_DE(gb, ADDR_Frameset_bd1b4);
+		SET_HL(gb, wSceneObj2Duration);
+		gb_call(gb, ADDR_Func_9f0ae);
+		scene_obj_sprite(gb, ADDR_OAM_bcfb3, ADDR_Func_9f0bc);
+	}
+	SET_DE(gb, wSceneObj2);
+	gb_call(gb, ADDR_Func_9fb6c);
+}
+
+PORT(Func_9fc1d)
+{
+	SET_DE(gb, wSceneObj2);
+	gb_call(gb, ADDR_Func_9fb4c);
+	// .Func_9fc2c
+	gb->cpu.a = rd8(gb, wSceneObj2State);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (gb->cpu.a) {
+		gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		SET_HL(gb, ADDR_Func_9fc1d + 0x27);
+		CALL(GetPointerFromTableDE);
+		SET_HL(gb, wSceneObj2Duration);
+		gb_call(gb, ADDR_Func_9f0ae);
+		scene_obj_sprite(gb, ADDR_OAM_bc1f6, ADDR_Func_9f0bc);
+	}
+	SET_DE(gb, wSceneObj2);
+	gb_call(gb, ADDR_Func_9fb6c);
+}
+
+static void obj12_movement(GB *gb, uint16_t flag, uint16_t data, uint16_t obj, uint16_t state)
+{
+	gb->cpu.a = rd8(gb, flag);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	if (!gb->cpu.a)
+		return;
+	SET_DE(gb, data);
+	SET_HL(gb, obj);
+	CALL(ApplyOWMovement);
+	if (!(gb->cpu.f & FLAG_Z))
+		return;
+	wr8(gb, flag, gb->cpu.a);
+	wr8(gb, state, gb->cpu.a);
+}
+
+PORT(Func_9ea9e) { obj12_movement(gb, wSceneObj12YCoord, ADDR_Data_9ec16, wSceneObj10, wSceneObj10State); }
+PORT(Func_9eab4) { obj12_movement(gb, wSceneObj12XCoord, ADDR_Data_9ec41, wSceneObj11, wSceneObj11State); }
+
+PORT_JUMP(Func_9cdcd)
+{
+	static const uint8_t steps[] = { 0xfc, 0x04, 0xfd, 0x03, 0xfe, 0x02, 0xff };
+	SET_HL(gb, wCollectionScrollMode);
+	wr8(gb, wCollectionScrollMode, alu_inc(gb, rd8(gb, wCollectionScrollMode)));
+	gb->cpu.a = rd8(gb, wCollectionLinkStateCounter);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
+	bool last = true;
+	gb->cpu.c = 0x01;
+	for (int i = 0; i < 7; i++) {
+		if (i)
+			gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		if (gb->cpu.f & FLAG_Z) {
+			gb->cpu.c = steps[i];
+			last = false;
+			break;
+		}
+	}
+	gb->cpu.a = rd8(gb, wCollectionScrollMode);
+	alu_cp(gb, gb->cpu.a, 0x06);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	SET_HL(gb, wSCY);
+	gb->cpu.a = alu_add(gb, gb->cpu.c, rd8(gb, wSCY));
+	wr8(gb, wSCY, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCollectionScrollMode, 0);
+	SET_HL(gb, wCollectionScrollMode - 1);
+	if (!last) {
+		wr8(gb, wCollectionScrollMode - 1, alu_inc(gb, rd8(gb, wCollectionScrollMode - 1)));
+		RET();
+		return;
+	}
+	wr8(gb, wCollectionScrollMode - 1, 0);
+	JUMP_TO(ADDR_AdvanceCutsceneFunc);
+}
