@@ -2770,3 +2770,72 @@ PORT(ShowMissingTreasureIndicators)
 	gb->cpu.a = rd8(gb, w2dffd);
 	wr8(gb, wOWLevel, gb->cpu.a);
 }
+
+// input:
+// - a = EVENT_* constant
+PORT(Func_819c6)
+{
+	gb_call(gb, ADDR_CheckIfEventIsUnlocked);
+	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.c);
+}
+
+PORT_JUMP(Func_814ec)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, w2d800);
+	SET_BC(gb, 0x8e);
+	CALL(WriteAToHL_BCTimes);
+	SET_HL(gb, wOWUIObj1);
+	SET_BC(gb, 0x40);
+	CALL(WriteAToHL_BCTimes);
+	gb_call(gb, ADDR_Func_82111);
+	gb->cpu.a = gb->cpu.l;
+	wr8(gb, w2d889 + 0, gb->cpu.a);
+	gb->cpu.a = gb->cpu.h;
+	wr8(gb, w2d889 + 1, gb->cpu.a);
+	JUMP_TO(ADDR_Func_814bd);
+}
+
+// Func_81714.Func_8175d
+static void func_8175d(GB *gb, uint16_t hl)
+{
+	gb->cpu.a = rd8(gb, hl--); // ld a, [hld]
+	SET_HL(gb, hl);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	SET_BC(gb, ADDR_Func_81714 + 0x6f); // .framesets
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.c);
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.a = 0;
+	gb->cpu.a = alu_adc(gb, gb->cpu.a, gb->cpu.b);
+	gb->cpu.b = gb->cpu.a;
+	uint16_t bc = REG_BC(gb);
+	gb->cpu.a = rd8(gb, bc);
+	gb->cpu.e = gb->cpu.a;
+	bc++;
+	SET_BC(gb, bc);
+	gb->cpu.a = rd8(gb, bc);
+	gb->cpu.d = gb->cpu.a;
+	gb->cpu.l = alu_dec(gb, gb->cpu.l); // dec l
+	gb->cpu.b = 0x2a;
+	CALL(UpdateOWAnimation);
+	gb->cpu.a = alu_and(gb, 0xf8, gb->cpu.l);
+	gb->cpu.l = gb->cpu.a;
+	SET_DE(gb, ADDR_OAM_aa0cf);
+	gb->cpu.b = BANK_OAM_aa0cf;
+	CALL(LoadOWSpriteWithScroll);
+}
+
+PORT(Func_81714)
+{
+	static const uint16_t objs[] = {
+		wDayNightTransistionSteps, wPalFade1Colour1BlueUnk3, wPalFade1Colour3RedUnk3,
+		wPalFade1Colour4GreenUnk3, wOWUIObj1State, wOWUIObj2State, wd156, w2d15e,
+		w2d166, w2d16e, w2d176, w2d17e,
+	};
+	for (unsigned i = 0; i < sizeof(objs) / sizeof(objs[0]); i++)
+		func_8175d(gb, objs[i]);
+}
