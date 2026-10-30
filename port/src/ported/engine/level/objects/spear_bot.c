@@ -491,3 +491,339 @@ PORT_LOCAL(SpearBotFunc, Func_4605f)
 	wr_hl(gb, A);
 	interaction_hld(gb, OBJ_INTERACTION_FRONT_STING);
 }
+
+// ld a, [wGroundShakeCounter] / cp $10 / jr c, ... / ldh a, [rDIV] / rra /
+// ld a, $04 / rla / ld [wCurObjState], a / ret: true when it took the ret.
+static bool ground_shake(GB *gb)
+{
+	A = rd8(gb, wGroundShakeCounter);
+	alu_cp(gb, A, 0x10);
+	if (CF)
+		return false;
+	alu_rra(gb, rd8(gb, rDIV));
+	A = alu_rla(gb, 0x04);
+	wr8(gb, wCurObjState, A);
+	return true;
+}
+
+// The position 4 pixels up and dx pixels to the side into hYPos / hXPos
+// (dx < 0: sub / sbc, else add / adc).
+static void ahead_pos_to_h(GB *gb, int dx)
+{
+	uint16_t hl = wCurObjYPos;
+	A = alu_sub(gb, rd8(gb, hl++), 4);
+	wr8(gb, hYPosLo, A);
+	A = alu_sbc(gb, rd8(gb, hl++), 0);
+	wr8(gb, hYPosHi, A);
+	if (dx < 0) {
+		A = alu_sub(gb, rd8(gb, hl++), (uint8_t)-dx);
+		wr8(gb, hXPosLo, A);
+		A = alu_sbc(gb, rd8(gb, hl++), 0);
+	} else {
+		A = alu_add(gb, rd8(gb, hl++), (uint8_t)dx);
+		wr8(gb, hXPosLo, A);
+		A = alu_adc(gb, rd8(gb, hl++), 0);
+	}
+	wr8(gb, hXPosHi, A);
+	SET_HL(gb, hl);
+}
+
+// The walk of .Func_460a6 (from .asm_460b7) and .Func_461fb (from
+// .asm_46253): checks for the ground below and a wall ahead. Returns 0 when
+// it moved (tail jump) or fell (state $11, ret); else 1 (blocked on the
+// left) or 2 (on the right), with nothing returned yet. rets: where the
+// calls of Func_3543, ProcessBlockOnLeft, Func_3513 (left),
+// ProcessBlockOnRight and Func_3513 (right) return to in the asm.
+static int walk(GB *gb, const uint16_t rets[5], uint16_t move_left, uint16_t move_right)
+{
+	obj_pos_to_hpos(gb);
+	gb_call_ret(gb, ADDR_Func_3543, rets[0]);
+	if (!alu_and(gb, A, A)) {
+		set_state(gb, 0x11);
+		RET();
+		return 0;
+	}
+	uint16_t hl = wCurObjYPos;
+	wr8(gb, hl++, rd8(gb, hYPosLo));
+	A = rd8(gb, hYPosHi);
+	wr8(gb, hl++, A);
+	SET_HL(gb, hl);
+	A = alu_rlca(gb, rd8(gb, wCurObjSubState));
+	if (!CF) {
+		A = alu_sub(gb, alu_and(gb, rd8(gb, hl), 0x0f), 0x06);
+		if (CF) {
+			gb_call_ret(gb, ADDR_ProcessBlockOnLeft, rets[1]);
+			if (!(A = alu_and(gb, A, 0x0f)))
+				return 1;
+		}
+		ahead_pos_to_h(gb, -6);
+		gb_call_ret(gb, ADDR_Func_3513, rets[2]);
+		if (!alu_and(gb, A, A)) {
+			JUMP_TO(move_left);
+			return 0;
+		}
+		return 1;
+	}
+	A = alu_add(gb, alu_and(gb, rd8(gb, hl), 0x0f), 0x05);
+	alu_cp(gb, A, 0x10);
+	if (!CF) {
+		gb_call_ret(gb, ADDR_ProcessBlockOnRight, rets[3]);
+		if (!(A = alu_and(gb, A, 0x0f)))
+			return 2;
+	}
+	ahead_pos_to_h(gb, 5);
+	gb_call_ret(gb, ADDR_Func_3513, rets[4]);
+	if (!alu_and(gb, A, A)) {
+		JUMP_TO(move_right);
+		return 0;
+	}
+	return 2;
+}
+
+PORT_LOCAL_JUMP(SpearBotFunc, Func_460a6)
+{
+	if (ground_shake(gb))
+		RETURN;
+	// .asm_460b7
+	static const uint16_t rets[5] = {SB(0x1e6), SB(0x208), SB(0x226), SB(0x246), SB(0x264)};
+	int side = walk(gb, rets, ADDR_MoveObjectLeft, ADDR_MoveObjectRight);
+	if (!side)
+		return;
+	// .asm_4610d / .asm_4614b
+	bool right = side == 2;
+	A = rd8(gb, wCurObjVar1);
+	if (alu_and(gb, A, A)) {
+		SET_DE(gb, right ? ADDR_Frameset_68e4c : ADDR_Frameset_68e41);
+		// .asm_46154
+		CALL(SetObjectFramesetPtr);
+		A = 36; wr_hli(gb, A);
+		dec_mhl(gb);
+		set_state(gb, 0x5a);
+		RETURN;
+	}
+	SET_DE(gb, right ? ADDR_Frameset_68e08 : ADDR_Frameset_68dff);
+	// .asm_46164
+	CALL(SetObjectFramesetPtr);
+	A = 38; wr_hli(gb, A);
+	set_state(gb, 0x5b);
+	RETURN;
+}
+
+PORT_LOCAL(SpearBotFunc, Func_46170)
+{
+	if (ground_shake(gb))
+		return;
+	// .asm_46181
+	ld_hl(gb, wCurObjStateDuration);
+	if (dec_mhl(gb))
+		return;
+	set_state(gb, 0x13);
+}
+
+PORT_LOCAL_JUMP(SpearBotFunc, Func_4618c)
+{
+	if (ground_shake(gb))
+		RETURN;
+	// .asm_4619d
+	ld_hl(gb, wCurObjStateDuration);
+	A = rd_hl(gb);
+	alu_cp(gb, A, 0x0f);
+	if (ZF) {
+		// .asm_461be
+		dec_mhl(gb);
+		ld_l(gb, OBJ_SUBSTATE);
+		A = alu_rlca(gb, rd_hl(gb));
+		if (!CF) {
+			set_mhl(gb, OBJSUBFLAG_HDIR_F);
+			ld_l(gb, OBJ_COLLBOX_RIGHT);
+			A = 0x09; wr_hld(gb, A);
+			A = 0xfa; wr_hld(gb, A);
+		} else {
+			// .asm_461d0
+			res_mhl(gb, OBJSUBFLAG_HDIR_F);
+			ld_l(gb, OBJ_COLLBOX_RIGHT);
+			A = 0x05; wr_hld(gb, A);
+			A = 0xf6; wr_hld(gb, A);
+		}
+		RETURN;
+	}
+	if (dec_mhl(gb)) {
+		JUMP(Func_3308);
+		return;
+	}
+	ld_l(gb, OBJ_STATE);
+	A = 0x2e; wr_hld(gb, A);
+	frameset_by_dir_hld(gb, ADDR_Frameset_68e57, ADDR_Frameset_68e60);
+	JUMP(SetObjectFramesetPtr);
+}
+
+PORT_LOCAL(SpearBotFunc, Func_461db)
+{
+	ld_hl(gb, wCurObjInteractionType);
+	heavy_or(gb, OBJ_INTERACTION_01);
+	wr_hld(gb, A);
+	ld_l(gb, OBJ_STATE);
+	A = 0x31; wr_hld(gb, A);
+	frameset_by_dir_hld(gb, ADDR_Frameset_68ddf, ADDR_Frameset_68de8);
+	CALL(SetObjectFramesetPtr);
+}
+
+PORT_LOCAL_JUMP(SpearBotFunc, Func_461fb)
+{
+	if (ground_shake(gb))
+		RETURN;
+	// .asm_4620c
+	gb->cpu.c = 0x2a;
+	gb->cpu.b = alu_add(gb, rd8(gb, wWarioScreenYPos), gb->cpu.c);
+	A = alu_add(gb, rd8(gb, wCurObjScreenYPos), gb->cpu.c);
+	A = alu_sub(gb, A, gb->cpu.b);
+	alu_cp(gb, A, 0x18);
+	bool near = CF;
+	if (!near) {
+		alu_cp(gb, A, 0xe8);
+		near = !CF;
+	}
+	if (near) {
+		// .asm_46220
+		ld_hl(gb, wCurObjSubState);
+		gb->cpu.b = alu_add(gb, rd8(gb, wWarioScreenXPos), gb->cpu.c);
+		A = alu_add(gb, rd8(gb, wCurObjScreenXPos), gb->cpu.c);
+		A = alu_sub(gb, A, gb->cpu.b);
+		alu_cp(gb, A, 0xc0);
+		bool turn = false;
+		uint16_t de = 0;
+		if (!CF) {
+			// .asm_46242
+			A = alu_rlca(gb, rd_hli(gb));
+			if (CF) {
+				turn = true;
+				de = ADDR_Frameset_68df8;
+			}
+		} else {
+			alu_cp(gb, A, 0x40);
+			if (CF) {
+				A = alu_rlca(gb, rd_hli(gb));
+				if (!CF) {
+					turn = true;
+					de = ADDR_Frameset_68df1;
+				}
+			} else {
+				near = false;
+			}
+		}
+		if (near) {
+			if (!turn) {
+				// .asm_4623e
+				A = 0x13;
+				wr_hl(gb, A);
+				RETURN;
+			}
+			SET_DE(gb, de);
+			// .asm_46249
+			A = 0x2d;
+			wr_hl(gb, A);
+			CALL(SetObjectFramesetPtr);
+			A = 20; wr_hli(gb, A);
+			RETURN;
+		}
+	}
+	// .asm_46253
+	static const uint16_t rets[5] = {SB(0x382), SB(0x3a4), SB(0x3c2), SB(0x3d8), SB(0x3f6)};
+	if (!walk(gb, rets, ADDR_MoveObjectLeft_Slow, ADDR_MoveObjectRight_Slow))
+		return;
+	// .asm_462a9 / .asm_462dd
+	set_state(gb, 0x13);
+	RETURN;
+}
+
+// .asm_462f1
+static void sb_462f1(GB *gb)
+{
+	frameset_by_dir_hld(gb, ADDR_Frameset_68e11, ADDR_Frameset_68e14);
+	CALL(SetObjectFramesetPtr);
+	A = 12; wr_hld(gb, A);
+	A = 0x02;
+	wr8(gb, wCurObjVar2, A);
+	collbox_5_fa(gb);
+	interaction_hld(gb, OBJ_INTERACTION_01);
+}
+
+PORT_LOCAL(SpearBotFunc, Func_462e3)
+{
+	set_state_hld(gb, 0x32);
+	sb_462f1(gb);
+}
+
+PORT_LOCAL(SpearBotFunc, Func_462eb)
+{
+	set_state_hld(gb, 0x33);
+	sb_462f1(gb);
+}
+
+// ld a, [hld] / rlca / ld_obj_frameset Frameset_68e17, Frameset_68e20 /
+// call SetObjectFramesetPtr
+static void sb_frameset_68e17(GB *gb)
+{
+	frameset_by_dir_hld(gb, ADDR_Frameset_68e17, ADDR_Frameset_68e20);
+	CALL(SetObjectFramesetPtr);
+}
+
+// .Func_4633e (jump = Func_32ae) / .Func_46371 (Func_32bd)
+static void sb_var2_wait(GB *gb, uint16_t jump)
+{
+	ld_hl(gb, wCurObjVar2);
+	A = rd_hl(gb);
+	if (alu_and(gb, A, A)) {
+		JUMP_TO(jump);
+		return;
+	}
+	set_state(gb, 0x0f);
+	RET();
+}
+
+PORT_LOCAL_JUMP(SpearBotFunc, Func_46319)
+{
+	set_state_hld(gb, 0x46);
+	sb_frameset_68e17(gb);
+	collbox_5_fa(gb);
+	interaction_hld(gb, OBJ_INTERACTION_00);
+	sb_var2_wait(gb, ADDR_Func_32ae);
+}
+
+PORT_LOCAL_JUMP(SpearBotFunc, Func_4633e) { sb_var2_wait(gb, ADDR_Func_32ae); }
+
+PORT_LOCAL_JUMP(SpearBotFunc, Func_4634c)
+{
+	set_state_hld(gb, 0x47);
+	sb_frameset_68e17(gb);
+	collbox_5_fa(gb);
+	interaction_hld(gb, OBJ_INTERACTION_00);
+	sb_var2_wait(gb, ADDR_Func_32bd);
+}
+
+PORT_LOCAL_JUMP(SpearBotFunc, Func_46371) { sb_var2_wait(gb, ADDR_Func_32bd); }
+
+// .asm_4638d
+static void sb_4638d(GB *gb)
+{
+	sb_frameset_68e17(gb);
+	inc_l(gb);
+	inc_l(gb);
+	A = 0x02; wr_hli(gb, A);
+	xor_a(gb);
+	wr_hli(gb, A);
+	collbox_5_fa(gb);
+	interaction_hld(gb, OBJ_INTERACTION_00);
+}
+
+PORT_LOCAL(SpearBotFunc, Func_4637f)
+{
+	set_state_hld(gb, 0x44);
+	sb_4638d(gb);
+}
+
+PORT_LOCAL(SpearBotFunc, Func_46387)
+{
+	set_state_hld(gb, 0x45);
+	sb_4638d(gb);
+}
