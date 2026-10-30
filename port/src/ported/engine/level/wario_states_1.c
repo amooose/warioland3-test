@@ -2036,7 +2036,16 @@ PORT_JUMP(UpdateState_EnteringDoor)
 
 // one direction of ApplyLastWaterCurrentMovement: with the current, the
 // pad bit `with`, against it `against`; returns true to reset the current
+static bool water_current_push_b(GB *gb, int with, int against, uint8_t bank, uint16_t coll, uint16_t move,
+	uint8_t step);
 static bool water_current_push(GB *gb, int with, int against, uint8_t bank, uint16_t coll, uint16_t move)
+{
+	return water_current_push_b(gb, with, against, bank, coll, move, 1);
+}
+
+// b = the distance moved (1 for the lingering current, 2 for the current itself)
+static bool water_current_push_b(GB *gb, int with, int against, uint8_t bank, uint16_t coll, uint16_t move,
+	uint8_t step)
 {
 	if (ld_bit(gb, wc0e1, with))
 		return true;
@@ -2051,7 +2060,7 @@ static bool water_current_push(GB *gb, int with, int against, uint8_t bank, uint
 		if (!CF)
 			return false;
 	}
-	gb->cpu.b = 1;
+	gb->cpu.b = step;
 	gb_call(gb, move);
 	return false;
 }
@@ -2296,4 +2305,1060 @@ PORT_JUMP(Func_1f3d9)
 	gb->cpu.b = 0x01;
 	CALL(MoveWarioUp);
 	RET();
+}
+
+// ApplyWaterCurrentMovement.ChangeCurrentDirection
+static void change_current_direction(GB *gb)
+{
+	if (ld_and(gb, wLastWaterCurrent))
+		return;
+	gb->cpu.a = alu_add(gb, rd8(gb, wCurWaterCurrent), 15 << 4);
+	wr8(gb, wLastWaterCurrent, gb->cpu.a);
+}
+
+// one direction of ApplyWaterCurrentMovement
+static void water_current(GB *gb, int bit, uint8_t others, int with, int against, uint8_t bank,
+	uint16_t coll, uint16_t move)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wCurWaterCurrent), others);
+	if (gb->cpu.a)
+		change_current_direction(gb);
+	SET_HL(gb, wWaterCurrent);
+	gb->cpu.a = rd8(gb, wWaterCurrent);
+	wr8(gb, wCurWaterCurrent, gb->cpu.a);
+	wr8(gb, wWaterCurrent, (uint8_t)(rd8(gb, wWaterCurrent) & ~(1 << bit)));
+	water_current_push_b(gb, with, against, bank, coll, move, 2);
+}
+
+PORT(ApplyWaterCurrentMovement)
+{
+	LCALL(ApplyLastWaterCurrentMovement);
+	gb->cpu.a = rd8(gb, wWaterCurrent);
+	if (alu_bit(gb, gb->cpu.a, CURRENT_RIGHT_F))
+		water_current(gb, CURRENT_RIGHT_F, CURRENT_LEFT | CURRENT_UP | CURRENT_DOWN, B_PAD_RIGHT, B_PAD_LEFT,
+			BANK_Func_19741, ADDR_Func_19741, ADDR_MoveWarioRight);
+	else if (alu_bit(gb, gb->cpu.a, CURRENT_LEFT_F))
+		water_current(gb, CURRENT_LEFT_F, CURRENT_RIGHT | CURRENT_UP | CURRENT_DOWN, B_PAD_LEFT, B_PAD_RIGHT,
+			BANK_Func_197b1, ADDR_Func_197b1, ADDR_MoveWarioLeft);
+	else if (alu_bit(gb, gb->cpu.a, CURRENT_UP_F))
+		water_current(gb, CURRENT_UP_F, CURRENT_RIGHT | CURRENT_LEFT | CURRENT_DOWN, B_PAD_UP, B_PAD_DOWN,
+			BANK_CheckUpCollision, ADDR_CheckUpCollision, ADDR_MoveWarioUp);
+	else if (alu_bit(gb, gb->cpu.a, CURRENT_DOWN_F))
+		water_current(gb, CURRENT_DOWN_F, CURRENT_RIGHT | CURRENT_LEFT | CURRENT_UP, B_PAD_DOWN, B_PAD_UP,
+			BANK_CheckCentreCollision, ADDR_CheckCentreCollision, ADDR_MoveWarioDown);
+	else {
+		if (ld_and(gb, wCurWaterCurrent))
+			change_current_direction(gb);
+		xor_a(gb);
+		wr8(gb, wCurWaterCurrent, 0);
+	}
+}
+
+PORT(HandleAttackingAirborneMovement)
+{
+	CALL(ApplyJumpVelocity);
+	FARCALL(HandleWalk);
+	ld_cp(gb, wWalkVelIndex, 0x14);
+	if (!CF)
+		st(gb, wWalkVelIndex, 0x10);
+}
+
+// ld a, [wWarioState] / cp state: true if still in that state
+static bool still_in(GB *gb, uint8_t state)
+{
+	ld_cp(gb, wWarioState, state);
+	return ZF;
+}
+
+// update_pos
+static void update_pos(GB *gb)
+{
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = rd8(gb, hPos + i);
+		wr8(gb, wWarioPos + i, gb->cpu.a);
+	}
+	SET_HL(gb, hPos + 3);
+	SET_DE(gb, wWarioPos + 3);
+}
+
+// farcall Func_19b25 / room transition check; true if it jumped
+static bool room_transition_check(GB *gb)
+{
+	FARCALL(Func_19b25);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return true;
+	}
+	return false;
+}
+
+// get_pos / ld b, PARTICLE_DUST / farcall CreateParticle
+static void dust(GB *gb)
+{
+	get_pos(gb);
+	gb->cpu.b = PARTICLE_DUST;
+	FARCALL(CreateParticle);
+}
+
+PORT_JUMP(UpdateState_Walking)
+{
+	sfx_loop(gb, 36, SFX_WALK);
+	anim(gb, OAM1);
+	if (anim_ended(gb))
+		dust(gb);
+	LCALL(HandleInput_Walking);
+	if (!still_in(gb, WST_WALKING)) {
+		RET();
+		return;
+	}
+	if (room_transition_check(gb))
+		return;
+	if (!still_in(gb, WST_WALKING)) {
+		RET();
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (!still_in(gb, WST_WALKING)) {
+		RET();
+		return;
+	}
+	if (!b_and(gb)) {
+		LJUMP(StartFall);
+		return;
+	}
+	update_pos_y(gb);
+	RET();
+}
+
+// the framesets of UpdateState_Airborne and UpdateState_GrabAirborne
+typedef struct {
+	uint16_t left, right; // not smash attacking
+	uint16_t smash_left, smash_right, super_smash_left, super_smash_right;
+} AirborneFramesets;
+
+// the smash attack checks after HandleInput_Airborne, up to the
+// UpdateWarioAnimation call
+static void airborne_smash_attack(GB *gb, const AirborneFramesets *f)
+{
+	enum { CONTINUE, SET_SMASH, NO_SMASH } next = CONTINUE;
+	ld_cp(gb, wPowerUpLevel, LEAD_OVERALLS);
+	if (!CF) {
+		if (ld_and(gb, wIsSmashAttacking)) {
+			// .check_still_smash_attacking
+			if (!ld_bit(gb, wJoypadDown, B_PAD_DOWN)) {
+				xor_a(gb);
+				wr8(gb, wIsSmashAttacking, FALSE);
+				next = NO_SMASH;
+			}
+		} else {
+			ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+			if (!CF && ld_bit(gb, wJoypadDown, B_PAD_DOWN)) {
+				st(gb, wIsSmashAttacking, TRUE);
+				next = SET_SMASH;
+			}
+		}
+	}
+	if (next == CONTINUE) {
+		if (ld_and(gb, wIsTurning))
+			next = ld_and(gb, wIsSmashAttacking) ? SET_SMASH : NO_SMASH;
+	}
+	if (next == SET_SMASH) {
+		reset_anim(gb);
+		bool right = facing_right(gb);
+		ld_cp(gb, wPowerUpLevel, SUPER_JUMP_SLAM_OVERALLS);
+		if (right)
+			set_frameset(gb, CF ? f->smash_right : f->super_smash_right);
+		else
+			set_frameset(gb, CF ? f->smash_left : f->super_smash_left);
+	} else if (next == NO_SMASH) {
+		reset_anim(gb);
+		frameset_by_dir(gb, f->left, f->right);
+	}
+	anim(gb, OAM1);
+}
+
+PORT_JUMP(UpdateState_Airborne)
+{
+	if (room_transition_check(gb))
+		return;
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (!CF) {
+		// falling
+		if (ld_and(gb, wWaterInteraction)) {
+			LJUMP(DiveFromSurface);
+			return;
+		}
+		if (ld_and(gb, wIsInSand)) {
+			FARCALL(SetState_SandFalling);
+			RET();
+			return;
+		}
+		if (ld_and(gb, wLadderInteraction) && ld_bit(gb, wJoypadDown, B_PAD_UP)) {
+			FARCALL(SetState_LadderClimbing);
+			RET();
+			return;
+		}
+		if (!still_in(gb, WST_AIRBORNE)) {
+			RET();
+			return;
+		}
+		FARCALL(Func_19afb);
+		if (ld_and(gb, wIsNearFence) && ld_bit(gb, wJoypadDown, B_PAD_UP)) {
+			FARCALL(SetState_FenceMovingVertical);
+			RET();
+			return;
+		}
+	}
+	// .handle_input
+	if (!still_in(gb, WST_AIRBORNE)) {
+		RET();
+		return;
+	}
+	LCALL(HandleInput_Airborne);
+	if (!still_in(gb, WST_AIRBORNE)) {
+		RET();
+		return;
+	}
+
+	static const AirborneFramesets f = {ADDR_Frameset_15f94, ADDR_Frameset_15f97, ADDR_Frameset_15f8e,
+		ADDR_Frameset_15f91, ADDR_Frameset_1604e, ADDR_Frameset_16055};
+	airborne_smash_attack(gb, &f);
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (CF) {
+		FARCALL(CheckUpCollision);
+		if (!b_and(gb) || !still_in(gb, WST_AIRBORNE)) {
+			RET();
+			return;
+		}
+		if (ld_and(gb, wJumpCollision)) {
+			LJUMP(StartFall_SkipResetJumpUpwards);
+			return;
+		}
+		center_on_ladder(gb);
+		RET();
+		return;
+	}
+	// .falling
+	FARCALL(CheckAirborneCollision);
+	if (!still_in(gb, WST_AIRBORNE)) {
+		RET();
+		return;
+	}
+	if (!b_and(gb)) {
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	update_pos_y(gb);
+	dust(gb);
+	ld_cp(gb, wJumpVelIndex, MAX_JUMP_VEL_INDEX);
+	if (CF) {
+		LJUMP(DoSoftLand);
+		return;
+	}
+	if (!ld_mask(gb, wJoypadDown, PAD_RIGHT | PAD_LEFT)) {
+		LJUMP(DoHardLand);
+		return;
+	}
+	LJUMP(DoSoftLand); // fallthrough
+}
+
+PORT_JUMP(UpdateState_CrouchWalking)
+{
+	sfx_loop(gb, 21, SFX_CROUCH_WALK);
+	anim(gb, OAM1);
+	if (room_transition_check(gb))
+		return;
+	if (!still_in(gb, WST_CROUCH_WALKING)) {
+		RET();
+		return;
+	}
+	if (ld_and(gb, wWaterInteraction)) {
+		LJUMP(DiveFromSurface);
+		return;
+	}
+	LCALL(Func_1ec6c);
+	if (!still_in(gb, WST_CROUCH_WALKING)) {
+		RET();
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (!b_and(gb)) {
+		LJUMP(StartCrouchFall);
+		return;
+	}
+	update_pos_y(gb);
+	if (ld_and(gb, wWarioSlopeInteraction)) {
+		LJUMP(SetState_Sliding);
+		return;
+	}
+	RET();
+}
+
+PORT_JUMP(UpdateState_CrouchAirborne)
+{
+	if (room_transition_check(gb))
+		return;
+	if (ld_and(gb, wWaterInteraction)) {
+		LJUMP(DiveFromSurface);
+		return;
+	}
+	if (ld_and(gb, wIsInSand)) {
+		FARCALL(SetState_SandFalling);
+		RET();
+		return;
+	}
+	if (!still_in(gb, WST_CROUCH_AIRBORNE)) {
+		RET();
+		return;
+	}
+	if (!ld_bit(gb, wJoypadDown, B_PAD_DOWN)) {
+		st(gb, wCollisionBoxTop, (uint8_t)-27);
+		FARCALL(CheckUpCollision);
+		if (!still_in(gb, WST_CROUCH_AIRBORNE)) {
+			RET();
+			return;
+		}
+		if (!b_and(gb)) {
+			LJUMP(StartJump);
+			return;
+		}
+	}
+	// .asm_1d583
+	st(gb, wCollisionBoxTop, (uint8_t)-15);
+	LCALL(HandleInput_Airborne);
+	if (!still_in(gb, WST_CROUCH_AIRBORNE)) {
+		RET();
+		return;
+	}
+	if (ld_and(gb, wIsTurning)) {
+		reset_anim(gb);
+		frameset_by_dir(gb, ADDR_Frameset_14a38, ADDR_Frameset_14a3b);
+		anim(gb, OAM1);
+	}
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (CF) {
+		// rising
+		FARCALL(CheckUpCollision);
+		if (b_and(gb) && still_in(gb, WST_CROUCH_AIRBORNE))
+			st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+		RET();
+		return;
+	}
+	// .falling
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb)) {
+		if (!still_in(gb, WST_CROUCH_AIRBORNE)) {
+			RET();
+			return;
+		}
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	update_pos_y(gb);
+	if (!still_in(gb, WST_CROUCH_AIRBORNE)) {
+		RET();
+		return;
+	}
+	LCALL(DoSoftLand);
+	if (!ld_bit(gb, wJoypadDown, B_PAD_DOWN)) {
+		RET();
+		return;
+	}
+	LJUMP(CrouchOrSlide);
+}
+
+// ld a, b / and $0f: true if nz
+static bool b_low_nibble(GB *gb)
+{
+	gb->cpu.a = alu_and(gb, gb->cpu.b, 0x0f);
+	return gb->cpu.a != 0;
+}
+
+PORT_JUMP(UpdateState_Sliding)
+{
+	sfx_loop(gb, 12, SFX_ZIP_LINE_SLIDE);
+	anim(gb, OAM1);
+	LCALL(Func_1f825);
+	if (!still_in(gb, WST_SLIDING)) {
+		RET();
+		return;
+	}
+	FARCALL(Func_198c7);
+	if (!b_and(gb)) {
+		LJUMP(Func_1e174);
+		return;
+	}
+	update_pos(gb);
+	FARCALL(CheckFrontCollision);
+	if (b_low_nibble(gb)) {
+		LJUMP(DoBumpWithSmallBackOffset);
+		return;
+	}
+	if (!anim_ended(gb)) {
+		RET();
+		return;
+	}
+	LJUMP(SetState_Rolling); // fallthrough
+}
+
+// move by direction with the walk velocity, then cap it at $18 (to $14)
+static void roll_move(GB *gb)
+{
+	if (facing_right(gb)) {
+		CALL(ApplyWalkVelocity_Right);
+		CALL(MoveWarioRight);
+	} else {
+		CALL(ApplyWalkVelocity_Left);
+		CALL(MoveWarioLeft);
+	}
+	ld_cp(gb, wWalkVelIndex, 0x18);
+	if (!CF)
+		st(gb, wWalkVelIndex, 0x14);
+}
+
+// a = wWarioSlopeInteraction: and $0f / dec a / ld b, a / ld a, [wDirection] /
+// xor b; true if nz (rolling against the slope)
+static bool against_slope(GB *gb)
+{
+	gb->cpu.a = alu_and(gb, gb->cpu.a, 0x0f);
+	gb->cpu.a = alu_dec(gb, gb->cpu.a);
+	gb->cpu.b = gb->cpu.a;
+	gb->cpu.a = alu_xor(gb, rd8(gb, wDirection), gb->cpu.b);
+	return gb->cpu.a != 0;
+}
+
+PORT_JUMP(UpdateState_Rolling)
+{
+	if (room_transition_check(gb))
+		return;
+	sfx_loop(gb, 12, SFX_ROLL);
+	anim(gb, OAM1);
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		// .asm_1e145
+		FARCALL(CheckCentreCollision);
+		update_pos_y(gb);
+		if (ld_and(gb, wWarioSlopeInteraction) && against_slope(gb)) {
+			LJUMP(DoBumpWithSmallBackOffset);
+			return;
+		}
+		LJUMP(Func_1e1e3);
+		return;
+	}
+	roll_move(gb);
+	FARCALL(CheckFrontCollision);
+	if (b_low_nibble(gb)) {
+		LJUMP(DoBumpWithBigBackOffset);
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (!b_and(gb)) {
+		LJUMP(Func_1e174);
+		return;
+	}
+	update_pos_y(gb);
+	if (ld_and(gb, wWarioSlopeInteraction) && against_slope(gb)) {
+		LJUMP(DoBumpWithSmallBackOffset);
+		return;
+	}
+	RET();
+}
+
+PORT_JUMP(UpdateState_RollingAirborne)
+{
+	if (room_transition_check(gb))
+		return;
+	if (ld_and(gb, wWaterInteraction)) {
+		LJUMP(DiveFromSurface);
+		return;
+	}
+	if (ld_and(gb, wIsInSand)) {
+		FARCALL(SetState_SandFalling);
+		RET();
+		return;
+	}
+	anim(gb, OAM1);
+	roll_move(gb);
+	FARCALL(CheckFrontCollision);
+	if (b_low_nibble(gb)) {
+		LJUMP(DoBumpWithBigBackOffset);
+		return;
+	}
+	gb->cpu.a = rd8(gb, wJumpVelIndex);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0x00;
+	uint16_t hl = alu_add16(gb, ADDR_JumpVelTable_HighJump, REG_DE(gb));
+	SET_HL(gb, hl);
+	if (alu_bit(gb, rd8(gb, hl), 7)) {
+		// rising
+		gb->cpu.a = alu_inc(gb, alu_cpl(gb, rd8(gb, hl)));
+		gb->cpu.b = gb->cpu.a;
+		CALL(MoveWarioUp);
+		SET_HL(gb, wJumpVelIndex);
+		wr8(gb, wJumpVelIndex, alu_inc(gb, rd8(gb, wJumpVelIndex)));
+	} else {
+		gb->cpu.b = rd8(gb, hl);
+		CALL(MoveWarioDown);
+		SET_HL(gb, wJumpVelIndex);
+		gb->cpu.a = alu_inc(gb, rd8(gb, wJumpVelIndex));
+		wr8(gb, wJumpVelIndex, gb->cpu.a);
+		alu_cp(gb, gb->cpu.a, MAX_JUMP_VEL_INDEX);
+		if (!CF)
+			wr8(gb, wJumpVelIndex, MAX_JUMP_VEL_INDEX);
+	}
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (CF) {
+		FARCALL(CheckUpCollision);
+		if (b_and(gb))
+			st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+		RET();
+		return;
+	}
+	FARCALL(CheckAirborneCollision);
+	if (!b_and(gb)) {
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	CALL(TriggerFloorTransition);
+	LJUMP(SetState_Rolling);
+}
+
+PORT_JUMP(UpdateState_PickingUp)
+{
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		LJUMP(Func_1dd78);
+		return;
+	}
+	if (!ld_and(gb, wGrabState)) {
+		LJUMP(SetState_Idling);
+		return;
+	}
+	gb->cpu.a = alu_and(gb, gb->cpu.a, 0x0f);
+	alu_cp(gb, gb->cpu.a, 0x02);
+	if (ZF) {
+		LJUMP(SetState_GrabIdling);
+		return;
+	}
+	anim(gb, OAM1);
+	if (!anim_ended(gb)) {
+		RET();
+		return;
+	}
+	LJUMP(SetState_GrabIdling);
+}
+
+PORT_JUMP(UpdateState_ThrowCharging)
+{
+	if (!ld_and(gb, wGrabState)) {
+		LJUMP(SetState_Idling);
+		return;
+	}
+	gb->cpu.a = rd8(gb, wJoypadDown);
+	if (!alu_bit(gb, gb->cpu.a, B_PAD_B)) {
+		LJUMP(Func_1de3f);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, B_PAD_A)) {
+		LJUMP(Func_1dd78);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, B_PAD_DOWN)) {
+		LJUMP(CrouchOrSlide);
+		return;
+	}
+	gb->cpu.b = ld_bit(gb, wGrabState, GRAB_HEAVY_F) ? THROW_CHARGE_FRAMES_HEAVY : THROW_CHARGE_FRAMES_LIGHT;
+	gb->cpu.a = alu_inc(gb, rd8(gb, wWarioStateCounter));
+	wr8(gb, wWarioStateCounter, gb->cpu.a);
+	alu_cp(gb, gb->cpu.a, gb->cpu.b);
+	if (CF) {
+		RET();
+		return;
+	}
+	static const uint16_t zero[] = {wSFXLoopCounter, wFrameDuration, wAnimationFrame,
+		wWarioStateCounter, wWarioStateCycles, 0};
+	clear(gb, zero);
+	st(gb, wWarioState, WST_THROW_FULLY_CHARGED);
+	gb->cpu.a = alu_and(gb, rd8(gb, wGrabState), GRAB_FLAGS_MASK);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, GRAB_THROW_FULLY_CHARGED);
+	wr8(gb, wGrabState, gb->cpu.a);
+	frameset_by_dir(gb, ADDR_Frameset_16432, ADDR_Frameset_16435);
+	anim(gb, OAM1);
+	RET();
+}
+
+PORT_JUMP(UpdateState_ThrowFullyCharged)
+{
+	sfx_loop(gb, 30, SFX_FULLY_CHARGED_THROW);
+	if (!ld_and(gb, wGrabState)) {
+		LJUMP(SetState_Idling);
+		return;
+	}
+	gb->cpu.a = alu_and(gb, gb->cpu.a, GRAB_STATE_MASK);
+	alu_cp(gb, gb->cpu.a, GRAB_HOLD_FULL_CHARGE);
+	if (!ZF && !ld_and(gb, wWarioStateCounter) && anim_ended(gb)) {
+		gb->cpu.a = alu_and(gb, rd8(gb, wGrabState), GRAB_FLAGS_MASK);
+		gb->cpu.a = alu_add(gb, gb->cpu.a, GRAB_HOLD_FULL_CHARGE);
+		wr8(gb, wGrabState, gb->cpu.a);
+		reset_anim(gb);
+		gb->cpu.a = alu_inc(gb, gb->cpu.a);
+		wr8(gb, wWarioStateCounter, gb->cpu.a);
+		frameset_by_dir(gb, ADDR_Frameset_16438, ADDR_Frameset_16441);
+	}
+	anim(gb, OAM1);
+	gb->cpu.a = rd8(gb, wJoypadDown);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_B)) {
+		if (alu_bit(gb, gb->cpu.a, B_PAD_A)) {
+			LJUMP(Func_1dd78);
+			return;
+		}
+		if (alu_bit(gb, gb->cpu.a, B_PAD_DOWN)) {
+			LJUMP(CrouchOrSlide);
+			return;
+		}
+		RET();
+		return;
+	}
+	reset_anim(gb);
+	frameset_by_dir(gb, ADDR_Frameset_16403, ADDR_Frameset_16423);
+	anim(gb, OAM1);
+	gb->cpu.a = alu_and(gb, rd8(gb, wGrabState), GRAB_FLAGS_MASK);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, GRAB_THROW | (1 << GRAB_FULL_CHARGE_F));
+	wr8(gb, wGrabState, gb->cpu.a);
+	LJUMP(SetState_Throwing);
+}
+
+PORT_JUMP(UpdateState_GrabSmashAttacking)
+{
+	if (!ld_and(gb, wGrabState)) {
+		LJUMP(SetState_Idling);
+		return;
+	}
+	anim(gb, OAM1);
+	alu_cp(gb, inc_counter(gb), 0x1b);
+	if (CF) {
+		RET();
+		return;
+	}
+	xor_a(gb);
+	wr8(gb, wIsSmashAttacking, FALSE);
+	LJUMP(SetState_GrabIdling);
+}
+
+PORT_JUMP(UpdateState_GroundShakeStunned)
+{
+	anim(gb, OAM1);
+	if (!ld_and(gb, wGroundShakeCounter)) {
+		// .no_more_ground_shake
+		st(gb, wCollisionBoxTop, (uint8_t)-27);
+		FARCALL(CheckUpCollision);
+		if (b_and(gb)) {
+			LJUMP(CrouchOrSlide);
+			return;
+		}
+		FARCALL(CheckCentreCollision);
+		if (!b_and(gb)) {
+			LJUMP(StartFall);
+			return;
+		}
+		LJUMP(SetState_Idling);
+		return;
+	}
+	if (!ld_and(gb, wJumpVelTable)) {
+		RET();
+		return;
+	}
+	CALL(ApplyJumpVelocity);
+	FARCALL(HandleWalk);
+	CALL(Func_1762);
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (CF) {
+		FARCALL(CheckUpCollision);
+		if (b_and(gb))
+			st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+		RET();
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (!b_and(gb)) {
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	CALL(TriggerFloorTransition);
+	xor_a(gb);
+	wr8(gb, wJumpVelTable, 0);
+	wr8(gb, wJumpVelIndex, 0);
+	RET();
+}
+
+// UpdateState_CrouchSliding.end_slide
+static void crouch_slide_end(GB *gb)
+{
+	if (!ld_bit(gb, wJoypadDown, B_PAD_DOWN)) {
+		st(gb, wCollisionBoxTop, (uint8_t)-27);
+		FARCALL(CheckUpCollision);
+		if (!still_in(gb, WST_CROUCH_SLIDING)) {
+			RET();
+			return;
+		}
+		if (!b_and(gb)) {
+			LJUMP(SetState_Idling);
+			return;
+		}
+	}
+	// .crouching
+	st(gb, wCollisionBoxTop, (uint8_t)-15);
+	LJUMP(CrouchOrSlide);
+}
+
+PORT_JUMP(UpdateState_CrouchSliding)
+{
+	if (room_transition_check(gb))
+		return;
+	if (!still_in(gb, WST_CROUCH_SLIDING)) {
+		RET();
+		return;
+	}
+	if (ld_bit(gb, wJoypadPressed, B_PAD_A)) {
+		// .try_jump
+		st(gb, wCollisionBoxTop, (uint8_t)-27);
+		FARCALL(CheckUpCollision);
+		if (!still_in(gb, WST_CROUCH_SLIDING)) {
+			RET();
+			return;
+		}
+		bool blocked = b_and(gb);
+		st(gb, wCollisionBoxTop, (uint8_t)-15);
+		if (blocked) {
+			RET();
+			return;
+		}
+		LJUMP(StartCrouchJump);
+		return;
+	}
+	FARCALL(CheckCentreCollision);
+	if (!still_in(gb, WST_CROUCH_SLIDING)) {
+		RET();
+		return;
+	}
+	if (!b_and(gb)) {
+		LJUMP(StartCrouchFall);
+		return;
+	}
+	if (ld_and(gb, wWarioSlopeInteraction)) {
+		update_pos_y(gb);
+		LJUMP(SetState_Sliding);
+		return;
+	}
+	FARCALL(CheckFrontCollision);
+	if (!still_in(gb, WST_CROUCH_SLIDING)) {
+		RET();
+		return;
+	}
+	if (b_and(gb)) {
+		crouch_slide_end(gb);
+		return;
+	}
+	// if Wario has Garlic power-up, then slide further
+	SET_HL(gb, wWarioStateCounter);
+	wr8(gb, wWarioStateCounter, alu_inc(gb, rd8(gb, wWarioStateCounter)));
+	ld_cp(gb, wPowerUpLevel, GARLIC);
+	bool garlic = !CF;
+	gb->cpu.a = rd8(gb, wWarioStateCounter);
+	uint8_t step;
+	alu_cp(gb, gb->cpu.a, garlic ? 0x1e : 0x14);
+	if (CF) {
+		step = 2; // .slide_fast
+	} else {
+		alu_cp(gb, gb->cpu.a, garlic ? 0x36 : 0x24);
+		if (CF) {
+			step = 1; // .slide_slow
+		} else {
+			alu_cp(gb, gb->cpu.a, garlic ? 0x3c : 0x28);
+			if (CF) {
+				// .slide_slower
+				gb->cpu.a = alu_and(gb, rd8(gb, wGlobalCounter), 0x1);
+				if (ZF) {
+					RET();
+					return;
+				}
+				step = 1;
+			} else if (ZF) {
+				crouch_slide_end(gb);
+				return;
+			} else {
+				RET();
+				return;
+			}
+		}
+	}
+	gb->cpu.b = step;
+	move_by_dir(gb);
+	RET();
+}
+
+PORT_JUMP(UpdateState_GrabAirborne)
+{
+	if (room_transition_check(gb))
+		return;
+	if (!still_in(gb, WST_GRAB_AIRBORNE)) {
+		RET();
+		return;
+	}
+	if (ld_and(gb, wWaterInteraction)) {
+		LJUMP(DiveFromSurface);
+		return;
+	}
+	if (!ld_and(gb, wGrabState)) {
+		LJUMP(StartFall);
+		return;
+	}
+	if (ld_and(gb, wIsInSand)) {
+		FARCALL(SetState_SandFalling);
+		RET();
+		return;
+	}
+	if (ld_bit(gb, wJoypadPressed, B_PAD_B)) {
+		LJUMP(SetState_ThrowingAirborne);
+		return;
+	}
+	LCALL(HandleInput_Airborne);
+	if (!still_in(gb, WST_GRAB_AIRBORNE)) {
+		RET();
+		return;
+	}
+	static const AirborneFramesets f = {ADDR_Frameset_15fa8, ADDR_Frameset_15fab, ADDR_Frameset_15fec,
+		ADDR_Frameset_15fef, ADDR_Frameset_1605c, ADDR_Frameset_16063};
+	airborne_smash_attack(gb, &f);
+
+	if (ld_bit(gb, wGrabState, GRAB_HEAVY_F)) {
+		ld_cp(gb, wWalkVelIndex, 0x08);
+		if (!CF)
+			st(gb, wWalkVelIndex, 0x04);
+	}
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (CF) {
+		FARCALL(CheckUpCollision);
+		if (b_and(gb))
+			st(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+		RET();
+		return;
+	}
+	FARCALL(CheckAirborneCollision);
+	if (!still_in(gb, WST_GRAB_AIRBORNE)) {
+		RET();
+		return;
+	}
+	if (!b_and(gb)) {
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	CALL(TriggerFloorTransition);
+	if (!ld_and(gb, wFloorTransitionDir))
+		play_sfx(gb, SFX_LAND);
+	xor_a(gb);
+	wr8(gb, wJumpVelIndex, 0);
+	wr8(gb, wJumpVelTable, 0);
+	wr8(gb, wWalkVelIndex, 0);
+	if (!ld_and(gb, wIsSmashAttacking)) {
+		LJUMP(SetState_GrabIdling);
+		return;
+	}
+	ld_cp(gb, wPowerUpLevel, SUPER_JUMP_SLAM_OVERALLS);
+	if (CF) {
+		// .asm_1dc25
+		play_sfx(gb, SFX_GROUND_POUND);
+		reset_anim(gb);
+		frameset_by_dir(gb, ADDR_Frameset_16020, ADDR_Frameset_16037);
+		anim(gb, OAM1);
+	} else {
+		// .continue
+		if (!ld_and(gb, wGroundShakeCounter)) {
+			st(gb, wGroundShakeCounter, 0x20);
+			st(gb, wIsWarioGroundShaking, TRUE);
+		}
+		if (!ld_and(gb, wFloorTransitionDir))
+			play_sfx(gb, SFX_GROUND_SHAKE);
+		reset_anim(gb);
+		frameset_by_dir(gb, ADDR_Frameset_15fd2, ADDR_Frameset_15fdf);
+		anim(gb, OAM1);
+	}
+	// .asm_1dc5f
+	st(gb, wIsSmashAttacking, 0x81);
+	st(gb, wWarioState, WST_GRAB_SMASH_ATTACKING);
+	static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wJumpVelIndex, wJumpVelTable, 0};
+	clear(gb, zero);
+	collision_box(gb, -1, -27, -9, 9);
+	RET();
+}
+
+PORT_JUMP(Func_1f357)
+{
+	FARCALL(CheckCentreCollision);
+	if (b_and(gb))
+		update_pos_y(gb);
+	if (still_in(gb, WST_WATER_STUNG)) {
+		RET();
+		return;
+	}
+	if (!ld_and(gb, wDirection)) {
+		LJUMP(Func_1f310);
+		return;
+	}
+	st(gb, wDirection, DIRECTION_LEFT);
+	reset_anim(gb);
+	set_frameset(gb, ADDR_Frameset_15576);
+	anim(gb, OAM1);
+	RET();
+}
+
+// ld a, [wSwimVelIndex] / ld e, a / ld d, $00 / ld hl, table / ld a, [wSwimmingDirectionInput] /
+// and mask / jr z / ld hl, alt / add hl, de / ld b, [hl]
+static void swim_vel(GB *gb, uint8_t mask, uint16_t alt)
+{
+	gb->cpu.a = rd8(gb, wSwimVelIndex);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0x00;
+	uint16_t hl = ADDR_SwimStraightVelTable;
+	if (ld_mask(gb, wSwimmingDirectionInput, mask))
+		hl = alt;
+	hl = alu_add16(gb, hl, REG_DE(gb));
+	SET_HL(gb, hl);
+	gb->cpu.b = rd8(gb, hl);
+}
+
+// ld hl, wc0e1 / set bit, [hl]
+static void set_c0e1(GB *gb, int bit)
+{
+	SET_HL(gb, wc0e1);
+	wr8(gb, wc0e1, (uint8_t)(rd8(gb, wc0e1) | (1 << bit)));
+}
+
+// HandleUnderwaterThrustingInput.up
+static void thrust_up(GB *gb)
+{
+	FARCALL(CheckUpCollision);
+	if (b_and(gb)) {
+		set_c0e1(gb, B_PAD_UP);
+		LJUMP(StartDive);
+		return;
+	}
+	FARCALL(Func_19acd);
+	if (!ld_and(gb, wWaterInteraction)) {
+		LJUMP(SurfaceFromUnderwater);
+		return;
+	}
+	swim_vel(gb, PAD_RIGHT | PAD_LEFT, ADDR_Data_1f894);
+	CALL(MoveWarioUp);
+	RET();
+}
+
+// HandleUnderwaterThrustingInput.down
+static void thrust_down(GB *gb)
+{
+	FARCALL(CheckCentreCollision);
+	if (b_and(gb)) {
+		update_pos_y(gb);
+		set_c0e1(gb, B_PAD_DOWN);
+		RET();
+		return;
+	}
+	swim_vel(gb, PAD_RIGHT | PAD_LEFT, ADDR_Data_1f894);
+	CALL(MoveWarioDown);
+	RET();
+}
+
+// HandleUnderwaterThrustingInput.right / .left
+static void thrust_horizontal(GB *gb, bool right)
+{
+	FARCALL(CheckCentreCollision);
+	if (b_and(gb))
+		update_pos_y(gb);
+	if (still_in(gb, WST_WATER_STUNG)) {
+		RET();
+		return;
+	}
+	if (right)
+		FARCALL(Func_19741);
+	else
+		FARCALL(Func_197b1);
+	if (b_and(gb)) {
+		LJUMP(SetState_SwimKnockBack_SwitchDirection);
+		return;
+	}
+	swim_vel(gb, PAD_UP | PAD_DOWN, ADDR_SwimDiagonalVelTable);
+	if (right)
+		CALL(MoveWarioRight);
+	else
+		CALL(MoveWarioLeft);
+	gb->cpu.a = rd8(gb, wSwimmingDirectionInput);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_UP)) {
+		thrust_up(gb);
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, B_PAD_DOWN)) {
+		thrust_down(gb);
+		return;
+	}
+	// .handle_diagonal_movement
+	if (!ld_mask(gb, wJoypadDown, PAD_UP | PAD_DOWN)) {
+		RET();
+		return;
+	}
+	if (alu_bit(gb, gb->cpu.a, B_PAD_DOWN)) {
+		// .diagonal_down
+		FARCALL(CheckCentreCollision);
+		if (!b_and(gb)) {
+			gb->cpu.b = 1;
+			CALL(MoveWarioDown);
+			RET();
+			return;
+		}
+		update_pos_y(gb);
+		set_c0e1(gb, B_PAD_DOWN);
+		RET();
+		return;
+	}
+	// diagonal up
+	FARCALL(CheckUpCollision);
+	if (b_and(gb)) {
+		set_c0e1(gb, B_PAD_UP);
+		RET();
+		return;
+	}
+	FARCALL(Func_19acd);
+	if (!ld_and(gb, wWaterInteraction)) {
+		LJUMP(SurfaceFromUnderwater);
+		return;
+	}
+	gb->cpu.b = 1;
+	CALL(MoveWarioUp);
+	RET();
+}
+
+PORT_JUMP(HandleUnderwaterThrustingInput)
+{
+	SET_HL(gb, wSwimVelIndex);
+	gb->cpu.a = alu_inc(gb, rd8(gb, wSwimVelIndex));
+	wr8(gb, wSwimVelIndex, gb->cpu.a);
+	alu_cp(gb, gb->cpu.a, 40);
+	if (!CF) {
+		xor_a(gb);
+		wr8(gb, wSwimVelIndex, 0);
+		LJUMP(SetState_Submerged);
+		return;
+	}
+	if (!ld_mask(gb, wJoypadDown, PAD_A | PAD_B)) {
+		LJUMP(SetState_Submerged);
+		return;
+	}
+	gb->cpu.a = rd8(gb, wSwimmingDirectionInput);
+	if (alu_bit(gb, gb->cpu.a, B_PAD_RIGHT))
+		thrust_horizontal(gb, true);
+	else if (alu_bit(gb, gb->cpu.a, B_PAD_LEFT))
+		thrust_horizontal(gb, false);
+	else if (alu_bit(gb, gb->cpu.a, B_PAD_UP))
+		thrust_up(gb);
+	else if (alu_bit(gb, gb->cpu.a, B_PAD_DOWN))
+		thrust_down(gb);
+	else
+		RET();
 }
