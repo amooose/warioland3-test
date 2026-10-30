@@ -554,3 +554,104 @@ PORT_JUMP(Func_9aab5)
 	wr8(gb, wHDMAMode, gb->cpu.a);
 	RET();
 }
+
+// rst JumpTable, with the table at `table` (right after the rst): leaves every
+// register as JumpTable does and returns the target (= hl).
+static uint16_t jumptable(GB *gb, uint16_t table)
+{
+	gb_push16(gb, table); // rst JumpTable
+	uint16_t hl = gb_pop16(gb); // pop hl
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0;
+	hl = alu_add16(gb, hl, gb->cpu.e);
+	gb->cpu.a = rd8(gb, hl);
+	gb->cpu.h = rd8(gb, (uint16_t)(hl + 1));
+	gb->cpu.l = gb->cpu.a;
+	return REG_HL(gb);
+}
+
+// ProcessCollectionLinkState.AdvanceState
+static void link_advance_state(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCollectionLinkStateCounter, 0);
+	SET_HL(gb, wCollectionLinkStateCounter - 1);
+	wr8(gb, wCollectionLinkStateCounter - 1, alu_inc(gb, rd8(gb, wCollectionLinkStateCounter - 1)));
+}
+
+// ProcessCollectionLinkState.Func_9a806: places a scene obj on each linked
+// cell other than the current one
+static void link_place_objs(GB *gb)
+{
+	static const uint16_t objs[] = { wSceneObj2YCoord, wSceneObj3YCoord, wSceneObj3End,
+		wSceneObj4End, wSceneObj5End, wSceneObj6End, wSceneObj7End };
+	for (int i = 0; i < 7; i++) {
+		gb->cpu.a = rd8(gb, wCollectionLinkedCells + i);
+		alu_cp(gb, gb->cpu.a, 0x80);
+		if (gb->cpu.f & FLAG_Z)
+			break;
+		gb->cpu.a = alu_dec(gb, gb->cpu.a);
+		SET_HL(gb, wCollectionCell);
+		alu_cp(gb, gb->cpu.a, rd8(gb, wCollectionCell));
+		if (gb->cpu.f & FLAG_Z)
+			continue;
+		SET_HL(gb, objs[i]);
+		get_collection_cell_row_and_column(gb);
+		// .Func_9a8d8
+		gb->cpu.l |= 0x04; // set 2, l
+		gb->cpu.a = 0x02;
+		CALL(SetSceneObjState);
+		SET_DE(gb, objs[i]);
+		gb_call(gb, ADDR_Func_9a78e);
+	}
+	link_advance_state(gb);
+}
+
+PORT_JUMP(ProcessCollectionLinkState)
+{
+	SET_HL(gb, wCollectionLinkStateCounter);
+	wr8(gb, wCollectionLinkStateCounter, alu_inc(gb, rd8(gb, wCollectionLinkStateCounter)));
+	SET_BC(gb, wCollectionLinkStateCounter);
+	gb->cpu.a = rd8(gb, wCollectionLinkState);
+	uint16_t target = jumptable(gb, ADDR_ProcessCollectionLinkState + 0xa);
+	switch (target - ADDR_ProcessCollectionLinkState) {
+	case 0x16: // .AdvanceState
+		link_advance_state(gb);
+		break;
+	case 0x1d: // .WaitDelay
+		gb->cpu.a = rd8(gb, REG_BC(gb));
+		alu_cp(gb, gb->cpu.a, 0x14);
+		if (!(gb->cpu.f & FLAG_C))
+			link_advance_state(gb);
+		break;
+	case 0x23: // .GetLinkedCells
+		SET_HL(gb, ADDR_CollectionLinkTable);
+		gb->cpu.a = rd8(gb, wCollectionPage);
+		CALL(GetPointerFromTableHL);
+		gb->cpu.a = rd8(gb, wCollectionCell);
+		CALL(GetPointerFromTableHL);
+		gb->cpu.a = rd8(gb, REG_HL(gb));
+		alu_cp(gb, gb->cpu.a, 0x80);
+		if (gb->cpu.f & FLAG_Z) {
+			link_advance_state(gb);
+			break;
+		}
+		gb->cpu.b = 7;
+		SET_DE(gb, wCollectionLinkedCells);
+		CALL(CopyHLToDE);
+		link_advance_state(gb);
+		link_advance_state(gb);
+		break;
+	case 0x45: // .Return
+		break;
+	case 0x46: // .Func_9a806
+		link_place_objs(gb);
+		break;
+	default:
+		JUMP_TO(target);
+		return;
+	}
+	RET();
+}
