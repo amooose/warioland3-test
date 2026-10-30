@@ -1837,9 +1837,56 @@ PORT_JUMP(Func_1ed558)
 	LJUMP(SetState_BlindAirborne); // fallthrough
 }
 
-// UpdateState_BlindAirborne stays in asm: one synthetic fuzz variant on
-// yellowbelly takes a garbage path into the native Func_81055 (bank $20),
-// which then differs from the asm (see the batch report).
+PORT_JUMP(UpdateState_BlindAirborne)
+{
+	FARCALL_RET(Func_19b25, ADDR_UpdateState_BlindAirborne + 0x0f);
+	if (room_transition(gb)) {
+		JUMP(TriggerRoomTransition);
+		return;
+	}
+	if (ld_and(gb, wWaterInteraction)) {
+		JUMP(RecoverFromTransformation);
+		return;
+	}
+	FARCALL_RET(CheckFrontCollision, ADDR_UpdateState_BlindAirborne + 0x2c);
+	ld_cp(gb, wWarioState, WST_BLIND_AIRBORNE);
+	if (!ZF) {
+		RET();
+		return;
+	}
+	if (b_and(gb)) {
+		JUMP(RecoverFromTransformation);
+		return;
+	}
+	gb_call_ret(gb, ADDR_Func_1ee00f, ADDR_UpdateState_BlindAirborne + 0x3a);
+	ld_cp(gb, wWarioState, WST_BLIND_AIRBORNE);
+	if (!ZF) {
+		RET();
+		return;
+	}
+	ld_cp(gb, wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+	if (CF) {
+		FARCALL_RET(CheckUpCollision, ADDR_UpdateState_BlindAirborne + 0x56);
+		if (!b_and(gb)) {
+			RET();
+			return;
+		}
+		ld_cp(gb, wWarioState, WST_BLIND_AIRBORNE);
+		if (!ZF) {
+			RET();
+			return;
+		}
+		LJUMP(Func_1ed548);
+		return;
+	}
+	FARCALL_RET(CheckAirborneCollision, ADDR_UpdateState_BlindAirborne + 0x71);
+	if (!b_and(gb)) {
+		JUMP(TriggerDownwardsFloorTransition);
+		return;
+	}
+	gb_call_ret(gb, ADDR_TriggerFloorTransition, ADDR_UpdateState_BlindAirborne + 0x7b);
+	LJUMP(SetState_BlindIdling);
+}
 
 PORT_JUMP(UpdateState_BlindIdling)
 {
