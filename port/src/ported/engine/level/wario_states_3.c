@@ -3684,3 +3684,19 @@ PORT_JUMP(UpdateState_InBubble)
 	LCALL(Func_2b56f);
 	RET();
 }
+
+// ld a, [wWarioState] / sub $60 / rst JumpTable (table after the rst)
+PORT_JUMP(UpdateWarioStates_Group3)
+{
+	gb->cpu.a = alu_sub(gb, rd8(gb, wWarioState), 0x60);
+	gb_push16(gb, ADDR_UpdateWarioStates_Group3 + 6); // rst JumpTable
+	uint16_t hl = gb_pop16(gb);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0;
+	hl = alu_add16(gb, hl, gb->cpu.e);
+	gb->cpu.a = rd8(gb, hl);
+	gb->cpu.h = rd8(gb, (uint16_t)(hl + 1));
+	gb->cpu.l = gb->cpu.a;
+	JUMP_TO(REG_HL(gb));
+}

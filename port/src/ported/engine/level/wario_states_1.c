@@ -3992,3 +3992,57 @@ PORT_JUMP(UpdateState_Attacking)
 	}
 	LJUMP(SetState_Idling);
 }
+
+// rst JumpTable with the table at `table` (right after the rst): leaves
+// every register as JumpTable does and returns the target (= hl).
+static uint16_t ws1_jumptable(GB *gb, uint16_t table)
+{
+	gb_push16(gb, table); // rst JumpTable
+	uint16_t hl = gb_pop16(gb); // pop hl
+	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
+	gb->cpu.e = gb->cpu.a;
+	gb->cpu.d = 0;
+	hl = alu_add16(gb, hl, gb->cpu.e);
+	gb->cpu.a = rd8(gb, hl);
+	gb->cpu.h = rd8(gb, (uint16_t)(hl + 1));
+	gb->cpu.l = gb->cpu.a;
+	return REG_HL(gb);
+}
+
+// Dispatch on wWarioState (a): rst JumpTable, table right after it.
+PORT_JUMP(UpdateWarioStates_Group1)
+{
+	JUMP_TO(ws1_jumptable(gb, ADDR_UpdateWarioStates_Group1 + 1));
+}
+
+PORT_JUMP(UpdateWarioStates)
+{
+	SET_HL(gb, wCoinCooldown);
+	gb->cpu.a = rd8(gb, wCoinCooldown);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+		wr8(gb, wCoinCooldown, alu_dec(gb, gb->cpu.a));
+	LCALL(HandleGroundShake);
+	LCALL(HandleInvincibility);
+
+	gb->cpu.a = rd8(gb, wWarioState);
+	alu_cp(gb, gb->cpu.a, WARIO_STATES_GROUP_1);
+	if (CF) {
+		LJUMP(UpdateWarioStates_Group1);
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, WARIO_STATES_GROUP_2);
+	if (CF) {
+		// farcall UpdateWarioStates_Group2 / ret
+		FARCALL_RET(UpdateWarioStates_Group2, ADDR_UpdateWarioStates + 0x4c);
+		RET();
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, WARIO_STATES_GROUP_3);
+	if (CF) {
+		FARCALL_RET(UpdateWarioStates_Group3, ADDR_UpdateWarioStates + 0x3c);
+		RET();
+		return;
+	}
+	FARCALL_RET(UpdateWarioStates_Group4, ADDR_UpdateWarioStates + 0x2c);
+	RET();
+}
