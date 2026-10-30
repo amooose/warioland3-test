@@ -25,20 +25,14 @@ scripting and expansion on top. The approach:
 
 ## Current state
 
-- **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`. All
-  work is pushed and the tests are green.
-- **Progress (2026-10-29):** 2136 / 3491 routines (61.2%) and 60.5% of
-  the instructions are ported. Run `cmake --build build --target progress`
-  and read `build/progress.md` for the per-directory numbers and the
-  "ready to port" list.
-- **By area (instructions):**
-  - Fully ported: `src/audio` and the action help power-ups.
-  - Mostly ported: action help 89%, level objects 82%, `src/home` 73%.
-  - About half: the level engine 51% (30k instructions, the biggest gap)
-    and the overworld 41% (22k).
-  - Little: title 34%, clear 31%, pause 27%, save 16%.
-  - Not started: golf, credits, game over, perfect.
-- **Tests:** `ctest --test-dir build -j12` takes about 17 minutes, and the
+- **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`.
+- **Progress (2026-10-30):** about 96% of the routines and 97% of the
+  instructions are ported, including `VBlank`, `JumpTable` and
+  `HandleSound`. Ordinary porting is done: "Ready to port" only lists
+  routines that can't or needn't be ported (see "Good next batches"). Run
+  `cmake --build build --target progress` and read `build/progress.md` for
+  the per-directory numbers.
+- **Tests:** `ctest --test-dir build -j12` takes about 20-30 minutes, and the
   fuzz passes grow with every port, so run it in the background. It runs a
   difftest for each input in `tests/inputs/` and a fuzz pass split into 4
   shards (`fuzz_<input>_0` to `_3`, each fuzzing every 4th hook with
@@ -212,6 +206,29 @@ Four agents ported 512 routines at once this way:
   - in an untimed check, the asm servicing an interrupt that the routine
     itself enabled (`ei` with one pending). Atomic native code can't match
     that.
+  - code running from RAM, except the buffers the game builds code in on
+    purpose (`wVBlankFunc`, `wLCDFunc`, `wVBlankFuncExtended`), and those
+    only when entered the game's way: by the instruction the game enters
+    them with (or its routine's native version), then running on or
+    returned into from their own calls (`wram_code_ok` in cpu.c). Allowing
+    the buffers outright let fuzzed jumps count as real, and 18 checks
+    failed;
+  - a V-Blank or LCD interrupt serviced in a check: the handlers do real
+    work, at moments that differ between the native and the asm run;
+  - the asm running the routine's own address range with another bank
+    mapped, but only when ROMX code switched the bank under itself or a
+    `ret` came back with another bank than its `call` was made in. A
+    farcall into another bank's code at the same addresses is fine
+    (`Func_8086f` does that).
+- **Native recursion.** Under test, `gb_call_ret` stops (unrealistic) when
+  its push lands below `wStackBottom`, as the asm would overflow there.
+  Before this, a fuzzed jump table leading back into its caller nested
+  host stack frames until the host stack overflowed.
+- **Early stop.** Once a check is unrealistic the asm run stops (or never
+  starts when the native run already was), since the check can only be
+  inconclusive. This cut the cutscene dispatchers from minutes to seconds.
+  Likewise, when the native run never finishes, an asm run that finishes
+  only after turning unrealistic is inconclusive, not a FAIL.
 
 ## Open issues
 
@@ -236,11 +253,11 @@ Four agents ported 512 routines at once this way:
 2. **The fuzzer's step budget.** When the routine never runs on an input,
    the fuzzer makes up a call from the final state; if that call hangs (a
    wait for H-Blank with the LCD off), the seed hits `MAX_STEPS` and every
-   variant then gets 20 times that, so one routine runs for minutes. This
-   keeps `LoadActionHelpBGPals` and its callers
-   (`LoadActionHelpPalsWithWater`, `LoadActionHelpPalsWithoutWater`,
-   `Func_1e48bc`) in asm. Fix: cap the variants' budget when the seed hit
-   `MAX_STEPS` (difftest.c).
+   variant then gets 20 times that, so one routine runs for minutes.
+   `LoadActionHelpBGPals` (ported, and verified on the action help
+   recordings) still costs about 7 minutes on `boot_through_n1`, where its
+   synthetic seeds have the LCD off and nothing is checked. Fix: cap the
+   variants' budget when the seed never finished (difftest.c).
 3. **Coverage gaps.** `UpdateRoomAnimatedPals` (60/104: the palette copy
    loop only runs in levels with palette cycling), `MizzouProjectileFunc`
    (54/59), `SilkPlatformsFunc` (18/26), `TransitionAfterSave` (18/32),
@@ -250,28 +267,47 @@ Four agents ported 512 routines at once this way:
 
 ## Good next batches
 
-**State (2026-10-29):** all the unverified work from the 2026-10-27
-session is now verified and merged. That covers the level, overworld,
-misc, obj2 and obj3 `wip/*` branches. The `wip/*` branches on the remote
-are no longer needed. `HandFunc.Func_477f3` (once a FAIL) passes with no
-code change. The `Func_19741` failure was a bank return in the bottom
-collision code, and it's fixed.
+**State (2026-10-30):** porting is done apart from these, which stay in
+asm:
 
-In order:
+- `debug_nop` routines (an endless `jr`): `Func_b4001`,
+  `InvalidMusicBoxAction`, `Func_81e44`.
+- `PushOAM` and `hCallFuncPointer`: code and data copied to HRAM and run
+  there, never at their ROM addresses.
+- `Func_af01f` (unreferenced): its asm never gets past `DisableLCD` under
+  the fuzzer, even timed, so nothing would be verified.
 
-1. **Bank-return sweep.** Check the remaining `gb_call` / `gb_call_ret`
-   sites for a callee that can switch the ROM bank (see the pitfall
-   above).
-2. **Wario states** in the level engine. The top of "Ready to port" is
-   `SetState_Idling`, `WalkIfPossible_Right` / `_Left`, `SetState_Stung`
-   and `UpdateParticles`.
-3. **The overworld**, then the small screens: save, title, pause,
-   credits, game over.
+Routines with 0 passed checks on every input are verified by nothing. A
+2026-10-30 audit found 32. The harness changes above fixed 12 of them, and
+one (`Func_1c9cf9`) had been wrong since it was ported. The rest are:
 
-- **Not portable as is:** `EnableDoubleSpeed` (`stop`), `Func_81feb` (its
-  `debug_nop` path loops forever), and `ZombieFunc.OnUnderground` (its bank 6
-  collision callees sit inside its own address range, so every fuzz check is
-  inconclusive).
+- dispatchers that jump into their own states (`CutsceneNNFunc`,
+  `*OWFunc_VulcanoEruption`, `Func_9d6f0`), whose states are checked one
+  by one;
+- object `Init` code that falls into its own update code (`CoinFunc`,
+  `FireBotFunc.Init`, `HammerBotFunc.Init`, `SpearBotFunc.Init`,
+  `MadSciensteinFunc.Init`, `OmodonmekaFunc` and `.Func_42199`);
+- `Func_84b97.Func_84bad` and `EOWFunc_VulcanoEruption.Func_b774c`
+  (unrealistic on every seed);
+- `InitGolfHole` and `Func_84c0d.Init`, whose checks all see a V-Blank
+  interrupt (unrealistic since VBlank went native). `InitGolfHole` was
+  read against the asm, and its callees pass on their own.
+
+The audit after the last full ctest found 35, all in these groups.
+
+Rerun that audit after any batch: sum the passed column per routine over
+`build/Testing/Temporary/LastTest.log`.
+
+Next:
+
+1. **`ZombieFunc.OnUnderground`** was left in asm because its bank 6
+   callees sit inside its own address range. The narrower bank rule may
+   make it checkable now.
+2. **Recordings** of golf, the bosses (Yellow Belly, Shoot, Scowler,
+   Pesce, GKTortoise) and the overworld map events: those routines are
+   only checked with synthetic calls.
+3. The clean-up plan: per-frame golden traces, then dropping the
+   interpreter.
 - **Coverage gaps:** `CoinFunc.Update` real seeds are all inconclusive. The
   big state dispatchers (`AnonsterFunc.Func_5041d`, `DollBoyBarrelFunc.Main`)
   only reach about half their code with 200 variants. `--fuzz-variants 2000`
