@@ -1880,6 +1880,83 @@ static void sfx_advance(GB *gb, uint16_t sfx)
 
 PORT_JUMP(NOWFunc_Garlic) { JUMP_TO(ADDR_EndOWFunc); }
 
+PORT_JUMP(NOWFunc_MagicSeed) { ow_func_jumptable(gb, ADDR_NOWFunc_MagicSeed); }
+PORT_LOCAL_JUMP(NOWFunc_MagicSeed, Wait1) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(NOWFunc_MagicSeed, PlayFallSFX) { sfx_advance(gb, SFX_119); }
+PORT_LOCAL_JUMP(NOWFunc_MagicSeed, SeedFall)
+{
+	SET_HL(gb, wOWFuncCounter);
+	gb_call(gb, ADDR_GetSceneFallingYOffset);
+	SET_HL(gb, wSceneObj4YCoord);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, rd8(gb, wSceneObj4YCoord));
+	wr8(gb, wSceneObj4YCoord, gb->cpu.a);
+	alu_cp(gb, gb->cpu.a, 0x4c);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	set_obj_state_sfx_advance(gb, 0x08, wSceneObj4State, SFX_014);
+}
+PORT_LOCAL_JUMP(NOWFunc_MagicSeed, WaitSeedFall) { wait_obj_state(gb, wSceneObj4State, 0x09); }
+PORT_LOCAL_JUMP(NOWFunc_MagicSeed, Wait2) { wait_ow_func(gb, 30); }
+PORT_LOCAL_JUMP(NOWFunc_MagicSeed, GrowStalk) { set_obj_state_sfx_advance(gb, 0x0a, wSceneObj4State, SFX_11A); }
+PORT_LOCAL_JUMP(NOWFunc_MagicSeed, WaitGrowStalk) { wait_obj_state(gb, wSceneObj4State, 0x0b); }
+
+// NOWFunc_SummonSnake.MoveNotes
+static void move_notes(GB *gb, uint16_t flag)
+{
+	gb->cpu.a = rd8(gb, flag);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return;
+	SET_HL(gb, wSceneObj1XCoord);
+	wr8(gb, wSceneObj1XCoord, alu_dec(gb, rd8(gb, wSceneObj1XCoord)));
+	gb->cpu.a = alu_add(gb, rd8(gb, wSceneObj1XCoord), 0x18);
+	alu_cp(gb, gb->cpu.a, 0xf0);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, flag, 0);
+}
+
+PORT_JUMP(NOWFunc_SummonSnake)
+{
+	move_notes(gb, wSceneObj1Unk7);
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, ADDR_NOWFunc_SummonSnake + 7));
+}
+PORT_LOCAL_JUMP(NOWFunc_SummonSnake, Wait1) { wait_ow_func(gb, 8); }
+PORT_LOCAL_JUMP(NOWFunc_SummonSnake, PlayFluteSFX)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, wSceneObj1Unk7, gb->cpu.a);
+	sfx_advance(gb, SFX_118);
+}
+PORT_LOCAL_JUMP(NOWFunc_SummonSnake, WaitNotesAndShowSnake)
+{
+	SET_HL(gb, wSceneObj1XCoord);
+	gb->cpu.a = 0x25;
+	alu_cp(gb, gb->cpu.a, rd8(gb, wSceneObj1XCoord));
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	set_obj_state_sfx_advance(gb, 0x0c, wSceneObj2State, SFX_TEMPLE_ROCK);
+}
+// ld a, [wSceneObj2Frame] / cp n / ret nz / jp AdvanceOWFunc
+static void wait_obj2_frame(GB *gb, uint8_t n)
+{
+	gb->cpu.a = rd8(gb, wSceneObj2Frame);
+	alu_cp(gb, gb->cpu.a, n);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(NOWFunc_SummonSnake, WaitSnakeComeOut) { wait_obj2_frame(gb, 0x37); }
+PORT_LOCAL_JUMP(NOWFunc_SummonSnake, WaitSnakeComeIn) { wait_obj2_frame(gb, 0x35); }
+
 PORT_JUMP(NOWFunc_PlayMusicBox) { ow_func_jumptable(gb, ADDR_NOWFunc_PlayMusicBox); }
 PORT_LOCAL_JUMP(NOWFunc_PlayMusicBox, Wait1) { wait_ow_func(gb, 20); }
 PORT_LOCAL_JUMP(NOWFunc_PlayMusicBox, PlayMusicBox)
@@ -1889,6 +1966,101 @@ PORT_LOCAL_JUMP(NOWFunc_PlayMusicBox, PlayMusicBox)
 	sfx_advance(gb, (gb->cpu.f & FLAG_Z) ? SFX_122 : SFX_11F);
 }
 PORT_LOCAL_JUMP(NOWFunc_PlayMusicBox, Wait2) { wait_ow_func(gb, 254); }
+
+PORT_JUMP(NOWFunc_Crayon) { ow_func_jumptable(gb, ADDR_NOWFunc_Crayon); }
+PORT_LOCAL_JUMP(NOWFunc_Crayon, Wait1) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(NOWFunc_Crayon, Wait4) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(NOWFunc_Crayon, PlayFallSFX) { sfx_advance(gb, SFX_119); }
+PORT_LOCAL_JUMP(NOWFunc_Crayon, CrayonFall)
+{
+	SET_HL(gb, wOWFuncCounter);
+	gb_call(gb, ADDR_GetSceneFallingYOffset);
+	SET_HL(gb, wSceneObj5YCoord);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, rd8(gb, wSceneObj5YCoord));
+	wr8(gb, wSceneObj5YCoord, gb->cpu.a);
+	gb->cpu.c = gb->cpu.a;
+	gb->cpu.a = alu_add(gb, gb->cpu.a, (uint8_t)-6);
+	wr8(gb, wSceneObj1YCoord, gb->cpu.a);
+	gb->cpu.a = gb->cpu.c;
+	alu_cp(gb, gb->cpu.a, 0x40);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSceneObj1State, 0);
+	sfx_advance(gb, SFX_014);
+}
+PORT_LOCAL_JUMP(NOWFunc_Crayon, Wait2) { wait_ow_func(gb, 4); }
+PORT_LOCAL_JUMP(NOWFunc_Crayon, CrayonLift)
+{
+	gb->cpu.a = 0x1e;
+	SET_HL(gb, wSceneObj5State);
+	CALL(SetSceneObjState);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(NOWFunc_Crayon, WaitCrayonLift) { wait_obj_state(gb, wSceneObj5State, 0x20); }
+PORT_LOCAL_JUMP(NOWFunc_Crayon, Wait3) { wait_ow_func(gb, 10); }
+PORT_LOCAL_JUMP(NOWFunc_Crayon, Scribble)
+{
+	SET_DE(gb, ADDR_Data_b6294);
+	SET_HL(gb, wSceneObj5);
+	CALL(ApplyOWMovement);
+	gb->cpu.a = rd8(gb, wSceneObj5Unk7);
+	alu_cp(gb, gb->cpu.a, 0x0a);
+	if (gb->cpu.f & FLAG_Z) {
+		play_sfx(gb, SFX_12D);
+		RET();
+		return;
+	}
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(NOWFunc_Crayon, AdvanceIfCollectedAllCrayons)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wCrayonFlags), ALL_CRAYONS);
+	alu_cp(gb, gb->cpu.a, ALL_CRAYONS);
+	if (gb->cpu.f & FLAG_Z) {
+		JUMP_TO(ADDR_AdvanceOWFunc);
+		return;
+	}
+	gb->cpu.a = 0x0c;
+	wr8(gb, w2d062, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wOWFuncCounter, 0);
+	RET();
+}
+PORT_LOCAL_JUMP(NOWFunc_Crayon, LoadNewOWPal)
+{
+	SET_HL(gb, wTempPals1);
+	SET_DE(gb, wTempBGPals);
+	gb->cpu.b = 8 * PAL_SIZE;
+	CALL(CopyHLToDE);
+	SET_HL(gb, ADDR_Pals_84500);
+	SET_DE(gb, wTempPals1);
+	gb->cpu.c = 8 * PAL_SIZE;
+	gb->cpu.b = BANK_Pals_84500;
+	CALL(CopyFarBytes);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wPalConfig1TotalSteps, 0);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(NOWFunc_Crayon, FadePal)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wOWFuncCounter), 7);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	gb_call(gb, ADDR_Func_b587d);
+	RET();
+}
 
 PORT_JUMP(WOWFunc_ElevatorWorking) { ow_func_jumptable(gb, ADDR_WOWFunc_ElevatorWorking); }
 PORT_LOCAL_JUMP(WOWFunc_ElevatorWorking, Wait1) { wait_ow_func(gb, 20); }
@@ -1901,11 +2073,188 @@ PORT_LOCAL_JUMP(WOWFunc_ElevatorWorking, SetElevatorWorking)
 }
 PORT_LOCAL_JUMP(WOWFunc_ElevatorWorking, Wait2) { wait_ow_func(gb, 200); }
 
+// MagicSeed .SeedFall: obj 4 falls until y >= limit, then gets state
+static void seed_fall(GB *gb, uint8_t limit, uint8_t state)
+{
+	SET_HL(gb, wOWFuncCounter);
+	gb_call(gb, ADDR_GetSceneFallingYOffset);
+	SET_HL(gb, wSceneObj4YCoord);
+	gb->cpu.a = alu_add(gb, gb->cpu.a, rd8(gb, wSceneObj4YCoord));
+	wr8(gb, wSceneObj4YCoord, gb->cpu.a);
+	alu_cp(gb, gb->cpu.a, limit);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	set_obj_state_sfx_advance(gb, state, wSceneObj4State, SFX_014);
+}
+
+PORT_JUMP(WOWFunc_MagicSeed) { ow_func_jumptable(gb, ADDR_WOWFunc_MagicSeed); }
+PORT_LOCAL_JUMP(WOWFunc_MagicSeed, Wait1) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(WOWFunc_MagicSeed, PlayFallSFX) { sfx_advance(gb, SFX_119); }
+PORT_LOCAL_JUMP(WOWFunc_MagicSeed, SeedFall) { seed_fall(gb, 0x5b, 0x0b); }
+PORT_LOCAL_JUMP(WOWFunc_MagicSeed, WaitSeedFall) { wait_obj_state(gb, wSceneObj4State, 0x0c); }
+PORT_LOCAL_JUMP(WOWFunc_MagicSeed, Wait2) { wait_ow_func(gb, 30); }
+PORT_LOCAL_JUMP(WOWFunc_MagicSeed, GrowStalk) { set_obj_state_sfx_advance(gb, 0x0d, wSceneObj4State, SFX_11A); }
+PORT_LOCAL_JUMP(WOWFunc_MagicSeed, WaitGrowStalk) { wait_obj_state(gb, wSceneObj4State, 0x0e); }
+
+// .WaitNotesAndShowSnake: once obj 1 is at x, sets the snake's state
+static void wait_notes_show_snake(GB *gb, uint8_t x, uint8_t state, uint16_t obj_state)
+{
+	SET_HL(gb, wSceneObj1XCoord);
+	gb->cpu.a = x;
+	alu_cp(gb, gb->cpu.a, rd8(gb, wSceneObj1XCoord));
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	set_obj_state_sfx_advance(gb, state, obj_state, SFX_TEMPLE_ROCK);
+}
+
+// ld a, [addr] / cp n / ret nz / jp AdvanceOWFunc
+static void wait_value(GB *gb, uint16_t addr, uint8_t n)
+{
+	gb->cpu.a = rd8(gb, addr);
+	alu_cp(gb, gb->cpu.a, n);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
+// .PlayFluteSFX
+static void play_flute_sfx(GB *gb, uint16_t flag)
+{
+	gb->cpu.a = 0x01;
+	wr8(gb, flag, gb->cpu.a);
+	sfx_advance(gb, SFX_118);
+}
+
+PORT_JUMP(WOWFunc_SummonSnake)
+{
+	move_notes(gb, wSceneObj1Unk7); // .MoveNotes
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, ADDR_WOWFunc_SummonSnake + 7));
+}
+PORT_LOCAL_JUMP(WOWFunc_SummonSnake, Wait1) { wait_ow_func(gb, 8); }
+PORT_LOCAL_JUMP(WOWFunc_SummonSnake, PlayFluteSFX) { play_flute_sfx(gb, wSceneObj1Unk7); }
+PORT_LOCAL_JUMP(WOWFunc_SummonSnake, WaitNotesAndShowSnake) { wait_notes_show_snake(gb, 0x26, 0x0f, wSceneObj5State); }
+PORT_LOCAL_JUMP(WOWFunc_SummonSnake, WaitSnakeComeOut) { wait_value(gb, wSceneObj5Frame, 0x0a); }
+
+PORT_JUMP(SOWFunc_MagicSeed) { ow_func_jumptable(gb, ADDR_SOWFunc_MagicSeed); }
+PORT_LOCAL_JUMP(SOWFunc_MagicSeed, Wait1) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(SOWFunc_MagicSeed, PlayFallSFX) { sfx_advance(gb, SFX_119); }
+PORT_LOCAL_JUMP(SOWFunc_MagicSeed, SeedFall) { seed_fall(gb, 0x56, 0x06); }
+PORT_LOCAL_JUMP(SOWFunc_MagicSeed, WaitSeedFall) { wait_obj_state(gb, wSceneObj4State, 0x03); }
+PORT_LOCAL_JUMP(SOWFunc_MagicSeed, Wait2) { wait_ow_func(gb, 30); }
+PORT_LOCAL_JUMP(SOWFunc_MagicSeed, GrowStalk) { set_obj_state_sfx_advance(gb, 0x02, wSceneObj4State, SFX_11A); }
+PORT_LOCAL_JUMP(SOWFunc_MagicSeed, WaitGrowStalk) { wait_obj_state(gb, wSceneObj4State, 0x01); }
+
+PORT_JUMP(SOWFunc_YellowMusicBox) { ow_func_jumptable(gb, ADDR_SOWFunc_YellowMusicBox); }
+PORT_LOCAL_JUMP(SOWFunc_YellowMusicBox, Wait1) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(SOWFunc_YellowMusicBox, Wait2) { wait_ow_func(gb, 40); }
+PORT_LOCAL_JUMP(SOWFunc_YellowMusicBox, PlayMusicBoxSFX) { sfx_advance(gb, SFX_11E); }
+PORT_LOCAL_JUMP(SOWFunc_YellowMusicBox, WaitMusic) { wait_ow_func(gb, 254); }
+PORT_LOCAL_JUMP(SOWFunc_YellowMusicBox, LowerBridge)
+{
+	play_sfx(gb, SFX_123);
+	gb->cpu.a = 0x08;
+	SET_HL(gb, wSceneObj6State);
+	CALL(SetSceneObjState);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(SOWFunc_YellowMusicBox, ShowLoweredBridge) { wait_obj_state(gb, wSceneObj6State, 0x09); }
+
+PORT_JUMP(SOWFunc_SummonSnake)
+{
+	move_notes(gb, wSceneObj7Unk7); // .MoveNotes
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, ADDR_SOWFunc_SummonSnake + 7));
+}
+PORT_LOCAL_JUMP(SOWFunc_SummonSnake, Wait1) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(SOWFunc_SummonSnake, PlayFluteSFX) { play_flute_sfx(gb, wSceneObj7Unk7); }
+PORT_LOCAL_JUMP(SOWFunc_SummonSnake, WaitNotesAndShowSnake) { wait_notes_show_snake(gb, 0x08, 0x13, wSceneObj7State); }
+PORT_LOCAL_JUMP(SOWFunc_SummonSnake, WaitSnakeComeOut) { wait_value(gb, wSceneObj7Frame, 0x31); }
+
+PORT_JUMP(SOWFunc_GreenMusicBox) { ow_func_jumptable(gb, ADDR_SOWFunc_GreenMusicBox); }
+PORT_LOCAL_JUMP(SOWFunc_GreenMusicBox, Wait1) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(SOWFunc_GreenMusicBox, Wait2) { wait_ow_func(gb, 40); }
+PORT_LOCAL_JUMP(SOWFunc_GreenMusicBox, PlayMusicBoxSFX) { sfx_advance(gb, SFX_120); }
+PORT_LOCAL_JUMP(SOWFunc_GreenMusicBox, WaitMusic) { wait_ow_func(gb, 254); }
+PORT_LOCAL_JUMP(SOWFunc_GreenMusicBox, BlowUpCave)
+{
+	SET_HL(gb, ADDR_Data_8560e);
+	gb_call(gb, ADDR_Func_b5868);
+	set_obj_state_sfx_advance(gb, 0x1b, wSceneObj2State, SFX_129);
+}
+PORT_LOCAL_JUMP(SOWFunc_GreenMusicBox, HideSmoke)
+{
+	SET_HL(gb, wSceneObj2State);
+	JUMP_TO(ADDR_WaitOWObjDisappear);
+}
+
+PORT_JUMP(SOWFunc_FullMoon) { ow_func_jumptable(gb, ADDR_SOWFunc_FullMoon); }
+PORT_LOCAL_JUMP(SOWFunc_FullMoon, Wait1) { wait_ow_func(gb, 40); }
+PORT_LOCAL_JUMP(SOWFunc_FullMoon, Wait3) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(SOWFunc_FullMoon, PlayGongSFX) { sfx_advance(gb, SFX_105); }
+PORT_LOCAL_JUMP(SOWFunc_FullMoon, Wait2) { wait_ow_func(gb, 30); }
+PORT_LOCAL_JUMP(SOWFunc_FullMoon, MoveMoon)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wGlobalCounter), 0x07);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	wr8(gb, wSceneObj14, alu_dec(gb, rd8(gb, wSceneObj14)));
+	SET_HL(gb, wSceneObj14);
+	gb->cpu.l = alu_inc(gb, gb->cpu.l);
+	uint16_t hl = REG_HL(gb);
+	wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
+	gb->cpu.a = rd8(gb, hl);
+	alu_cp(gb, gb->cpu.a, 0x7b);
+	if (gb->cpu.f & FLAG_Z) {
+		play_sfx(gb, SFX_11A);
+		RET();
+		return;
+	}
+	alu_cp(gb, gb->cpu.a, 0x80);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
 PORT_JUMP(EOWFunc_ShowWarpedVoid) { ow_func_jumptable(gb, ADDR_EOWFunc_ShowWarpedVoid); }
 PORT_LOCAL_JUMP(EOWFunc_ShowWarpedVoid, Func_b786d) { wait_ow_func(gb, 60); }
 PORT_LOCAL_JUMP(EOWFunc_ShowWarpedVoid, Func_b7872) { wait_ow_func(gb, 160); }
 PORT_LOCAL_JUMP(EOWFunc_ShowWarpedVoid, Func_b7877) { set_obj_state_sfx_advance(gb, 0x1b, wSceneObj5State, SFX_128); }
 PORT_LOCAL_JUMP(EOWFunc_ShowWarpedVoid, Func_b788a) { wait_obj_state(gb, wSceneObj5State, 0x19); }
+
+PORT_JUMP(EOWFunc_RaisePipe) { ow_func_jumptable(gb, ADDR_EOWFunc_RaisePipe); }
+PORT_LOCAL_JUMP(EOWFunc_RaisePipe, Func_b78aa) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(EOWFunc_RaisePipe, Func_b78af) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(EOWFunc_RaisePipe, Func_b78b4)
+{
+	gb->cpu.a = 0x37;
+	wr8(gb, wSceneObj8, gb->cpu.a);
+	gb->cpu.a = 0x1d;
+	SET_HL(gb, wSceneObj8State);
+	CALL(SetSceneObjState);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(EOWFunc_RaisePipe, Func_b78c4)
+{
+	gb->cpu.a = rd8(gb, wOWFuncCounter);
+	alu_cp(gb, gb->cpu.a, 0x10);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	sfx_advance(gb, SFX_FAT_WALK);
+}
+PORT_LOCAL_JUMP(EOWFunc_RaisePipe, Func_b78d5) { wait_obj_state(gb, wSceneObj8State, 0x1c); }
 
 // ld a, [addr] / and a: true if nonzero
 static bool nonzero(GB *gb, uint16_t addr)
@@ -2354,11 +2703,152 @@ PORT(Func_b69a6)
 	SET_HL(gb, hl);
 }
 
+PORT_JUMP(WOWFunc_RedMusicBox)
+{
+	// .Func_b608a
+	SET_HL(gb, wSceneObj6Unk7);
+	if (nonzero(gb, wSceneObj6Unk7)) {
+		alu_cp(gb, gb->cpu.a, 0x01);
+		if (gb->cpu.f & FLAG_Z)
+			play_sfx(gb, SFX_076);
+		wr8(gb, wSceneObj6Unk7, alu_inc(gb, rd8(gb, wSceneObj6Unk7)));
+		gb->cpu.a = rd8(gb, wSceneObj6Unk7);
+		alu_cp(gb, gb->cpu.a, 0x1b);
+		if (!(gb->cpu.f & FLAG_C)) {
+			gb->cpu.a = 0x01;
+			wr8(gb, wSceneObj6Unk7, gb->cpu.a);
+		}
+	}
+	gb->cpu.a = rd8(gb, w2d062);
+	JUMP_TO(jumptable(gb, ADDR_WOWFunc_RedMusicBox + 7));
+}
+PORT_LOCAL_JUMP(WOWFunc_RedMusicBox, Wait1) { wait_ow_func(gb, 20); }
+PORT_LOCAL_JUMP(WOWFunc_RedMusicBox, Func_b60aa) { sfx_advance(gb, SFX_121); }
+PORT_LOCAL_JUMP(WOWFunc_RedMusicBox, Func_b60b5) { wait_ow_func(gb, 254); }
+PORT_LOCAL_JUMP(WOWFunc_RedMusicBox, Func_b60ba)
+{
+	set_state(gb, 0x20, wSceneObj6State);
+	SET_HL(gb, ADDR_Data_8556e);
+	gb_call(gb, ADDR_Func_b5868);
+	gb->cpu.a = 0x01;
+	wr8(gb, wSceneObj6Unk7, gb->cpu.a);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(WOWFunc_RedMusicBox, Func_b60d0) { wait_ow_func(gb, 23); }
+PORT_LOCAL_JUMP(WOWFunc_RedMusicBox, Func_b60d5)
+{
+	set_state(gb, 0x21, wSceneObj6State);
+	SET_HL(gb, wSceneObj6);
+	wr8(gb, wSceneObj6, alu_dec(gb, rd8(gb, wSceneObj6)));
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(WOWFunc_RedMusicBox, Func_b60e4) { wait_ow_func(gb, 10); }
+PORT_LOCAL_JUMP(WOWFunc_RedMusicBox, Func_b60e9)
+{
+	set_state(gb, 0x22, wSceneObj6State);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(WOWFunc_RedMusicBox, Func_b60f4)
+{
+	gb->cpu.a = rd8(gb, wOWFuncCounter);
+	alu_cp(gb, gb->cpu.a, 106);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wSceneObj6Unk7, 0);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+
 // unreferenced
 PORT_JUMP(Func_b5849)
 {
 	gb->cpu.a = 4;
 	JUMP_TO(ADDR_WaitOWFunc); // fallthrough
+}
+
+PORT_JUMP(NOWFunc_BottomBar) { ow_func_jumptable(gb, ADDR_NOWFunc_BottomBar); }
+PORT_LOCAL_JUMP(NOWFunc_BottomBar, Wait1) { wait_ow_func(gb, 40); }
+PORT_LOCAL_JUMP(NOWFunc_BottomBar, Wait4) { wait_ow_func(gb, 60); }
+PORT_LOCAL_JUMP(NOWFunc_BottomBar, LoadBottomBarPal)
+{
+	SET_HL(gb, ADDR_Pals_84000 + 7 * PAL_SIZE);
+	SET_DE(gb, wTempPals1 + 7 * PAL_SIZE);
+	gb->cpu.b = BANK_Pals_84000;
+	gb->cpu.c = 1 * PAL_SIZE;
+	CALL(CopyFarBytes);
+	wr8(gb, wPalConfig1 + 0, (uint8_t)rBGPI);
+	wr8(gb, wPalConfig1 + 1, BGPI_AUTOINC | (7 * PAL_SIZE));
+	wr8(gb, wPalConfig1 + 2, 1);
+	wr8(gb, wPalConfig1 + 3, (uint8_t)((wTempPals1 + 7 * PAL_SIZE) >> 8));
+	gb->cpu.a = (uint8_t)(wTempPals1 + 7 * PAL_SIZE);
+	wr8(gb, wPalConfig1 + 4, gb->cpu.a);
+	SET_HL(gb, wPalConfig1 + 5);
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(NOWFunc_BottomBar, RaiseBBtnIndicator)
+{
+	gb->cpu.a = alu_and(gb, rd8(gb, wOWFuncCounter), 0x01);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	SET_HL(gb, wSceneObj1);
+	wr8(gb, wSceneObj1, alu_dec(gb, rd8(gb, wSceneObj1)));
+	gb->cpu.a = rd8(gb, wSceneObj1);
+	alu_cp(gb, gb->cpu.a, 0x94);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	sfx_advance(gb, SFX_113);
+}
+PORT_LOCAL_JUMP(NOWFunc_BottomBar, Wait2) { wait_ow_func(gb, 45); }
+PORT_LOCAL_JUMP(NOWFunc_BottomBar, BlinkBBtnIndicator)
+{
+	gb->cpu.a = rd8(gb, wOWFuncCounter);
+	gb->cpu.b = gb->cpu.a;
+	bool z = !alu_bit(gb, gb->cpu.a, 3);
+	gb->cpu.a = z ? 0x22 : 0x23;
+	wr8(gb, wSceneObj1State, gb->cpu.a);
+	gb->cpu.a = 47;
+	alu_cp(gb, gb->cpu.a, gb->cpu.b);
+	if (!(gb->cpu.f & FLAG_C)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
+}
+PORT_LOCAL_JUMP(NOWFunc_BottomBar, StartOpenBottomBar)
+{
+	gb->cpu.a = rd8(gb, wOWFuncCounter);
+	alu_cp(gb, gb->cpu.a, 45);
+	if (gb->cpu.f & FLAG_C) {
+		RET();
+		return;
+	}
+	gb->cpu.a = 0x23;
+	wr8(gb, wSceneObj1State, gb->cpu.a);
+	sfx_advance(gb, SFX_113);
+}
+PORT_LOCAL_JUMP(NOWFunc_BottomBar, Wait3) { wait_ow_func(gb, 10); }
+PORT_LOCAL_JUMP(NOWFunc_BottomBar, OpenBottomBar)
+{
+	bump(gb, wWY, -1);
+	gb->cpu.a = rd8(gb, wWY);
+	bump(gb, wSceneObj1, -1);
+	bump(gb, wSceneObj5YCoord, -1);
+	bump(gb, wSceneObj8YCoord, -1);
+	bump(gb, wSceneObj9YCoord, -1);
+	bump(gb, wSceneObj10YCoord, -1);
+	alu_cp(gb, gb->cpu.a, 0x78);
+	if (!(gb->cpu.f & FLAG_Z)) {
+		RET();
+		return;
+	}
+	JUMP_TO(ADDR_AdvanceOWFunc);
 }
 
 #define SOBJ_X (wSceneObj6XCoord - wSceneObj6)
