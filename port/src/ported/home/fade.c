@@ -266,3 +266,86 @@ PORT(SlowFadeInScreen)
 	fade_to_pals1(gb, move_towards);
 	fade_end(gb, false);
 }
+
+// The end of Func_54e / Func_7cf: like fade_end(gb, false), but wFadeSpeed
+// is left alone.
+static void fade_end_unref(GB *gb)
+{
+	SET_HL(gb, wPalFadeCounter);
+	uint8_t counter = alu_inc(gb, rd8(gb, wPalFadeCounter));
+	wr8(gb, wPalFadeCounter, counter);
+	gb->cpu.a = counter;
+	alu_cp(gb, counter, 0x21);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.ime = false; // di
+	SET_HL(gb, wBackupVBlankFunc);
+	SET_DE(gb, wVBlankFunc);
+	gb->cpu.b = 3;
+	CALL(CopyHLToDE);
+	gb->cpu.ime = true; // ei
+	gb->cpu.ime_delay = 0;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wPalFadeCounter, 0);
+	wr8(gb, wUnused_c186, 0);
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}
+
+// unreferenced: darkens wTempBGPals (and wTempOBPals) by 1 per component
+// and frame, down to 0, in 33 frames
+PORT(Func_54e)
+{
+	if (!fade_begin(gb))
+		return;
+	uint8_t e = (uint8_t)wTempBGPals; // inc e / dec e never carry into d
+	for (int i = 0; i < 8 * PAL_SIZE; i++) {
+		uint16_t lo = (uint16_t)((wTempBGPals & 0xff00) | e);
+		uint16_t hi = (uint16_t)((wTempBGPals & 0xff00) | (uint8_t)(e + 1));
+		unpack_rgb(gb, lo, hi, wCurRGB);
+		for (int c = 2; c >= 0; c--) {
+			uint8_t v = rd8(gb, wCurRGB + c);
+			gb->cpu.a = alu_and(gb, v, v);
+			if (v)
+				wr8(gb, wCurRGB + c, alu_dec(gb, v));
+		}
+		pack_cur_rgb(gb, lo, hi);
+		e = (uint8_t)(e + 2);
+	}
+	gb->cpu.b = 0;
+	gb->cpu.d = (uint8_t)(wTempBGPals >> 8);
+	gb->cpu.e = e;
+	fade_end_unref(gb);
+}
+
+// unreferenced: raises each component of wTempBGPals (and wTempOBPals) by 1
+// per frame until it equals wTempPals1's, in 33 frames
+PORT(Func_7cf)
+{
+	if (!fade_begin(gb))
+		return;
+	uint8_t e = (uint8_t)wTempPals1; // inc e / dec e never carry into d
+	for (int i = 0; i < 0x40; i++) {
+		uint16_t target = (uint16_t)(0xc000 | e);
+		uint16_t target_hi = (uint16_t)(0xc000 | (uint8_t)(e + 1));
+		uint16_t cur = (uint16_t)(0xc100 | e);
+		uint16_t cur_hi = (uint16_t)(0xc100 | (uint8_t)(e + 1));
+		unpack_rgb(gb, target, target_hi, wTargetRGB);
+		unpack_rgb(gb, cur, cur_hi, wCurRGB);
+		for (int c = 2; c >= 0; c--) {
+			gb->cpu.c = rd8(gb, wTargetRGB + c);
+			uint8_t v = rd8(gb, wCurRGB + c);
+			gb->cpu.a = v;
+			alu_cp(gb, v, gb->cpu.c);
+			if (!(gb->cpu.f & FLAG_Z))
+				wr8(gb, wCurRGB + c, alu_inc(gb, v));
+		}
+		pack_cur_rgb(gb, cur, cur_hi);
+		e = (uint8_t)(e + 2);
+	}
+	gb->cpu.b = 0;
+	gb->cpu.d = 0xc0;
+	gb->cpu.e = e;
+	fade_end_unref(gb);
+}

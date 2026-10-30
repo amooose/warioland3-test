@@ -449,3 +449,69 @@ PORT_JUMP(Func_1c86dd)
 	}
 	JUMP_TO(ADDR_Func_1c9fae); // same bank
 }
+
+PORT(Func_1c8586)
+{
+	CALL(DisableLCD);
+	CALL(ClearVirtualOAM);
+	gb->cpu.a = 0x08;
+	wr8(gb, wAnimatedTilesFrameDuration, 0x08);
+	gb->cpu.a = 0x0f;
+	wr8(gb, wAnimatedTilesGfx, 0x0f);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wAnimatedTilesFrameCount, 0);
+	wr8(gb, wAnimatedTilesFrame, 0);
+	gb->cpu.a = alu_inc(gb, gb->cpu.a);
+	wr8(gb, wRoomAnimatedTilesEnabled, gb->cpu.a);
+	gb->cpu.a = alu_and(gb, rd8(gb, w1d800), rd8(gb, w1d800));
+	if (gb->cpu.f & FLAG_Z)
+		CALL(SaveBackupVRAM);
+
+	gb->cpu.a = alu_and(gb, rd8(gb, wGolfMenuOption), rd8(gb, wGolfMenuOption));
+	if (!gb->cpu.a) {
+		gb->cpu.a = 0x01;
+		wr8(gb, w1d800, 0x01);
+	}
+
+	// .asm_1c85b3: clear all Golf RAM starting from wPredeterminedGolfHole onwards
+	uint16_t hl = wPredeterminedGolfHole;
+	for (uint16_t bc = 0x800 - (wPredeterminedGolfHole - 0xd800); bc; bc--)
+		wr8(gb, hl++, 0);
+	SET_HL(gb, hl);
+	SET_BC(gb, 0);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // or c
+
+	CALL(CheckHasAllMusicalCoinFlags);
+	wr8(gb, wHasAllMusicalCoinFlags, gb->cpu.a);
+
+	gb_call(gb, ADDR_Func_1c8604);
+	SET_HL(gb, w1db00);
+	CALL(LoadPalsToTempPals1);
+	SET_HL(gb, ADDR_Pals_1ca34f);
+	CALL(LoadPalsToTempPals2);
+
+	gb->cpu.a = rd8(gb, wNumCoins + 0);
+	wr8(gb, wGolfNumCoins + 0, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wNumCoins + 1);
+	wr8(gb, wGolfNumCoins + 1, gb->cpu.a);
+
+	gb_call(gb, ADDR_Func_1c86f8);
+	gb_call(gb, ADDR_Func_1c9fae);
+
+	SET_BC(gb, MUSIC_GOLF_LOBBY);
+	CALL(PlayNewMusic);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rSCY, 0);
+	wr8(gb, wSCY, 0);
+	gb->cpu.a = rd8(gb, wGolfMenuTargetSCX);
+	wr8(gb, rSCX, gb->cpu.a);
+	wr8(gb, wSCX, gb->cpu.a);
+	gb->cpu.a = LCDC_DEFAULT;
+	wr8(gb, rLCDC, gb->cpu.a);
+	SET_HL(gb, wSubState);
+	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
+}
