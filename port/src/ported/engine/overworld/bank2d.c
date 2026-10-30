@@ -3586,3 +3586,61 @@ PORT_LOCAL_JUMP(EOWFunc_Explosives, Func_b6dcd)
 	}
 	JUMP_TO(ADDR_AdvanceOWFunc);
 }
+
+// Frameset setters reached through the Func_b4ba2 / Func_b4ccb jumptables
+PORT_JUMP(Func_b4be9) { SET_DE(gb, ADDR_Frameset_a9e61); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4bee) { SET_DE(gb, ADDR_Frameset_a9e72); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4bf3) { SET_DE(gb, ADDR_Frameset_a9e75); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4bf8) { SET_DE(gb, ADDR_Frameset_a9e94); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c02) { SET_DE(gb, ADDR_Frameset_a9e8c); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c07) { SET_DE(gb, ADDR_Frameset_a9e91); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c16) { SET_DE(gb, ADDR_Frameset_a9ed3); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c25) { SET_DE(gb, ADDR_Frameset_a9ef1); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c2a) { SET_DE(gb, ADDR_Frameset_a9ee3); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c39) { SET_DE(gb, ADDR_Frameset_a9efd); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c3e) { SET_DE(gb, ADDR_Frameset_a9ee0); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c43) { SET_DE(gb, ADDR_Frameset_a9f02); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c48) { SET_DE(gb, ADDR_Frameset_a9f0d); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c4d) { SET_DE(gb, ADDR_Frameset_a9ecd); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c52) { SET_DE(gb, ADDR_Frameset_a9ed0); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c6d) { SET_DE(gb, ADDR_Frameset_a9eaa); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c72) { SET_DE(gb, ADDR_Frameset_a9eb3); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c77) { SET_DE(gb, ADDR_Frameset_a9ebc); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c7c) { SET_DE(gb, ADDR_Frameset_a9ec5); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c86) { SET_DE(gb, ADDR_Frameset_a9f36); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4c9f) { SET_DE(gb, ADDR_Frameset_a9fa7); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4cae) { SET_DE(gb, ADDR_Frameset_a9fc9); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4cb3) { SET_DE(gb, ADDR_Frameset_a9fbb); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4cb8) { SET_DE(gb, ADDR_Frameset_a9fc2); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4cbd) { SET_DE(gb, ADDR_Frameset_a9fdf); JUMP_TO(ADDR_Func_b4c57); }
+PORT_JUMP(Func_b4d0e) { SET_DE(gb, ADDR_Frameset_a96c0); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d1f) { SET_DE(gb, ADDR_Frameset_a967d); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d25) { SET_DE(gb, ADDR_Frameset_a9680); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d2b) { SET_DE(gb, ADDR_Frameset_a9674); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d3c) { SET_DE(gb, ADDR_Frameset_a96af); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d4b) { SET_DE(gb, ADDR_Frameset_a96bd); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d50) { SET_DE(gb, ADDR_Frameset_a96d1); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d55) { SET_DE(gb, ADDR_Frameset_a969a); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d5a) { SET_DE(gb, ADDR_Frameset_a96a3); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d5f) { SET_DE(gb, ADDR_Frameset_a96a6); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d64) { SET_DE(gb, ADDR_Frameset_a96a9); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d69) { SET_DE(gb, ADDR_Frameset_a96ac); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d6e) { SET_DE(gb, ADDR_Frameset_a96d8); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d91) { SET_DE(gb, ADDR_Frameset_a979f); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4d96) { SET_DE(gb, ADDR_Frameset_a97a2); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4db6) { SET_DE(gb, ADDR_Frameset_a97e1); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4dbb) { SET_DE(gb, ADDR_Frameset_a97ec); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4df1) { SET_DE(gb, ADDR_Frameset_a97fe); JUMP_TO(ADDR_Func_b4da0); }
+PORT_JUMP(Func_b4df6) { SET_DE(gb, ADDR_Frameset_a9803); JUMP_TO(ADDR_Func_b4da0); }
+
+PORT_JUMP(Func_b7b61)
+{
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	JUMP_TO(jumptable(gb, ADDR_Func_b7b61 + 2));
+}
+
+PORT_JUMP(Func_b7c18)
+{
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+	JUMP_TO(jumptable(gb, ADDR_Func_b7c18 + 2));
+}
