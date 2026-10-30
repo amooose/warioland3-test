@@ -501,6 +501,11 @@ static int exec(GB *gb)
 		return 16;
 	case 0xe9:
 		PC = REG_HL(gb);
+		// Every computed jump the game makes (jump tables, update
+		// pointers) goes to a label: one to the middle of a routine, or of
+		// an instruction, comes from a fuzzed pointer.
+		if (gb->test.active && PC < 0x8000 && !sym_is_rom_label(gb->rom_bank, PC))
+			gb->test.unrealistic = true;
 		return 4;
 	// call
 	case 0xc4: case 0xcc: case 0xd4: case 0xdc:

@@ -97,10 +97,28 @@ const char *sym_name_at(int bank, uint16_t addr)
 	return best ? best->name : NULL;
 }
 
+static uint8_t *label_bitmap; // one bit per ROM byte: a label starts there
+
+bool sym_is_rom_label(int bank, uint16_t addr)
+{
+	if (!label_bitmap || addr >= 0x8000)
+		return false;
+	size_t off = rom_offset(addr < 0x4000 ? 0 : bank, addr);
+	return off / 8 < hook_bitmap_bytes && (label_bitmap[off / 8] & (1 << (off % 8)));
+}
+
 void hooks_init(GB *gb)
 {
 	hook_bitmap_bytes = gb->rom_size / 8 + 1;
 	hook_bitmap = calloc(hook_bitmap_bytes, 1);
+	label_bitmap = calloc(hook_bitmap_bytes, 1);
+	for (int i = 0; i < nsyms; i++) {
+		if (syms[i].addr >= 0x8000)
+			continue;
+		size_t off = rom_offset(syms[i].addr < 0x4000 ? 0 : syms[i].bank, syms[i].addr);
+		if (off / 8 < hook_bitmap_bytes)
+			label_bitmap[off / 8] |= (uint8_t)(1 << (off % 8));
+	}
 	for (int i = 0; i < nhooks; i++) {
 		size_t off = rom_offset(hooks[i].bank, hooks[i].addr);
 		hook_bitmap[off / 8] |= (uint8_t)(1 << (off % 8));

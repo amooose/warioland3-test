@@ -37,6 +37,8 @@ bool sym_load(const char *path);
 bool sym_lookup(const char *name, int *bank, uint16_t *addr);
 // Name of the label at or before an address (for debugging); NULL if none.
 const char *sym_name_at(int bank, uint16_t addr);
+// Whether a label (global or local) starts at this ROM address.
+bool sym_is_rom_label(int bank, uint16_t addr);
 
 // Global (non-local) ROM labels, for coverage reports.
 int sym_count(void);
