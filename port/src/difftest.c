@@ -170,24 +170,70 @@ static void native_out_of_budget(GB *gb)
 static long asm_step_limit = MAX_STEPS, asm_steps_taken;
 
 // The routine being checked, in its bank: its own code running with another
-// bank mapped means the asm is executing garbage.
+// bank mapped means the asm is executing garbage (a fuzzed bank number
+// restored before a ret, say). Other banks' code at the same addresses,
+// reached the normal way (a farcall that switched the bank in ROM0 and
+// called it), is fine.
 static int body_bank;
 static uint16_t body_start, body_end;
+
+// The ROM bank mapped when each return address on the WRAM stack was pushed
+// by the asm run, valid when push_gen matches asm_gen.
+static uint16_t push_bank[0x2000];
+static uint32_t push_gen[0x2000], asm_gen;
+
+static uint8_t rom_opcode(const GB *gb, uint16_t at)
+{
+	if (at < 0x4000)
+		return gb->rom[at];
+	if (at < 0x8000)
+		return gb->rom[(size_t)(gb->rom_bank % gb->rom_banks) * 0x4000 + (at - 0x4000)];
+	return 0x00; // code in RAM: not tracked
+}
+
+static bool is_call(uint8_t op)
+{
+	return op == 0xcd || op == 0xc4 || op == 0xcc || op == 0xd4 || op == 0xdc || (op & 0xc7) == 0xc7;
+}
+
+static bool is_ret(uint8_t op)
+{
+	return op == 0xc9 || op == 0xd9 || op == 0xc0 || op == 0xc8 || op == 0xd0 || op == 0xd8;
+}
 
 static bool run_asm_until(GB *gb, uint16_t pc, uint16_t sp, uint16_t entry_sp, bool *left)
 {
 	*left = false;
+	asm_gen++;
 	for (asm_steps_taken = 0; asm_steps_taken < asm_step_limit && !gb->test.crashed; asm_steps_taken++) {
 		uint16_t at = gb->cpu.pc;
 		if (at == pc && gb->cpu.sp == sp)
 			return true;
 		if (gb->cpu.sp > entry_sp)
 			*left = true;
-		if (at >= 0x4000 && at < 0x8000 && at >= body_start && at < body_end && gb->rom_bank != body_bank)
-			gb->test.unrealistic = true;
+		uint8_t op = rom_opcode(gb, at);
+		uint16_t sp_before = gb->cpu.sp;
+		int bank_before = gb->rom_bank;
 		int cycles = cpu_step(gb);
 		if (timed)
 			gb_tick(gb, cycles);
+		uint16_t now = gb->cpu.pc;
+		if (is_call(op) && gb->cpu.sp == (uint16_t)(sp_before - 2) && gb->cpu.sp >= 0xc000 && gb->cpu.sp < 0xe000) {
+			push_bank[gb->cpu.sp & 0x1fff] = (uint16_t)gb->rom_bank;
+			push_gen[gb->cpu.sp & 0x1fff] = asm_gen;
+		}
+		if (now < 0x4000 || now >= 0x8000 || now < body_start || now >= body_end || gb->rom_bank == body_bank)
+			continue;
+		// In the routine's range with another bank mapped. Unrealistic if
+		// ROMX code switched the bank under itself, or a ret came back with
+		// another bank than the one its call was made in.
+		if (at >= 0x4000 && at < 0x8000 && gb->rom_bank != bank_before)
+			gb->test.unrealistic = true;
+		if (is_ret(op) && gb->cpu.sp == (uint16_t)(sp_before + 2)) {
+			unsigned i = sp_before & 0x1fff;
+			if (sp_before < 0xc000 || sp_before >= 0xe000 || push_gen[i] != asm_gen || push_bank[i] != gb->rom_bank)
+				gb->test.unrealistic = true;
+		}
 	}
 	return false;
 }

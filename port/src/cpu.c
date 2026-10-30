@@ -5,6 +5,7 @@
 // cycle count. That's enough for this game, which syncs to VBlank.
 #include "gb.h"
 #include "hooks.h"
+#include "syms.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +20,15 @@
 #define L (gb->cpu.l)
 #define SP (gb->cpu.sp)
 #define PC (gb->cpu.pc)
+
+// The WRAM the game copies or writes code into and runs on purpose: the
+// V-Blank and LCD functions (wVBlankFunc, wLCDFunc, up to wROMBank) and the
+// level's tile queue copy loop (wVBlankFuncExtended).
+static inline bool wram_code(uint16_t pc)
+{
+	return (pc >= wVBlankFunc && pc < wROMBank) ||
+		(pc >= wVBlankFuncExtended && pc < wVBlankFuncExtended + 0x200);
+}
 
 static inline uint8_t fetch8(GB *gb)
 {
@@ -542,9 +552,10 @@ int cpu_step(GB *gb)
 		history[idx].sp = SP;
 		history[idx].bank = (uint8_t)gb->rom_bank;
 		history[idx].a = A;
-		// Under test: game code runs from ROM, and HRAM (hCallFunc and the
-		// OAM DMA routine); anywhere else means a fuzzed input sent it astray.
-		if (gb->test.active && PC >= 0x8000 && PC < 0xff80)
+		// Under test: game code runs from ROM, HRAM (hCallFunc and the OAM
+		// DMA routine) and the WRAM buffers the game builds code in;
+		// anywhere else means a fuzzed input sent it astray.
+		if (gb->test.active && PC >= 0x8000 && PC < 0xff80 && !wram_code(PC))
 			gb->test.unrealistic = true;
 		if (gb->test.exec_map && PC < 0x8000) {
 			size_t off = PC < 0x4000 ? PC : (size_t)(gb->rom_bank % gb->rom_banks) * 0x4000 + (PC - 0x4000);
