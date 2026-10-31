@@ -257,23 +257,6 @@ void NoPowerUpDemo::approach_slide()
 	next_state();
 }
 
-// Wario jumps over the slide as it moves left.
-void NoPowerUpDemo::jump_over()
-{
-	if (wario().x() != 0x40)
-		++wario().x();
-	jump_wario();
-	if (wario().y() < 0x40) {
-		--enemy().x();
-		return;
-	}
-	wario_var() = 0;
-	wario().y() = 0x40;
-	call(ADDR_ActionHelp_ShowWarioWalk);
-	clear_buttons();
-	next_state();
-}
-
 void NoPowerUpDemo::slide_comes()
 {
 	if (--enemy().x() < 0xe8)
@@ -318,37 +301,6 @@ void NoPowerUpDemo::jump_onto_slide()
 	next_state();
 }
 
-void NoPowerUpDemo::ride_slide()
-{
-	uint8_t x = --enemy().x();
-	if (x >= 0x39)
-		return;
-	if (x >= 0x30) {
-		++wario().y();
-		return;
-	}
-	call(ADDR_ActionHelp_ShowWarioSlide);
-	next_state();
-}
-
-// Wario slides down to the ground as the slide moves left.
-void NoPowerUpDemo::slide_down()
-{
-	if (wario().y() < 0x40)
-		++wario().y();
-	--enemy().x();
-}
-
-void NoPowerUpDemo::roll()
-{
-	slide_down();
-	if (enemy().x() >= 0x18)
-		return;
-	clear_dpad();
-	call(ADDR_ActionHelp_ShowWarioRoll);
-	next_state();
-}
-
 void NoPowerUpDemo::roll_to_block()
 {
 	slide_down();
@@ -367,33 +319,6 @@ void NoPowerUpDemo::bump_while_rolling()
 	call(ADDR_ActionHelp_ShowWarioBump);
 	play_sfx(mem_, SFX_BUMP);
 	wario_var() = 0x0e;
-	next_state();
-}
-
-void NoPowerUpDemo::bounce_off()
-{
-	jump_wario();
-	dec_twice_odd(wario().x());
-	if (wario_var() < 0x18 || wario().y() < 0x40)
-		return;
-	wario().y() = 0x40;
-	call(ADDR_ActionHelp_ShowWarioIdle);
-	wario_var() = 0;
-	timer() = 0x30;
-	next_state();
-}
-
-void NoPowerUpDemo::approach_last_slide()
-{
-	Byte x = wario().x();
-	if (x != 0x40)
-		++x;
-	uint8_t wario_x = x;
-	uint8_t slide_x = --enemy().x();
-	if (static_cast<uint8_t>(slide_x - wario_x) >= 0x1c)
-		return;
-	show_a();
-	call(ADDR_ActionHelp_ShowWarioJump);
 	next_state();
 }
 

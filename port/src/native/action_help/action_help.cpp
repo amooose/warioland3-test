@@ -16,25 +16,6 @@ constexpr uint8_t NUM_BAR_SLOTS = 10;
 constexpr uint16_t VBLANK_FUNC = ADDR_VBlank_1fb6b7 + 0x0c; // VBlank_1fb6b7.Func
 constexpr uint8_t VBLANK_FUNC_SIZE = 0x34;
 
-constexpr uint16_t MAIN_DEMOS[NUM_MAIN_POWER_UPS] = {
-	ADDR_NoPowerUpActionHelp,
-	ADDR_LeadOverallsActionHelp,
-	ADDR_SwimmingFlippersActionHelp,
-	ADDR_HeadSmashHelmetActionHelp,
-	ADDR_GrabGloveActionHelp,
-	ADDR_GarlicActionHelp,
-	ADDR_SuperJumpSlamOverallsActionHelp,
-	ADDR_HighJumpBootsActionHelp,
-	ADDR_PrinceFrogsGlovesActionHelp,
-	ADDR_SuperGrabGloveActionHelp,
-};
-
-constexpr uint16_t SPECIAL_DEMOS[NUM_SPECIAL_POWER_UPS] = {
-	ADDR_OwlActionHelp,
-	ADDR_RailActionHelp,
-	ADDR_VampireActionHelp,
-};
-
 // writes a 2x2 tile block at addr, in the VRAM bank mapped
 void fill_2x2(Memory mem, uint16_t addr, uint8_t value)
 {
@@ -216,9 +197,13 @@ void ActionHelp::run_main_power_up()
 	case LEAD_OVERALLS: LeadOverallsDemo(gb_).run(); break;
 	case SWIMMING_FLIPPERS: SwimmingFlippersDemo(gb_).run(); break;
 	case HEAD_SMASH_HELMET: HeadSmashHelmetDemo(gb_).run(); break;
+	case GRAB_GLOVE: GrabGlovesDemo(gb_).run(); break;
+	case GARLIC: GarlicDemo(gb_).run(); break;
+	case SUPER_JUMP_SLAM_OVERALLS: SuperJumpSlamOverallsDemo(gb_).run(); break;
 	case HIGH_JUMP_BOOTS: HighJumpBootsDemo(gb_).run(); break;
 	case PRINCE_FROGS_GLOVES: PrinceFrogsGlovesDemo(gb_).run(); break;
-	default: routines_.call(MAIN_DEMOS[power_up]); break;
+	case SUPER_GRAB_GLOVES: SuperGrabGlovesDemo(gb_).run(); break;
+	default: unrealistic(); break; // checked above
 	}
 }
 
@@ -229,7 +214,11 @@ void ActionHelp::run_special_power_up()
 		unrealistic();
 		return;
 	}
-	routines_.call(SPECIAL_DEMOS[index]);
+	switch (index) {
+	case POWER_UP_OWL - POWER_UP_OWL: OwlDemo(gb_).run(); break;
+	case POWER_UP_RAIL - POWER_UP_OWL: RailDemo(gb_).run(); break;
+	case POWER_UP_VAMPIRE - POWER_UP_OWL: VampireDemo(gb_).run(); break;
+	}
 }
 
 // ---------------------------------------------------------------------------

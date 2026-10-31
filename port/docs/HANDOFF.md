@@ -423,13 +423,15 @@ Modules so far:
   graphics loaders. The 13 demonstrations (power_ups/*.c) and the helpers
   they call (common1.c, the rest of common2.c) are still register-level C,
   called by address; part 2 moves them in.
-- **action help, part 2** (in progress): the demonstrations as `Demo`
-  subclasses (demo.hpp): no power-up, lead overalls, swimming flippers and
-  prince frog's gloves (both `WaterDemo`), head smash helmet, high jump
-  boots. Left: grab gloves, garlic, super jump slam overalls, super grab
-  gloves, owl, rail, vampire; then common1.c / common2.c move in. Each demo
-  is a state machine on wActionHelpState; the common1 helpers are still
-  called by address (`call(ADDR_ActionHelp_...)`).
+- **action help, part 2**: all 13 demonstrations as `Demo` subclasses
+  (demo.hpp), on shared bases: `WaterDemo` (swimming flippers, prince
+  frog's gloves), `GrabDemo` (grab gloves, super grab gloves) and
+  `SpecialDemo` (owl, rail, vampire: they run in the bank of common2.asm,
+  call its routines directly and use the ActionHelp2_* prompts). Each demo
+  is a state machine on wActionHelpState. Left for part 3: the helpers they
+  call (common1.c, the rest of common2.c), still register-level C called by
+  address (`call(ADDR_ActionHelp_...)`), some with register inputs (hl, b,
+  c for the block debris).
   `tests/inputs/title_demos.input` (no input, 80000 frames from boot) lets
   the title screen's demo cycle through all 13 demonstrations: its trace is
   what checks them.

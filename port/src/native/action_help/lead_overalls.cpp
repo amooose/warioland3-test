@@ -83,13 +83,6 @@ void LeadOverallsDemo::approach()
 	start_jump();
 }
 
-bool LeadOverallsDemo::jump_towards_enemy()
-{
-	jump_wario();
-	dec_twice_odd(enemy().x());
-	return wario().x() < enemy().x();
-}
-
 void LeadOverallsDemo::jump_at_enemy()
 {
 	if (jump_towards_enemy())
@@ -127,33 +120,6 @@ void LeadOverallsDemo::blocks_come()
 	call(ADDR_ActionHelp_ShowWarioIdle);
 	clear_dpad();
 	timer() = 0x30;
-	next_state();
-}
-
-void LeadOverallsDemo::jump_onto_blocks()
-{
-	if (jump_towards_enemy())
-		return;
-	wario().x() = enemy().x();
-	clear_dpad();
-	if (wario().y() < 0x20)
-		return;
-	wario().y() = 0x20;
-	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioIdle);
-	clear_buttons();
-	timer() = 0x30;
-	next_state();
-}
-
-void LeadOverallsDemo::high_jump()
-{
-	if (!jump_above(0x0c))
-		return;
-	wario_var() = 0x18;
-	call(ADDR_ActionHelp_ShowWarioSmashAttack);
-	call(ADDR_ActionHelp_ShowDDownInput);
-	clear_buttons();
 	next_state();
 }
 

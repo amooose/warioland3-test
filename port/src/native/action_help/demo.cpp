@@ -106,12 +106,152 @@ void Demo::init_object(MenuObject obj, uint8_t y, uint8_t x, uint16_t frameset, 
 		mem_[static_cast<uint16_t>(obj.addr() + 11)] = 0;
 }
 
+bool Demo::jump_towards_enemy()
+{
+	jump_wario();
+	dec_twice_odd(enemy().x());
+	return wario().x() < enemy().x();
+}
+
+void Demo::jump_onto_blocks()
+{
+	if (jump_towards_enemy())
+		return;
+	wario().x() = enemy().x();
+	clear_dpad();
+	if (wario().y() < 0x20)
+		return;
+	wario().y() = 0x20;
+	wario_var() = 0;
+	call(ADDR_ActionHelp_ShowWarioIdle);
+	clear_buttons();
+	timer() = 0x30;
+	next_state();
+}
+
+void Demo::high_jump()
+{
+	if (!jump_above(0x0c))
+		return;
+	wario_var() = 0x18;
+	call(ADDR_ActionHelp_ShowWarioSmashAttack);
+	call(ADDR_ActionHelp_ShowDDownInput);
+	clear_buttons();
+	next_state();
+}
+
+uint8_t Demo::capped_velocity()
+{
+	Byte step = wario_var();
+	++step;
+	if (step >= 0x28)
+		step = 0x27;
+	return mem_[static_cast<uint16_t>(ADDR_JumpVelTable_Normal + step)];
+}
+
+uint8_t Demo::jump_wario_capped()
+{
+	return wario().y() += capped_velocity();
+}
+
+bool Demo::ground_shake(uint16_t at_5)
+{
+	if (timer_done())
+		return true;
+	if (timer() == 0x05) {
+		call(at_5);
+		clear_dpad();
+	}
+	Byte scy = wram_.scy();
+	switch (timer() & 0x03) {
+	case 0x03: scy += 2; break;
+	case 0x01: scy -= 2; break;
+	}
+	return false;
+}
+
+// Wario jumps over the slide as it moves left.
+void Demo::jump_over()
+{
+	if (wario().x() != 0x40)
+		++wario().x();
+	jump_wario();
+	if (wario().y() < 0x40) {
+		--enemy().x();
+		return;
+	}
+	wario_var() = 0;
+	wario().y() = 0x40;
+	call(ADDR_ActionHelp_ShowWarioWalk);
+	clear_buttons();
+	next_state();
+}
+
+void Demo::ride_slide()
+{
+	uint8_t x = --enemy().x();
+	if (x >= 0x39)
+		return;
+	if (x >= 0x30) {
+		++wario().y();
+		return;
+	}
+	call(ADDR_ActionHelp_ShowWarioSlide);
+	next_state();
+}
+
+// Wario slides down to the ground as the slide moves left.
+void Demo::slide_down()
+{
+	if (wario().y() < 0x40)
+		++wario().y();
+	--enemy().x();
+}
+
+void Demo::roll()
+{
+	slide_down();
+	if (enemy().x() >= 0x18)
+		return;
+	clear_dpad();
+	call(ADDR_ActionHelp_ShowWarioRoll);
+	next_state();
+}
+
+void Demo::bounce_off()
+{
+	jump_wario();
+	dec_twice_odd(wario().x());
+	if (wario_var() < 0x18 || wario().y() < 0x40)
+		return;
+	wario().y() = 0x40;
+	call(ADDR_ActionHelp_ShowWarioIdle);
+	wario_var() = 0;
+	timer() = 0x30;
+	next_state();
+}
+
+void Demo::approach_last_slide()
+{
+	Byte x = wario().x();
+	if (x != 0x40)
+		++x;
+	uint8_t wario_x = x;
+	uint8_t slide_x = --enemy().x();
+	if (static_cast<uint8_t>(slide_x - wario_x) >= 0x1c)
+		return;
+	show_a();
+	call(ADDR_ActionHelp_ShowWarioJump);
+	next_state();
+}
+
 void Demo::animate_object(MenuObject obj, uint16_t bank_field, uint16_t ended_field)
 {
 	uint8_t bank = mem_[bank_field];
 	wram_.temp_bank() = bank;
 	obj.animate_far(bank);
-	mem_[ended_field] = wram_.obj_anim_was_reset();
+	if (ended_field)
+		mem_[ended_field] = wram_.obj_anim_was_reset();
 }
 
 void Demo::load_object_sprite(MenuObject obj)
