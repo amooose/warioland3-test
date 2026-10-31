@@ -221,14 +221,6 @@ PORT(ActionHelp_FlashBInput)
 	wr8(gb, wActionHelpState, alu_inc(gb, rd8(gb, wActionHelpState)));
 }
 
-PORT(VBlank_1fb6b7)
-{
-	SET_HL(gb, ADDR_VBlank_1fb6b7 + 0x0c); // .Func
-	SET_DE(gb, wVBlankFunc);
-	gb->cpu.b = 0x34; // .end - .Func
-	CALL(CopyHLToDE);
-}
-
 // VBlank_1fb6b7.Func, as copied to wVBlankFunc (see ram_code.c). Its call
 // returns to base + n, the block's start wherever it runs from.
 PORT_LOCAL_JUMP(VBlank_1fb6b7, Func)
@@ -337,85 +329,6 @@ PORT(ActionHelp_Init)
 	wr8(gb, wTimer, 0x60);
 	SET_HL(gb, wActionHelpState);
 	wr8(gb, wActionHelpState, alu_inc(gb, rd8(gb, wActionHelpState)));
-}
-
-// writes a 2x2 block of a at hl; de = TILEMAP_WIDTH
-static void fill_2x2(GB *gb, uint16_t hl, uint8_t a)
-{
-	gb->cpu.a = a;
-	wr8(gb, hl++, a);
-	wr8(gb, hl--, a);
-	hl = alu_add16(gb, hl, REG_DE(gb));
-	wr8(gb, hl++, a);
-	wr8(gb, hl, a);
-	SET_HL(gb, hl);
-}
-
-// Moves the power-up selection with the d-pad.
-PORT(Func_1fb6f7)
-{
-	uint16_t hl = wActionHelpPowerUp;
-	SET_HL(gb, hl);
-	gb->cpu.a = rd8(gb, wJoypadPressed);
-	if (alu_bit(gb, gb->cpu.a, B_PAD_RIGHT)) {
-		gb->cpu.a = rd8(gb, hl);
-		alu_cp(gb, gb->cpu.a, NUM_MAIN_POWER_UPS - 1);
-		if (gb->cpu.f & FLAG_Z)
-			return;
-		gb->cpu.e = gb->cpu.a;
-		wr8(gb, hl, alu_inc(gb, rd8(gb, hl)));
-		gb->cpu.a = 0;
-		gb->cpu.f = FLAG_Z; // xor a
-		wr8(gb, wActionHelpState, 0);
-		gb->cpu.a = alu_add(gb, rd8(gb, wMenuObj1XCoord), 0x10);
-		wr8(gb, wMenuObj1XCoord, gb->cpu.a);
-	} else if (alu_bit(gb, gb->cpu.a, B_PAD_LEFT)) {
-		gb->cpu.a = rd8(gb, hl);
-		gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
-		if (!gb->cpu.a)
-			return;
-		gb->cpu.e = gb->cpu.a;
-		wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
-		gb->cpu.a = 0;
-		gb->cpu.f = FLAG_Z; // xor a
-		wr8(gb, wActionHelpState, 0);
-		gb->cpu.a = alu_sub(gb, rd8(gb, wMenuObj1XCoord), 0x10);
-		wr8(gb, wMenuObj1XCoord, gb->cpu.a);
-	} else {
-		return;
-	}
-	gb->cpu.a = TRUE;
-	wr8(gb, wActionHelpBlackedOut, TRUE);
-	gb->cpu.a = BANK_v1BGMap1; // BANK("VRAM1")
-	wr8(gb, rVBK, gb->cpu.a);
-	gb->cpu.a = alu_and(gb, rd8(gb, wPowerUpLevel), POWER_UP_MASK);
-	alu_cp(gb, gb->cpu.a, gb->cpu.e);
-	if (!(gb->cpu.f & FLAG_C)) {
-		gb->cpu.e = alu_sla(gb, gb->cpu.e);
-		gb->cpu.d = 0;
-		SET_HL(gb, alu_add16(gb, v1BGMap1 + 16 * TILEMAP_WIDTH, REG_DE(gb)));
-		gb->cpu.e = TILEMAP_WIDTH;
-		CALL(WaitNextHBlank);
-		fill_2x2(gb, REG_HL(gb), 0x03);
-	}
-	gb->cpu.a = rd8(gb, wActionHelpPowerUp);
-	gb->cpu.e = gb->cpu.a;
-	gb->cpu.a = alu_and(gb, rd8(gb, wPowerUpLevel), POWER_UP_MASK);
-	alu_cp(gb, gb->cpu.a, gb->cpu.e);
-	if (!(gb->cpu.f & FLAG_C)) {
-		gb->cpu.d = 0;
-		hl = alu_add16(gb, ADDR_PowerUpOBPals, REG_DE(gb));
-		gb->cpu.b = rd8(gb, hl);
-		gb->cpu.e = alu_sla(gb, gb->cpu.e);
-		SET_HL(gb, alu_add16(gb, v1BGMap1 + 16 * TILEMAP_WIDTH, REG_DE(gb)));
-		gb->cpu.e = TILEMAP_WIDTH;
-		CALL(WaitNextHBlank);
-		fill_2x2(gb, REG_HL(gb), gb->cpu.b);
-	}
-	gb->cpu.a = 0;
-	gb->cpu.f = FLAG_Z; // xor a
-	wr8(gb, rVBK, 0);
-	play_sfx(gb, SFX_0E2);
 }
 
 // ld hl, obj / xor a / ld [hli], a x2 / frameset, the low byte with

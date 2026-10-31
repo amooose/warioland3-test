@@ -417,6 +417,12 @@ Modules so far:
   `LoadHiddenFigureGfx`, called from elsewhere, keep exact registers. The
   rLY-timed raster effects and the V-Blank function stay C
   (title/raster.c).
+- **action help, part 1** (src/native/action_help): the screen itself:
+  `_ActionHelpStateTable`, init (which power-up to show, the power-up
+  bar), update (input, the d-pad selection, the prompts' animation) and the
+  graphics loaders. The 13 demonstrations (power_ups/*.c) and the helpers
+  they call (common1.c, the rest of common2.c) are still register-level C,
+  called by address; part 2 moves them in.
 
 `src/native/routines.hpp` wraps the register-level C routines a module calls
 (DisableLCD, FarDecompress, the golf sprite helpers...): each sets the

@@ -1,54 +1,6 @@
 // Port of src/engine/action_help/common2.asm
 #include "ported.h"
 
-PORT(LoadActionHelpCommonPals)
-{
-	gb->cpu.a = TRUE;
-	wr8(gb, wActionHelpBlackedOut, TRUE);
-	SET_HL(gb, ADDR_Pals_1e4eef);
-	CALL(LoadPalsToTempPals1);
-}
-
-// Loads the OB palettes for the power-up being demonstrated.
-PORT(LoadActionHelpPowerUpPals)
-{
-	uint8_t power_up = alu_and(gb, rd8(gb, wActionHelpPowerUp), POWER_UP_MASK);
-	alu_cp(gb, power_up, NUM_MAIN_POWER_UPS);
-	bool main_power_up = gb->cpu.f & FLAG_C;
-
-	SET_HL(gb, main_power_up ? ADDR_Pals_1e4f2f : ADDR_Pals_1e4f7f);
-	CALL(LoadPalsToTempPals2);
-	gb->cpu.a = rd8(gb, wActionHelpPowerUp);
-	alu_cp(gb, gb->cpu.a, main_power_up ? GARLIC : POWER_UP_VAMPIRE);
-	if (main_power_up ? (gb->cpu.f & FLAG_C) : !(gb->cpu.f & FLAG_Z))
-		return;
-
-	// garlic and later power-ups, or the vampire transformation, recolour
-	// the first two palettes
-	SET_HL(gb, main_power_up ? ADDR_Pals_1e4f6f : ADDR_Pals_1e4fbf);
-	SET_DE(gb, wTempPals2);
-	gb->cpu.b = 2 * PAL_SIZE;
-	CALL(CopyHLToDE_Short);
-}
-
-PORT(LoadActionHelpGfx)
-{
-	wr8(gb, rVBK, BANK_v1Tiles0);
-	uint8_t power_up = alu_and(gb, rd8(gb, wActionHelpPowerUp), POWER_UP_MASK);
-	alu_cp(gb, power_up, NUM_MAIN_POWER_UPS);
-	gb->cpu.a = power_up;
-	SET_HL(gb, (gb->cpu.f & FLAG_C) ? ADDR_ActionHelpObjects1Gfx : ADDR_ActionHelpObjects2Gfx);
-	SET_BC(gb, v1Tiles0);
-	CALL(Decompress);
-
-	gb->cpu.a = 0;
-	gb->cpu.f = FLAG_Z; // xor a
-	wr8(gb, rVBK, 0);
-	SET_HL(gb, ADDR_ActionHelpHUDGfx);
-	SET_BC(gb, v0Tiles0);
-	CALL(Decompress);
-}
-
 // hl = y, x, frame and attributes; y is relative to the background scroll
 static uint16_t set_cur_sprite(GB *gb)
 {
@@ -86,13 +38,6 @@ PORT(LoadActionHelpSprite_Far)
 	gb->cpu.a = rd8(gb, wTempBank);
 	wr8(gb, hCallFuncBank, gb->cpu.a);
 	HCALL(LoadSprite);
-}
-
-PORT(LoadActionHelpSprite)
-{
-	set_cur_sprite(gb);
-	SET_HL(gb, ADDR_OAM_1e697c);
-	CALL(LoadSprite);
 }
 
 // Copies b palettes from hl to the palette data register c, one palette
@@ -196,95 +141,6 @@ PORT(Func_1e4a47)
 	gb->cpu.c = (uint8_t)rOBPD;
 	gb->cpu.b = 4;
 	copy_pals_hblank(gb);
-}
-
-// writes a 2x2 block of a at hl (VRAM bank already mapped); de = TILEMAP_WIDTH
-// ld [hli], a / ld [hld], a / add hl, de / ld [hli], a / ld [hl], a
-static uint16_t fill_2x2(GB *gb, uint16_t hl, uint8_t a)
-{
-	wr8(gb, hl++, a);
-	wr8(gb, hl--, a);
-	hl = alu_add16(gb, hl, REG_DE(gb));
-	wr8(gb, hl++, a);
-	wr8(gb, hl, a);
-	return hl;
-}
-
-// .Func_1e499c: draws an empty power-up slot at hl
-static void draw_empty_slot(GB *gb, uint16_t hl)
-{
-	SET_DE(gb, TILEMAP_WIDTH);
-	gb->cpu.a = BANK_v1Tiles0; // BANK("VRAM1")
-	wr8(gb, rVBK, gb->cpu.a);
-	gb->cpu.a = 0x07;
-	fill_2x2(gb, hl, 0x07);
-	gb->cpu.a = 0;
-	gb->cpu.f = FLAG_Z; // xor a
-	wr8(gb, rVBK, 0);
-	wr8(gb, hl++, 0x64);
-	gb->cpu.a = alu_inc(gb, 0x64);
-	wr8(gb, hl--, gb->cpu.a);
-	hl = alu_add16(gb, hl, REG_DE(gb));
-	wr8(gb, hl++, 0x74);
-	gb->cpu.a = alu_inc(gb, 0x74);
-	wr8(gb, hl, gb->cpu.a);
-	SET_HL(gb, hl);
-}
-
-PORT(LoadActionHelpBGMaps)
-{
-	gb->cpu.a = BANK_v1Tiles0; // BANK("VRAM1")
-	wr8(gb, rVBK, gb->cpu.a);
-	SET_HL(gb, ADDR_ActionHelpAttrmap);
-	SET_BC(gb, v1BGMap1);
-	CALL(Decompress);
-	gb->cpu.a = 0;
-	gb->cpu.f = FLAG_Z; // xor a
-	wr8(gb, rVBK, 0);
-	SET_HL(gb, ADDR_ActionHelpTilemap);
-	SET_BC(gb, v0BGMap1);
-	CALL(Decompress);
-
-	gb->cpu.a = alu_and(gb, rd8(gb, wActionHelpPowerUp), POWER_UP_MASK);
-	alu_cp(gb, gb->cpu.a, NUM_MAIN_POWER_UPS);
-	if (!(gb->cpu.f & FLAG_C)) {
-		gb->cpu.b = 0x0a;
-	} else {
-		gb->cpu.a = alu_and(gb, rd8(gb, wPowerUpLevel), POWER_UP_MASK);
-		if (gb->cpu.a) {
-			gb->cpu.c = gb->cpu.a;
-			gb->cpu.a = BANK_v1Tiles0; // BANK("VRAM1")
-			wr8(gb, rVBK, gb->cpu.a);
-			uint16_t hl = v1BGMap1 + 16 * TILEMAP_WIDTH + 0;
-			SET_DE(gb, TILEMAP_WIDTH);
-			gb->cpu.b = 0;
-			do {
-				gb->cpu.a = 0x03;
-				fill_2x2(gb, hl, 0x03);
-				hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl + 2)); // inc l / inc l
-				gb->cpu.b = alu_inc(gb, gb->cpu.b);
-				gb->cpu.a = gb->cpu.b;
-				alu_cp(gb, gb->cpu.a, gb->cpu.c);
-			} while (gb->cpu.f & FLAG_C);
-			SET_HL(gb, hl);
-		}
-		gb->cpu.a = 0;
-		gb->cpu.f = FLAG_Z; // xor a
-		wr8(gb, rVBK, 0);
-		gb->cpu.a = alu_and(gb, rd8(gb, wPowerUpLevel), POWER_UP_MASK);
-		gb->cpu.b = gb->cpu.a;
-		gb->cpu.a = alu_sub(gb, 0x09, gb->cpu.b);
-		if (!gb->cpu.a)
-			return;
-		gb->cpu.b = gb->cpu.a;
-	}
-	uint16_t hl = v0BGMap1 + 16 * TILEMAP_WIDTH + 18;
-	do {
-		draw_empty_slot(gb, hl);
-		hl -= 2;
-		SET_HL(gb, hl);
-		gb->cpu.b = alu_dec(gb, gb->cpu.b);
-	} while (gb->cpu.b);
 }
 
 // hl = 8 BG palettes: copies them to wTempPals1 and to the BG palette RAM
