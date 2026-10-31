@@ -400,11 +400,14 @@ src/ported/audio/engine.c, home/audio.c and home/audio_functions.c.
 Modules so far:
 
 - **audio** (src/native/audio): the sound engine; 13 entry points.
-- **golf** (src/native/golf), part 1: the golf building, lobby and clear
-  cutscene, entered through the two state tables (`_GolfStateTable`,
+- **golf** (src/native/golf): the whole minigame. `Golf` is the building,
+  lobby and clear cutscene; `GolfHole` is a hole (shots, the Para-Goom's
+  flight and landing, scrolling, scoring); both derive from `GolfScreen`.
+  Entered through the two state tables (`_GolfStateTable`,
   `_GolfBuildingStateTable`, which clobber every register: hCallFunc
-  restores af and the main loop follows). The holes (hole.asm) are still C
-  and are called from it.
+  restores af and the main loop follows). What stays register-level C is in
+  golf/hole_ram.c: the V-Blank functions copied to wVBlankFunc, and
+  HoldGolfWarioLastFrame, which home code calls.
 
 `src/native/routines.hpp` wraps the register-level C routines a module calls
 (DisableLCD, FarDecompress, the golf sprite helpers...): each sets the

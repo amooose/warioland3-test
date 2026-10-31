@@ -30,9 +30,9 @@ void Golf::run_golf_state()
 	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
 	case 3: handle_lobby(); break;
 	case SST_GOLF_HOLE: routines_.call(ADDR_FastFadeToWhite); break;
-	case SST_GOLF_HOLE + 1: routines_.call(ADDR_InitGolfHole); break;
+	case SST_GOLF_HOLE + 1: GolfHole(gb_).init(); break;
 	case SST_GOLF_HOLE + 2: routines_.call(ADDR_SlowFadeFromWhite); break;
-	case SST_GOLF_HOLE + 3: routines_.call(ADDR_HandleGolfHole); break;
+	case SST_GOLF_HOLE + 3: GolfHole(gb_).handle(); break;
 	case SST_GOLF_EXIT: routines_.call(ADDR_FastFadeToWhite); break;
 	case SST_GOLF_EXIT + 1: routines_.call(ADDR_ReturnToLevelFromGolf); break;
 	case SST_GOLF_CLEAR: routines_.call(ADDR_FastFadeToWhite); break;
@@ -51,16 +51,16 @@ void Golf::run_building_state()
 	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
 	case 3: handle_building(); break;
 	case 4: routines_.call(ADDR_FastFadeToWhite); break;
-	case 5: routines_.call(ADDR_InitGolfHole); break;
+	case 5: GolfHole(gb_).init(); break;
 	case 6: routines_.call(ADDR_SlowFadeFromWhite); break;
-	case 7: routines_.call(ADDR_HandleGolfHole); break;
+	case 7: GolfHole(gb_).handle(); break;
 	case 8: routines_.call(ADDR_ReturnToMap); break;
 	default: unrealistic(); break;
 	}
 }
 
 // A state outside a jump table: the original jumps to whatever follows it.
-void Golf::unrealistic()
+void GolfScreen::unrealistic()
 {
 	if (gb_->test.active)
 		gb_->test.unrealistic = true;
@@ -70,28 +70,33 @@ void Golf::unrealistic()
 // Shared
 
 // wGolfOAMPtr is stored high byte first
-void Golf::set_oam_pointer(uint16_t oam)
+void GolfScreen::set_oam_pointer(uint16_t oam)
 {
 	ram(wGolfOAMPtr + 0) = static_cast<uint8_t>(oam >> 8);
 	ram(wGolfOAMPtr + 1) = static_cast<uint8_t>(oam);
 }
 
-void Golf::update_object(GolfObject obj, uint8_t y, uint8_t x, uint16_t frameset)
+void GolfScreen::update_object(GolfObject obj, uint8_t y, uint8_t x, uint16_t frameset)
 {
 	obj.y() = y;
 	obj.x() = x;
 	routines_.update_golf_object_animation(frameset, obj.duration().addr());
+	load_object_sprite(obj);
+}
+
+void GolfScreen::load_object_sprite(GolfObject obj)
+{
 	obj.frame() = obj.current_frame();
 	routines_.load_golf_sprite(obj.sprite());
 }
 
-void Golf::clear_golf_ram_from(uint16_t start)
+void GolfScreen::clear_golf_ram_from(uint16_t start)
 {
 	for (uint16_t addr = start; addr < GOLF_RAM_END; addr++)
 		ram(addr) = 0;
 }
 
-void Golf::reset_scroll()
+void GolfScreen::reset_scroll()
 {
 	ram(rSCY) = 0;
 	ram(rSCX) = 0;
@@ -135,7 +140,7 @@ void Golf::init_lobby()
 		object(wGolfObj4).state() = COININFO_NOT_ENOUGH_COINS;
 
 	ram(wGolfVBlankMode) = 0x01;
-	routines_.call(ADDR_GolfLobbyVBlank);
+	GolfHole(gb_).set_lobby_vblank();
 	play_music2(mem_, MUSIC_GOLF_LOBBY);
 	reset_scroll();
 	ram(rLCDC) = LCDC_DEFAULT;
@@ -177,7 +182,7 @@ void Golf::handle_lobby()
 	update_lobby_animations();
 	handle_lobby_wario_sprite();
 	routines_.clear_unused_virtual_oam();
-	routines_.call(ADDR_GolfLobbyVBlank);
+	GolfHole(gb_).set_lobby_vblank();
 }
 
 void Golf::handle_lobby_states()
@@ -405,7 +410,7 @@ void Golf::handle_lobby_wario_sprite()
 	ram(wGolfWarioYCoord) = ram(wGolfWarioYPos);
 	ram(wGolfWarioXCoord) = ram(wGolfWarioXPos);
 	routines_.update_golf_wario_animation();
-	routines_.call(ADDR_LoadGolfWarioStateGfx);
+	GolfHole(gb_).load_wario_state_gfx();
 	// a step sound at the start of each walk cycle
 	if (ram(wGolfWarioState) == GOLF_WARIO_WALKING && ram(wGolfWarioFramesetOffset) == 0x2 &&
 		!ram(wGolfWarioDuration))
@@ -500,7 +505,7 @@ void Golf::init_building()
 	ram(wGolfNumCoins + 0) = ram(wNumCoins + 0);
 	ram(wGolfNumCoins + 1) = ram(wNumCoins + 1);
 	update_building_animations();
-	routines_.call(ADDR_Func_1c9fae);
+	GolfHole(gb_).set_building_vblank();
 	routines_.play_new_music(MUSIC_GOLF_LOBBY);
 
 	ram(rSCY) = 0;
@@ -605,7 +610,7 @@ void Golf::handle_building()
 		ram(w1d800) = 0;
 		ram(wGolfMenuOption) = 0;
 	}
-	routines_.call(ADDR_Func_1c9fae);
+	GolfHole(gb_).set_building_vblank();
 }
 
 // A picks the course (if Wario can pay), B leaves, left and right scroll
