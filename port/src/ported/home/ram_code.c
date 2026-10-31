@@ -161,6 +161,14 @@ static bool vblank_code(GB *gb)
 	return true;
 }
 
+// The ROM labels whose code the hooks above stand in for: hCallFunc and
+// its operand labels (InitHRAMCallFunc copies them to HRAM), and PushOAM
+// (copied to hTransferVirtualOAM).
+PORT_RAM(hCallFunc);
+PORT_RAM(hCallFuncBank);
+PORT_RAM(hCallFuncPointer);
+PORT_RAM(PushOAM);
+
 void ram_hooks_register_all(void)
 {
 	ram_hook_register(hCallFunc, hcall_func);

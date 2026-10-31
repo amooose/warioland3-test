@@ -162,3 +162,179 @@ PORT_LOCAL_JUMP(InitWithoutDemoPowerUpReset, wait_vblank_exec)
 	gb_call_ret(gb, ADDR_HandleSound, WAIT_VBLANK_EXEC + 0x14);
 	JUMP_TO(GAME_LOOP); // loop back to game loop
 }
+
+PORT_JUMP(DebugReset) { JUMP(Init); }
+
+// The boot and reset code, falling into the main game loop. Calls return to
+// the asm's own return addresses (all in ROM0, from the call bytes).
+#define INIT_WO (ADDR_InitWithoutDemoPowerUpReset) // $0161
+
+PORT_JUMP(Start)
+{
+	alu_and(gb, gb->cpu.a, gb->cpu.a);
+	alu_cp(gb, gb->cpu.a, BOOTUP_A_CGB);
+	bool cgb = gb->cpu.f & FLAG_Z;
+	gb->cpu.a = FALSE;
+	if (cgb)
+		gb->cpu.a = alu_inc(gb, gb->cpu.a); // TRUE
+	// .not_cgb
+	wr8(gb, hCGB, gb->cpu.a);
+	gb->cpu.a = 0x00;
+	wr8(gb, hUnused_fffd, 0x00);
+	JUMP_TO(ADDR_Init); // fallthrough
+}
+
+PORT_JUMP(Init)
+{
+	// reset power up to show in Demo
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, hDemoPowerUp, 0);
+	JUMP_TO(INIT_WO); // fallthrough
+}
+
+PORT_JUMP(InitWithoutDemoPowerUpReset)
+{
+	// init stack
+	gb->cpu.ime = false; // di
+	gb->cpu.ime_delay = 0;
+	gb->cpu.sp = wStackTop - 1;
+	SET_HL(gb, gb->cpu.sp); // ld hl, sp+$00
+	gb->cpu.f = 0;
+	gb->cpu.c = 0; // aka $100 bytes
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	uint16_t hl = REG_HL(gb);
+	do { // .loop_clear_stack
+		wr8(gb, hl--, gb->cpu.a);
+		gb->cpu.c = alu_dec(gb, gb->cpu.c);
+	} while (!(gb->cpu.f & FLAG_Z));
+	SET_HL(gb, hl);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+	wr8(gb, rWBK, 0);
+	wr8(gb, rRP, 0);
+
+	// set lcd on and wait for VBlank
+	gb->cpu.a = LCDC_ON;
+	wr8(gb, rLCDC, gb->cpu.a);
+	for (;;) { // .wait_vblank
+		gb->cpu.a = rd8(gb, rLY);
+		alu_cp(gb, gb->cpu.a, LY_VBLANK + 4);
+		if (gb->cpu.f & FLAG_Z)
+			break;
+		idle(gb, 32);
+	}
+
+	// enable BG and OBJ
+	gb->cpu.a = LCDC_BG_ON | LCDC_OBJ_ON;
+	wr8(gb, rLCDC, gb->cpu.a);
+	gb_call_ret(gb, ADDR_ClearVRAM, INIT_WO + 0x25);
+	gb_call_ret(gb, ADDR_EnableDoubleSpeed, INIT_WO + 0x28);
+
+	gb->cpu.a = rd8(gb, hCGB);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		// is CGB
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, rVBK, 0);
+		wr8(gb, rWBK, 0);
+		wr8(gb, rRP, 0);
+	}
+
+	// .clear_wram: clear all WRAM except stack
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, 0xc000);  // STARTOF(WRAM0)
+	SET_BC(gb, 0x0f00);  // SIZEOF(WRAM0) - SIZEOF("Stack")
+	gb_call_ret(gb, ADDR_WriteAToHL_BCTimes, INIT_WO + 0x3e);
+	gb_call_ret(gb, ADDR_ClearWRAM, INIT_WO + 0x41);
+
+	// clear OAM
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, 0xfe00); // STARTOF(OAM)
+	SET_BC(gb, 0x100);
+	gb_call_ret(gb, ADDR_WriteAToHL_BCTimes, INIT_WO + 0x4b);
+
+	// clears most of HRAM except hDemoPowerUp, hUnused_fffd and hCGB
+	SET_HL(gb, 0xff80); // STARTOF(HRAM)
+	gb->cpu.b = (uint8_t)(hDemoPowerUp - 0xff80);
+	gb_call_ret(gb, ADDR_WriteAToHL_BTimes, INIT_WO + 0x53);
+
+	// clear BGMap0 and BGMap1
+	gb_call_ret(gb, ADDR_FillBGMap0_With7f, INIT_WO + 0x56);
+	gb_call_ret(gb, ADDR_ClearBGMap1, INIT_WO + 0x59);
+
+	gb->cpu.a = BANK_MainStateTable; // BANK("Main State Table")
+	bankswitch(gb, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rROMB1 + 0x100, 0);
+	sramswitch(gb, 0); // xor a / sramswitch: SRAM0
+
+	wr8(gb, rIF, 0);
+	wr8(gb, rIE, 0);
+	wr8(gb, rSCY, 0);
+	wr8(gb, rSCX, 0);
+	wr8(gb, rSTAT, 0);
+
+	// init hTransferVirtualOAM
+	gb->cpu.c = (uint8_t)hTransferVirtualOAM;
+	// should be ld b, (PushOAM.end - PushOAM) + 1
+	gb->cpu.b = (uint8_t)(ADDR_WriteAToHL_BCTimes - ADDR_PushOAM + 1);
+	hl = ADDR_PushOAM;
+	do { // .loop_write_oam_func
+		gb->cpu.a = rd8(gb, hl++);
+		wr8(gb, (uint16_t)(0xff00 + gb->cpu.c), gb->cpu.a);
+		gb->cpu.c = alu_inc(gb, gb->cpu.c);
+		gb->cpu.b = alu_dec(gb, gb->cpu.b);
+	} while (!(gb->cpu.f & FLAG_Z));
+	SET_HL(gb, hl);
+
+	// init VBlank function, HRAM call function
+	gb_call_ret(gb, ADDR_VBlank_Ret, INIT_WO + 0x87);
+	gb_call_ret(gb, ADDR_InitHRAMCallFunc, INIT_WO + 0x8a);
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rIF, 0);
+	gb->cpu.a = IE_VBLANK;
+	wr8(gb, rIE, gb->cpu.a);
+	gb_call_ret(gb, ADDR_InitLCD, INIT_WO + 0x94);
+
+	// enable SRAM
+	gb->cpu.a = RAMG_SRAM_ENABLE;
+	wr8(gb, rRAMG, gb->cpu.a);
+	FARCALL_RET(ValidateSaveData, INIT_WO + 0xa8);
+	gb->cpu.ime = true; // ei
+
+	// if not playing on CGB, then show the GB Incompatible screen
+	gb->cpu.a = rd8(gb, hCGB);
+	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.a = ST_GB_INCOMPATIBLE;
+		wr8(gb, wState, gb->cpu.a);
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wSubState, 0);
+	} else {
+		// otherwise, init the game state
+		gb_call_ret(gb, ADDR_InitGameState, INIT_WO + 0xbc);
+	}
+
+	// .skip_init_game_state
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wJoypadPressed, 0);
+	gb_call_ret(gb, ADDR_FillWhiteBGPal, INIT_WO + 0xc3);
+	gb->cpu.a = LCDC_ON;
+	wr8(gb, rLCDC, gb->cpu.a);
+
+	// init audio
+	gb->cpu.ime = false; // di
+	gb_call_ret(gb, ADDR_InitAudio, INIT_WO + 0xcb);
+	gb->cpu.ime = true; // ei
+	JUMP_TO(GAME_LOOP); // main game loop
+}

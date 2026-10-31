@@ -5553,3 +5553,108 @@ PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b77a6)
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, wOWUIObj1State, 0);
 }
+
+// The two scene object state machines (Func_b4b99 / Func_b4cc2): bc = the
+// object's state, its pointer kept in wCurSceneObjPtr, then a jump table
+// of animation states. A state whose animation finishes moves on to the
+// next one (Func_b4a0d) and dispatches again.
+
+// ld a, c / and $f8 / ld hl, wCurSceneObjPtr / ld [hli], a / ld [hl], b /
+// ld a, [bc]
+static void set_cur_scene_obj(GB *gb)
+{
+	gb->cpu.a = alu_and(gb, gb->cpu.c, 0xf8);
+	wr8(gb, wCurSceneObjPtr + 0, gb->cpu.a);
+	wr8(gb, wCurSceneObjPtr + 1, gb->cpu.b);
+	SET_HL(gb, wCurSceneObjPtr + 1);
+	gb->cpu.a = rd8(gb, REG_BC(gb));
+}
+
+// ld de, frameset / call UpdateCurOWObjAnimation / ld b, state / jr next
+static void anim_then(GB *gb, uint16_t frameset, uint8_t state, uint16_t next)
+{
+	SET_DE(gb, frameset);
+	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
+	gb->cpu.b = state;
+	JUMP_TO(next);
+}
+
+PORT_JUMP(Func_b4b99)
+{
+	set_cur_scene_obj(gb);
+	JUMP_TO(ADDR_Func_b4ba2); // fallthrough
+}
+
+PORT_JUMP(Func_b4ba2) { JUMP_TO(jumptable(gb, ADDR_Func_b4ba2 + 1)); }
+
+PORT_JUMP(Func_b4bfd) { SET_DE(gb, ADDR_Frameset_a9e7a); JUMP_TO(ADDR_Func_b4c60); }
+PORT_JUMP(Func_b4c0c) { SET_DE(gb, ADDR_Frameset_a9fd0); JUMP_TO(ADDR_Func_b4c60); }
+PORT_JUMP(Func_b4c11) { SET_DE(gb, ADDR_Frameset_a9e99); JUMP_TO(ADDR_Func_b4c60); }
+PORT_JUMP(Func_b4c81) { SET_DE(gb, ADDR_Frameset_a9ec8); JUMP_TO(ADDR_Func_b4c60); }
+PORT_JUMP(Func_b4c1b) { anim_then(gb, ADDR_Frameset_a9eea, 0x0b, ADDR_Func_b4c65); }
+PORT_JUMP(Func_b4c2f) { anim_then(gb, ADDR_Frameset_a9ef6, 0x0e, ADDR_Func_b4c65); }
+PORT_JUMP(Func_b4c8b) { anim_then(gb, ADDR_Frameset_a9f47, 0x1b, ADDR_Func_b4c65); }
+PORT_JUMP(Func_b4c95) { anim_then(gb, ADDR_Frameset_a9f76, 0x19, ADDR_Func_b4c65); }
+PORT_JUMP(Func_b4ca4) { anim_then(gb, ADDR_Frameset_a9faa, 0x1c, ADDR_Func_b4c65); }
+
+PORT_JUMP(Func_b4c60)
+{
+	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
+	gb->cpu.b = 0x00;
+	JUMP_TO(ADDR_Func_b4c65); // fallthrough
+}
+
+PORT_JUMP(Func_b4c65)
+{
+	gb_call(gb, ADDR_Func_b4a0d);
+	JUMP_TO((gb->cpu.f & FLAG_Z) ? ADDR_Func_b4ba2 : ADDR_Func_b4c5a);
+}
+
+PORT_JUMP(Func_b4cc2)
+{
+	set_cur_scene_obj(gb);
+	JUMP_TO(ADDR_Func_b4ccb); // fallthrough
+}
+
+PORT_JUMP(Func_b4ccb) { JUMP_TO(jumptable(gb, ADDR_Func_b4ccb + 1)); }
+
+PORT_JUMP(Func_b4d73) { SET_DE(gb, ADDR_Frameset_a96e1); JUMP_TO(ADDR_Func_b4da9); }
+PORT_JUMP(Func_b4d78) { SET_DE(gb, ADDR_Frameset_a96ea); JUMP_TO(ADDR_Func_b4da9); }
+PORT_JUMP(Func_b4d9b) { SET_DE(gb, ADDR_Frameset_a97ad); JUMP_TO(ADDR_Func_b4da9); }
+PORT_JUMP(Func_b4ddd) { SET_DE(gb, ADDR_Frameset_a97c5); JUMP_TO(ADDR_Func_b4da9); }
+PORT_JUMP(Func_b4de2) { SET_DE(gb, ADDR_Frameset_a97ef); JUMP_TO(ADDR_Func_b4da9); }
+PORT_JUMP(Func_b4d14) { anim_then(gb, ADDR_Frameset_a968d, 0x01, ADDR_Func_b4dae); }
+PORT_JUMP(Func_b4d31) { anim_then(gb, ADDR_Frameset_a9680, 0x03, ADDR_Func_b4dae); }
+PORT_JUMP(Func_b4d41) { anim_then(gb, ADDR_Frameset_a96b2, 0x09, ADDR_Func_b4dae); }
+PORT_JUMP(Func_b4d7d) { anim_then(gb, ADDR_Frameset_a96ef, 0x15, ADDR_Func_b4dae); }
+PORT_JUMP(Func_b4d87) { anim_then(gb, ADDR_Frameset_a974a, 0x15, ADDR_Func_b4dae); }
+PORT_JUMP(Func_b4de7) { anim_then(gb, ADDR_Frameset_a97b2, 0x15, ADDR_Func_b4dae); }
+
+PORT_JUMP(Func_b4da9)
+{
+	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
+	gb->cpu.b = 0x00;
+	JUMP_TO(ADDR_Func_b4dae); // fallthrough
+}
+
+PORT_JUMP(Func_b4dae)
+{
+	gb_call(gb, ADDR_Func_b4a0d);
+	JUMP_TO((gb->cpu.f & FLAG_Z) ? ADDR_Func_b4ccb : ADDR_Func_b4da3);
+}
+
+PORT_JUMP(InitOWObjects_South)
+{
+	gb->cpu.a = rd8(gb, wOWSceneActionParam);
+	JUMP_TO(jumptable(gb, ADDR_InitOWObjects_South + 4));
+}
+
+PORT_JUMP(InitOWObjects_East)
+{
+	gb->cpu.a = rd8(gb, wOWSceneActionParam);
+	JUMP_TO(jumptable(gb, ADDR_InitOWObjects_East + 4));
+}
+
+// debug_nop: nop / jr back, forever. Each pass through the dispatcher is
+// one turn of the loop, interrupts serviced in between as in the asm.
+PORT_JUMP(Func_b4001) { JUMP_TO(ADDR_Func_b4001); }

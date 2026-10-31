@@ -467,5 +467,25 @@ int main(int argc, char **argv)
 			fprintf(stdout, "  %-36s %8llu tested %4d callers %5d instr  %s:%d\n", r->name,
 				r->covered, r->callers, r->instructions, r->file, r->line);
 	}
+
+	// Everything else still in asm, with the unported callees that hold
+	// it back.
+	fprintf(out, "\n## Not ported\n\n");
+	fprintf(out, "Every routine with code that has no native version yet, and which of its\n"
+		"callees are still asm (a dash: none, so it's in \"Ready to port\").\n\n");
+	fprintf(out, "| Routine | Instructions | Waiting on | Location |\n| --- | ---: | --- | --- |\n");
+	for (int i = 0; i < nroutines; i++) {
+		Routine *r = &routines[i];
+		if (r->ported || !is_code(r))
+			continue;
+		fprintf(out, "| %s | %d | ", r->name, r->instructions);
+		int n = 0;
+		for (int k = 0; k < r->ncallees; k++) {
+			const Routine *c = &routines[r->callees[k]];
+			if (c != r && is_code(c) && !c->ported)
+				fprintf(out, "%s%s", n++ ? ", " : "", c->name);
+		}
+		fprintf(out, "%s | %s:%d |\n", n ? "" : "-", r->file, r->line);
+	}
 	return fclose(out) != 0;
 }

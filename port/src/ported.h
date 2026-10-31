@@ -51,6 +51,11 @@ void port_register(const PortInfo *info);
 // or falling through into the next label): it must end with JUMP() or
 // JUMP_TO(), or RET() on paths that return.
 #define PORT_JUMP(name) PORT_EX(name, HOOK_MANUAL_RET, 0)
+// A ROM label whose code only ever runs after being copied to RAM, where a
+// RAM hook (src/ported/home/ram_code.c) runs it natively: marks it ported
+// for the progress report. No ROM hook is registered. Use as
+// PORT_RAM(Label);
+#define PORT_RAM(name) extern int port_ram_##name
 
 // A local label of a routine (Parent.local), e.g. an object's .Update code
 // that's reached through its update pointer: PORT_LOCAL(ChestFunc, Update).

@@ -210,3 +210,5 @@ PORT_JUMP(RecoverFromTransformation_WithoutInvincibility)
 	CALL(ClearTransformationValues);
 	JUMP(ResetLevelMusicWarioPalsAndState); // fallthrough
 }
+
+PORT_JUMP(InvalidWarioStateReset) { JUMP(Init); }

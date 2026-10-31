@@ -372,3 +372,7 @@ PORT(SaveLevel)
 	SET_HL(gb, wSubState);
 	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
 }
+
+PORT_JUMP(ResetAfterPauseMenuSave) { JUMP(Init); }
+
+PORT_JUMP(ResetAfterSave) { JUMP(Init); }

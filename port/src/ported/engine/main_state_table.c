@@ -22,3 +22,5 @@ PORT_JUMP(MainStateTable)
 	gb->cpu.a = rd8(gb, wState);
 	JUMP_TO(jumptable(gb, ADDR_MainStateTable + 4));
 }
+
+PORT_JUMP(InvalidState) { JUMP(Init); }

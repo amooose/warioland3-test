@@ -3806,3 +3806,6 @@ PORT(Func_8143d)
 	wr8(gb, wOWXCoord1, gb->cpu.a);
 	wr8(gb, w2d101, gb->cpu.a);
 }
+
+// debug_nop: nop / jr back, forever (one turn per dispatch).
+PORT_JUMP(Func_81e44) { JUMP_TO(ADDR_Func_81e44); }

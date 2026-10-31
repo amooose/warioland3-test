@@ -2832,3 +2832,10 @@ PORT_LOCAL_JUMP(InitGolfHole, SetUpGolfHole)
 	gb_call(gb, ADDR_ShowGolfHoleFlagAndPar);
 	JUMP_TO(ADDR_SetUpGolfHoleObjects);
 }
+
+// unreferenced
+PORT_JUMP(Func_1c8957)
+{
+	gb->cpu.a = rd8(gb, wSubState);
+	JUMP_TO(jumptable(gb, ADDR_Func_1c8957 + 4));
+}

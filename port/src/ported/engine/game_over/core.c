@@ -182,3 +182,5 @@ PORT(Func_db3e4)
 	SET_HL(gb, wSubState);
 	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
 }
+
+PORT_JUMP(GameOverReset) { JUMP(Init); }

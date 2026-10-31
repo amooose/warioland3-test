@@ -3589,3 +3589,6 @@ PORT_LOCAL_JUMP(VBlank_PrologueEpilogue, Func)
 	gb->cpu.a = (uint8_t)(wVirtualOAM >> 8);
 	JUMP_TO(hTransferVirtualOAM);
 }
+
+// debug_nop: nop / jr back, forever (one turn per dispatch).
+PORT_JUMP(InvalidMusicBoxAction) { JUMP_TO(ADDR_InvalidMusicBoxAction); }
