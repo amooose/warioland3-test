@@ -397,6 +397,24 @@ src/ported/audio/engine.c, home/audio.c and home/audio_functions.c.
   less emulated time passes per frame. Mid-frame raster timing moves (more
   "screen alone differs" frames in the traces); nothing else does.
 
+Modules so far:
+
+- **audio** (src/native/audio): the sound engine; 13 entry points.
+- **golf** (src/native/golf), part 1: the golf building, lobby and clear
+  cutscene, entered through the two state tables (`_GolfStateTable`,
+  `_GolfBuildingStateTable`, which clobber every register: hCallFunc
+  restores af and the main loop follows). The holes (hole.asm) are still C
+  and are called from it.
+
+`src/native/routines.hpp` wraps the register-level C routines a module calls
+(DisableLCD, FarDecompress, the golf sprite helpers...): each sets the
+registers the routine takes and returns what it returns.
+
+Init routines usually start with DisableLCD, which waits for V-Blank, so
+the fuzzer's checks of them are inconclusive and only the traces check them
+(golf part 1's course menu had its score digits in the wrong rows; only the
+golf trace caught it). Make sure a recording reaches each new module.
+
 Next candidates: subsystems with a narrow boundary, like the audio engine
 had. Check a candidate's entry points and their callers' register use first.
 

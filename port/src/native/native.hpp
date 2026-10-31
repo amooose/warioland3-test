@@ -104,6 +104,19 @@ private:
 	static void port_##name(GB *gb)
 #define PORT(name) PORT_EX(name, 0, 0)
 
+// A local label (Parent.local), as PORT_LOCAL_EX in ported.h.
+#define PORT_LOCAL_EX(parent, local, flags, clobbers) \
+	static void port_##parent##__##local(GB *gb); \
+	extern "C" const PortInfo portinfo_##parent##__##local; \
+	const PortInfo portinfo_##parent##__##local = {#parent "." #local, port_##parent##__##local, (flags), (clobbers)}; \
+	static void port_##parent##__##local(GB *gb)
+
+// A HOOK_MANUAL_RET entry point's jump onwards (as in ported.h).
+#define JUMP_TO(addr) (gb->cpu.pc = static_cast<uint16_t>(addr))
+
+// Every register: for an entry point whose callers use none after it.
+#define ALL_REGISTERS (R_A | R_F | R_B | R_C | R_D | R_E | R_H | R_L)
+
 // A routine the module implements inside, with no hook of its own (its
 // callers are all in the module): marks it ported for the progress report.
 // Use as PORT_COVERED(Label);
