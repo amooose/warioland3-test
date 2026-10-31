@@ -1,13 +1,6 @@
-// Port of src/engine/language_selection/vblank.asm
+// Port of src/engine/language_selection/vblank.asm: the V-Blank function
+// (the rest is C++, src/native/screens)
 #include "ported.h"
-
-PORT(VBlank_LanguageSelection)
-{
-	SET_HL(gb, ADDR_VBlank_LanguageSelection + 0x0c); // .Func
-	SET_DE(gb, wVBlankFunc);
-	gb->cpu.b = 0x53; // .end - .Func
-	CALL(CopyHLToDE);
-}
 
 // ld a, BANK("VRAM1") / ldh [rVBK], a / then hlbgcoord 5, 7 and 5, 9 filled
 // with 13 times `top` and `bottom` (the call returns at base + ret1, ret2)

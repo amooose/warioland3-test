@@ -417,6 +417,14 @@ Modules so far:
   `LoadHiddenFigureGfx`, called from elsewhere, keep exact registers. The
   rLY-timed raster effects and the V-Blank function stay C
   (title/raster.c).
+- **screens** (src/native/screens): the GB incompatible notice, the
+  language selection, "Perfect" and the credits (`GBIncompatible`,
+  `LanguageSelection`, `Perfect`, `Credits` on a shared `Screen`). Their
+  state tables are entries that clobber every register: MainStateTable
+  returns to the main loop, which reloads them all (`ld a, [...]` right
+  after the call). No recording reaches Perfect or the GB incompatible
+  notice; the fuzzer's synthetic calls check them. The V-Blank functions
+  stay C.
 - **action help** (src/native/action_help): the whole screen. `ActionHelp`
   is the screen itself (state table, the power-up shown, the power-up bar,
   input, loaders); the 13 demonstrations are `Demo` subclasses (demo.hpp),

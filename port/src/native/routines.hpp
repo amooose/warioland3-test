@@ -179,6 +179,12 @@ inline void play_music(Memory mem, uint16_t music)
 	mem[hMusicID + 1] = static_cast<uint8_t>(music);
 }
 
+inline void stop_music(Memory mem)
+{
+	mem[hMusicID + 0] = 0xff;
+	mem[hMusicID + 1] = 0x00;
+}
+
 inline void play_music2(Memory mem, uint16_t music)
 {
 	mem[hMusicIDBackup + 0] = static_cast<uint8_t>(music >> 8);
