@@ -122,6 +122,15 @@ PORT_LOCAL_JUMP(InitWithoutDemoPowerUpReset, GameLoop)
 	// .no_reset: where all main game logic is handled
 	gb_call_ret(gb, ADDR_MainStateTable, GAME_LOOP + 0x24);
 
+	// The game logic took most of the frame on the hardware, but native code
+	// takes no time: without this, LY would still be in V-Blank here, and
+	// UpdateRoomAnimatedTiles / UpdateRoomAnimatedPals, which only animate
+	// when LY is well before V-Blank, would never animate. Let V-Blank end
+	// as it would have. (Not under test, where time is frozen.)
+	if (!gb->test.active)
+		while (rd8(gb, rLY) >= LY_VBLANK)
+			idle(gb, 32);
+
 	// update animated tiles if enabled (farcall)
 	gb->cpu.a = rd8(gb, wRoomAnimatedTilesEnabled);
 	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {

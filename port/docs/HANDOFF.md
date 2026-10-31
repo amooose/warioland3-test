@@ -162,6 +162,14 @@ Four agents ported 512 routines at once this way:
 
 ### Pitfalls that bit before
 
+- **`--input` runs the asm.** Replaying or recording turns the ported
+  routines off unless `--hooks` is given too. Check what the port does
+  with `--hooks --input X --watch ...`.
+- **Native code takes no emulated time.** Code that reads LY to see how
+  late the frame is runs differently. The animated tiles and palettes
+  stopped for that reason until the native main loop let V-Blank end
+  first. The traces replay LY at `UpdateRoomAnimatedTiles` from the asm,
+  so they can't catch this.
 - **`xor a` / `and a` / `cp` flags.** The flags have to be exact even when the
   next instruction is a farcall: hCallFunc pushes and pops af, so the
   caller sees the flags from just before it.
