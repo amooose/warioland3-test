@@ -86,76 +86,6 @@ PORT(ApplySceneWarioMovementLeft)
 	apply_scene_wario_movement(gb, a, -1);
 }
 
-// The first value of each SCENEWARIO_GROUP_* after the group
-static const uint8_t scene_wario_group_ends[] = {
-	SCENEWARIO_GROUP_00, SCENEWARIO_GROUP_01, SCENEWARIO_GROUP_02, SCENEWARIO_GROUP_03,
-	SCENEWARIO_GROUP_04, SCENEWARIO_GROUP_05, SCENEWARIO_GROUP_06, SCENEWARIO_GROUP_07,
-	SCENEWARIO_GROUP_08, SCENEWARIO_GROUP_19, SCENEWARIO_GROUP_10, SCENEWARIO_GROUP_11,
-	SCENEWARIO_GROUP_12,
-};
-
-// .LoadGfx: hl = wSceneWarioStateGroup, b = group. Sets the sprite and
-// starts a DMA of the group's tiles.
-static void scene_wario_load_gfx(GB *gb, uint16_t hl)
-{
-	gb->cpu.a = gb->cpu.b;
-	wr8(gb, hl++, gb->cpu.a); // wSceneWarioStateGroup
-	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a); // *2
-	gb->cpu.c = gb->cpu.a;
-	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a); // *4
-	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.c); // *6
-	uint16_t table = ADDR_SetSceneWarioState + 0x8e; // .WarioSpritePointers
-	gb->cpu.a = alu_add(gb, gb->cpu.a, (uint8_t)table);
-	gb->cpu.e = gb->cpu.a;
-	gb->cpu.a = alu_adc(gb, (uint8_t)(table >> 8), 0);
-	gb->cpu.d = gb->cpu.a;
-	uint16_t de = REG_DE(gb);
-	wr8(gb, hl++, rd8(gb, de++)); // wSceneWarioOAMPtr
-	wr8(gb, hl++, rd8(gb, de++));
-	wr8(gb, hl, rd8(gb, de++)); // wSceneWarioOAMBank
-	wr8(gb, wHDMABank, rd8(gb, de++));
-
-	gb->cpu.b = rd8(gb, de++);
-	gb->cpu.a = rd8(gb, de);
-	wr8(gb, wHDMA + 0, gb->cpu.a);
-	wr8(gb, wHDMA + 1, gb->cpu.b);
-	wr8(gb, wHDMA + 2, 0);
-	wr8(gb, wHDMA + 3, 0);
-	wr8(gb, wHDMA + 4, 0x80 - 1); // $80 dma_tiles
-	SET_DE(gb, de);
-
-	gb->cpu.a = 0;
-	gb->cpu.f = FLAG_Z; // xor a
-	wr8(gb, wHDMADestVRAMBank, 0);
-}
-
-// a = SCENEWARIO_* state
-PORT(SetSceneWarioState)
-{
-	uint8_t a = gb->cpu.a;
-	wr8(gb, wSceneWarioState, a);
-	uint8_t b = 0;
-	for (unsigned i = 0; i < sizeof(scene_wario_group_ends); i++, b++) {
-		alu_cp(gb, a, scene_wario_group_ends[i]);
-		if (gb->cpu.f & FLAG_C)
-			break;
-	}
-	if (b == sizeof(scene_wario_group_ends))
-		alu_cp(gb, a, SCENEWARIO_GROUP_13);
-	gb->cpu.b = b;
-
-	gb->cpu.a = rd8(gb, wSceneWarioStateGroup);
-	alu_cp(gb, gb->cpu.a, b);
-	if (!(gb->cpu.f & FLAG_Z))
-		scene_wario_load_gfx(gb, wSceneWarioStateGroup);
-	gb->cpu.a = 0;
-	gb->cpu.f = FLAG_Z; // xor a
-	wr8(gb, wSceneWarioDuration + 0, 0);
-	wr8(gb, wSceneWarioDuration + 1, 0);
-	SET_HL(gb, wSceneWarioDuration + 1);
-	wr8(gb, w2d14c, 0);
-}
-
 // copies 5 bytes from de to hl
 PORT(Func_ac9ec)
 {
@@ -357,38 +287,6 @@ PORT(Func_aca09)
 {
 	copy_bytes(gb, wTempPals2, wTempOBPals, 8 * PAL_SIZE);
 	copy_bytes(gb, wTempPals1, wTempBGPals, 8 * PAL_SIZE);
-}
-
-PORT(Func_ac4fa)
-{
-	SET_HL(gb, w2d14c);
-	gb->cpu.a = rd8(gb, w2d14c);
-	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
-	if (gb->cpu.f & FLAG_Z)
-		play_sfx(gb, SFX_12A);
-	wr8(gb, w2d14c, alu_inc(gb, rd8(gb, w2d14c)));
-	gb->cpu.c = 0x24;
-	gb->cpu.a = rd8(gb, w2d14c);
-	alu_cp(gb, gb->cpu.a, gb->cpu.c);
-	if (gb->cpu.f & FLAG_C)
-		return;
-	gb->cpu.a = 0;
-	gb->cpu.f = FLAG_Z; // xor a
-	wr8(gb, w2d14c, 0);
-}
-
-PORT(Func_ac515)
-{
-	SET_HL(gb, w2d14c);
-	wr8(gb, w2d14c, alu_inc(gb, rd8(gb, w2d14c)));
-	gb->cpu.a = rd8(gb, w2d14c);
-	alu_cp(gb, gb->cpu.a, 0x08);
-	if (gb->cpu.f & FLAG_C)
-		return;
-	gb->cpu.a = 0;
-	gb->cpu.f = FLAG_Z; // xor a
-	wr8(gb, w2d14c, 0);
-	play_sfx(gb, SFX_137);
 }
 
 PORT(ClearText)
@@ -715,35 +613,6 @@ static void scene_wario_do_animation(GB *gb)
 		return;
 	case SCENEWARIO_IDLE_FRONT: scene_wario_update_animation(gb, ADDR_Frameset_1fc316); return;
 	}
-}
-
-PORT_JUMP(UpdateSceneWario)
-{
-	if (rd8(gb, wSceneWarioState) >= NUM_SCENEWARIO_STATES) {
-		// out of the table: run the asm's call .DoAnimation as is
-		gb_push16(gb, ADDR_UpdateSceneWario + 3);
-		gb->cpu.a = rd8(gb, wSceneWarioState);
-		JUMP_TO(jumptable(gb, ADDR_UpdateSceneWario + 0x23));
-		return;
-	}
-	scene_wario_do_animation(gb);
-	gb->cpu.a = rd8(gb, wSceneWarioState);
-	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
-	if (gb->cpu.f & FLAG_Z) {
-		RET();
-		return;
-	}
-	gb->cpu.e = rd8(gb, wSceneWarioOAMPtr + 0);
-	gb->cpu.d = rd8(gb, wSceneWarioOAMPtr + 1);
-	gb->cpu.a = rd8(gb, wSceneWarioOAMBank);
-	gb->cpu.b = gb->cpu.a;
-	SET_HL(gb, wSceneWario);
-	gb->cpu.a = rd8(gb, wSceneWarioIgnoreScroll);
-	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
-	if (gb->cpu.f & FLAG_Z)
-		JUMP(LoadOWSpriteWithScroll);
-	else
-		JUMP(LoadOWSprite);
 }
 
 // prints text given in wTextBuffer

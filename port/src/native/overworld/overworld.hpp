@@ -824,6 +824,29 @@ private:
 	Routines routines_;
 };
 
+// Wario in the overworld's scenes (bank2b.asm): his state's animation
+// (a table of framesets and the states they end in), his sprite, and the
+// sprites and tiles of each group of states.
+class SceneWario {
+public:
+	explicit SceneWario(GB *gb) : gb_(gb), mem_(gb), routines_(gb) {}
+
+	void update(); // UpdateSceneWario
+	void set_state(uint8_t state); // SetSceneWarioState
+
+private:
+	void unrealistic();
+	void animate(); // UpdateSceneWario.DoAnimation
+	void footsteps(); // Func_ac4fa
+	void panic_steps(); // Func_ac515
+	void look_around_sounds(); // UpdateSceneWario.asm_ac65f
+	void look_up_sounds();
+
+	GB *gb_;
+	Memory mem_;
+	Routines routines_;
+};
+
 // The map's palettes and tile updates (bank21.asm): the day and night
 // transitions (each colour stepped in a ColourFadeStruct), the PalConfig
 // fades (FadePalConfig), the level name's, and the scenes' tile blocks.

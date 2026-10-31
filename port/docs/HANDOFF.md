@@ -550,8 +550,12 @@ Modules so far:
   `TempleScene` (temple_scene.cpp, entries `_InitTempleScene`,
   `_UpdateTempleScene` and every sub-scene of the hidden figure's reveal:
   the music boxes, the shake and the rocks' drops, Wario's panic run, the
-  hands). Scene Wario, the temple objects (UpdateTempleSceneObjs) and the
-  text printing stay C, called by address.
+  hands). `SceneWario` (scene_wario.cpp, entries `UpdateSceneWario` and
+  `SetSceneWarioState`: the 61 states' animations as a table, each group's
+  sprites and tiles). SetSceneWarioState leaves every register as the asm
+  (C still calls it); UpdateSceneWario with no state leaves de, hl, a and f
+  as JumpTable to .None does (InitTempleScene's C passes them on). The
+  temple and prologue scene objects and the text printing stay C.
 - Testing gotcha: TaskStop on a background test job kills only its outer
   shell; the MSYS bash, ctest, fuzz_batch's sh and their wl3 runs go on and
   hold build/wl3.exe (the next link fails with "Permission denied", and a
