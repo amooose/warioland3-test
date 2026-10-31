@@ -22,14 +22,14 @@ void LeadOverallsDemo::run()
 void LeadOverallsDemo::run_state()
 {
 	switch (wram_.action_help_state()) {
-	case 0: call(ADDR_ActionHelp_Init); break;
+	case 0: init_demo(); break;
 	case 1:
 		if (timer_done())
 			start();
 		break;
 	case 2: approach(); break;
 	case 3: jump_at_enemy(); break;
-	case 4: call(ADDR_ActionHelp_FlashDDownInput); break;
+	case 4: flash_ddown(); break;
 	case 5: pound_enemy(); break;
 	case 6: land(); break;
 	case 7: blocks_come(); break;
@@ -66,9 +66,9 @@ void LeadOverallsDemo::run_state()
 // Wario walks in towards a Para-Goom.
 void LeadOverallsDemo::start()
 {
-	call(ADDR_ActionHelp_ShowInitialWarioWalk);
+	show_initial_wario_walk();
 	show_dright();
-	call(ADDR_ActionHelp_ShowParaGoomWalk);
+	show_paragoom_walk();
 	hide_obj5_debris();
 	load_pals_without_water();
 	next_state();
@@ -87,7 +87,7 @@ void LeadOverallsDemo::jump_at_enemy()
 {
 	if (jump_towards_enemy())
 		return;
-	call(ADDR_ActionHelp_ShowWarioSmashAttack);
+	show_wario_smash_attack();
 	clear_buttons();
 	next_state();
 }
@@ -98,7 +98,7 @@ void LeadOverallsDemo::pound_enemy()
 		return;
 	wario().y() = 0x34;
 	wario_var() = 0x0a;
-	call(ADDR_ActionHelp_ShowObj4EnemyVanish);
+	show_obj4_enemy_vanish();
 	next_state();
 }
 
@@ -108,7 +108,7 @@ void LeadOverallsDemo::land()
 		return;
 	wario().y() = 0x40;
 	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioGroundPound);
+	show_wario_ground_pound();
 	next_state();
 }
 
@@ -116,8 +116,8 @@ void LeadOverallsDemo::blocks_come()
 {
 	if (!wram_.menu_obj4_animation_ended())
 		return;
-	call(ADDR_ActionHelp_ShowVerticalBlockPair);
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_vertical_block_pair();
+	show_wario_idle();
 	clear_dpad();
 	timer() = 0x30;
 	next_state();
@@ -129,10 +129,9 @@ void LeadOverallsDemo::pound_top_block()
 		return;
 	wario().y() = 0x20;
 	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioGroundPound);
-	call(ADDR_ActionHelp_ShowSingleSolidBlock);
-	gb_->cpu.b = 0x10; // the debris's y offset
-	call(ADDR_ActionHelp_ShowBlockDebrisWithYOffset);
+	show_wario_ground_pound();
+	show_single_solid_block();
+	show_block_debris_with_y_offset(0x10);
 	timer() = 0x10;
 	next_state();
 }
@@ -142,7 +141,7 @@ void LeadOverallsDemo::pound_again()
 	if (!timer_done())
 		return;
 	wario_var() = 0x18;
-	call(ADDR_ActionHelp_ShowWarioSmashAttack);
+	show_wario_smash_attack();
 	hide_obj5_debris();
 	next_state();
 }
@@ -153,7 +152,7 @@ void LeadOverallsDemo::pound_lower_block()
 		return;
 	wario().y() = 0x30;
 	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioGroundPound);
+	show_wario_ground_pound();
 	timer() = 0x10;
 	next_state();
 }
@@ -162,7 +161,7 @@ void LeadOverallsDemo::stand()
 {
 	if (!timer_done())
 		return;
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	clear_dpad();
 	timer() = 0x30;
 	next_state();
@@ -189,7 +188,7 @@ void LeadOverallsDemo::fall_off()
 	wario().y() = 0x40;
 	wario_var() = 0;
 	clear_buttons();
-	call(ADDR_ActionHelp_ShowWarioWalk);
+	show_wario_walk();
 	show_dright();
 	init_object(enemy(), 0x50, 0xc0, ADDR_Frameset_1e6f66, ADDR_OAM_1e6bab, BANK_OAM_1e6bab);
 	init_object(object(wMenuObj5), 0x40, 0xb8, ADDR_Frameset_1e6b8b, ADDR_OAM_1e697c, BANK_OAM_1e697c);
@@ -208,8 +207,8 @@ void LeadOverallsDemo::futamogu_comes()
 {
 	if (!move_futamogu(0x40))
 		return;
-	call(ADDR_ActionHelp_ShowWarioIdle);
-	call(ADDR_ActionHelp_ShowFutamoguAngry);
+	show_wario_idle();
+	show_futamogu_angry();
 	clear_dpad();
 	timer() = 0x30;
 	next_state();
@@ -220,8 +219,8 @@ void LeadOverallsDemo::jump_at_futamogu()
 	if (!timer_done())
 		return;
 	show_a();
-	call(ADDR_ActionHelp_ShowWarioJump);
-	call(ADDR_ActionHelp_ShowFutamoguHappy);
+	show_wario_jump();
+	show_futamogu_happy();
 	next_state();
 }
 
@@ -230,8 +229,8 @@ void LeadOverallsDemo::smash_down()
 	jump_wario();
 	if (wario_var() < 0x18)
 		return;
-	call(ADDR_ActionHelp_ShowWarioSmashAttack);
-	call(ADDR_ActionHelp_ShowDDownInput);
+	show_wario_smash_attack();
+	show_ddown();
 	clear_buttons();
 	next_state();
 }
@@ -242,7 +241,7 @@ void LeadOverallsDemo::pound_futamogu(uint8_t y)
 	if (jump_above(y))
 		return;
 	wario().y() = y;
-	call(ADDR_ActionHelp_ShowWarioGroundPound);
+	show_wario_ground_pound();
 	enemy().y() += 4;
 	if (y == 0x40)
 		enemy().set_frameset(ADDR_Frameset_1e6f7d);
@@ -254,7 +253,7 @@ void LeadOverallsDemo::smash_again()
 {
 	if (!timer_done())
 		return;
-	call(ADDR_ActionHelp_ShowWarioSmashAttack);
+	show_wario_smash_attack();
 	next_state();
 }
 
@@ -263,7 +262,7 @@ void LeadOverallsDemo::bounce()
 	if (!timer_done())
 		return;
 	wario_var() = 0x18;
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	clear_dpad();
 	next_state();
 }
@@ -292,8 +291,8 @@ void LeadOverallsDemo::climb_out()
 	--enemy().y();
 	if (--wario().y() != 0x40)
 		return;
-	call(ADDR_ActionHelp_ShowWarioIdle);
-	call(ADDR_ActionHelp_ShowFutamoguAngry);
+	show_wario_idle();
+	show_futamogu_angry();
 	timer() = 0x30;
 	next_state();
 }
@@ -303,8 +302,8 @@ void LeadOverallsDemo::walk_on()
 	if (!timer_done())
 		return;
 	show_dright();
-	call(ADDR_ActionHelp_ShowWarioWalk);
-	call(ADDR_ActionHelp_ShowFutamoguHappy);
+	show_wario_walk();
+	show_futamogu_happy();
 	next_state();
 }
 

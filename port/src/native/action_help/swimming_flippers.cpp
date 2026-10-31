@@ -22,7 +22,7 @@ void WaterDemo::draw()
 void SwimmingFlippersDemo::run_state()
 {
 	switch (wram_.action_help_state()) {
-	case 0: call(ADDR_ActionHelp_Init); break;
+	case 0: init_demo(); break;
 	case 1:
 		if (timer_done())
 			start();
@@ -33,16 +33,16 @@ void SwimmingFlippersDemo::run_state()
 	case 5:
 		if (!timer_done())
 			break;
-		call(ADDR_ActionHelp_ShowWarioSubmerge);
+		show_wario_submerge();
 		next_state();
 		break;
-	case 6: call(ADDR_ActionHelp_FlashDDownInput); break;
+	case 6: flash_ddown(); break;
 	case 7: dive(); break;
 	case 8: swim_right(); break;
 	case 9: swim_down(0x03, false); break;
 	case 10: swim_left_up(); break;
 	case 11: swim_up(); break;
-	case 12: call(ADDR_ActionHelp_FlashBInput); break;
+	case 12: flash_b(); break;
 	case 13: thrust(); break;
 	case 14: swim_down(0x03, true); break;
 	case 15: swim_back(); break;
@@ -86,7 +86,7 @@ void WaterDemo::walk_to_water()
 {
 	if (++wario().x() < 0x2c)
 		return;
-	call(ADDR_ActionHelp_ShowWarioJump);
+	show_wario_jump();
 	wario_var() = 0x18;
 	next_state();
 }
@@ -97,7 +97,7 @@ void WaterDemo::jump_in()
 	if (jump_above(0x50))
 		return;
 	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioSwim);
+	show_wario_swim();
 	clear_dpad();
 	timer() = 0x30;
 	next_state();
@@ -122,7 +122,7 @@ void WaterDemo::swim_right()
 		return;
 	if (++wario().x() < 0x6c)
 		return;
-	call(ADDR_ActionHelp_ShowDDownInput);
+	show_ddown();
 	timer() = 0x10;
 	next_state();
 }
@@ -147,7 +147,7 @@ void WaterDemo::swim_left_up()
 	if (--wario().x() >= 0x34)
 		return;
 	wario().x() = 0x34;
-	call(ADDR_ActionHelp_ShowDUpInput);
+	show_dup();
 	timer() = 0x10;
 	next_state();
 }
@@ -159,7 +159,7 @@ void SwimmingFlippersDemo::swim_up()
 		return;
 	if (--wario().y() >= 0x58)
 		return;
-	call(ADDR_ActionHelp_ShowWarioUnderwaterThrust);
+	show_wario_underwater_thrust();
 	clear_dpad();
 	next_state();
 }
@@ -172,8 +172,8 @@ void SwimmingFlippersDemo::thrust()
 		return;
 	if (++wario().x() < 0x6c)
 		return;
-	call(ADDR_ActionHelp_ShowWarioSubmerge);
-	call(ADDR_ActionHelp_ShowDDownInput);
+	show_wario_submerge();
+	show_ddown();
 	clear_buttons();
 	timer() = 0x10;
 	next_state();
@@ -185,7 +185,7 @@ void SwimmingFlippersDemo::swim_back()
 	if (--wario().x() >= 0x50)
 		return;
 	wario().x() = 0x50;
-	call(ADDR_ActionHelp_ShowWarioUnderwaterThrust);
+	show_wario_underwater_thrust();
 	show_b();
 	next_state();
 }
@@ -196,7 +196,7 @@ void SwimmingFlippersDemo::thrust_again()
 	if (++timer() < 0x30)
 		return;
 	timer() = 0;
-	call(ADDR_ActionHelp_ShowWarioSubmerge);
+	show_wario_submerge();
 	clear_buttons();
 	next_state();
 }
@@ -208,7 +208,7 @@ void WaterDemo::surface()
 		return;
 	if (--wario().y() >= 0x50)
 		return;
-	call(ADDR_ActionHelp_ShowWarioSwimLeft);
+	show_wario_swim_left();
 	clear_dpad();
 	timer() = 0x30;
 	next_state();
@@ -218,8 +218,8 @@ void WaterDemo::jump_out()
 {
 	if (!timer_done())
 		return;
-	call(ADDR_ActionHelp_ShowWarioJumpLeft);
-	call(ADDR_ActionHelp_ShowDLeftInput);
+	show_wario_jump_left();
+	show_dleft();
 	show_a();
 	wario_var() = 0;
 	next_state();

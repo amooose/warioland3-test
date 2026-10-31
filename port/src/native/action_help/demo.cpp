@@ -54,7 +54,7 @@ void Demo::wait_then_walk()
 {
 	if (!timer_done())
 		return;
-	call(ADDR_ActionHelp_ShowWarioWalk);
+	show_wario_walk();
 	show_dright();
 	next_state();
 }
@@ -62,14 +62,14 @@ void Demo::wait_then_walk()
 void Demo::start_jump()
 {
 	show_a();
-	call(ADDR_ActionHelp_ShowWarioJump);
+	show_wario_jump();
 	next_state();
 }
 
 void Demo::start_attack()
 {
 	show_b();
-	call(ADDR_ActionHelp_ShowWarioAttack);
+	show_wario_attack();
 	wario_var() = 0x30;
 	next_state();
 }
@@ -123,7 +123,7 @@ void Demo::jump_onto_blocks()
 		return;
 	wario().y() = 0x20;
 	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	clear_buttons();
 	timer() = 0x30;
 	next_state();
@@ -134,8 +134,8 @@ void Demo::high_jump()
 	if (!jump_above(0x0c))
 		return;
 	wario_var() = 0x18;
-	call(ADDR_ActionHelp_ShowWarioSmashAttack);
-	call(ADDR_ActionHelp_ShowDDownInput);
+	show_wario_smash_attack();
+	show_ddown();
 	clear_buttons();
 	next_state();
 }
@@ -182,7 +182,7 @@ void Demo::jump_over()
 	}
 	wario_var() = 0;
 	wario().y() = 0x40;
-	call(ADDR_ActionHelp_ShowWarioWalk);
+	show_wario_walk();
 	clear_buttons();
 	next_state();
 }
@@ -196,7 +196,7 @@ void Demo::ride_slide()
 		++wario().y();
 		return;
 	}
-	call(ADDR_ActionHelp_ShowWarioSlide);
+	show_wario_slide();
 	next_state();
 }
 
@@ -214,7 +214,7 @@ void Demo::roll()
 	if (enemy().x() >= 0x18)
 		return;
 	clear_dpad();
-	call(ADDR_ActionHelp_ShowWarioRoll);
+	show_wario_roll();
 	next_state();
 }
 
@@ -225,7 +225,7 @@ void Demo::bounce_off()
 	if (wario_var() < 0x18 || wario().y() < 0x40)
 		return;
 	wario().y() = 0x40;
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	wario_var() = 0;
 	timer() = 0x30;
 	next_state();
@@ -241,7 +241,7 @@ void Demo::approach_last_slide()
 	if (static_cast<uint8_t>(slide_x - wario_x) >= 0x1c)
 		return;
 	show_a();
-	call(ADDR_ActionHelp_ShowWarioJump);
+	show_wario_jump();
 	next_state();
 }
 
@@ -254,29 +254,9 @@ void Demo::animate_object(MenuObject obj, uint16_t bank_field, uint16_t ended_fi
 		mem_[ended_field] = wram_.obj_anim_was_reset();
 }
 
-void Demo::load_object_sprite(MenuObject obj)
-{
-	SET_HL(gb_, obj.addr());
-	routines_.farcall(BANK_LoadActionHelpSprite_Far, ADDR_LoadActionHelpSprite_Far);
-}
-
 void Demo::animate_wario(uint8_t bank)
 {
 	wario().animate_far(bank);
-}
-
-void Demo::load_wario_sprite()
-{
-	SET_HL(gb_, wActionHelpWario);
-	routines_.farcall(BANK_LoadActionHelpWarioSprite, ADDR_LoadActionHelpWarioSprite);
-}
-
-void Demo::show_block_debris(MenuObject obj, uint8_t y, uint8_t x)
-{
-	SET_HL(gb_, obj.addr());
-	gb_->cpu.b = y;
-	gb_->cpu.c = x;
-	call(ADDR_ActionHelp_ShowBlockDebris);
 }
 
 void Demo::load_pals_without_water()

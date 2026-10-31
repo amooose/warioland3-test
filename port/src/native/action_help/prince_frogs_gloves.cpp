@@ -12,7 +12,7 @@ void PrinceFrogsGlovesDemo::run()
 void PrinceFrogsGlovesDemo::run_state()
 {
 	switch (wram_.action_help_state()) {
-	case 0: call(ADDR_ActionHelp_Init); break;
+	case 0: init_demo(); break;
 	case 1:
 		if (timer_done())
 			start();
@@ -23,15 +23,15 @@ void PrinceFrogsGlovesDemo::run_state()
 	case 5:
 		if (!timer_done())
 			break;
-		call(ADDR_ActionHelp_ShowDDownInput);
-		call(ADDR_ActionHelp_ShowWarioSubmerge);
+		show_ddown();
+		show_wario_submerge();
 		next_state();
 		break;
 	case 6: dive(); break;
 	case 7: swim_right(); break;
 	case 8: swim_down(0x03, false); break;
 	case 9: stop_at(0x50, false); break;
-	case 10: call(ADDR_ActionHelp_FlashBInput); break;
+	case 10: flash_b(); break;
 	case 11: thrust(); break;
 	case 12: stop_at(0x34, true); break;
 	case 13: short_thrust(); break;
@@ -51,7 +51,7 @@ void PrinceFrogsGlovesDemo::stop_at(uint8_t x, bool b_prompt)
 	if (--wario().x() >= x)
 		return;
 	wario().x() = x;
-	call(ADDR_ActionHelp_ShowWarioUnderwaterStopped);
+	show_wario_underwater_stopped();
 	if (b_prompt)
 		show_b();
 	next_state();
@@ -71,7 +71,7 @@ void PrinceFrogsGlovesDemo::thrust()
 	swim_fast();
 	if (!thrust_right(0x58, 0x6c))
 		return;
-	call(ADDR_ActionHelp_ShowWarioSubmerge);
+	show_wario_submerge();
 	clear_buttons();
 	next_state();
 }
@@ -94,12 +94,12 @@ void PrinceFrogsGlovesDemo::thrust_again()
 	if (timer()) {
 		if (--timer())
 			return;
-		call(ADDR_ActionHelp_ShowWarioUnderwaterStopped);
+		show_wario_underwater_stopped();
 		show_b();
 	}
 	if (!thrust_right(0x58, 0x6c))
 		return;
-	call(ADDR_ActionHelp_ShowWarioSubmerge);
+	show_wario_submerge();
 	clear_buttons();
 	next_state();
 }

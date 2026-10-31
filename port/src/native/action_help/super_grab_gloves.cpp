@@ -24,7 +24,7 @@ void SuperGrabGlovesDemo::run()
 void SuperGrabGlovesDemo::run_state()
 {
 	switch (wram_.action_help_state()) {
-	case 0: call(ADDR_ActionHelp_Init); break;
+	case 0: init_demo(); break;
 	case 1:
 		if (timer_done())
 			start();
@@ -34,7 +34,7 @@ void SuperGrabGlovesDemo::run_state()
 	case 4:
 		if (!timer_done())
 			break;
-		call(ADDR_ActionHelp_ShowWarioBeginThrow);
+		show_wario_begin_throw();
 		show_b();
 		timer() = 0x20;
 		next_state();
@@ -48,14 +48,14 @@ void SuperGrabGlovesDemo::run_state()
 		if (!timer_done())
 			break;
 		timer() = 0x20;
-		call(ADDR_ActionHelp_ShowDUpInput);
+		show_dup();
 		next_state();
 		break;
 	case 11:
 		if (!timer_done())
 			break;
 		timer() = 0x30;
-		call(ADDR_ActionHelp_ShowWarioBeginThrow);
+		show_wario_begin_throw();
 		show_b();
 		next_state();
 		break;
@@ -67,7 +67,7 @@ void SuperGrabGlovesDemo::run_state()
 	case 17:
 		if (!timer_done())
 			break;
-		call(ADDR_ActionHelp_ShowWarioGrabWalk);
+		show_wario_grab_walk();
 		show_dright();
 		next_state();
 		break;
@@ -75,7 +75,7 @@ void SuperGrabGlovesDemo::run_state()
 	case 19:
 		if (!timer_done())
 			break;
-		call(ADDR_ActionHelp_ShowWarioChargeThrow);
+		show_wario_charge_throw();
 		next_state();
 		break;
 	case 20: charged(); break;
@@ -90,11 +90,11 @@ void SuperGrabGlovesDemo::run_state()
 // Wario walks in; Count Richtertoff stands stunned under a pillar.
 void SuperGrabGlovesDemo::start()
 {
-	call(ADDR_ActionHelp_ShowInitialWarioWalk);
+	show_initial_wario_walk();
 	show_dright();
-	call(ADDR_ActionHelp_ShowCountRichtertoffIdle);
-	call(ADDR_ActionHelp_ShowCountRichtertoffStun);
-	call(ADDR_ActionHelp_ShowOverheadPillar);
+	show_count_richtertoff_idle();
+	show_count_richtertoff_stun();
+	show_overhead_pillar();
 	load_pals_without_water();
 	next_state();
 }
@@ -110,7 +110,7 @@ void SuperGrabGlovesDemo::grab()
 	if (--enemy().x() >= 0x48)
 		return;
 	hold(0x05, 0x10);
-	call(ADDR_ActionHelp_ShowWarioSlowGrab);
+	show_wario_slow_grab();
 	clear_dpad();
 	next_state();
 }
@@ -126,7 +126,7 @@ void SuperGrabGlovesDemo::lift()
 	if (!wario().animation_ended())
 		return;
 	timer() = 0x30;
-	call(ADDR_ActionHelp_ShowWarioBeginGrab);
+	show_wario_begin_grab();
 	next_state();
 }
 
@@ -134,8 +134,8 @@ void SuperGrabGlovesDemo::throw_count()
 {
 	if (!timer_done())
 		return;
-	call(ADDR_ActionHelp_ShowWarioThrow);
-	call(ADDR_ActionHelp_ShowCountRichtertoffThrown);
+	show_wario_throw();
+	show_count_richtertoff_thrown();
 	clear_buttons();
 	next_state();
 }
@@ -143,7 +143,7 @@ void SuperGrabGlovesDemo::throw_count()
 void GrabDemo::idle_when_done()
 {
 	if (wario().animation_ended())
-		call(ADDR_ActionHelp_ShowWarioIdle);
+		show_wario_idle();
 }
 
 // The enemy's flight: forwards to the ground, then a bounce.
@@ -156,12 +156,11 @@ void GrabDemo::throw_arc(uint16_t stun, bool pillar)
 		enemy().x() += 2;
 		if (pillar && enemy().x() >= object(wMenuObj6).x()) {
 			// the Para-Goom breaks the pillar (.Func_1f9a25)
-			gb_->cpu.b = 0x00;
-			call(ADDR_ActionHelp_ShowBlockDebrisWithYOffset);
+			show_block_debris_with_y_offset(0x00);
 			MenuObject debris = object(wMenuObj5);
 			debris.y() = object(wMenuObj6).y();
 			debris.x() = object(wMenuObj6).x();
-			call(ADDR_ActionHelp_ShowOverheadPillar);
+			show_overhead_pillar();
 		}
 		if (t < 0x03)
 			return;
@@ -188,7 +187,7 @@ void GrabDemo::throw_arc(uint16_t stun, bool pillar)
 		++y;
 	else if ((y += 2) >= 0x40) {
 		y = 0x40;
-		call(ADDR_ActionHelp_ShowWarioIdle);
+		show_wario_idle();
 		call(stun);
 		timer() = 0x20;
 		next_state();
@@ -237,7 +236,7 @@ void GrabDemo::high_throw_arc(uint16_t stun)
 		++y;
 	else if ((y += 2) >= 0x40) {
 		y = 0x40;
-		call(ADDR_ActionHelp_ShowWarioIdle);
+		show_wario_idle();
 		call(stun);
 		timer() = 0x30;
 		next_state();
@@ -248,7 +247,7 @@ void SuperGrabGlovesDemo::approach_wall()
 {
 	if (--object(wMenuObj6).x() >= 0x80)
 		return;
-	call(ADDR_ActionHelp_ShowWarioBeginThrow);
+	show_wario_begin_throw();
 	clear_dpad();
 	show_b();
 	timer() = 0x50;
@@ -260,7 +259,7 @@ void GrabDemo::charged()
 	play_sfx_rept(30, SFX_FULLY_CHARGED_THROW);
 	if (!wario().animation_ended())
 		return;
-	call(ADDR_ActionHelp_ShowWarioFullyChargedGrab);
+	show_wario_fully_charged_grab();
 	enemy().x() -= 8;
 	timer() = 0x30;
 	next_state();
@@ -271,7 +270,7 @@ void GrabDemo::charged_throw(uint16_t thrown)
 	play_sfx_rept(30, SFX_FULLY_CHARGED_THROW);
 	if (!timer_done())
 		return;
-	call(ADDR_ActionHelp_ShowWarioFullyChargedThrow);
+	show_wario_fully_charged_throw();
 	call(thrown);
 	clear_buttons();
 	next_state();
@@ -284,8 +283,8 @@ void GrabDemo::hit_wall()
 	uint8_t wall = static_cast<uint8_t>(object(wMenuObj6).x() - 0x10);
 	if ((enemy().x() += 4) < wall)
 		return;
-	call(ADDR_ActionHelp_ShowWarioIdle);
-	call(ADDR_ActionHelp_ShowObj4EnemyVanish);
+	show_wario_idle();
+	show_obj4_enemy_vanish();
 	next_state();
 }
 
@@ -294,7 +293,7 @@ void GrabDemo::enemy_gone()
 	if (!wram_.menu_obj4_animation_ended())
 		return;
 	enemy().x() = 0xe8;
-	call(ADDR_ActionHelp_ShowWarioWalk);
+	show_wario_walk();
 	show_dright();
 	next_state();
 }

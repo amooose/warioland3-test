@@ -1,26 +1,7 @@
-// The Owl demonstration, and what the transformations' demonstrations
-// share; see demo.hpp.
+// The Owl demonstration; see demo.hpp.
 #include "demo.hpp"
 
 namespace wl3::action_help {
-
-void SpecialDemo::load_object_sprite_near(MenuObject obj)
-{
-	SET_HL(gb_, obj.addr());
-	call(ADDR_LoadActionHelpSprite_Far);
-}
-
-void SpecialDemo::load_wario_sprite_from_bank()
-{
-	SET_HL(gb_, wActionHelpWario);
-	call(ADDR_LoadActionHelpWarioSprite_FromBank);
-}
-
-void SpecialDemo::hide_block_debris(MenuObject obj)
-{
-	SET_HL(gb_, obj.addr());
-	routines_.farcall(BANK_ActionHelp_HideBlockDebris, ADDR_ActionHelp_HideBlockDebris);
-}
 
 void OwlDemo::run()
 {
@@ -32,13 +13,13 @@ void OwlDemo::run()
 		animate_object(wario(), wActionHelpWarioOAMBank, 0);
 	}
 	load_wario_sprite_from_bank();
-	load_object_sprite_near(enemy());
+	load_object_sprite(enemy());
 }
 
 void OwlDemo::run_state()
 {
 	switch (wram_.action_help_state()) {
-	case 0: call(ADDR_ActionHelp2_Init); break;
+	case 0: init_demo(); break;
 	case 1:
 		if (timer_done())
 			start();
@@ -50,14 +31,14 @@ void OwlDemo::run_state()
 	case 6: fly_right(); break;
 	case 7: glide_left(); break;
 	case 8: glide_right(); break;
-	case 9: call(ADDR_ActionHelp2_FlashBInput); break;
+	case 9: flash_b_far(); break;
 	case 10: drop(); break;
 	case 11:
 		enemy().y() -= 2;
 		if (!timer_done())
 			break;
-		call(ADDR_ActionHelp2_ShowDRightInput);
-		call(ADDR_ActionHelp2_ShowWarioWalk);
+		show_dright();
+		show_wario_walk2();
 		next_state();
 		break;
 	case 12:
@@ -79,7 +60,7 @@ void OwlDemo::start()
 	mem_[wActionHelpWarioOAMPtr + 0] = static_cast<uint8_t>(ADDR_OAM_1fddb4 >> 8);
 	mem_[wActionHelpWarioOAMPtr + 1] = static_cast<uint8_t>(ADDR_OAM_1fddb4);
 	wram_.action_help_wario_oam_bank() = BANK_OAM_1fddb4;
-	hide_block_debris(enemy());
+	hide_block_debris_far(enemy());
 	call(ADDR_LoadActionHelpPalsWithoutWater);
 	next_state();
 }
@@ -96,8 +77,8 @@ void OwlDemo::fly_left()
 		return;
 	if (--wario().x() >= 0x60)
 		return;
-	call(ADDR_ActionHelp2_ShowDUpInput);
-	call(ADDR_ActionHelp_ShowWarioHangVertical);
+	show_dup();
+	show_wario_hang_vertical();
 	next_state();
 }
 
@@ -107,7 +88,7 @@ void OwlDemo::fly_up()
 		return;
 	uint8_t y = --wario().y();
 	if (y == 0x34) {
-		clear_dpad2();
+		clear_dpad();
 		return;
 	}
 	if (y < 0x20)
@@ -120,8 +101,8 @@ void OwlDemo::fly_down()
 		return;
 	if (++wario().y() < 0x38)
 		return;
-	call(ADDR_ActionHelp2_ShowDLeftInput);
-	call(ADDR_ActionHelp_ShowWarioHangHorizontal);
+	show_dleft();
+	show_wario_hang_horizontal();
 	next_state();
 }
 
@@ -131,12 +112,12 @@ void OwlDemo::fly_left_again()
 		return;
 	uint8_t x = --wario().x();
 	if (x == 0x5c) {
-		clear_dpad2();
+		clear_dpad();
 		return;
 	}
 	if (x >= 0x10)
 		return;
-	call(ADDR_ActionHelp_ShowWarioHangOwlRight);
+	show_wario_hang_owl_right();
 	next_state();
 }
 
@@ -147,8 +128,8 @@ void OwlDemo::fly_right()
 	if (++wario().x() < 0x60)
 		return;
 	wram_.sfx_timer() = 0;
-	call(ADDR_ActionHelp2_ShowDLeftInput);
-	call(ADDR_ActionHelp_ShowWarioOwlMoveHang);
+	show_dleft();
+	show_wario_owl_move_hang();
 	next_state();
 }
 
@@ -157,8 +138,8 @@ void OwlDemo::glide_left()
 	flap(16, false);
 	if (--wario().x() >= 0x20)
 		return;
-	call(ADDR_ActionHelp2_ShowDRightInput);
-	call(ADDR_ActionHelp_ShowWarioOwlMoveHangRight);
+	show_dright();
+	show_wario_owl_move_hang_right();
 	next_state();
 }
 
@@ -167,9 +148,9 @@ void OwlDemo::glide_right()
 	flap(16, false);
 	if (++wario().x() < 0x80)
 		return;
-	clear_dpad2();
-	call(ADDR_ActionHelp_ShowWarioHangDrop);
-	call(ADDR_ActionHelp_ShowOwlFlyUp);
+	clear_dpad();
+	show_wario_hang_drop();
+	show_owl_fly_up();
 	next_state();
 }
 
@@ -179,8 +160,8 @@ void OwlDemo::drop()
 	enemy().y() -= 2;
 	if (++wario().y() < 0x40)
 		return;
-	clear_buttons2();
-	call(ADDR_ActionHelp2_ShowWarioIdle);
+	clear_buttons();
+	show_wario_idle2();
 	timer() = 0x30;
 	next_state();
 }

@@ -22,7 +22,7 @@ void HeadSmashHelmetDemo::run()
 void HeadSmashHelmetDemo::run_state()
 {
 	switch (wram_.action_help_state()) {
-	case 0: call(ADDR_ActionHelp_Init); break;
+	case 0: init_demo(); break;
 	case 1:
 		if (timer_done())
 			start();
@@ -31,10 +31,10 @@ void HeadSmashHelmetDemo::run_state()
 	case 3:
 		if (!timer_done())
 			break;
-		call(ADDR_ActionHelp_ShowWarioJump);
+		show_wario_jump();
 		next_state();
 		break;
-	case 4: call(ADDR_ActionHelp_FlashAInput); break;
+	case 4: flash_a(); break;
 	case 5: head_smash(ADDR_Frameset_1e6b67); break;
 	case 6: land(); break;
 	case 7:
@@ -45,7 +45,7 @@ void HeadSmashHelmetDemo::run_state()
 	case 9:
 		if (!timer_done())
 			break;
-		call(ADDR_ActionHelp_ShowWarioJump);
+		show_wario_jump();
 		show_a();
 		next_state();
 		break;
@@ -63,7 +63,7 @@ void HeadSmashHelmetDemo::run_state()
 // Wario walks in; a block (wMenuObj4) comes in above.
 void HeadSmashHelmetDemo::start()
 {
-	call(ADDR_ActionHelp_ShowInitialWarioWalk);
+	show_initial_wario_walk();
 	show_dright();
 	init_object(enemy(), 0x20, 0xe8, ADDR_Frameset_1e6b64, ADDR_OAM_1e697c, BANK_OAM_1e697c);
 	hide_obj5_debris();
@@ -76,7 +76,7 @@ void HeadSmashHelmetDemo::block_above()
 {
 	if (--enemy().x() >= 0x40)
 		return;
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	clear_dpad();
 	timer() = 0x10;
 	next_state();
@@ -89,8 +89,7 @@ void HeadSmashHelmetDemo::head_smash(uint16_t next_block)
 	if (static_cast<uint8_t>(wario().y() - 0x18) >= enemy().y())
 		return;
 	wario_var() = 0x18;
-	gb_->cpu.b = 0x00; // the debris's y offset
-	call(ADDR_ActionHelp_ShowBlockDebrisWithYOffset);
+	show_block_debris_with_y_offset(0x00);
 	init_object(enemy(), 0x20, 0xe8, next_block, ADDR_OAM_1e697c, BANK_OAM_1e697c);
 	next_state();
 }
@@ -102,7 +101,7 @@ void HeadSmashHelmetDemo::land()
 	wario().y() = 0x40;
 	wario_var() = 0;
 	clear_buttons();
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	timer() = 0x20;
 	next_state();
 }

@@ -22,7 +22,7 @@ void NoPowerUpDemo::run()
 void NoPowerUpDemo::run_state()
 {
 	switch (wram_.action_help_state()) {
-	case 0: call(ADDR_ActionHelp_Init); break;
+	case 0: init_demo(); break;
 	case 1:
 		if (!--timer())
 			start();
@@ -31,7 +31,7 @@ void NoPowerUpDemo::run_state()
 	case 3: stomp(); break;
 	case 4: land_on_paragoom(); break;
 	case 5: wait_then_attack(); break;
-	case 6: call(ADDR_ActionHelp_FlashBInput); break;
+	case 6: flash_b(); break;
 	case 7: attack_until_gone(); break;
 	case 8: paragoom_falls(); break;
 	case 9: approach_block(); break;
@@ -49,7 +49,7 @@ void NoPowerUpDemo::run_state()
 	case 21: jump_onto_slide(); break;
 	case 22: wait_then_walk(); break;
 	case 23: ride_slide(); break;
-	case 24: call(ADDR_ActionHelp_FlashDDownInput); break;
+	case 24: flash_ddown(); break;
 	case 25: roll(); break;
 	case 26: roll_to_block(); break;
 	case 27: bump_while_rolling(); break;
@@ -65,9 +65,9 @@ void NoPowerUpDemo::run_state()
 // Wario walks in towards a Para-Goom.
 void NoPowerUpDemo::start()
 {
-	call(ADDR_ActionHelp_ShowInitialWarioWalk);
+	show_initial_wario_walk();
 	show_dright();
-	call(ADDR_ActionHelp_ShowParaGoomWalk);
+	show_paragoom_walk();
 	hide_obj5_debris();
 	load_pals_without_water();
 	next_state();
@@ -79,7 +79,7 @@ void NoPowerUpDemo::approach()
 	if (enemy().x() >= 0x60)
 		return;
 	show_a();
-	call(ADDR_ActionHelp_ShowWarioJump);
+	show_wario_jump();
 	next_state();
 }
 
@@ -90,7 +90,7 @@ void NoPowerUpDemo::stomp()
 	if (wario_var() >= 0x18 && wario().y() >= 0x34) {
 		play_sfx(mem_, SFX_014);
 		wario_var() = 0x0a;
-		call(ADDR_ActionHelp_ShowParaGoomStun);
+		show_paragoom_stun();
 		next_state();
 		return;
 	}
@@ -122,7 +122,7 @@ void NoPowerUpDemo::land_on_paragoom()
 		return;
 	wario().y() = 0x40;
 	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	timer() = 0x30;
 	next_state();
 }
@@ -131,7 +131,7 @@ void NoPowerUpDemo::wait_then_attack()
 {
 	if (--timer())
 		return;
-	call(ADDR_ActionHelp_ShowWarioAttack);
+	show_wario_attack();
 	wario_var() = 0x30;
 	next_state();
 }
@@ -154,7 +154,7 @@ void NoPowerUpDemo::attack_until_gone()
 	play_sfx(mem_, SFX_017);
 	clear_buttons();
 	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	timer() = 0x30;
 	next_state();
 }
@@ -176,7 +176,7 @@ void NoPowerUpDemo::paragoom_falls()
 	mem_[static_cast<uint16_t>(obj.addr() + 8)] = static_cast<uint8_t>(ADDR_OAM_1e697c >> 8);
 	mem_[static_cast<uint16_t>(obj.addr() + 9)] = static_cast<uint8_t>(ADDR_OAM_1e697c);
 	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioWalk);
+	show_wario_walk();
 	show_dright();
 	next_state();
 }
@@ -186,7 +186,7 @@ void NoPowerUpDemo::approach_block()
 	if (--enemy().x() >= 0x78)
 		return;
 	show_b();
-	call(ADDR_ActionHelp_ShowWarioAttack);
+	show_wario_attack();
 	wario_var() = 0x30;
 	next_state();
 }
@@ -196,10 +196,10 @@ void NoPowerUpDemo::break_block()
 	if (!attack_paragoom(0x60))
 		return;
 	show_block_debris(object(wMenuObj5), 0x00, 0x10);
-	call(ADDR_ActionHelp_ShowSingleSolidBlock);
+	show_single_solid_block();
 	clear_dpad();
 	clear_buttons();
-	call(ADDR_ActionHelp_ShowWarioAttack);
+	show_wario_attack();
 	wario_var() = 0x0e;
 	next_state();
 }
@@ -214,7 +214,7 @@ void NoPowerUpDemo::bounce_back()
 	wario_var() = 0;
 	wario().y() = 0x40;
 	hide_obj5_debris();
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	timer() = 0x30;
 	next_state();
 }
@@ -224,7 +224,7 @@ void NoPowerUpDemo::walk_to_block()
 	if (++wario().x() < 0x40)
 		return;
 	show_b();
-	call(ADDR_ActionHelp_ShowWarioAttack);
+	show_wario_attack();
 	wario_var() = 0x30;
 	next_state();
 }
@@ -235,7 +235,7 @@ void NoPowerUpDemo::bump_solid_block()
 		return;
 	clear_dpad();
 	clear_buttons();
-	call(ADDR_ActionHelp_ShowWarioAttack);
+	show_wario_attack();
 	play_sfx(mem_, SFX_BUMP);
 	wario_var() = 0x0e;
 	next_state();
@@ -253,7 +253,7 @@ void NoPowerUpDemo::approach_slide()
 	if (static_cast<uint8_t>(x - 0x40) >= 0x1c)
 		return;
 	show_a();
-	call(ADDR_ActionHelp_ShowWarioJump);
+	show_wario_jump();
 	next_state();
 }
 
@@ -261,9 +261,9 @@ void NoPowerUpDemo::slide_comes()
 {
 	if (--enemy().x() < 0xe8)
 		return;
-	call(ADDR_ActionHelp_ShowSlide);
+	show_slide();
 	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioWalk);
+	show_wario_walk();
 	show_dright();
 	next_state();
 }
@@ -277,7 +277,7 @@ void NoPowerUpDemo::approach_slide_again()
 	if (x >= 0x60)
 		return;
 	show_a();
-	call(ADDR_ActionHelp_ShowWarioJump);
+	show_wario_jump();
 	next_state();
 }
 
@@ -295,7 +295,7 @@ void NoPowerUpDemo::jump_onto_slide()
 		return;
 	wario().y() = 0x20;
 	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	clear_buttons();
 	timer() = 0x30;
 	next_state();
@@ -306,7 +306,7 @@ void NoPowerUpDemo::roll_to_block()
 	slide_down();
 	if (enemy().x() != 0xd8)
 		return;
-	call(ADDR_ActionHelp_ShowSingleSolidBlock);
+	show_single_solid_block();
 	next_state();
 }
 
@@ -316,7 +316,7 @@ void NoPowerUpDemo::bump_while_rolling()
 	dec_twice_odd(x);
 	if (x >= 0x50)
 		return;
-	call(ADDR_ActionHelp_ShowWarioBump);
+	show_wario_bump();
 	play_sfx(mem_, SFX_BUMP);
 	wario_var() = 0x0e;
 	next_state();

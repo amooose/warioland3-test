@@ -29,7 +29,7 @@ void GarlicDemo::run()
 void GarlicDemo::run_state()
 {
 	switch (wram_.action_help_state()) {
-	case 0: call(ADDR_ActionHelp_Init); break;
+	case 0: init_demo(); break;
 	case 1:
 		if (timer_done())
 			start();
@@ -37,11 +37,11 @@ void GarlicDemo::run_state()
 	case 2:
 		if (!move_blocks())
 			break;
-		call(ADDR_ActionHelp_ShowWarioAttack);
+		show_wario_attack();
 		wario_var() = 0x30;
 		next_state();
 		break;
-	case 3: call(ADDR_ActionHelp_FlashBInput); break;
+	case 3: flash_b(); break;
 	case 4: break_first_block(); break;
 	case 5: break_second_block(); break;
 	case 6: charge_ends(); break;
@@ -83,13 +83,13 @@ void GarlicDemo::run_state()
 	case 20: jump_onto_blocks(); break;
 	case 21: wait_then_walk(); break;
 	case 22: ride_slide(); break;
-	case 23: call(ADDR_ActionHelp_FlashDDownInput); break;
+	case 23: flash_ddown(); break;
 	case 24: roll(); break;
 	case 25:
 		slide_down();
 		if (enemy().x() != 0xd8)
 			break;
-		call(ADDR_ActionHelp_ShowCountRichtertoffIdle);
+		show_count_richtertoff_idle();
 		next_state();
 		break;
 	case 26: bump_count(); break;
@@ -103,7 +103,7 @@ void GarlicDemo::run_state()
 		dec_twice_odd(x);
 		if (x >= 0x50)
 			break;
-		call(ADDR_ActionHelp_ShowWarioBump);
+		show_wario_bump();
 		wario_var() = 0x0e;
 		next_state();
 		break;
@@ -123,13 +123,12 @@ void GarlicDemo::run_state()
 // Wario walks in; two cracked blocks (wMenuObj4, wMenuObj6) come in.
 void GarlicDemo::start()
 {
-	call(ADDR_ActionHelp_ShowInitialWarioWalk);
+	show_initial_wario_walk();
 	show_dright();
 	init_object(enemy(), 0x40, 0xe8, ADDR_Frameset_1e6b9c, ADDR_OAM_1e697c, BANK_OAM_1e697c);
 	hide_obj5_debris();
 	init_object(object(wMenuObj6), 0x40, 0xf8, ADDR_Frameset_1e6b9c, ADDR_OAM_1e697c, BANK_OAM_1e697c, false);
-	SET_HL(gb_, wMenuObj7);
-	call(ADDR_ActionHelp_HideBlockDebris);
+	hide_block_debris(object(wMenuObj7));
 	load_pals_without_water();
 	next_state();
 }
@@ -174,16 +173,14 @@ bool GarlicDemo::attack_enemy()
 // the front block's debris, and wMenuObj7's
 void GarlicDemo::break_blocks()
 {
-	gb_->cpu.b = 0x00; // the debris's y offset
-	call(ADDR_ActionHelp_ShowBlockDebrisWithYOffset);
+	show_block_debris_with_y_offset(0x00);
 	show_block_debris(object(wMenuObj7), 0x10, 0x00);
 }
 
 void GarlicDemo::hide_debris()
 {
 	hide_obj5_debris();
-	SET_HL(gb_, wMenuObj7);
-	call(ADDR_ActionHelp_HideBlockDebris);
+	hide_block_debris(object(wMenuObj7));
 }
 
 void GarlicDemo::break_first_block()
@@ -217,7 +214,7 @@ void GarlicDemo::charge_ends()
 	if (--wario_var())
 		return;
 	clear_buttons();
-	call(ADDR_ActionHelp_ShowWarioWalk);
+	show_wario_walk();
 	show_dright();
 	next_state();
 }
@@ -231,7 +228,7 @@ void GarlicDemo::break_blocks_again()
 	init_object(object(wMenuObj6), 0xa0, 0xf8, ADDR_Frameset_1e6ba2, ADDR_OAM_1e697c, BANK_OAM_1e697c, false);
 	clear_dpad();
 	clear_buttons();
-	call(ADDR_ActionHelp_ShowWarioAttack);
+	show_wario_attack();
 	wario_var() = 0x0e;
 	next_state();
 }
@@ -244,7 +241,7 @@ void GarlicDemo::bounce_back()
 	wario_var() = 0;
 	wario().y() = 0x40;
 	hide_debris();
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	timer() = 0x30;
 	next_state();
 }
@@ -254,10 +251,10 @@ void GarlicDemo::break_block_at_count()
 	if (!attack_enemy())
 		return;
 	break_blocks();
-	call(ADDR_ActionHelp_ShowCountRichtertoffIdle);
+	show_count_richtertoff_idle();
 	clear_dpad();
 	clear_buttons();
-	call(ADDR_ActionHelp_ShowWarioAttack);
+	show_wario_attack();
 	wario_var() = 0x0e;
 	next_state();
 }
@@ -267,10 +264,10 @@ void GarlicDemo::knock_out_count()
 	if (!attack_enemy())
 		return;
 	play_sfx(mem_, SFX_017);
-	call(ADDR_ActionHelp_ShowCountRichtertoffStun);
+	show_count_richtertoff_stun();
 	clear_dpad();
 	clear_buttons();
-	call(ADDR_ActionHelp_ShowWarioAttack);
+	show_wario_attack();
 	wario_var() = 0x0e;
 	next_state();
 }
@@ -292,7 +289,7 @@ void GarlicDemo::count_flies()
 		count.x() += 2;
 		if (count.y() < 0x80)
 			return;
-		call(ADDR_ActionHelp_ShowSlide);
+		show_slide();
 		wario_var() = 0;
 		timer() = 0x30;
 		next_state();
@@ -304,7 +301,7 @@ void GarlicDemo::count_flies()
 	if (wario().y() < 0x40)
 		return;
 	wario().y() = 0x40;
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 }
 
 void GarlicDemo::bump_count()
@@ -314,7 +311,7 @@ void GarlicDemo::bump_count()
 	if (x >= 0x50)
 		return;
 	play_sfx(mem_, SFX_BUMP);
-	call(ADDR_ActionHelp_ShowCountRichtertoffStun);
+	show_count_richtertoff_stun();
 	wario_var() = 0x0e;
 	next_state();
 }
@@ -339,11 +336,9 @@ void GarlicDemo::blocks_come()
 	if ((enemy().x() & 0xfe) != 0x48)
 		return;
 	enemy().x() = 0x48;
-	gb_->cpu.b = 0x00;
-	call(ADDR_ActionHelp_ShowBlockDebrisWithYOffset);
+	show_block_debris_with_y_offset(0x00);
 	routines_.copy(wMenuObj6, wMenuObj4, 0x0b);
-	SET_HL(gb_, wMenuObj6);
-	call(ADDR_ActionHelp_HideBlockDebris);
+	hide_block_debris(object(wMenuObj6));
 	next_state();
 }
 
@@ -354,15 +349,13 @@ void GarlicDemo::blocks_break()
 	uint8_t at = x & 0xfe;
 	if (at == 0x58) {
 		x = 0x58;
-		gb_->cpu.b = 0x00;
-		call(ADDR_ActionHelp_ShowBlockDebrisWithYOffset);
-		call(ADDR_ActionHelp_ShowSingleSolidBlock);
+		show_block_debris_with_y_offset(0x00);
+		show_single_solid_block();
 		return;
 	}
 	if (at != 0x48)
 		return;
-	gb_->cpu.b = 0x00;
-	call(ADDR_ActionHelp_ShowBlockDebrisWithYOffset);
+	show_block_debris_with_y_offset(0x00);
 	enemy().init(0x50, 0xe8, ADDR_Frameset_1e6b85);
 	next_state();
 }

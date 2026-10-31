@@ -26,7 +26,7 @@ void GrabGlovesDemo::run()
 void GrabGlovesDemo::run_state()
 {
 	switch (wram_.action_help_state()) {
-	case 0: call(ADDR_ActionHelp_Init); break;
+	case 0: init_demo(); break;
 	case 1:
 		if (timer_done())
 			start();
@@ -46,10 +46,10 @@ void GrabGlovesDemo::run_state()
 	case 8:
 		if (!timer_done())
 			break;
-		call(ADDR_ActionHelp_ShowWarioBeginThrow);
+		show_wario_begin_throw();
 		next_state();
 		break;
-	case 9: call(ADDR_ActionHelp_FlashBInput); break;
+	case 9: flash_b(); break;
 	case 10: throw_after_wait(); break;
 	case 11: throw_arc(ADDR_ActionHelp_ShowParaGoomStun); break;
 	case 12: wait_then_walk(); break;
@@ -59,7 +59,7 @@ void GrabGlovesDemo::run_state()
 		if (timer_done())
 			next_state();
 		break;
-	case 16: call(ADDR_ActionHelp_FlashDUpInput); break;
+	case 16: flash_dup(); break;
 	case 17: throw_up(); break;
 	case 18: high_throw_arc(ADDR_ActionHelp_ShowParaGoomStun); break;
 	case 19: wait_then_walk(); break;
@@ -89,7 +89,7 @@ void GrabGlovesDemo::run_state()
 	case 31:
 		if (!timer_done())
 			break;
-		call(ADDR_ActionHelp_ShowWarioChargeThrow);
+		show_wario_charge_throw();
 		next_state();
 		break;
 	case 32: charged(); break;
@@ -104,9 +104,9 @@ void GrabGlovesDemo::run_state()
 // Wario walks in towards a Para-Goom; a pillar (wMenuObj6) comes later.
 void GrabGlovesDemo::start()
 {
-	call(ADDR_ActionHelp_ShowInitialWarioWalk);
+	show_initial_wario_walk();
 	show_dright();
-	call(ADDR_ActionHelp_ShowParaGoomWalk);
+	show_paragoom_walk();
 	hide_obj5_debris();
 	init_object(object(wMenuObj6), 0x40, 0xe8, ADDR_Frameset_1e6b6a, ADDR_OAM_1e697c, BANK_OAM_1e697c, false);
 	load_pals_without_water();
@@ -124,7 +124,7 @@ void GrabGlovesDemo::stomp()
 	clear_buttons();
 	play_sfx(mem_, SFX_014);
 	wario_var() = 0x0a;
-	call(ADDR_ActionHelp_ShowParaGoomStun);
+	show_paragoom_stun();
 	next_state();
 }
 
@@ -144,7 +144,7 @@ void GrabGlovesDemo::bounce_off()
 	wario().y() = 0x40;
 	paragoom.y() = 0x40;
 	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	timer() = 0x20;
 	next_state();
 }
@@ -156,7 +156,7 @@ void GrabGlovesDemo::grab()
 	if (x >= 0x48)
 		return;
 	hold(0x05, 0x10);
-	call(ADDR_ActionHelp_ShowWarioGrab);
+	show_wario_grab();
 	clear_dpad();
 	next_state();
 }
@@ -171,14 +171,14 @@ void GrabGlovesDemo::lift()
 	if (!wario().animation_ended())
 		return;
 	timer() = 0x30;
-	call(ADDR_ActionHelp_ShowWarioBeginGrab);
+	show_wario_begin_grab();
 	next_state();
 }
 
 void GrabGlovesDemo::throw_paragoom()
 {
-	call(ADDR_ActionHelp_ShowWarioThrow);
-	call(ADDR_ActionHelp_ShowParaGoomThrown);
+	show_wario_throw();
+	show_paragoom_thrown();
 	clear_buttons();
 	next_state();
 }
@@ -196,7 +196,7 @@ void GrabGlovesDemo::throw_up()
 {
 	uint8_t t = ++timer();
 	if (t == 0x01) {
-		call(ADDR_ActionHelp_ShowWarioBeginThrow);
+		show_wario_begin_throw();
 		show_b();
 		return;
 	}
@@ -210,7 +210,7 @@ void GrabGlovesDemo::grab_walk()
 {
 	if (!timer_done())
 		return;
-	call(ADDR_ActionHelp_ShowWarioGrabWalk);
+	show_wario_grab_walk();
 	show_dright();
 	next_state();
 }
@@ -221,7 +221,7 @@ bool GrabGlovesDemo::walk_to_pillar(uint8_t x)
 	dec_twice_odd(pillar_x);
 	if (pillar_x >= x)
 		return false;
-	call(ADDR_ActionHelp_ShowWarioBeginThrow);
+	show_wario_begin_throw();
 	clear_dpad();
 	show_b();
 	return true;

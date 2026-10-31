@@ -40,7 +40,7 @@ uint8_t HighJumpBootsDemo::jump_by(uint16_t table, Step step)
 void HighJumpBootsDemo::run_state()
 {
 	switch (wram_.action_help_state()) {
-	case 0: call(ADDR_ActionHelp_Init); break;
+	case 0: init_demo(); break;
 	case 1:
 		if (timer_done())
 			start();
@@ -48,10 +48,10 @@ void HighJumpBootsDemo::run_state()
 	case 2:
 		if (--object(wMenuObj5).x() >= 0x58)
 			break;
-		call(ADDR_ActionHelp_ShowWarioIdle);
+		show_wario_idle();
 		next_state();
 		break;
-	case 3: call(ADDR_ActionHelp_FlashDUpInput); break;
+	case 3: flash_dup(); break;
 	case 4:
 		if (++timer() < 0x30)
 			break;
@@ -64,7 +64,7 @@ void HighJumpBootsDemo::run_state()
 		if (!timer_done())
 			break;
 		show_dright();
-		call(ADDR_ActionHelp_ShowWarioJump);
+		show_wario_jump();
 		wario_var() = 0x18;
 		next_state();
 		break;
@@ -91,7 +91,7 @@ void HighJumpBootsDemo::run_state()
 		if (!wario().animation_ended())
 			break;
 		show_dright();
-		call(ADDR_ActionHelp_ShowWarioJump);
+		show_wario_jump();
 		next_state();
 		break;
 	case 21:
@@ -108,7 +108,7 @@ void HighJumpBootsDemo::run_state()
 			break;
 		show_a();
 		show_dright();
-		call(ADDR_ActionHelp_ShowWarioJump);
+		show_wario_jump();
 		next_state();
 		break;
 	case 24: jump_off(); break;
@@ -119,9 +119,9 @@ void HighJumpBootsDemo::run_state()
 // Wario walks in; a tall block comes in.
 void HighJumpBootsDemo::start()
 {
-	call(ADDR_ActionHelp_ShowInitialWarioWalk);
+	show_initial_wario_walk();
 	show_dright();
-	call(ADDR_ActionHelp_ShowParaGoomWalk);
+	show_paragoom_walk();
 	init_object(object(wMenuObj5), 0x40, 0xe8, ADDR_Frameset_1e6b99, ADDR_OAM_1e697c, BANK_OAM_1e697c, false);
 	load_pals_without_water();
 	next_state();
@@ -154,7 +154,7 @@ void HighJumpBootsDemo::land_on_top(bool dright)
 		show_dright();
 	else
 		clear_dpad();
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	wario_var() = 0;
 	timer() = 0x30;
 	next_state();
@@ -167,7 +167,7 @@ void HighJumpBootsDemo::jump_down()
 		return;
 	wario().y() = 0x40;
 	clear_dpad();
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	wario_var() = 0;
 	next_state();
 }
@@ -178,9 +178,9 @@ void HighJumpBootsDemo::jump_on_paragoom()
 	jump_by(ADDR_JumpVelTable_Normal, Step::Next);
 	if (wario_var() < 0x18 || wario().y() < 0x34)
 		return;
-	call(ADDR_ActionHelp_ShowDLeftInput);
-	call(ADDR_ActionHelp_ShowParaGoomStun);
-	call(ADDR_ActionHelp_ShowWarioJumpLeft);
+	show_dleft();
+	show_paragoom_stun();
+	show_wario_jump_left();
 	wario_var() = 0;
 	next_state();
 }
@@ -213,9 +213,9 @@ void HighJumpBootsDemo::jump_smash()
 	if (!timer_done())
 		return;
 	show_a();
-	call(ADDR_ActionHelp_ShowDRightAndDDownInput);
-	call(ADDR_ActionHelp_ShowWarioJump);
-	call(ADDR_ActionHelp_ShowWarioSmashAttack);
+	show_dright_and_ddown();
+	show_wario_jump();
+	show_wario_smash_attack();
 	wario_var() = 0x18;
 	next_state();
 }
@@ -227,9 +227,9 @@ void HighJumpBootsDemo::smash_paragoom()
 	if (jump_by(ADDR_JumpVelTable_Normal, Step::NextCapped) < 0x34)
 		return;
 	wario().y() = 0x30;
-	call(ADDR_ActionHelp_ShowDLeftInput);
-	call(ADDR_ActionHelp_ShowObj4EnemyVanish);
-	call(ADDR_ActionHelp_ShowWarioJumpLeft);
+	show_dleft();
+	show_obj4_enemy_vanish();
+	show_wario_jump_left();
 	wario_var() = 0;
 	next_state();
 }
@@ -260,15 +260,14 @@ void HighJumpBootsDemo::bounce_on()
 void HighJumpBootsDemo::fall()
 {
 	if (wram_.menu_obj4_animation_ended()) {
-		SET_HL(gb_, wMenuObj4);
-		call(ADDR_ActionHelp_HideBlockDebris);
+		hide_block_debris(object(wMenuObj4));
 	}
 	++object(wMenuObj5).x();
 	if (jump_by(ADDR_JumpVelTable_Normal, Step::NextCapped) < 0x40)
 		return;
 	wario().y() = 0x40;
 	clear_dpad();
-	call(ADDR_ActionHelp_ShowWarioIdle);
+	show_wario_idle();
 	wario_var() = 0;
 	timer() = 0x30;
 	next_state();
@@ -285,7 +284,7 @@ void HighJumpBootsDemo::land_after_jump()
 		return;
 	show_a();
 	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioLand);
+	show_wario_land();
 	next_state();
 }
 

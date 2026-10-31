@@ -67,15 +67,24 @@ public:
 
 	// LoadSprite with the OAM data at oam (in the bank mapped), the y
 	// relative to the background (wSCY)
-	void load_sprite(uint16_t oam)
+	// (or, scrolled false, the y on screen)
+	void load_sprite(uint16_t oam, bool scrolled = true)
+	{
+		set_cur_sprite(scrolled);
+		SET_HL(gb_, oam);
+		gb_call(gb_, ADDR_LoadSprite);
+	}
+
+	// wCurSprite*, for LoadSprite: its y relative to the background (or,
+	// scrolled false, on screen)
+	void set_cur_sprite(bool scrolled = true) const
 	{
 		Memory mem(gb_);
-		mem[wCurSpriteYCoord] = static_cast<uint8_t>(y() + OAM_Y_OFS - mem[wSCY]);
+		uint8_t scroll = scrolled ? static_cast<uint8_t>(mem[wSCY]) : 0;
+		mem[wCurSpriteYCoord] = static_cast<uint8_t>(y() + OAM_Y_OFS - scroll);
 		mem[wCurSpriteXCoord] = static_cast<uint8_t>(x() + OAM_X_OFS);
 		mem[wCurSpriteFrame] = frame();
 		mem[wCurSpriteAttributes] = attributes();
-		SET_HL(gb_, oam);
-		gb_call(gb_, ADDR_LoadSprite);
 	}
 
 private:

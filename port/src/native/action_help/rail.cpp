@@ -13,13 +13,13 @@ void RailDemo::run()
 		animate_object(wario(), wActionHelpWarioOAMBank, wActionHelpWarioAnimationEnded);
 	}
 	load_wario_sprite_from_bank();
-	load_object_sprite_near(enemy());
+	load_object_sprite(enemy());
 }
 
 void RailDemo::run_state()
 {
 	switch (wram_.action_help_state()) {
-	case 0: call(ADDR_ActionHelp2_Init); break;
+	case 0: init_demo(); break;
 	case 1:
 		if (timer_done())
 			start();
@@ -31,7 +31,7 @@ void RailDemo::run_state()
 		wario_var() = 0x18;
 		next_state();
 		break;
-	case 4: call(ADDR_ActionHelp2_FlashBInput); break;
+	case 4: flash_b_far(); break;
 	case 5:
 		++enemy().x();
 		if (!jump_above(0x40))
@@ -43,7 +43,7 @@ void RailDemo::run_state()
 	case 9:
 		if (!wario().animation_ended())
 			break;
-		call(ADDR_ActionHelp_ShowWarioHangRailRight);
+		show_wario_hang_rail_right();
 		next_state();
 		break;
 	case 10: ride_left(); break;
@@ -51,7 +51,7 @@ void RailDemo::run_state()
 		if (ride_right())
 			next_state();
 		break;
-	case 12: call(ADDR_ActionHelp2_FlashAInput); break;
+	case 12: flash_a_far(); break;
 	case 13: fall(); break;
 	case 14: rail_leaves(); break;
 	case 15: rail_back(); break;
@@ -86,7 +86,7 @@ void RailDemo::ride_left()
 	--wario().x();
 	if (--enemy().x() >= 0x1c)
 		return;
-	call(ADDR_ActionHelp_ShowRailRotateRight);
+	show_rail_rotate_right();
 	next_state();
 }
 
@@ -98,7 +98,7 @@ bool RailDemo::ride_right()
 		return false;
 	mem_[hSFXID + 0] = 0xff; // stop_sfx
 	mem_[hSFXID + 1] = 0x00;
-	call(ADDR_ActionHelp2_ShowWarioJump);
+	show_wario_jump2();
 	return true;
 }
 
@@ -106,8 +106,8 @@ void RailDemo::land()
 {
 	wario().y() = 0x40;
 	wario_var() = 0;
-	clear_buttons2();
-	call(ADDR_ActionHelp2_ShowWarioIdle);
+	clear_buttons();
+	show_wario_idle2();
 	next_state();
 }
 
@@ -115,7 +115,7 @@ void RailDemo::rail_leaves()
 {
 	if (++enemy().x() < 0x7c)
 		return;
-	call(ADDR_ActionHelp_ShowRailRotateLeft);
+	show_rail_rotate_left();
 	next_state();
 }
 
@@ -123,8 +123,8 @@ void RailDemo::rail_back()
 {
 	if (--enemy().x() >= 0x4c)
 		return;
-	call(ADDR_ActionHelp2_ShowAInput);
-	call(ADDR_ActionHelp2_ShowWarioJump);
+	show_a();
+	show_wario_jump2();
 	next_state();
 }
 
@@ -137,8 +137,8 @@ void RailDemo::grab_rail(bool reset_sfx_timer)
 	wario_var() = 0;
 	if (reset_sfx_timer)
 		wram_.sfx_timer() = 0;
-	clear_buttons2();
-	call(ADDR_ActionHelp_ShowWarioHangStopped);
+	clear_buttons();
+	show_wario_hang_stopped();
 	next_state();
 }
 

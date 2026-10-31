@@ -104,17 +104,87 @@ protected:
 	void animate_wario(uint8_t bank); // UpdateObjAnim with bank mapped
 	void load_wario_sprite(); // LoadActionHelpWarioSprite
 
-	// common1.asm's states and helpers (still C)
 	void call(uint16_t addr) { routines_.call(addr); }
-	void clear_dpad() { call(ADDR_ActionHelp_ClearDPadInput); }
-	void clear_buttons() { call(ADDR_ActionHelp_ClearButtonsInput); }
-	void show_dright() { call(ADDR_ActionHelp_ShowDRightInput); }
-	void show_a() { call(ADDR_ActionHelp_ShowAInput); }
-	void show_b() { call(ADDR_ActionHelp_ShowBInput); }
-	void hide_obj5_debris() { call(ADDR_ActionHelp_HideObj5BlockDebris); }
-	// debris at obj's position, offset by (y, x)
+	void load_pals_without_water(); // LoadActionHelpPalsWithoutWater (C)
+
+	// common1.asm: the shared states
+	void init_demo(); // ActionHelp_Init
+	// flashes a prompt (on obj, between two framesets) 4 times, then the
+	// next state
+	void flash(MenuObject obj, uint16_t off, uint16_t on);
+	void flash_b() { flash(object(wMenuObj3), ADDR_Frameset_1e6b6d, ADDR_Frameset_1e6b73); }
+	void flash_a() { flash(object(wMenuObj3), ADDR_Frameset_1e6b6d, ADDR_Frameset_1e6b70); }
+	void flash_ddown() { flash(object(wMenuObj2), ADDR_Frameset_1e6b76, ADDR_Frameset_1e6b7f); }
+	void flash_dup() { flash(object(wMenuObj2), ADDR_Frameset_1e6b76, ADDR_Frameset_1e6b79); }
+
+	// the d-pad (wMenuObj2) and button (wMenuObj3) prompts
+	void dpad(uint16_t frameset) { object(wMenuObj2).set_frameset(frameset); }
+	void buttons(uint16_t frameset) { object(wMenuObj3).set_frameset(frameset); }
+	void clear_dpad() { dpad(ADDR_Frameset_1e6b76); }
+	void show_dright() { dpad(ADDR_Frameset_1e6b7c); }
+	void show_dleft() { dpad(ADDR_Frameset_1e6b82); }
+	void show_ddown() { dpad(ADDR_Frameset_1e6b7f); }
+	void show_dup() { dpad(ADDR_Frameset_1e6b79); }
+	void show_dright_and_ddown() { dpad(ADDR_Frameset_1e6ba8); }
+	void clear_buttons() { buttons(ADDR_Frameset_1e6b6d); }
+	void show_a() { buttons(ADDR_Frameset_1e6b70); }
+	void show_b() { buttons(ADDR_Frameset_1e6b73); }
+
+	// Wario's looks: his frameset, and the graphics (a DMA) and OAM data it
+	// needs
+	void wario_frameset(uint16_t frameset) { wario().set_frameset(frameset); }
+	void set_wario_oam(uint16_t oam);
+	void set_wario_oam(uint16_t oam, uint8_t bank);
+	void show_wario(uint16_t sfx, uint8_t gfx_bank, uint16_t gfx, uint16_t frameset, uint16_t oam);
+	void show_initial_wario_walk();
+	void show_wario_idle();
+	void show_wario_walk();
+	void show_wario_jump();
+	void show_wario_jump_left();
+	void show_wario_attack(); // stronger with garlic
+	void show_wario_smash_attack(); // a super one with the overalls
+	void show_wario_ground_pound();
+	void show_wario_ground_shake();
+	void show_wario_land();
+	void show_wario_swim();
+	void show_wario_swim_left() { wario_frameset(ADDR_Frameset_15554); }
+	void show_wario_submerge();
+	void show_wario_underwater_thrust();
+	void show_wario_underwater_stopped() { wario_frameset(ADDR_Frameset_1556c); }
+	void show_wario_grab();
+	void show_wario_slow_grab();
+	void show_wario_begin_grab();
+	void show_wario_begin_throw();
+	void show_wario_bump();
+	void show_wario_slide();
+	void show_wario_grab_walk() { wario_frameset(ADDR_Frameset_14a0f); }
+	void show_wario_throw() { wario_frameset(ADDR_Frameset_1641e); }
+	void show_wario_charge_throw();
+	void show_wario_fully_charged_grab() { wario_frameset(ADDR_Frameset_16441); }
+	void show_wario_fully_charged_throw() { wario_frameset(ADDR_Frameset_16423); }
+	void show_wario_roll() { wario_frameset(ADDR_Frameset_166f7); }
+
+	// the enemies and objects
+	void enemy_frameset(uint16_t frameset) { enemy().set_frameset(frameset); }
+	void show_paragoom_walk();
+	void show_paragoom_stun() { enemy_frameset(ADDR_Frameset_1e6f48); }
+	void show_paragoom_thrown() { enemy_frameset(ADDR_Frameset_1e6f3f); }
+	void show_futamogu_angry() { enemy_frameset(ADDR_Frameset_1e6f78); }
+	void show_futamogu_happy() { enemy_frameset(ADDR_Frameset_1e6f66); }
+	void show_count_richtertoff_idle();
+	void show_count_richtertoff_stun() { enemy_frameset(ADDR_Frameset_1e6f5e); }
+	void show_count_richtertoff_thrown() { enemy_frameset(ADDR_Frameset_1e6f55); }
+	void show_enemy_vanish(MenuObject obj); // a puff of smoke, from obj
+	void show_obj4_enemy_vanish() { show_enemy_vanish(enemy()); }
+	void show_single_solid_block() { enemy_frameset(ADDR_Frameset_1e6b67); }
+	void show_vertical_block_pair();
+	void show_slide();
+	void show_overhead_pillar();
+	void hide_block_debris(MenuObject obj);
+	void hide_obj5_debris() { hide_block_debris(object(wMenuObj5)); }
+	// debris (obj) where wMenuObj4 is, less (y, x)
 	void show_block_debris(MenuObject obj, uint8_t y, uint8_t x);
-	void load_pals_without_water();
+	void show_block_debris_with_y_offset(uint8_t y) { show_block_debris(object(wMenuObj5), y, 0); }
 
 	GB *gb_;
 	Memory mem_;
@@ -428,11 +498,32 @@ public:
 	using Demo::Demo;
 
 protected:
-	void load_object_sprite_near(MenuObject obj); // call LoadActionHelpSprite_Far
 	void load_wario_sprite_from_bank(); // LoadActionHelpWarioSprite_FromBank
-	void hide_block_debris(MenuObject obj); // farcall ActionHelp_HideBlockDebris
-	void clear_dpad2() { call(ADDR_ActionHelp2_ClearDPadInput); }
-	void clear_buttons2() { call(ADDR_ActionHelp2_ClearButtonsInput); }
+	// common1's routines, which these reach through farcall
+	void hide_block_debris_far(MenuObject obj);
+	void flash_b_far(); // ActionHelp2_FlashBInput
+	void flash_a_far(); // ActionHelp2_FlashAInput
+
+	// common2.asm: the transformations' looks
+	void show_wario_idle2(); // ActionHelp2_ShowWarioIdle: its OAM bank too
+	void show_wario_walk2(); // ActionHelp2_ShowWarioWalk
+	// the graphics, frameset and OAM data, wActionHelpWarioVar reset
+	void show_wario_from(uint8_t gfx_bank, uint16_t gfx, uint16_t frameset, uint16_t oam, uint8_t oam_bank);
+	void show_wario_jump2(); // ActionHelp2_ShowWarioJump
+	void show_wario_hang_stopped();
+	void show_wario_hang_rail_right();
+	void show_wario_hang_vertical() { wario_frameset(ADDR_Frameset_1fedd0); }
+	void show_wario_hang_horizontal() { wario_frameset(ADDR_Frameset_1fed7c); }
+	void show_wario_hang_owl_right() { wario_frameset(ADDR_Frameset_1fed91); }
+	void show_wario_owl_move_hang() { wario_frameset(ADDR_Frameset_1feda6); }
+	void show_wario_owl_move_hang_right() { wario_frameset(ADDR_Frameset_1fedbb); }
+	void show_wario_hang_drop() { wario_frameset(ADDR_Frameset_1fedfe); }
+	void show_wario_bat_transform();
+	void show_wario_bat(uint16_t frameset); // ShowWarioBatRight, ShowWarioBatLeft
+	void show_wario_vampire_transform();
+	void show_owl_fly_up(); // the owl leaves, from above Wario
+	void show_rail_rotate_right() { enemy_frameset(ADDR_Frameset_1e6fcb); }
+	void show_rail_rotate_left() { enemy_frameset(ADDR_Frameset_1e6fc2); }
 
 	// The end: back to the title screen, or again from the start.
 	template <class F>
@@ -442,8 +533,8 @@ protected:
 			call(ADDR_InitWithoutDemoPowerUpReset);
 			return;
 		}
-		clear_dpad2();
-		clear_buttons2();
+		clear_dpad();
+		clear_buttons();
 		wram_.action_help_state() = 1;
 		restart();
 	}

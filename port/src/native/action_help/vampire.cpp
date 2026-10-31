@@ -18,7 +18,7 @@ void VampireDemo::run()
 void VampireDemo::run_state()
 {
 	switch (wram_.action_help_state()) {
-	case 0: call(ADDR_ActionHelp2_Init); break;
+	case 0: init_demo(); break;
 	case 1:
 		if (timer_done())
 			start();
@@ -26,11 +26,11 @@ void VampireDemo::run_state()
 	case 2:
 		if (++wario().x() < 0x80)
 			break;
-		clear_dpad2();
-		call(ADDR_ActionHelp_ShowWarioBatTransform);
+		clear_dpad();
+		show_wario_bat_transform();
 		next_state();
 		break;
-	case 3: call(ADDR_ActionHelp2_FlashBInput); break;
+	case 3: flash_b_far(); break;
 	case 4:
 		if (!timer()) {
 			play_sfx(mem_, SFX_046);
@@ -39,7 +39,7 @@ void VampireDemo::run_state()
 		}
 		if (!wario().animation_ended())
 			break;
-		call(ADDR_ActionHelp_ShowWarioBatRight);
+		show_wario_bat(ADDR_Frameset_1fd46c);
 		timer() = 0x30;
 		next_state();
 		break;
@@ -47,11 +47,11 @@ void VampireDemo::run_state()
 		play_sfx_rept(32, SFX_FLAP);
 		if (!timer_done())
 			break;
-		call(ADDR_ActionHelp2_ShowDLeftInput);
-		call(ADDR_ActionHelp_ShowWarioBatLeft);
+		show_dleft();
+		show_wario_bat(ADDR_Frameset_1fd42c);
 		next_state();
 		break;
-	case 6: call(ADDR_ActionHelp2_FlashAInput); break;
+	case 6: flash_a_far(); break;
 	case 7: flap_up(0x30, 0x20); break;
 	case 8: glide(); break;
 	case 9: flap_up(0x2c, 0x1c); break;
@@ -64,8 +64,8 @@ void VampireDemo::run_state()
 		play_sfx_rept(32, SFX_FLAP);
 		if (!timer_done())
 			break;
-		call(ADDR_ActionHelp2_ShowBInput);
-		call(ADDR_ActionHelp_ShowWarioVampireTransform);
+		show_b();
+		show_wario_vampire_transform();
 		next_state();
 		break;
 	case 16:
@@ -79,7 +79,7 @@ void VampireDemo::run_state()
 // Vampire Wario walks in.
 void VampireDemo::start()
 {
-	call(ADDR_ActionHelp2_ShowDRightInput);
+	show_dright();
 	queue_wario_gfx(BANK_WarioVampireGfx, ADDR_WarioVampireGfx);
 	MenuObject w = wario();
 	w.init(0x40, 0x30, ADDR_Frameset_1fd82e);
@@ -113,7 +113,7 @@ void VampireDemo::flap_up(uint8_t fast_from, uint8_t to)
 	rise(fast_from);
 	if (wario().y() >= to)
 		return;
-	clear_buttons2();
+	clear_buttons();
 	wario_var() = 0x18;
 	next_state();
 }
@@ -127,7 +127,7 @@ void VampireDemo::glide()
 		return;
 	wario_var() = 0;
 	wram_.sfx_timer() = 0;
-	call(ADDR_ActionHelp2_ShowAInput);
+	show_a();
 	next_state();
 }
 
@@ -139,8 +139,8 @@ void VampireDemo::fly_home()
 		return;
 	if (--wario().x() != 0x30)
 		return;
-	clear_buttons2();
-	clear_dpad2();
+	clear_buttons();
+	clear_dpad();
 	wario_var() = 0x18;
 	next_state();
 }
@@ -154,7 +154,7 @@ void VampireDemo::land()
 		return;
 	wario().y() = 0x40;
 	wario_var() = 0;
-	call(ADDR_ActionHelp_ShowWarioBatRight);
+	show_wario_bat(ADDR_Frameset_1fd46c);
 	timer() = 0x30;
 	next_state();
 }
