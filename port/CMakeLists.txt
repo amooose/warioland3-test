@@ -138,10 +138,15 @@ foreach(input ${TEST_INPUTS})
 	file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/traces)
 	add_test(NAME trace_${name} COMMAND ${CMAKE_COMMAND} -DWL3=$<TARGET_FILE:wl3> -DINPUT=${input}
 		-DTRACE=${CMAKE_CURRENT_BINARY_DIR}/traces/${name}.trace -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/trace_test.cmake)
+	# The quick tier (ctest -L quick, a few minutes): run before every commit.
+	set_tests_properties(difftest_${name} trace_${name} PROPERTIES LABELS quick)
 	# The fuzz run of one input takes far longer than its replay, so it is
-	# split into shards that ctest -j can run side by side.
+	# split into shards that ctest -j can run side by side. The whole fuzz
+	# tier (ctest -L fuzz, about an hour) is for when something looks wrong;
+	# new routines are fuzzed on their own with tools/fuzz_batch.sh.
 	foreach(shard RANGE 0 3)
 		add_test(NAME fuzz_${name}_${shard} COMMAND wl3 --fuzz --input ${input} --fuzz-shard ${shard}/4)
+		set_tests_properties(fuzz_${name}_${shard} PROPERTIES LABELS fuzz)
 	endforeach()
 	list(APPEND COVERAGE_COMMANDS COMMAND wl3 --coverage ${CMAKE_CURRENT_BINARY_DIR}/coverage/${name}.txt --input ${input})
 	list(APPEND COVERAGE_ARGS --coverage ${CMAKE_CURRENT_BINARY_DIR}/coverage/${name}.txt)

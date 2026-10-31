@@ -14,5 +14,8 @@ Rules for ported code:
 - Every ported routine must match the asm exactly: registers, flags and
   memory.
 - Fuzz new routines with `port/tools/fuzz_batch.sh`.
-- Run `ctest --test-dir port/build -j6` before committing.
+- Run the quick tier, `ctest --test-dir port/build -L quick -j6` (the
+  difftests and per-frame traces, a few minutes), before committing.
+  Run the full fuzz tier (`-L fuzz`, about an hour) only when something
+  looks wrong.
 - Never skip or disable a test to get green.

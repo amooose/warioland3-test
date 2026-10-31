@@ -35,16 +35,22 @@ scripting and expansion on top. The approach:
   routines that can't or needn't be ported (see "Good next batches"). Run
   `cmake --build build --target progress` and read `build/progress.md` for
   the per-directory numbers.
-- **Tests:** `ctest --test-dir build -j12` takes about 35 minutes with all
-  the recordings, so run it in the background. For each input in
-  `tests/inputs/` it runs a difftest, a per-frame trace test
-  (`trace_<input>`, see "Per-frame traces"), and a fuzz pass split into 4
-  shards (`fuzz_<input>_0` to `_3`, each fuzzing every 4th hook with
-  `--fuzz-shard I/4`). Three inputs are committed. The user's local
-  recordings aren't committed, but a local ctest picks them up:
-  `action_help2`, `coin_bug`, `boss` (the Hidden Figure fight), `golf`,
-  `yellowbelly`, `gameover` and `fresh_save_cutscene`. That makes 60
-  tests.
+- **Tests come in two tiers:**
+  - **Quick, before every commit:** `ctest --test-dir build -L quick -j6`,
+    a few minutes. It runs a difftest and a per-frame trace test
+    (`trace_<input>`, see "Per-frame traces") for each input in
+    `tests/inputs/`. Also fuzz the routines the commit adds or changes
+    with `tools/fuzz_batch.sh`.
+  - **Full fuzz, only when something looks wrong:** `ctest -L fuzz`,
+    about an hour, so run it in the background. It splits each input's
+    fuzz pass into 4 shards (`fuzz_<input>_0` to `_3`, each fuzzing every
+    4th hook with `--fuzz-shard I/4`). This is the user's rule since
+    2026-10-30.
+- **Inputs.** Three are committed. The user's local recordings aren't
+  committed, but a local ctest picks them up: `action_help2`, `coin_bug`,
+  `boss` (the Hidden Figure fight), `golf`, `yellowbelly`, `gameover`,
+  `fresh_save_cutscene`, `anonster` and `credit` (which doesn't reach the
+  credits yet).
 
 ## Building
 
@@ -291,6 +297,9 @@ per label, most run first. It's the real list of work left before the
 interpreter can go. The progress report counts routines, and it treats
 anything calling `hCallFunc` as blocked.
 
+**State (2026-10-30):** over the 11 recordings the interpreter now runs
+2.29M instructions, down from 169M. Everything left is listed here.
+
 - **RAM hooks** (`ram_hook_register` in hooks.h, the code is in
   src/ported/home/ram_code.c) cover what the game runs from RAM:
   - `hCallFunc`, the HRAM trampoline behind every farcall and hcall;
@@ -299,20 +308,31 @@ anything calling `hCallFunc` as blocked.
 
   A RAM hook first checks that the bytes are the code it stands for, and
   otherwise leaves them to the interpreter.
-- **The main loop** (`InitWithoutDemoPowerUpReset.GameLoop`) stays asm on
-  purpose. As a hook it would call `MainStateTable`, a whole game frame,
-  so the fuzzer would run 200 variants of whole frames per seed. It's also
-  the traces' sync point. Port it as plain C when the interpreter goes.
-- **Deliberate fallbacks.** The collision helpers (`Func_19b5c` and
-  siblings) hand back to asm when `ProcessBlock` returns with another
-  bank mapped, as the game does.
+- **Copied V-Blank functions.** The screens copy an `X.Func ... X.end`
+  block into `wVBlankFunc`. ram_code.c recognises any such block by its
+  bytes and runs the native routine of its ROM label, `PORT_LOCAL(X,
+  Func)`. Calls inside a block return to `gb->cpu.pc + n`, the block's
+  start wherever it runs from. Blocks that switch the ROM bank (the
+  overworld's, the title's, two golf ones) are inconclusive in the
+  fuzzer at their ROM address, so the traces are what check them.
+  `VBlank_1c9f7a.Func` stays asm, because no recording reaches it and the
+  fuzzer can't check it.
+- **The main loop** is native in two parts around its `halt`. The
+  interpreter still runs the `halt` and `nop` once a frame, about 0.5M
+  instructions over all recordings. `.GameLoop` exits at the halt inside
+  its own routine, so its fuzz checks are inconclusive; the traces check
+  it.
+- **Collision tails, about 1.5M instructions.** `call_process_block` in
+  collisions.c pushes the asm's return address and jumps to
+  `ProcessBlock`, leaving each caller's `ld b, a / ret` to the
+  interpreter. That's deliberate: a block function that drops its
+  caller's frame then behaves as on the hardware, where a nested
+  `gb_call_ret` would be stranded. It becomes plain C with the rest when
+  the interpreter goes.
+- **Interrupt vectors.** The `jp VBlank` at $0040 runs once per V-Blank.
+  It shows under `JumpTable` in the profile, the nearest label.
 
 ## Open issues
-
-- **Objects with states still in asm.** These states have no hook:
-  `SeeingEyeDoorFunc` (.CheckWarioDistance, .Default, .LookAround),
-  `SpearBotFunc` (13 states), `ZombieFunc.OnUnderground`, and parts of
-  `SmallLeafFunc`. Each costs about 0.1% of the interpreted instructions.
 
 1. **`Prologue_WarioFallFromPlane`** (may be stale) (`src/ported/engine/overworld/bank2b_2.c`,
    ported by a parallel agent with `PORT_NESTED` and `dispatch` /
