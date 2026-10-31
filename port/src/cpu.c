@@ -661,7 +661,10 @@ void gb_call(GB *gb, uint16_t addr)
 	gb_call_ret(gb, addr, CALL_SENTINEL);
 }
 
-void gb_call_ret(GB *gb, uint16_t addr, uint16_t ret)
+// The call loop of gb_call_ret. With may_unwind, code that pops past the
+// call's frame (returning to the caller's caller) ends it: false, with PC
+// and SP where that code left them.
+static bool call_ret(GB *gb, uint16_t addr, uint16_t ret, bool may_unwind)
 {
 	uint16_t saved_sp = SP;
 	uint16_t saved_pc = PC;
@@ -695,6 +698,10 @@ void gb_call_ret(GB *gb, uint16_t addr, uint16_t ret)
 		int cycles = cpu_step(gb);
 		if (!gb->no_tick)
 			gb_tick(gb, cycles);
+		if (may_unwind && SP > saved_sp) {
+			gb->call_depth--;
+			return false;
+		}
 		// Code that pops past the native caller's frame (a fuzzed jump
 		// table sending a call somewhere that unwinds the stack) can never
 		// come back here; the asm caller would carry on, so it's not a
@@ -706,4 +713,15 @@ void gb_call_ret(GB *gb, uint16_t addr, uint16_t ret)
 	}
 	gb->call_depth--;
 	PC = saved_pc;
+	return true;
+}
+
+void gb_call_ret(GB *gb, uint16_t addr, uint16_t ret)
+{
+	call_ret(gb, addr, ret, false);
+}
+
+bool gb_call_ret_unwind(GB *gb, uint16_t addr, uint16_t ret)
+{
+	return call_ret(gb, addr, ret, true);
 }

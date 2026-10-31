@@ -189,6 +189,7 @@ InitWithoutDemoPowerUpReset::
 	ld a, TRUE
 	ld [wEnableVBlankFunc], a
 	halt
+.after_halt
 	nop
 .wait_vblank_exec
 	ld a, [wVBlankFuncExecuted]

@@ -815,8 +815,10 @@ static void fuzz_seed(const GB *base, Hook *h, int index, const char *seed_name)
 			seed_reads = readset.n;
 			// The seed itself never finished (it waits for hardware that
 			// doesn't run here, e.g. H-Blank with the LCD off): its variants
-			// would each spin 20 times as long for nothing.
-			if (res == CHECK_INCONCLUSIVE && asm_steps_taken >= asm_step_limit) {
+			// would each spin 20 times as long for nothing. The same goes
+			// for native code that ran out of budget (a wait loop of its own).
+			if (res == CHECK_INCONCLUSIVE &&
+				(asm_steps_taken >= asm_step_limit || native_accesses >= native_budget)) {
 				st->samples++;
 				st->inconclusive++;
 				break;

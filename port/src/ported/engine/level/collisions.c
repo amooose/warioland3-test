@@ -4,14 +4,22 @@
 // Jumps and calls within this bank use the address rather than JUMP / CALL:
 // like the asm, they run whatever bank is mapped.
 
-// A call of ProcessBlock is done as the asm does it, pushing the return
-// address and jumping, rather than with gb_call: a block function can be
-// anything the level's block function table points at, and must see the
-// same stack. The rest of the caller (ld b, a / ret) then runs as asm.
+// A call of ProcessBlock, then the caller's ld b, a / ret. A block function
+// can be anything the level's block function table points at: it sees the
+// asm's own return address, may pop past it to return to the caller's
+// caller (then we stop where it left off, as the asm would), and may come
+// back with another ROM bank mapped (then the asm returns into whatever
+// that bank holds there, so the rest runs from it).
 static void call_process_block(GB *gb, uint16_t ret)
 {
-	gb_push16(gb, ret);
-	JUMP_TO(ADDR_ProcessBlock);
+	if (!gb_call_ret_unwind(gb, ADDR_ProcessBlock, ret))
+		return;
+	if (gb->rom_bank != BANK_ProcessBlock) {
+		JUMP_TO(ret);
+		return;
+	}
+	gb->cpu.b = gb->cpu.a; // ld b, a
+	RET();
 }
 
 // A call that reaches ProcessBlock can come back with another ROM bank
@@ -56,9 +64,15 @@ PORT_JUMP(Func_19b3a)
 	wr8(gb, wIsInSand, 0);
 	wr8(gb, wIsNearFence, 0);
 	wr8(gb, wIsInAirCurrent, 0);
-	// call Func_19c0b / ret
-	gb_push16(gb, (uint16_t)(ADDR_Func_19b3a + 0x13 + 3));
-	JUMP_TO(ADDR_Func_19c0b);
+	// call Func_19c0b / ret (Func_19c0b ends in call_process_block, see there)
+	uint16_t ret = (uint16_t)(ADDR_Func_19b3a + 0x13 + 3);
+	if (!gb_call_ret_unwind(gb, ADDR_Func_19c0b, ret))
+		return;
+	if (gb->rom_bank != BANK_ProcessBlock) {
+		JUMP_TO(ret);
+		return;
+	}
+	RET();
 }
 
 PORT_JUMP(Func_19b51)
@@ -286,13 +300,7 @@ PORT_JUMP(CheckAirborneCollision)
 	RET();
 }
 
-PORT_JUMP(Func_19b5c)
-{
-	if (!call_in_bank(gb, ADDR_ProcessBlock, (uint16_t)(ADDR_Func_19b5c + 3)))
-		return;
-	gb->cpu.b = gb->cpu.a;
-	RET();
-}
+PORT_JUMP(Func_19b5c) { call_process_block(gb, (uint16_t)(ADDR_Func_19b5c + 3)); }
 
 PORT_JUMP(CheckCentreCollision)
 {
@@ -348,13 +356,7 @@ PORT_JUMP(CheckCentreCollision)
 	RET();
 }
 
-PORT_JUMP(Func_19bce)
-{
-	if (!call_in_bank(gb, ADDR_ProcessBlock, (uint16_t)(ADDR_Func_19bce + 3)))
-		return;
-	gb->cpu.b = gb->cpu.a;
-	RET();
-}
+PORT_JUMP(Func_19bce) { call_process_block(gb, (uint16_t)(ADDR_Func_19bce + 3)); }
 
 PORT_JUMP(Func_19823)
 {
@@ -653,10 +655,7 @@ static void process_adjacent_block(GB *gb, bool next, uint16_t ret)
 	gb->cpu.a = rd8(gb, hl--);
 	gb->cpu.h = rd8(gb, hl);
 	gb->cpu.l = gb->cpu.a;
-	if (!call_in_bank(gb, ADDR_ProcessBlock, ret))
-		return;
-	gb->cpu.b = gb->cpu.a;
-	RET();
+	call_process_block(gb, ret);
 }
 
 PORT_JUMP(Func_19bab) { process_adjacent_block(gb, false, ADDR_Func_19bab + 0x0a); }

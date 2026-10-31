@@ -27,18 +27,23 @@ SECTION "rst38", ROM0
 
 ; interrupts
 SECTION "vblank", ROM0
+VBlankVector:
 	jp VBlank
 	ds 5
 SECTION "lcd", ROM0
+LCDVector:
 	jp wLCDFunc
 	ds 5
 SECTION "timer", ROM0
+TimerVector:
 	reti
 	ds 7
 SECTION "serial", ROM0
+SerialVector:
 	reti
 	ds 7
 SECTION "joypad", ROM0
+JoypadVector:
 	reti
 
 VBlank:

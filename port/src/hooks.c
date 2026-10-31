@@ -21,6 +21,9 @@ static int nhooks;
 // One bit per ROM byte: is there a hook at this offset?
 static uint8_t *hook_bitmap;
 static size_t hook_bitmap_bytes;
+// The first hook at each ROM offset (-1: none), so the interpreter finds
+// one without scanning them all: nearly every routine it enters has one.
+static int32_t *hook_index;
 static bool all_enabled = true;
 
 static size_t rom_offset(int bank, uint16_t addr)
@@ -119,9 +122,14 @@ void hooks_init(GB *gb)
 		if (off / 8 < hook_bitmap_bytes)
 			label_bitmap[off / 8] |= (uint8_t)(1 << (off % 8));
 	}
+	hook_index = malloc(gb->rom_size * sizeof(int32_t));
+	for (size_t i = 0; i < gb->rom_size; i++)
+		hook_index[i] = -1;
 	for (int i = 0; i < nhooks; i++) {
 		size_t off = rom_offset(hooks[i].bank, hooks[i].addr);
 		hook_bitmap[off / 8] |= (uint8_t)(1 << (off % 8));
+		if (off < gb->rom_size && hook_index[off] < 0)
+			hook_index[off] = i;
 	}
 }
 
@@ -177,6 +185,9 @@ Hook *hook_find_any(GB *gb, uint16_t pc)
 	size_t off = rom_offset(bank, pc);
 	if (!(hook_bitmap[off / 8] & (1 << (off % 8))))
 		return NULL;
+	if (hook_index && off < gb->rom_size && hook_index[off] >= 0 && hooks[hook_index[off]].enabled)
+		return &hooks[hook_index[off]];
+	// a disabled first hook: look for another at the same address
 	for (int i = 0; i < nhooks; i++) {
 		Hook *h = &hooks[i];
 		if (h->addr == pc && h->bank == bank && h->enabled)

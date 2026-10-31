@@ -94,9 +94,10 @@ PORT(HandleSound)
 }
 
 // The main game loop (InitWithoutDemoPowerUpReset.GameLoop), one game
-// frame per pass, in two parts around its halt, which the interpreter runs
-// so that the V-Blank interrupt wakes it as on the hardware. Every call
-// returns to the asm's own return address.
+// frame per pass, in parts around its halt: .GameLoop halts the CPU as the
+// halt does (the V-Blank interrupt wakes it as on the hardware), and the
+// loop goes on at .after_halt. Every call returns to the asm's own return
+// address.
 #define GAME_LOOP (ADDR_InitWithoutDemoPowerUpReset + 0xcc)        // .GameLoop
 #define GAME_LOOP_HALT (ADDR_InitWithoutDemoPowerUpReset + 0x113)   // halt
 #define WAIT_VBLANK_EXEC (ADDR_InitWithoutDemoPowerUpReset + 0x115) // .wait_vblank_exec
@@ -140,8 +141,11 @@ PORT_LOCAL_JUMP(InitWithoutDemoPowerUpReset, GameLoop)
 	// .skip_animated_pals: enable V-Blank handler and wait for it
 	gb->cpu.a = TRUE;
 	wr8(gb, wEnableVBlankFunc, TRUE);
-	JUMP_TO(GAME_LOOP_HALT);
+	gb->cpu.halted = true; // halt
+	JUMP_TO(GAME_LOOP_HALT + 1);
 }
+
+PORT_LOCAL_JUMP(InitWithoutDemoPowerUpReset, after_halt) { JUMP_TO(WAIT_VBLANK_EXEC); } // nop
 
 PORT_LOCAL_JUMP(InitWithoutDemoPowerUpReset, wait_vblank_exec)
 {

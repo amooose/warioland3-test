@@ -263,6 +263,11 @@ void gb_call(GB *gb, uint16_t addr);
 // would: for callees that may look at the stack. ret is where the asm's call
 // instruction returns to; it is never executed here.
 void gb_call_ret(GB *gb, uint16_t addr, uint16_t ret);
+// The same, for a callee that may pop past the call's frame and return to
+// the caller's caller (as the game's block functions are free to): then it
+// returns false, with PC and SP where the code left them, and the native
+// caller (a PORT_JUMP) must return straight away.
+bool gb_call_ret_unwind(GB *gb, uint16_t addr, uint16_t ret);
 
 // Debugging: dump recently executed instructions, stop-and-dump at an address.
 void cpu_dump_history(GB *gb, int n);

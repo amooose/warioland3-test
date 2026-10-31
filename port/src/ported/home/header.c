@@ -57,3 +57,18 @@ PORT_JUMP(VBlank)
 	RET();
 	gb->cpu.ime = true;
 }
+
+// The interrupt vectors
+PORT_JUMP(VBlankVector) { JUMP_TO(ADDR_VBlank); }
+PORT_JUMP(LCDVector) { JUMP_TO(wLCDFunc); }
+
+// reti
+static void vector_reti(GB *gb)
+{
+	RET();
+	gb->cpu.ime = true;
+}
+
+PORT_JUMP(TimerVector) { vector_reti(gb); }
+PORT_JUMP(SerialVector) { vector_reti(gb); }
+PORT_JUMP(JoypadVector) { vector_reti(gb); }
