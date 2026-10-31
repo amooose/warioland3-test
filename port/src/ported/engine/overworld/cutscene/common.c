@@ -1,12 +1,15 @@
 // Port of src/engine/overworld/cutscene/common.asm
 #include "ported.h"
 
-PORT(InitCutscene)
+// InitCutscene and UpdateCutscene are overworld states (HandleOverworld,
+// which clobbers every register); the C++ cutscenes (src/native/cutscenes)
+// leave b to l as they like.
+PORT_EX(InitCutscene, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
 	FARCALL(_InitCutscene);
 }
 
-PORT(UpdateCutscene)
+PORT_EX(UpdateCutscene, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
 	// .SkipCutsceneIfAble
 	gb->cpu.a = alu_and(gb, rd8(gb, wOWBarsState), rd8(gb, wOWBarsState));

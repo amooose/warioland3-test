@@ -447,6 +447,59 @@ Modules so far:
   Lesson: write rotates as rotates (`rlca`, `rra` through the carry a
   `sla` just set), not shifts. Only the fuzzer's out-of-range inputs show
   the difference; the traces never do.
+- **overworld, part 4**: most of bank20, the map itself.
+  - `TopBar` (top_bar.cpp, entry `UpdateTopBar`): the Select bar, its
+    buttons and their states. Its later states (.CloseTopBar, .Cutscene,
+    .Collection, .NextMap, the day/night ones) had never been ported: the
+    collection recording ran them on the interpreter (`--asm-profile`
+    showed it). Check `--asm-profile` after a module goes in.
+  - `BottomBar` (bottom_bar.cpp, entries `HandleBottomBar`,
+    `DrawBottomBar`): the magnifying glass bar. .SetVisibleTreasures was
+    never ported either. It spins on rDIV until it picks a hidden
+    treasure; native code takes no time, so each retry calls `idle()` (as
+    ported.h's) to let DIV move.
+  - `MapWalk` (map_walk.cpp, entry `Func_80e89`): Wario on a side, by
+    w2d013's states (arriving, entering levels, walking paths, the exits,
+    the temple hint, Func_8137a's steps).
+  - `PathPreview` (path_preview.cpp, entries `Func_81477`, and `Func_814ec`
+    and `Func_8150c` that the unreferenced Func_8143d jumps to): B held on
+    a level, arrows along its paths.
+  - `Scenes` (scenes.cpp, entries `Func_81dce`, `Func_818ad`,
+    `Func_82bb8`, `Func_82bda`): every event's scene on the map, set up and
+    played (UnlockLevel, Func_82c33's highlight).
+  All the entries clobber every register: their callers reload what they
+  use. The helpers other C still calls stay C and are called by address:
+  Func_810fc, Func_821a1, Func_82208, GetMapLevelCoords, SetOWWarioOAM,
+  Func_82111, the event and treasure checks.
+  Quirks kept: Func_811cf's `ld [hl], a` writes 0 to its own address, the
+  MBC's RAM bank register, since hl is still the jumptable's target; a
+  `debug_nop` (an endless loop) marks the run unrealistic.
+- **cutscenes** (src/native/cutscenes, bank27's event cutscenes, all
+  50). `Cutscenes` hooks `DoCutsceneFunc` and `InitEventCutscene` (both
+  clobber every register: their callers, UpdateCutscene and
+  _InitCutscene, are annotated `PORT_EX` B..L). Each cutscene is a step
+  method (switch on w2d013, frames in w2d014) plus its init and its draw
+  routine. Only `PrologueFunc` (a farcall into bank2b's prologue) is
+  still called by address, with the registers the jumptable leaves (a and
+  hl the target, de the offset, bc w2d014). bank27.c keeps the loaders
+  (LoadCutscenesNGfx, LoadCutsceneBGMapsNN, ...), which the C++ calls,
+  and VBlank_Cutscene. Helpers: `wait`/`advance`/`end` (WaitCutsceneFunc,
+  AdvanceCutsceneFunc, EndCutscene), `place` (y, x, SetSceneObjState),
+  `rise` (the item-rises step with Func_9ce1f's whoosh), `animate`/`draw`/
+  `next_state_when_done` (Func_9f0ae/0bc/0d0), `animate_all`,
+  `draw_shadow` (Func_9fb53), `shake_screen` (Func_9cdcd). Read framesets
+  tables at their local labels' addresses (look the offsets up in
+  warioland3.sym: guessing them cost two bugs).
+- **overworld, part 5**: bank56. `BestTimes` (best_times.cpp, entries
+  `_InitBestTimeList`, `_BestTimeList`: the time attack's best time list;
+  its V-Blank function stays C as RAM code) and `TempleRocks`
+  (temple_rocks.cpp, entry `_HandleTempleShakeAndRocks`: the screen shake
+  and the falling and bouncing rocks), and `TempleNotes` (temple_notes.cpp,
+  entries `Func_15848a`, the music box notes, and `Func_15868e`, the
+  prologue's six objects). All are only farcalled. bank56.c keeps only the
+  best time list's V-Blank function (RAM code). Watch for
+  names constants.h already defines as macros (`OBJ_STATE`): a C++
+  constant of the same name won't compile.
 - **pause** (src/native/pause): the pause menu (`PauseMenu`: the options,
   keys and treasures, its state table) and the save screens (`SaveScreen`:
   the progress bar, saving the game or the level in progress to SRAM with
@@ -516,7 +569,18 @@ had. Check a candidate's entry points and their callers' register use first.
      `Func_ac042` to `Func_ac051`) are back in `bank2b_1.c`. The root cause
      was never found, so it may still be there under other inputs.
 
-2. **Coverage gaps.** `UpdateRoomAnimatedPals` (60/104: the palette copy
+2. **`Func_818ad` on `collection.input`** (the map's scenes, now
+   scenes.cpp) fails 1 of 1005 fuzz checks (seed from call 512, variant
+   15). The asm run ends with `ime` 0, wTreasuresCollected cleared to
+   treasure 0 and wTempBGPals changed, as if it reached a reset or new
+   game path. The native run does not. No native sample reaches the
+   scene's end (Func_81931), so the divergence is likely in a callee
+   reached through fuzzed state (DoOWFunction's bank2d functions). The C
+   it replaced failed this routine too, 12 of 1005 (register `c`), since
+   collection.input was added after the last full fuzz run. The quick
+   tier's traces pass.
+
+3. **Coverage gaps.** `UpdateRoomAnimatedPals` (60/104: the palette copy
    loop only runs in levels with palette cycling), `MizzouProjectileFunc`
    (54/59), `SilkPlatformsFunc` (18/26), `TransitionAfterSave` (18/32),
    `Func_850ff` (24/30). Most transformation states (snowman, ball, fan,

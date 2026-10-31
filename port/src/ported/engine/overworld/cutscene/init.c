@@ -1,22 +1,6 @@
 // Port of src/engine/overworld/cutscene/init.asm
 #include "ported.h"
 
-// rst JumpTable, with the table at `table` (right after the rst): leaves every
-// register as JumpTable does and returns the target (= hl).
-static uint16_t jumptable(GB *gb, uint16_t table)
-{
-	gb_push16(gb, table); // rst JumpTable
-	uint16_t hl = gb_pop16(gb); // pop hl
-	gb->cpu.a = alu_add(gb, gb->cpu.a, gb->cpu.a);
-	gb->cpu.e = gb->cpu.a;
-	gb->cpu.d = 0;
-	hl = alu_add16(gb, hl, gb->cpu.e);
-	gb->cpu.a = rd8(gb, hl);
-	gb->cpu.h = rd8(gb, (uint16_t)(hl + 1));
-	gb->cpu.l = gb->cpu.a;
-	return REG_HL(gb);
-}
-
 // for cutscenes that don't need to run an init function
 PORT(NoInitCutscene)
 {
@@ -49,7 +33,9 @@ PORT(CheckIfEventHasCutscene)
 	wr8(gb, wEventWithCutscene, gb->cpu.a);
 }
 
-PORT(_InitCutscene)
+// Only farcalled, by InitCutscene; InitEventCutscene (C++) leaves c, d and
+// e as it likes.
+PORT_EX(_InitCutscene, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
 	CALL(DisableLCD);
 	CALL(ClearVirtualOAM);
@@ -95,32 +81,4 @@ PORT(_InitCutscene)
 
 	SET_HL(gb, wSubState);
 	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
-}
-
-// runs the init function from CutsceneInitFunctions
-// for the cutscene in [wCurEvent]
-PORT_JUMP(InitEventCutscene)
-{
-	gb->cpu.a = 0;
-	gb->cpu.f = FLAG_Z; // xor a
-	wr8(gb, wLCDCFlagsToFlip, 0);
-	CALL(ClearVirtualOAM);
-	gb->cpu.a = alu_dec(gb, rd8(gb, wCurEvent));
-	if (!(gb->cpu.f & FLAG_Z)) {
-		// != EVENT_PROLOGUE: decompress_tiles1 Cutscenes6Gfx, v1Tiles0
-		gb->cpu.a = 1; // BANK("VRAM1")
-		wr8(gb, rVBK, 1);
-		wr8(gb, wTempBank, BANK_Cutscenes6Gfx);
-		SET_HL(gb, ADDR_Cutscenes6Gfx);
-		SET_BC(gb, v1Tiles0);
-		gb->cpu.a = rd8(gb, wTempBank);
-		wr8(gb, hCallFuncBank, gb->cpu.a);
-		HCALL(Decompress);
-		gb->cpu.a = 0;
-		gb->cpu.f = FLAG_Z; // xor a
-		wr8(gb, rVBK, 0);
-	}
-	gb->cpu.a = rd8(gb, wCurEvent);
-	wr8(gb, wEventWithCutscene, gb->cpu.a);
-	JUMP_TO(jumptable(gb, ADDR_CutsceneInitFunctions));
 }

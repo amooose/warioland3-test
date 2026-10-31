@@ -210,7 +210,7 @@ void Overworld::init()
 // whether the event has a scene on the map to play
 void Overworld::after_cutscene()
 {
-	if (call_z(ADDR_GetOWSceneParams, wram_.cur_event())) {
+	if (!Scenes(gb_).get_params(wram_.cur_event())) {
 		load_map_without_scene();
 		return;
 	}
@@ -238,9 +238,10 @@ void Overworld::wait_for_a()
 
 void Overworld::update_scene()
 {
-	routines_.call(ADDR_Func_818ad);
-	routines_.call(ADDR_Func_82bb8);
-	routines_.call(ADDR_Func_82bda);
+	Scenes scenes(gb_);
+	scenes.update();
+	scenes.draw_unlock_marker();
+	scenes.draw_highlight_marker();
 	routines_.farcall(BANK_Func_b4a37, ADDR_Func_b4a37);
 	routines_.call(ADDR_LoadCompassSprite);
 	routines_.clear_unused_virtual_oam();
@@ -248,7 +249,7 @@ void Overworld::update_scene()
 
 void Overworld::update_map_side()
 {
-	routines_.call(ADDR_Func_80e89);
+	MapWalk(gb_).update();
 	routines_.call(ADDR_LoadCompassSprite);
 	routines_.clear_unused_virtual_oam();
 }
@@ -348,18 +349,18 @@ void Overworld::finish_map_side()
 	mem_[rSCX] = 0;
 	wram_.scx() = 0;
 	wram_.virtual_oam_byte_size() = 0;
-	call_a(ADDR_Func_81dce, wram_.cur_map_side());
+	Scenes(gb_).init();
 	routines_.call(ADDR_ShowMissingTreasureIndicators);
 	routines_.call(ADDR_Func_80bd9);
 	write_bg_map_from_wram();
-	routines_.call(ADDR_Func_8212c);
+	MapWalk(gb_).place_on_level();
 	uint8_t level = wram_.map_side_level_id();
 	wram_.level2() = level;
 	wram_.unk_2d068() = level;
 	wram_.level_arrow_directions1() = 0;
 	call_a(ADDR_SetOWWarioOAM, OWWARIO_DOWN);
 	routines_.farcall(BANK_Func_b4a3d, ADDR_Func_b4a3d);
-	routines_.call(ADDR_Func_82041);
+	MapWalk(gb_).update_wario();
 	routines_.farcall(BANK_Func_b4aa9, ADDR_Func_b4aa9);
 	routines_.farcall(BANK__LoadCloudAndSeaGfx, ADDR__LoadCloudAndSeaGfx);
 	if (!wram_.game_mode_flags().bit(MODE_TIME_ATTACK_F)) {
@@ -414,7 +415,7 @@ void Overworld::show_top_bar()
 	set_vram1(false);
 	if (wram_.ow_bars_state() != OWBARS_INPUT_TOP)
 		return;
-	routines_.call(ADDR_UpdateTopBar + 0x72); // UpdateTopBar.InitTopBarButtons
+	TopBar(gb_).init_buttons();
 	routines_.copy(TILES, WINDOW_ROWS, 2 * TILEMAP_WIDTH);
 	set_vram1(true);
 	routines_.copy(ATTRS, WINDOW_ROWS, 2 * TILEMAP_WIDTH);
@@ -497,7 +498,7 @@ void Overworld::init_north_scene()
 void Overworld::finish_scene_map_side()
 {
 	reset_clouds();
-	call_a(ADDR_Func_81dce, wram_.cur_map_side());
+	Scenes(gb_).init();
 	write_bg_map_from_wram();
 	mem_[rSCY] = 0x04;
 	wram_.scy() = 0x04;
