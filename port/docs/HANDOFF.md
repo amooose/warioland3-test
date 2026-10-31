@@ -423,6 +423,16 @@ Modules so far:
   graphics loaders. The 13 demonstrations (power_ups/*.c) and the helpers
   they call (common1.c, the rest of common2.c) are still register-level C,
   called by address; part 2 moves them in.
+- **action help, part 2** (in progress): the demonstrations as `Demo`
+  subclasses (demo.hpp): no power-up, lead overalls, swimming flippers and
+  prince frog's gloves (both `WaterDemo`), head smash helmet, high jump
+  boots. Left: grab gloves, garlic, super jump slam overalls, super grab
+  gloves, owl, rail, vampire; then common1.c / common2.c move in. Each demo
+  is a state machine on wActionHelpState; the common1 helpers are still
+  called by address (`call(ADDR_ActionHelp_...)`).
+  `tests/inputs/title_demos.input` (no input, 80000 frames from boot) lets
+  the title screen's demo cycle through all 13 demonstrations: its trace is
+  what checks them.
 
 `src/native/routines.hpp` wraps the register-level C routines a module calls
 (DisableLCD, FarDecompress, the golf sprite helpers...): each sets the

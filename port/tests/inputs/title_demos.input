@@ -1,0 +1,3 @@
+# Written by hand: no input from boot, so the title screen's demo shows
+# each power-up's Action Help in turn (hDemoPowerUp counts through all 13).
+end 80000

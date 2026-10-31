@@ -1,5 +1,6 @@
 // Action Help; see action_help.hpp.
 #include "action_help.hpp"
+#include "demo.hpp"
 
 namespace wl3::action_help {
 
@@ -210,7 +211,15 @@ void ActionHelp::run_main_power_up()
 		unrealistic();
 		return;
 	}
-	routines_.call(MAIN_DEMOS[power_up]);
+	switch (power_up) {
+	case NO_POWER_UP: NoPowerUpDemo(gb_).run(); break;
+	case LEAD_OVERALLS: LeadOverallsDemo(gb_).run(); break;
+	case SWIMMING_FLIPPERS: SwimmingFlippersDemo(gb_).run(); break;
+	case HEAD_SMASH_HELMET: HeadSmashHelmetDemo(gb_).run(); break;
+	case HIGH_JUMP_BOOTS: HighJumpBootsDemo(gb_).run(); break;
+	case PRINCE_FROGS_GLOVES: PrinceFrogsGlovesDemo(gb_).run(); break;
+	default: routines_.call(MAIN_DEMOS[power_up]); break;
+	}
 }
 
 void ActionHelp::run_special_power_up()

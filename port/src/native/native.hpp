@@ -26,6 +26,7 @@ namespace wl3 {
 class Byte {
 public:
 	Byte(GB *gb, uint16_t addr) : gb_(gb), addr_(addr) {}
+	Byte(const Byte &) = default; // another view of the same byte
 
 	operator uint8_t() const { return gb_read(gb_, addr_); }
 	Byte &operator=(uint8_t v)
@@ -58,6 +59,7 @@ private:
 class Word {
 public:
 	Word(GB *gb, uint16_t addr) : gb_(gb), addr_(addr) {}
+	Word(const Word &) = default;
 
 	operator uint16_t() const
 	{

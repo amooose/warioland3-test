@@ -56,6 +56,15 @@ public:
 		return Byte(gb_, wObjAnimWasReset);
 	}
 
+	// UpdateObjAnim through farcall with bank mapped, whatever it is (bank 0
+	// too, as hCallFunc maps it)
+	bool animate_far(uint8_t bank)
+	{
+		SET_HL(gb_, static_cast<uint16_t>(base_ + 7));
+		port_farcall(gb_, bank, ADDR_UpdateObjAnim);
+		return Byte(gb_, wObjAnimWasReset);
+	}
+
 	// LoadSprite with the OAM data at oam (in the bank mapped), the y
 	// relative to the background (wSCY)
 	void load_sprite(uint16_t oam)
