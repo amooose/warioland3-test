@@ -68,9 +68,9 @@ void Epilogue::init()
 	wram_.scx() = 0;
 	mem_[rSCY] = 0;
 	wram_.scy() = 0;
-	routines_.call(ADDR_VBlank_PrologueEpilogue);
-	routines_.call(ADDR_ClearGeneralSceneRAM);
-	routines_.call(ADDR_ClearSceneObjsRAM);
+	SceneCommon(gb_).set_vblank();
+	SceneCommon(gb_).clear_scene_ram();
+	SceneCommon(gb_).clear_scene_objs();
 	for (uint16_t pals : {wTempPals1, wTempPals2}) {
 		gb_->cpu.a = 0;
 		SET_HL(gb_, pals);
@@ -94,7 +94,7 @@ void Epilogue::init()
 	decompress(BANK_EpilogueTransformationTilemap, ADDR_EpilogueTransformationTilemap, v0BGMap0, false);
 	decompress(BANK_PrologueAttrmap, ADDR_PrologueAttrmap, v1BGMap1, true);
 	decompress(BANK_PrologueTilemap, ADDR_PrologueTilemap, v0BGMap1, false);
-	routines_.call(ADDR_FillClearedTextBuffer);
+	SceneCommon(gb_).fill_cleared_text_buffer();
 	decompress(BANK_TextJP_OldManThankYou,
 		wram_.language() ? ADDR_TextEN_OldManThankYou : ADDR_TextJP_OldManThankYou, wTextBuffer, false);
 	wram_.unk_2d013() = 0;
@@ -177,7 +177,7 @@ void Epilogue::hdma(uint8_t bank, uint8_t vram_bank, uint16_t src, uint8_t dest_
 // .Func_af1bd: the epilogue's palettes, from the current ones
 void Epilogue::load_pals()
 {
-	routines_.call(ADDR_Func_aca09);
+	SceneCommon(gb_).copy_temp_pals();
 	far_pals(BANK_Pals_86add, ADDR_Pals_86add, wTempPals1);
 	far_pals(BANK_Pals_86b1d, ADDR_Pals_86b1d, wTempPals2);
 }
@@ -206,7 +206,7 @@ void Epilogue::step()
 		mem_[wPalConfig2TotalSteps] = 0;
 		next_step();
 		return;
-	case 3: case 13: case 27: routines_.call(ADDR_Func_ac9ca); return;
+	case 3: case 13: case 27: SceneCommon(gb_).fade(); return;
 	case 4: music_boxes(); return; // .Func_af7af
 	case 5: case 23: case 29: // .Func_af2d0: to black
 		mem_[w2d880] = 0;
@@ -214,7 +214,7 @@ void Epilogue::step()
 		mem_[wPalConfig2TotalSteps] = 0;
 		next_step();
 		return;
-	case 6: case 24: routines_.call(ADDR_PrologueFade); return;
+	case 6: case 24: SceneCommon(gb_).prologue_fade(); return;
 	// the crowd's graphics, by HDMA
 	case 7: hdma(BANK_OldMan1Gfx, 0, ADDR_OldMan1Gfx, (v0Tiles1 >> 8) - 0x80, 0x40 - 1); return;
 	case 8: hdma(BANK_OldMan1Gfx, 1, ADDR_OldMan2Gfx, (v1Tiles0 >> 8) - 0x80, 0x80 - 1); return;
@@ -223,18 +223,18 @@ void Epilogue::step()
 	case 11: hdma(BANK_OldMan1Gfx, 1, wAttrmap, (v1Tiles1 >> 8) - 0x80, 0x50 - 1); return;
 	case 12: crowd_start(); return; // .Func_af23e
 	case 14: transformation(); return; // .Func_af741
-	case 15: routines_.call(ADDR_InitTextPrinting); return;
-	case 16: routines_.call(ADDR_Func_aca9e); return;
+	case 15: SceneCommon(gb_).init_text(); return;
+	case 16: SceneCommon(gb_).print_page(); return;
 	case 17: wait(0x1e); return; // .Func_af2bc
-	case 18: routines_.call(ADDR_LoadCurTextPageBufferPage); return;
-	case 19: routines_.call(ADDR_Func_acacd); return;
+	case 18: SceneCommon(gb_).load_page(); return;
+	case 19: SceneCommon(gb_).wait_for_a(); return;
 	case 20: // .Func_af2c1: the old man's thanks
-		routines_.call(ADDR_PrintTextWithoutHeader);
+		SceneCommon(gb_).print_without_header();
 		old_man_talks();
 		if (mem_[wCurTextLine] == 0x80)
 			next_step();
 		return;
-	case 21: routines_.call(ADDR_Func_acaf3); return;
+	case 21: SceneCommon(gb_).next_page(); return;
 	case 22: leave_on_gift(); return; // .Func_af670
 	case 25: // .Func_af2df
 		hdma(BANK_PrologueBackgroundGfx, 0, ADDR_PrologueBackgroundGfx, (v0Tiles2 >> 8) - 0x80, 0x80 - 1);
@@ -249,7 +249,7 @@ void Epilogue::step()
 		for (uint16_t state : {wSceneObj10State, wSceneObj11State, wSceneObj12State, wSceneObj13State})
 			mem_[state] = 0;
 		mem_[wCollectionRow] = 0x08;
-		routines_.call(ADDR_Func_aca09);
+		SceneCommon(gb_).copy_temp_pals();
 		far_pals(BANK_Pals_869cd, ADDR_Pals_869cd, wTempPals1);
 		far_pals(BANK_Pals_86b1d, ADDR_Pals_86b1d, wTempPals2);
 		wram_.pal_config1_total_steps() = 0;
@@ -259,7 +259,7 @@ void Epilogue::step()
 	case 28: thrown_out(); return; // .Func_af436
 	case 30: // .Func_af34a: a fade step every 4 frames
 		if (!(wram_.unk_2d014() & 0x03))
-			routines_.call(ADDR_PrologueFade);
+			SceneCommon(gb_).prologue_fade();
 		return;
 	case 31: // .Func_af353
 		if (wram_.unk_2d014() >= 0x3c)
@@ -390,8 +390,7 @@ void Epilogue::music_boxes()
 		set_state(wSceneObj9State, state);
 		mem_[wSceneObj9XCoord] = x;
 		load_gift_pals();
-		SET_DE(gb_, ADDR_Data_aca04);
-		routines_.call(ADDR_Func_ac9e4);
+		SceneCommon(gb_).set_pal_config(wPalConfig2, ADDR_Data_aca04);
 		next_sub();
 	};
 
@@ -408,8 +407,8 @@ void Epilogue::music_boxes()
 		if (mem_[wSceneObj1YCoord] < 0x50)
 			return;
 		play_sfx(mem_, SFX_0EB);
-		routines_.call(ADDR_Func_aca09);
-		routines_.call(ADDR_Func_aca25);
+		SceneCommon(gb_).copy_temp_pals();
+		SceneCommon(gb_).white_pals(wTempPals2);
 		next_sub();
 		return;
 	case 3: case 5: case 9: case 11: case 15: case 17: wait_fade(); return;
@@ -506,7 +505,7 @@ void Epilogue::leave_on_gift()
 			return;
 		set_state(wSceneObj1State, 0x00);
 		stop_music2(mem_);
-		routines_.call(ADDR_ClearTextbox);
+		SceneCommon(gb_).clear_textbox();
 		set_state(wSceneObj9State, 0x0f);
 		next_sub();
 		return;

@@ -847,6 +847,54 @@ private:
 	Routines routines_;
 };
 
+// bank2b's helpers shared by its scenes (bank2b_1.asm): the text box
+// (a page of wTextBuffer printed a character at a time, through
+// wPendingCharDest, which the V-Blank function writes to the BG map),
+// scene Wario's walking, clearing the scenes' RAM and the palette
+// configs. The scenes' steps count in w2d013 (step) and w2d014 (frames).
+class SceneCommon {
+public:
+	explicit SceneCommon(GB *gb) : gb_(gb), mem_(gb), routines_(gb) {}
+
+	uint8_t walk(bool right); // ApplySceneWarioMovementLeft / Right: x after the step
+	void clear_scene_ram(); // ClearGeneralSceneRAM
+	void clear_scene_objs(); // ClearSceneObjsRAM
+	void set_vblank(); // VBlank_PrologueEpilogue
+	void set_pal_config(uint16_t config, uint16_t data); // Func_ac9e4, Func_ac9e9
+	void copy_temp_pals(); // Func_aca09
+	void white_pals(uint16_t pals); // Func_aca28
+	void fade(); // Func_ac9ca: the next step once Func_84e43's fade is done
+	void prologue_fade(); // PrologueFade
+	void temple_shake(); // HandleTempleShakeAndRocks
+
+	void fill_cleared_text_buffer(); // FillClearedTextBuffer
+	void init_text(); // InitTextPrinting
+	void load_page(); // LoadCurTextPageBufferPage
+	bool next_page(); // Func_acaf3: whether it starts with '▼'
+	void print_page(); // Func_aca9e
+	void print_page_without_header(); // Func_acae7
+	void wait_for_a(); // Func_acacd
+	void print_with_header() { print_lines(true); } // PrintTextWithHeader
+	void print_without_header() { print_lines(false); } // PrintTextWithoutHeader
+	void clear_textbox() { clear_textbox_at(6 * TILEMAP_WIDTH, 0x8 - 1); } // ClearTextbox
+	void clear_textbox_except_header() { clear_textbox_at(7 * TILEMAP_WIDTH, 0x6 - 1); } // ClearTextboxExceptHeader
+	void load_next_objective(); // LoadNextObjectiveText
+
+private:
+	void next_step(); // Func_aca6d
+	void fill(uint16_t addr, uint16_t size, uint8_t value);
+	uint16_t buffer_page(uint8_t page); // wTextBuffer + page * $40
+	void print_lines(bool header);
+	void print(uint8_t line); // PrintText
+	void next_line(); // GoToNextLine
+	void clear_textbox_at(uint8_t dest, uint8_t tiles); // ClearTextboxAtCoord
+	void set_state(uint16_t state, uint8_t value); // SetSceneObjState
+
+	GB *gb_;
+	Memory mem_;
+	Routines routines_;
+};
+
 // The bank2b scenes' objects (the epilogue's, the temple's, the
 // prologue's): three state machines over tables of animations.
 class SceneSprites {

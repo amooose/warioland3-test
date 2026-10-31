@@ -559,7 +559,14 @@ Modules so far:
   prologue's object machines, Func_ac0b6, UpdateTempleSceneObjAnimation,
   Func_ac409, as tables; they find the object by UpdateOWAnimation's hl and
   its counter by inc c, as the asm, and call a state address outside the
-  scene objects unrealistic). The text printing stays C.
+  scene objects unrealistic). `SceneCommon` (scene_common.cpp: bank2b's
+  shared helpers, called directly by the scenes' C++: the text box's
+  printing, a character per few frames through wPendingCharDest, its
+  pages and clearing by HDMA, the next objective's text, scene Wario's
+  walking, clearing the scenes' RAM, the palette configs). Its hooks
+  clobber every register: only the fuzzer and _InitPrologue's C call them
+  by address, and that C reads no register after them. bank2b_1.c keeps
+  the unreferenced routines and the V-Blank functions copied to RAM.
 - Testing gotcha: TaskStop on a background test job kills only its outer
   shell; the MSYS bash, ctest, fuzz_batch's sh and their wl3 runs go on and
   hold build/wl3.exe (the next link fails with "Permission denied", and a

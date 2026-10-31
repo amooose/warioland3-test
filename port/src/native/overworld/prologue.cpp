@@ -67,10 +67,8 @@ void Prologue::place_music_box()
 void Prologue::load_pals(uint16_t pals)
 {
 	far_copy(BANK_Pals_86a0d, pals, wTempPals1, 8 * PAL_SIZE);
-	SET_DE(gb_, ADDR_Data_ac9f5);
-	routines_.call(ADDR_Func_ac9e9);
-	SET_DE(gb_, ADDR_Data_ac9ff);
-	routines_.call(ADDR_Func_ac9e4);
+	SceneCommon(gb_).set_pal_config(wPalConfig1, ADDR_Data_ac9f5);
+	SceneCommon(gb_).set_pal_config(wPalConfig2, ADDR_Data_ac9ff);
 	next_step();
 }
 
@@ -103,7 +101,7 @@ void Prologue::step()
 	case 0: next_step(); return;
 	case 1: wait(60); return; // .Wait60
 	case 2: set_fade(0x01); return; // .SetFadeInFromBlack
-	case 3: case 8: case 10: case 17: routines_.call(ADDR_PrologueFade); return;
+	case 3: case 8: case 10: case 17: SceneCommon(gb_).prologue_fade(); return;
 	case 4: fall_from_plane(); return; // Prologue_WarioFallFromPlane
 	case 5: { // .ScrollRight40Pixels
 		Byte scx = wram_.scx();
@@ -171,25 +169,25 @@ void Prologue::step()
 		return;
 	case 22: // .Func_ae15b: a fade step every 8 frames
 		if (!(wram_.unk_2d014() & 0x07))
-			routines_.call(ADDR_PrologueFade);
+			SceneCommon(gb_).prologue_fade();
 		return;
 	case 23: wake_up(); return; // Func_ae55c
 	case 24: set_fade(0x02); return; // .Func_ae164
 	case 25: { // .Func_ae169: every 8 frames, then every other
 		uint8_t mask = wram_.pal_config1_total_steps() >= 0x08 ? 0x01 : 0x07;
 		if (!(wram_.unk_2d014() & mask))
-			routines_.call(ADDR_PrologueFade);
+			SceneCommon(gb_).prologue_fade();
 		return;
 	}
 	case 26: bow(); return; // Func_ae641
-	case 27: routines_.call(ADDR_InitTextPrinting); return;
-	case 28: routines_.call(ADDR_Func_aca9e); return;
+	case 27: SceneCommon(gb_).init_text(); return;
+	case 28: SceneCommon(gb_).print_page(); return;
 	case 29: wait(30); return; // .Wait30
-	case 30: routines_.call(ADDR_LoadCurTextPageBufferPage); return;
-	case 31: routines_.call(ADDR_Func_acacd); return;
-	case 32: routines_.call(ADDR_Func_acae7); return;
+	case 30: SceneCommon(gb_).load_page(); return;
+	case 31: SceneCommon(gb_).wait_for_a(); return;
+	case 32: SceneCommon(gb_).print_page_without_header(); return;
 	case 33: // .Func_ae181
-		routines_.call(ADDR_Func_acaf3);
+		SceneCommon(gb_).next_page();
 		if (mem_[wCurTextBufferPage] == 0x02) // .Func_ae188
 			wario_state(SCENEWARIO_LOOK_AROUND);
 		return;
@@ -207,7 +205,7 @@ void Prologue::step()
 		if (!(wram_.joypad_pressed() & (1 << B_PAD_A)))
 			return;
 		set_state(wSceneObj1State, 0x00);
-		routines_.call(ADDR_ClearTextbox);
+		SceneCommon(gb_).clear_textbox();
 		next_step();
 		return;
 	case 37: walk_off(); return; // Func_ae668
@@ -246,8 +244,7 @@ void Prologue::end_sub()
 // ApplySceneWarioMovementRight: Wario's x after the step (even)
 uint8_t Prologue::walk_right()
 {
-	routines_.call(ADDR_ApplySceneWarioMovementRight);
-	return gb_->cpu.a;
+	return SceneCommon(gb_).walk(true);
 }
 
 // Func_ae1de: the music box's close-up: two sparkles
@@ -487,8 +484,7 @@ void Prologue::sucked_into_music_box()
 			mem_[wTempOBPals + i * 2] = static_cast<uint8_t>(GREY);
 			mem_[wTempOBPals + i * 2 + 1] = static_cast<uint8_t>(GREY >> 8);
 		}
-		SET_DE(gb_, ADDR_Data_ac9ff);
-		routines_.call(ADDR_Func_ac9e4);
+		SceneCommon(gb_).set_pal_config(wPalConfig2, ADDR_Data_ac9ff);
 		next_sub();
 		return;
 	}
@@ -577,8 +573,7 @@ void Prologue::wait_wario(uint8_t state)
 
 uint8_t Prologue::walk_left()
 {
-	routines_.call(ADDR_ApplySceneWarioMovementLeft);
-	return gb_->cpu.a;
+	return SceneCommon(gb_).walk(false);
 }
 
 // Func_ae55c: Wario wakes in the temple, gets up, walks over and hears

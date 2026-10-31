@@ -57,9 +57,9 @@ void TempleScene::init()
 	wram_.scx() = 0;
 	mem_[rSCY] = 0;
 	wram_.scy() = 0;
-	routines_.call(ADDR_VBlank_PrologueEpilogue);
-	routines_.call(ADDR_ClearGeneralSceneRAM);
-	routines_.call(ADDR_ClearSceneObjsRAM);
+	SceneCommon(gb_).set_vblank();
+	SceneCommon(gb_).clear_scene_ram();
+	SceneCommon(gb_).clear_scene_objs();
 	load_far(ADDR_LoadFarPalsToTempPals1, BANK_Pals_86a4d, ADDR_Pals_86a4d);
 	decompress(BANK_FontGfx, ADDR_FontGfx, v1Tiles0, true);
 	load_far(ADDR_LoadFarTiles, BANK_TempleGfx, ADDR_TempleGfx);
@@ -67,7 +67,7 @@ void TempleScene::init()
 	mem_[rVBK] = 1;
 	load_far(ADDR_LoadFarBGMap, BANK_TempleAttrmap, ADDR_TempleAttrmap);
 	mem_[rVBK] = 0;
-	routines_.call(ADDR_FillClearedTextBuffer);
+	SceneCommon(gb_).fill_cleared_text_buffer();
 
 	gb_->cpu.a = GOLD_MUSIC_BOX;
 	routines_.call(ADDR_IsTreasureCollected);
@@ -89,7 +89,7 @@ void TempleScene::init()
 		decompress(BANK_TextJP_HiddenFigureHeadFor,
 			wram_.language() ? ADDR_TextEN_HiddenFigureHeadFor : ADDR_TextJP_HiddenFigureHeadFor,
 			wTextBuffer, false);
-		routines_.call(ADDR_LoadNextObjectiveText);
+		SceneCommon(gb_).load_next_objective();
 	}
 
 	// Wario, off the screen to the left
@@ -138,10 +138,9 @@ void TempleScene::step()
 			next_state();
 			return;
 		case 1: // .walk_right
-			routines_.call(ADDR_ApplySceneWarioMovementRight);
-			if (gb_->cpu.a != 0x50)
+			if (SceneCommon(gb_).walk(true) != 0x50)
 				return;
-			mem_[wSceneWarioXCoord] = gb_->cpu.a;
+			mem_[wSceneWarioXCoord] = 0x50;
 			wario_state(SCENEWARIO_IDLE_RIGHT);
 			next_state();
 			return;
@@ -171,12 +170,12 @@ void TempleScene::step()
 	case TEMPLE_SCENE_TALKING: // .TalkToHiddenFigure
 		temple_music();
 		if (!mem_[wIsNextObjectiveTheTemple])
-			routines_.call(ADDR_PrintTextWithHeader);
+			SceneCommon(gb_).print_with_header();
 		if (!(wram_.joypad_pressed() & (PAD_B | PAD_LEFT)))
 			return;
 		mem_[wTempleSceneCounter] = 0; // .start_exit
 		mem_[w2da04] = 0;
-		routines_.call(ADDR_ClearTextbox);
+		SceneCommon(gb_).clear_textbox();
 		wram_.temple_scene() = TEMPLE_SCENE_EXITING;
 		return;
 	case TEMPLE_SCENE_EXITING: // .Exiting
@@ -200,8 +199,7 @@ void TempleScene::step()
 				leave();
 				return;
 			}
-			routines_.call(ADDR_ApplySceneWarioMovementLeft);
-			if (gb_->cpu.a != 0xf0)
+			if (SceneCommon(gb_).walk(false) != 0xf0)
 				return;
 			wario_state(SCENEWARIO_NONE);
 			next_state();
@@ -307,7 +305,7 @@ void TempleScene::reveal()
 	right_hand(); // DoHiddenFigureRightHandMovement
 	uint8_t frames = ++wram_.unk_2d014();
 	auto panic = [this] { wario_panic(); }; // HandleTempleWarioPanic
-	auto shake = [this] { routines_.call(ADDR_HandleTempleShakeAndRocks); };
+	auto shake = [this] { SceneCommon(gb_).temple_shake(); };
 	auto fade = [this](uint8_t mode) { // the next PrologueFade
 		mem_[w2d880] = mode;
 		wram_.pal_config1_total_steps() = 0;
@@ -317,13 +315,13 @@ void TempleScene::reveal()
 	case 0: next_step(); return;
 	case 1: enter_with_music_boxes(); return; // HandleEnterTempleWithAllMusicBoxesScene
 	case 2: wait(40); return; // .Wait1
-	case 3: routines_.call(ADDR_InitTextPrinting); return;
-	case 4: case 26: routines_.call(ADDR_Func_aca9e); return;
+	case 3: SceneCommon(gb_).init_text(); return;
+	case 4: case 26: SceneCommon(gb_).print_page(); return;
 	case 5: wait(30); return; // .Wait2
-	case 6: case 28: case 33: routines_.call(ADDR_LoadCurTextPageBufferPage); return;
-	case 7: routines_.call(ADDR_Func_acacd); return;
-	case 8: routines_.call(ADDR_Func_acae7); return;
-	case 9: routines_.call(ADDR_Func_acaf3); return; // .Func_ad0bd
+	case 6: case 28: case 33: SceneCommon(gb_).load_page(); return;
+	case 7: SceneCommon(gb_).wait_for_a(); return;
+	case 8: SceneCommon(gb_).print_page_without_header(); return;
+	case 9: SceneCommon(gb_).next_page(); return; // .Func_ad0bd
 	case 10: case 39: // .WaitThenShowTextArrow, .Func_ad308
 		if (frames < 30)
 			return;
@@ -334,7 +332,7 @@ void TempleScene::reveal()
 		if (!(wram_.joypad_pressed() & (1 << B_PAD_A)))
 			return;
 		set_state(wSceneObj1State, 0x00);
-		routines_.call(ADDR_ClearTextbox);
+		SceneCommon(gb_).clear_textbox();
 		next_step();
 		return;
 	case 12: show_music_boxes(); return; // Func_ad445
@@ -348,7 +346,7 @@ void TempleScene::reveal()
 		panic();
 		shake();
 		if (!(wram_.unk_2d014() & 0x0f))
-			routines_.call(ADDR_PrologueFade);
+			SceneCommon(gb_).prologue_fade();
 		return;
 	case 16: // .InitShakeAndRocks
 		mem_[w2d896] = 0x01;
@@ -394,13 +392,13 @@ void TempleScene::reveal()
 		panic();
 		uint8_t mask = wram_.pal_config1_total_steps() >= 0x14 ? 0x03 : 0x07;
 		if (!(wram_.unk_2d014() & mask))
-			routines_.call(ADDR_PrologueFade);
+			SceneCommon(gb_).prologue_fade();
 		return;
 	}
 	case 23: figure_appears(); return; // HandleHiddenFigureReveal
 	case 24: wait(40); return; // .Wait3
 	case 25: // .InitTextPrintOnBGMap1
-		routines_.call(ADDR_InitTextPrinting);
+		SceneCommon(gb_).init_text();
 		mem_[wBGMapToPrintText] = 0x01;
 		return;
 	case 27: // .Func_ad207
@@ -420,7 +418,7 @@ void TempleScene::reveal()
 		next_step();
 		return;
 	case 31: // .PrintTextUntilNextPage
-		routines_.call(ADDR_PrintTextWithoutHeader);
+		SceneCommon(gb_).print_without_header();
 		if (mem_[wCurTextLine] == 0x80)
 			next_step();
 		return;
@@ -439,7 +437,7 @@ void TempleScene::reveal()
 		if (!(wram_.joypad_pressed() & (1 << B_PAD_A)))
 			return;
 		set_state(wSceneObj1State, 0x00);
-		routines_.call(ADDR_ClearTextboxExceptHeader);
+		SceneCommon(gb_).clear_textbox_except_header();
 		mem_[wSceneObj7State] = 0x10;
 		next_step(); // Func_aca6d
 		return;
@@ -448,7 +446,7 @@ void TempleScene::reveal()
 			next_step(); // Func_aca6d
 		return;
 	case 36: // .Func_ad27a
-		routines_.call(ADDR_PrintTextWithoutHeader);
+		SceneCommon(gb_).print_without_header();
 		close_mouth();
 		if (mem_[wCurTextLine] == 0x80)
 			next_step(); // Func_af135
@@ -457,10 +455,8 @@ void TempleScene::reveal()
 		// one more step than Func_acaf3 goes)
 		if (mem_[wSceneObj7State] != 0x0d)
 			return;
-		routines_.call(ADDR_Func_acaf3);
-		if (gb_->cpu.f & FLAG_C)
-			return;
-		--mem_[REG_HL(gb_)];
+		if (!SceneCommon(gb_).next_page())
+			--mem_[w2d013];
 		return;
 	case 38: // .Func_ad300
 		wario_state(SCENEWARIO_PANIC_JUMP);
@@ -470,7 +466,7 @@ void TempleScene::reveal()
 		if (!(wram_.joypad_pressed() & (1 << B_PAD_A)))
 			return;
 		mem_[wSceneObj1State] = 0;
-		routines_.call(ADDR_ClearTextbox);
+		SceneCommon(gb_).clear_textbox();
 		next_step();
 		return;
 	case 41: fight(); return;
@@ -539,10 +535,9 @@ void TempleScene::enter_with_music_boxes()
 		next_sub();
 		return;
 	case 2: // .MoveRight
-		routines_.call(ADDR_ApplySceneWarioMovementRight);
-		if (gb_->cpu.a != 0x50)
+		if (SceneCommon(gb_).walk(true) != 0x50)
 			return;
-		mem_[wSceneWarioXCoord] = gb_->cpu.a;
+		mem_[wSceneWarioXCoord] = 0x50;
 		wario_state(SCENEWARIO_IDLE_RIGHT);
 		next_sub();
 		return;
@@ -775,7 +770,7 @@ void TempleScene::shake_scene()
 	static constexpr uint8_t LARGE_WAITS[] = {20, 4, 10, 4, 10, 10, 30, 8, 10, 8};
 
 	wario_panic(); // HandleTempleWarioPanic
-	routines_.call(ADDR_HandleTempleShakeAndRocks);
+	SceneCommon(gb_).temple_shake();
 	uint8_t frames = ++mem_[w2d891];
 	uint8_t s = mem_[w2d890];
 	auto rock = [](int i) { return static_cast<uint16_t>(wTempleRocks + i * TEMPLE_ROCK_STRUCT_LENGTH); };
@@ -874,8 +869,7 @@ void TempleScene::wario_panic()
 		mem_[w2d893] = 0;
 	};
 	auto run_to = [&](bool right, uint8_t x, uint8_t state) { // whether there
-		routines_.call(right ? ADDR_ApplySceneWarioMovementRight : ADDR_ApplySceneWarioMovementLeft);
-		if (gb_->cpu.a != x)
+		if (SceneCommon(gb_).walk(right) != x)
 			return false;
 		mem_[wSceneWarioXCoord] = x;
 		wario_state(state);

@@ -27,8 +27,7 @@ void GolfBuilding::wario_state(uint8_t state)
 // ApplySceneWarioMovementLeft / Right: Wario's x after the step
 uint8_t GolfBuilding::walk(bool right)
 {
-	routines_.call(right ? ADDR_ApplySceneWarioMovementRight : ADDR_ApplySceneWarioMovementLeft);
-	return gb_->cpu.a;
+	return SceneCommon(gb_).walk(right);
 }
 
 // _GolfBuilding: the building's screen, Wario coming in from the side
@@ -46,8 +45,8 @@ void GolfBuilding::init()
 	wram_.scy() = 0;
 	// .VBlank_GolfBuilding: its V-Blank function, run from wVBlankFunc
 	routines_.copy(ADDR__GolfBuilding + 0xfa, wVBlankFunc, 0x140 - 0xfa);
-	routines_.call(ADDR_ClearGeneralSceneRAM);
-	routines_.call(ADDR_ClearSceneObjsRAM);
+	SceneCommon(gb_).clear_scene_ram();
+	SceneCommon(gb_).clear_scene_objs();
 	fill_bg_pals();
 	SET_HL(gb_, ADDR_Pals_84900);
 	SET_DE(gb_, wTempPals2);
