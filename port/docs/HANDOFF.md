@@ -425,6 +425,11 @@ Modules so far:
   after the call). No recording reaches Perfect or the GB incompatible
   notice; the fuzzer's synthetic calls check them. The V-Blank functions
   stay C.
+- **clear** (src/native/clear): the level clear screens (`ClearScreen`):
+  treasure and music boxes, the time attack result, the musical coins tally
+  with the pencil. The bank-$78 loaders run through `in_bank`. Still C: the
+  V-Blank functions, and `_CheckLevelMusicalCoinFlag` (home code calls it
+  with registers).
 - **action help** (src/native/action_help): the whole screen. `ActionHelp`
   is the screen itself (state table, the power-up shown, the power-up bar,
   input, loaders); the 13 demonstrations are `Demo` subclasses (demo.hpp),

@@ -1,21 +1,6 @@
-// Port of src/engine/clear/vblank.asm
+// Port of src/engine/clear/vblank.asm: the V-Blank functions (the copiers
+// are C++, src/native/clear)
 #include "ported.h"
-
-PORT(VBlank_ClearScreen)
-{
-	SET_HL(gb, ADDR_VBlank_ClearScreen + 0x0c); // .Func
-	SET_DE(gb, wVBlankFunc);
-	gb->cpu.b = 0x37; // .end - .Func
-	CALL(CopyHLToDE);
-}
-
-PORT(VBlank_MusicalCoinsScreen)
-{
-	SET_HL(gb, ADDR_VBlank_MusicalCoinsScreen + 0x0c); // .Func
-	SET_DE(gb, wVBlankFunc);
-	gb->cpu.b = 0x3e; // .end - .Func
-	CALL(CopyHLToDE);
-}
 
 // ld hl, src / ld c, [hl] / ld b, TILE_SIZE - 1 / ld de, src - 2 /
 // .loop: ld a, [de] / ld [hld], a / dec l / dec e / dec e / dec b /
