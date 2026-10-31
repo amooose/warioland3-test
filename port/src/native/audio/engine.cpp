@@ -58,47 +58,47 @@ uint16_t multiply(uint8_t b, uint8_t c)
 
 void Engine::set_channels(uint16_t first, uint8_t count)
 {
-	ram(wNumAudioChannels) = count;
-	ram_word(wCurChannelPtr) = first;
+	wram_.num_audio_channels() = count;
+	wram_.cur_channel_ptr().word() = first;
 }
 
 bool Engine::next_channel()
 {
-	uint8_t left = static_cast<uint8_t>(ram(wNumAudioChannels) - 1);
-	ram(wNumAudioChannels) = left;
+	uint8_t left = static_cast<uint8_t>(wram_.num_audio_channels() - 1);
+	wram_.num_audio_channels() = left;
 	if (!left)
 		return false;
-	ram_word(wCurChannelPtr) = static_cast<uint16_t>(ram_word(wCurChannelPtr) + CHANNEL_STRUCT_LENGTH);
+	wram_.cur_channel_ptr().word() = static_cast<uint16_t>(wram_.cur_channel_ptr().word() + CHANNEL_STRUCT_LENGTH);
 	return true;
 }
 
 void Engine::set_tracks(uint16_t first, uint8_t count, uint8_t sound_register)
 {
-	ram(wNumTracks) = count;
-	ram_word(wCurTrackPtr) = first;
-	ram(wCurSoundRegister) = sound_register;
+	wram_.num_tracks() = count;
+	wram_.cur_track_ptr().word() = first;
+	wram_.cur_sound_register() = sound_register;
 }
 
 bool Engine::next_track()
 {
-	uint8_t left = static_cast<uint8_t>(ram(wNumTracks) - 1);
-	ram(wNumTracks) = left;
+	uint8_t left = static_cast<uint8_t>(wram_.num_tracks() - 1);
+	wram_.num_tracks() = left;
 	if (!left)
 		return false;
-	ram_word(wCurTrackPtr) = static_cast<uint16_t>(ram_word(wCurTrackPtr) + TRACK_STRUCT_LENGTH);
-	ram(wCurSoundRegister) += 5; // the next sound generator's registers
+	wram_.cur_track_ptr().word() = static_cast<uint16_t>(wram_.cur_track_ptr().word() + TRACK_STRUCT_LENGTH);
+	wram_.cur_sound_register() += 5; // the next sound generator's registers
 	return true;
 }
 
 void Engine::map_rom_bank(uint8_t bank)
 {
-	ram(wROMBank) = bank;
+	wram_.rom_bank() = bank;
 	ram(rROMB0) = bank;
 }
 
 uint8_t Engine::read_command_byte(uint16_t addr)
 {
-	map_rom_bank(ram(wSoundBank));
+	map_rom_bank(wram_.sound_bank());
 	uint8_t value = mem_[addr];
 	map_rom_bank(AUDIO_ENGINE_BANK);
 	return value;
@@ -106,7 +106,7 @@ uint8_t Engine::read_command_byte(uint16_t addr)
 
 uint16_t Engine::read_command_word(uint16_t addr)
 {
-	map_rom_bank(ram(wSoundBank));
+	map_rom_bank(wram_.sound_bank());
 	uint8_t lo = mem_[addr];
 	uint8_t hi = mem_[static_cast<uint16_t>(addr + 1)];
 	map_rom_bank(AUDIO_ENGINE_BANK);
@@ -118,19 +118,19 @@ uint16_t Engine::read_command_word(uint16_t addr)
 
 void Engine::init()
 {
-	ram(wAudioEngineFlags) = 0xff;
-	uint8_t bank_backup = ram(wAudioBankBackup);
+	wram_.audio_engine_flags() = 0xff;
+	uint8_t bank_backup = wram_.audio_bank_backup();
 	for (uint16_t addr = wAudioBankBackup; addr <= wStartChannel; addr++)
 		ram(addr) = 0;
-	ram(wAudioBankBackup) = bank_backup;
+	wram_.audio_bank_backup() = bank_backup;
 
-	ram(wSFXBaseTempo) = 74;
-	ram(wSFXTempo) = 74;
-	ram(wMusicBaseTempo) = 74;
-	ram(wMusicTempo) = 74;
-	ram(wSFXTempoMult) = Q6_1_0;
-	ram(wMusicTempoMult) = Q6_1_0;
-	ram(wCurWaveSample) = 0xff;
+	wram_.sfx_base_tempo() = 74;
+	wram_.sfx_tempo() = 74;
+	wram_.music_base_tempo() = 74;
+	wram_.music_tempo() = 74;
+	wram_.sfx_tempo_mult() = Q6_1_0;
+	wram_.music_tempo_mult() = Q6_1_0;
+	wram_.cur_wave_sample() = 0xff;
 
 	for (int i = 0; i < NUM_CHANNELS; i++)
 		Channel(gb_, static_cast<uint16_t>(wChannels + i * CHANNEL_STRUCT_LENGTH)).flags() = 0;
@@ -148,7 +148,7 @@ void Engine::init()
 	mem_[rAUD3ENA] = AUD3ENA_OFF;
 	mem_[rAUDTERM] = 0xff; // all channels in both speakers
 	mem_[rAUDVOL] = MAX_VOLUME;
-	ram(wAudioEngineFlags) = 0x00;
+	wram_.audio_engine_flags() = 0x00;
 }
 
 void Engine::update(uint8_t caller_c)
@@ -165,9 +165,9 @@ void Engine::update(uint8_t caller_c)
 	static const Part parts[] = {{true, wSFXTempo, w3d008}, {false, wMusicTempo, w3d00d}};
 	for (const Part &part : parts) {
 		if (part.sfx)
-			ram(wAudioEngineFlags).set_bit(AUDIOENG_HANDLING_SFX_F);
+			wram_.audio_engine_flags().set_bit(AUDIOENG_HANDLING_SFX_F);
 		else
-			ram(wAudioEngineFlags).reset_bit(AUDIOENG_HANDLING_SFX_F);
+			wram_.audio_engine_flags().reset_bit(AUDIOENG_HANDLING_SFX_F);
 		Word accumulator = ram_word(part.accumulator);
 		accumulator = static_cast<uint16_t>(accumulator + ram(part.tempo));
 		auto set_part_channels = [&] { part.sfx ? set_sfx_channels() : set_music_channels(); };
@@ -196,8 +196,8 @@ void Engine::update(uint8_t caller_c)
 		update_track_output();
 	while (next_track());
 
-	uint8_t counter = ram(w3d01a);
-	ram(w3d01a) = static_cast<uint8_t>((counter ? counter : 0x0f) - 1);
+	uint8_t counter = wram_.unk_3d01a();
+	wram_.unk_3d01a() = static_cast<uint8_t>((counter ? counter : 0x0f) - 1);
 
 	// clear the channels' update flags, and collect which are active
 	uint8_t active = 0;
@@ -207,7 +207,7 @@ void Engine::update(uint8_t caller_c)
 		ch.flags() = flags;
 		active = static_cast<uint8_t>(active >> 1 | (flags & CHANFLAGS_ACTIVE));
 	}
-	ram(wActiveChannels) = active;
+	wram_.active_channels() = active;
 }
 
 // ---------------------------------------------------------------------------
@@ -222,32 +222,32 @@ void Engine::play_sfx(uint16_t id)
 	if (!load_sound(id))
 		return;
 
-	uint8_t start = ram(wStartChannel);
+	uint8_t start = wram_.start_channel();
 	if (start & 0x80) {
 		// Any free SFX channels first (wSoundEngineParam4 is the bit of the
 		// channel, wSoundEngineParam3 collects the ones loaded), then the
 		// others whose sound has no higher priority.
 		set_sfx_channels();
-		ram(wSoundEngineParam4) = 1;
-		ram(wSoundEngineParam3) = 0;
+		wram_.sound_engine_param4() = 1;
+		wram_.sound_engine_param3() = 0;
 		do {
 			if (!cur_channel().active()) {
 				if (load_channel_with_sound())
 					return;
-				ram(wSoundEngineParam3) |= ram(wSoundEngineParam4);
+				wram_.sound_engine_param3() |= wram_.sound_engine_param4();
 			}
-			ram(wSoundEngineParam4) = static_cast<uint8_t>(ram(wSoundEngineParam4) << 1);
+			wram_.sound_engine_param4() = static_cast<uint8_t>(wram_.sound_engine_param4() << 1);
 		} while (next_channel());
 
 		set_sfx_channels();
-		ram(wSoundEngineParam4) = 1;
+		wram_.sound_engine_param4() = 1;
 		do {
-			if (!(ram(wSoundEngineParam3) & ram(wSoundEngineParam4)) &&
-				ram(wSoundPriority) >= cur_channel()[CHANNEL_PRIORITY]) {
+			if (!(wram_.sound_engine_param3() & wram_.sound_engine_param4()) &&
+				wram_.sound_priority() >= cur_channel()[CHANNEL_PRIORITY]) {
 				if (load_channel_with_sound())
 					return;
 			}
-			ram(wSoundEngineParam4) = static_cast<uint8_t>(ram(wSoundEngineParam4) << 1);
+			wram_.sound_engine_param4() = static_cast<uint8_t>(wram_.sound_engine_param4() << 1);
 		} while (next_channel());
 		return;
 	}
@@ -255,11 +255,11 @@ void Engine::play_sfx(uint16_t id)
 	// from the given channel on, over sounds of no higher priority
 	if (start >= CHAN5_F)
 		return;
-	ram(wNumAudioChannels) = static_cast<uint8_t>(CHAN5_F - start);
-	ram_word(wCurChannelPtr) = static_cast<uint16_t>(wChannels + start * CHANNEL_STRUCT_LENGTH);
+	wram_.num_audio_channels() = static_cast<uint8_t>(CHAN5_F - start);
+	wram_.cur_channel_ptr().word() = static_cast<uint16_t>(wChannels + start * CHANNEL_STRUCT_LENGTH);
 	for (;;) {
 		Channel ch = cur_channel();
-		bool load = !ch.active() || ram(wSoundPriority) >= ch[CHANNEL_PRIORITY];
+		bool load = !ch.active() || wram_.sound_priority() >= ch[CHANNEL_PRIORITY];
 		if (load ? load_channel_with_sound() : skip_loading_channel())
 			return;
 		if (!next_channel())
@@ -273,9 +273,9 @@ void Engine::play_music(uint16_t id)
 		deactivate_music_channels();
 		return;
 	}
-	ram_word(wLoadedMusic) = id;
-	ram(wMusicFadeOutPeriod) = 0;
-	ram(w3d025) = 0;
+	wram_.loaded_music().word() = id;
+	wram_.music_fade_out_period() = 0;
+	wram_.unk_3d025() = 0;
 	if (!load_sound(id))
 		return;
 
@@ -293,21 +293,21 @@ void Engine::play_music(uint16_t id)
 
 void Engine::play_new_music(uint16_t id)
 {
-	if (ram_word(wLoadedMusic) != id || !(ram(wActiveChannels) & MUSIC_CHANNELS))
+	if (wram_.loaded_music().word() != id || !(wram_.active_channels() & MUSIC_CHANNELS))
 		play_music(id);
 }
 
 void Engine::play_new_music_set_noise(uint16_t id)
 {
-	if (ram_word(wLoadedMusic) != id)
+	if (wram_.loaded_music().word() != id)
 		play_music(id);
-	else if (!(ram(wActiveChannels) & MUSIC_CHANNELS))
+	else if (!(wram_.active_channels() & MUSIC_CHANNELS))
 		resume_music();
 }
 
 void Engine::resume_music()
 {
-	ram(w3d025) = 0;
+	wram_.unk_3d025() = 0;
 	set_music_channels();
 	do {
 		Channel ch = cur_channel();
@@ -326,11 +326,11 @@ bool Engine::load_sound(uint16_t id)
 
 	uint16_t header = static_cast<uint16_t>(ADDR_SoundHeaders - 8 + id * 8);
 	uint16_t commands = mem_.word(header);
-	ram(wSoundBank) = mem_[static_cast<uint16_t>(header + 2)];
-	ram(wSoundPriority) = mem_[static_cast<uint16_t>(header + 4)];
-	ram(wStartChannel) = mem_[static_cast<uint16_t>(header + 5)];
-	ram(wNumChannels) = mem_[static_cast<uint16_t>(header + 6)];
-	ram_word(wAudioCmdPtr) = static_cast<uint16_t>(commands + 2);
+	wram_.sound_bank() = mem_[static_cast<uint16_t>(header + 2)];
+	wram_.sound_priority() = mem_[static_cast<uint16_t>(header + 4)];
+	wram_.start_channel() = mem_[static_cast<uint16_t>(header + 5)];
+	wram_.num_channels() = mem_[static_cast<uint16_t>(header + 6)];
+	wram_.audio_cmd_ptr().word() = static_cast<uint16_t>(commands + 2);
 	return true;
 }
 
@@ -340,21 +340,21 @@ bool Engine::load_channel_with_sound()
 {
 	Channel ch = cur_channel();
 	ch.flags() = CHANFLAGS_5 | CHANFLAGS_ACTIVE;
-	ch.word(CHANNEL_CMD_PTR) = ram_word(wAudioCmdPtr);
-	ch[CHANNEL_SOUND_BANK] = ram(wSoundBank);
-	ch.word(CHANNEL_SOUND_ID) = ram_word(wCurSoundID);
-	ch[CHANNEL_PRIORITY] = ram(wSoundPriority);
+	ch.word(CHANNEL_CMD_PTR) = wram_.audio_cmd_ptr().word();
+	ch[CHANNEL_SOUND_BANK] = wram_.sound_bank();
+	ch.word(CHANNEL_SOUND_ID) = wram_.cur_sound_id().word();
+	ch[CHANNEL_PRIORITY] = wram_.sound_priority();
 	return skip_loading_channel();
 }
 
 // Moves on to the sound's next part. True when there's none left.
 bool Engine::skip_loading_channel()
 {
-	uint8_t left = static_cast<uint8_t>(ram(wNumChannels) - 1);
-	ram(wNumChannels) = left;
+	uint8_t left = static_cast<uint8_t>(wram_.num_channels() - 1);
+	wram_.num_channels() = left;
 	if (!left)
 		return true;
-	ram_word(wAudioCmdPtr) = static_cast<uint16_t>(ram_word(wAudioCmdPtr) + 2);
+	wram_.audio_cmd_ptr().word() = static_cast<uint16_t>(wram_.audio_cmd_ptr().word() + 2);
 	return false;
 }
 
@@ -378,7 +378,7 @@ void Engine::init_channel(Channel ch)
 	ch.flags() = CHANFLAGS_6 | CHANFLAGS_ACTIVE;
 	ch[CHANNEL_DURATION] = 0;
 	uint16_t pointer = ch.word(CHANNEL_CMD_PTR);
-	ram(wSoundBank) = ch[CHANNEL_SOUND_BANK];
+	wram_.sound_bank() = ch[CHANNEL_SOUND_BANK];
 	ch.word(CHANNEL_CMD_PTR) = read_command_word(pointer);
 	for (unsigned i = 0; i < sizeof(initial); i++)
 		ch[CHANNEL_PITCH + static_cast<int>(i)] = initial[i];
@@ -390,11 +390,11 @@ void Engine::turn_off_sfx(uint16_t id)
 		turn_sfx_off();
 		return;
 	}
-	ram_word(wCurSoundID) = id;
+	wram_.cur_sound_id().word() = id;
 	set_sfx_channels();
 	do {
 		Channel ch = cur_channel();
-		if (ch.active() && ch[CHANNEL_SOUND_ID] == ram(wCurSoundID) &&
+		if (ch.active() && ch[CHANNEL_SOUND_ID] == wram_.cur_sound_id() &&
 			ch[CHANNEL_SOUND_ID + 1] == ram(wCurSoundID + 1))
 			ch.flags() = 0;
 	} while (next_channel());
@@ -415,7 +415,7 @@ void Engine::turn_music_off()
 
 void Engine::deactivate_music_channels()
 {
-	ram(w3d025) = 0xff;
+	wram_.unk_3d025() = 0xff;
 	set_music_channels();
 	do
 		cur_channel().flags().reset_bit(CHANFLAGS_ACTIVE_F);
@@ -425,7 +425,7 @@ void Engine::deactivate_music_channels()
 uint16_t Engine::playing_sound_id(uint8_t which)
 {
 	if (!which)
-		return (ram(wActiveChannels) & MUSIC_CHANNELS) ? static_cast<uint16_t>(ram_word(wLoadedMusic)) : 0;
+		return (wram_.active_channels() & MUSIC_CHANNELS) ? static_cast<uint16_t>(wram_.loaded_music().word()) : 0;
 	if (which >= NUM_SFX_CHANNELS + 1)
 		return 0;
 	// a table of the SFX channels, just before AudioModFunctionTable
@@ -451,48 +451,48 @@ void Engine::execute_audio_mod_internal(uint8_t mod, uint8_t b, uint8_t c, uint8
 {
 	if (mod >= NUM_AUDIOMOD_FUNCTIONS)
 		return;
-	ram(wSoundEngineParam1) = c;
-	ram(wSoundEngineParam2) = b;
-	ram(wSoundEngineParam3) = e;
-	ram(wSoundEngineParam4) = d;
-	ram(wNumChannels) = 0;
+	wram_.sound_engine_param1() = c;
+	wram_.sound_engine_param2() = b;
+	wram_.sound_engine_param3() = e;
+	wram_.sound_engine_param4() = d;
+	wram_.num_channels() = 0;
 
 	switch (mem_.word(static_cast<uint16_t>(ADDR_AudioModFunctionTable + mod * 2))) {
 	case ADDR_AudioMod_Tempo:
-		if (ram(wSoundEngineParam4)) {
-			ram(wSFXTempoMult) = ram(wSoundEngineParam2);
+		if (wram_.sound_engine_param4()) {
+			wram_.sfx_tempo_mult() = wram_.sound_engine_param2();
 			calculate_tempo(wSFXBaseTempo);
 		}
-		if (ram(wSoundEngineParam3)) {
-			ram(wMusicTempoMult) = ram(wSoundEngineParam2);
+		if (wram_.sound_engine_param3()) {
+			wram_.music_tempo_mult() = wram_.sound_engine_param2();
 			calculate_tempo(wMusicBaseTempo);
 		}
 		return;
 	case ADDR_AudioMod_Pitch:
-		ram(wNumChannels) |= CHANFLAGS_UPDATE_FREQUENCY;
+		wram_.num_channels() |= CHANFLAGS_UPDATE_FREQUENCY;
 		audio_mod_set_long(CHANNEL_PITCH_OFFSET_MOD);
 		return;
 	case ADDR_AudioMod_Volume:
-		ram(wNumChannels) |= CHANFLAGS_UPDATE_VOLUME;
+		wram_.num_channels() |= CHANFLAGS_UPDATE_VOLUME;
 		audio_mod_set_short(CHANNEL_VOLUME_MOD);
 		return;
 	case ADDR_AudioMod_Pan:
-		ram(wNumChannels) |= CHANFLAGS_UPDATE_SO;
+		wram_.num_channels() |= CHANFLAGS_UPDATE_SO;
 		audio_mod_set_short(CHANNEL_GLOBAL_PAN);
 		return;
 	case ADDR_AudioMod_VibratoAmplitude:
 		audio_mod_set_short(CHANNEL_VIBRATO_AMPLITUDE_MOD);
 		return;
 	case ADDR_AudioMod_VibratoSpeed: {
-		uint8_t speed = ram(wSoundEngineParam2);
+		uint8_t speed = wram_.sound_engine_param2();
 		if (static_cast<uint8_t>(speed << 1)) {
 			audio_mod_set_short(CHANNEL_VIBRATO_SPEED);
 			return;
 		}
 		// speed $00 or $80: also sets the vibrato value
 		bool half = speed & 0x80;
-		ram(wSoundEngineParam1) = half ? 0x80 : 0x00;
-		ram(wSoundEngineParam2) = half ? 0x00 : 0x40;
+		wram_.sound_engine_param1() = half ? 0x80 : 0x00;
+		wram_.sound_engine_param2() = half ? 0x00 : 0x40;
 		audio_mod_set_long(CHANNEL_VIBRATO_SPEED);
 		return;
 	}
@@ -508,7 +508,7 @@ void Engine::execute_audio_mod_internal(uint8_t mod, uint8_t b, uint8_t c, uint8
 // PrepareChannelBitmasks: bit i selects channel i (SFX 1-4, then music).
 uint8_t Engine::channel_bitmask() const
 {
-	return static_cast<uint8_t>((ram(wSoundEngineParam4) & 0x0f) | (swap(ram(wSoundEngineParam3)) & 0xf0));
+	return static_cast<uint8_t>((wram_.sound_engine_param4() & 0x0f) | (swap(wram_.sound_engine_param3()) & 0xf0));
 }
 
 void Engine::audio_mod_set_short(int field)
@@ -517,8 +517,8 @@ void Engine::audio_mod_set_short(int field)
 	for (int i = 0; i < NUM_CHANNELS; i++, mask = rrca(mask)) {
 		Channel ch(gb_, static_cast<uint16_t>(wChannels + i * CHANNEL_STRUCT_LENGTH));
 		if ((mask & 1) && ch.active()) {
-			ch.flags() |= ram(wNumChannels);
-			ch[field] = ram(wSoundEngineParam2);
+			ch.flags() |= wram_.num_channels();
+			ch[field] = wram_.sound_engine_param2();
 		}
 	}
 }
@@ -529,40 +529,40 @@ void Engine::audio_mod_set_long(int field)
 	for (int i = 0; i < NUM_CHANNELS; i++, mask = rrca(mask)) {
 		Channel ch(gb_, static_cast<uint16_t>(wChannels + i * CHANNEL_STRUCT_LENGTH));
 		if ((mask & 1) && ch.active()) {
-			ch.flags() |= ram(wNumChannels);
-			ch[field] = ram(wSoundEngineParam1);
-			ch[field + 1] = ram(wSoundEngineParam2);
+			ch.flags() |= wram_.num_channels();
+			ch[field] = wram_.sound_engine_param1();
+			ch[field + 1] = wram_.sound_engine_param2();
 		}
 	}
 }
 
 void Engine::set_music_fade_out(uint8_t period)
 {
-	ram(wMusicFadeOutPeriod) = period;
-	ram(wMusicFadeOutTimer) = period;
-	ram(wMusicFadeOutVolumeMult) = Q6_1_0;
+	wram_.music_fade_out_period() = period;
+	wram_.music_fade_out_timer() = period;
+	wram_.music_fade_out_volume_mult() = Q6_1_0;
 }
 
 void Engine::update_music_fade_out(uint8_t caller_c)
 {
-	if (ram(w3d025))
+	if (wram_.unk_3d025())
 		return;
-	uint8_t period = ram(wMusicFadeOutPeriod);
+	uint8_t period = wram_.music_fade_out_period();
 	if (!period)
 		return;
-	uint8_t timer = static_cast<uint8_t>(ram(wMusicFadeOutTimer) - 1);
-	ram(wMusicFadeOutTimer) = timer;
+	uint8_t timer = static_cast<uint8_t>(wram_.music_fade_out_timer() - 1);
+	wram_.music_fade_out_timer() = timer;
 	if (timer)
 		return;
-	ram(wMusicFadeOutTimer) = period;
-	uint8_t volume = ram(wMusicFadeOutVolumeMult);
+	wram_.music_fade_out_timer() = period;
+	uint8_t volume = wram_.music_fade_out_volume_mult();
 	if (volume < Q6_0_063) {
-		ram(wMusicFadeOutPeriod) = 0;
+		wram_.music_fade_out_period() = 0;
 		deactivate_music_channels();
 		return;
 	}
 	volume = static_cast<uint8_t>(volume - Q6_0_063);
-	ram(wMusicFadeOutVolumeMult) = volume;
+	wram_.music_fade_out_volume_mult() = volume;
 	execute_audio_mod_internal(AUDIOMOD_VOLUME, volume, caller_c, 0x00, 0xff);
 }
 
@@ -586,7 +586,7 @@ void Engine::update_channel_without_commands()
 	uint8_t flags = ch.flags();
 	if (flags < CHANNEL_PLAYING)
 		return;
-	ram(wCurChannelFlags) = flags;
+	wram_.cur_channel_flags() = flags;
 	apply_channel_updates(ch, flags);
 }
 
@@ -600,7 +600,7 @@ void Engine::update_channel()
 		init_channel(ch);
 		flags = ch.flags();
 	}
-	ram(wCurChannelFlags) = flags;
+	wram_.cur_channel_flags() = flags;
 
 	uint8_t duration = ch[CHANNEL_DURATION];
 	if (duration) {
@@ -609,7 +609,7 @@ void Engine::update_channel()
 		return;
 	}
 	uint16_t cmd = ch.word(CHANNEL_CMD_PTR);
-	ram(wSoundBank) = ch[CHANNEL_SOUND_BANK];
+	wram_.sound_bank() = ch[CHANNEL_SOUND_BANK];
 	do_audio_commands(cmd);
 }
 
@@ -628,7 +628,7 @@ void Engine::update_vibrato(Channel ch)
 	uint8_t wave = static_cast<uint8_t>(value << 1); // a triangle wave
 	if (value & 0x80)
 		wave = static_cast<uint8_t>(~wave);
-	ram(wVibratoValue) = wave;
+	wram_.vibrato_value() = wave;
 
 	uint8_t amplitude = static_cast<uint8_t>(ch[CHANNEL_VIBRATO_AMPLITUDE] + ch[CHANNEL_VIBRATO_AMPLITUDE_MOD]);
 	bool enabled = ch[CHANNEL_VIBRATO_DISABLED] == FALSE;
@@ -642,15 +642,15 @@ void Engine::update_vibrato(Channel ch)
 			offset = static_cast<uint16_t>(diff << 3);
 		}
 		if (static_cast<uint8_t>(offset) != ch[CHANNEL_UNK_24]) {
-			ram(wCurChannelFlags) |= CHANFLAGS_UPDATE_FREQUENCY;
+			wram_.cur_channel_flags() |= CHANFLAGS_UPDATE_FREQUENCY;
 			ch[CHANNEL_UNK_24] = static_cast<uint8_t>(offset);
 		}
 		if (static_cast<uint8_t>(offset >> 8) != ch[CHANNEL_UNK_24 + 1]) {
-			ram(wCurChannelFlags) |= CHANFLAGS_UPDATE_FREQUENCY;
+			wram_.cur_channel_flags() |= CHANFLAGS_UPDATE_FREQUENCY;
 			ch[CHANNEL_UNK_24 + 1] = static_cast<uint8_t>(offset >> 8);
 		}
 	}
-	apply_channel_updates(ch, ram(wCurChannelFlags));
+	apply_channel_updates(ch, wram_.cur_channel_flags());
 }
 
 // Func_30651: recalculates the channel's frequency, output and volume as
@@ -664,18 +664,18 @@ void Engine::apply_channel_updates(Channel ch, uint8_t flags)
 		if (ch[CHANNEL_VIBRATO_DISABLED] == FALSE)
 			frequency = static_cast<uint16_t>(frequency + ch.word(CHANNEL_UNK_24));
 		ch.word(CHANNEL_FREQUENCY) = frequency;
-		flags = ram(wCurChannelFlags);
+		flags = wram_.cur_channel_flags();
 	}
 	if (flags & CHANFLAGS_UPDATE_SO) {
 		ch[CHANNEL_SO_FLAGS] = static_cast<uint8_t>(ch[CHANNEL_SINGLE_PAN] + ch[CHANNEL_GLOBAL_PAN]);
-		flags = ram(wCurChannelFlags);
+		flags = wram_.cur_channel_flags();
 	}
 	if (flags & CHANFLAGS_UPDATE_VOLUME) {
 		uint8_t volume = static_cast<uint8_t>((multiply_short(ch[CHANNEL_VOLUME], ch[CHANNEL_VOLUME_MOD]) + 0x0f) & 0xf0);
 		if (volume >= 0x40)
 			volume = 0xff;
 		ch[CHANNEL_UNK_2F] = rlca(rlca(volume));
-		flags = ram(wCurChannelFlags);
+		flags = wram_.cur_channel_flags();
 	}
 	ch.flags() = flags;
 }
@@ -691,11 +691,11 @@ void Engine::do_audio_commands(uint16_t cmd)
 		uint8_t first = static_cast<uint8_t>(bytes), second = static_cast<uint8_t>(bytes >> 8);
 		uint8_t command;
 		if (!(first & 0x80)) {
-			ram(wAudioCmdArg) = first;
+			wram_.audio_cmd_arg() = first;
 			command = ch[CHANNEL_ACTIVE_COMMAND];
 		} else {
 			cmd++;
-			ram(wAudioCmdArg) = second;
+			wram_.audio_cmd_arg() = second;
 			command = first;
 			if (command >= 0xbe)
 				ch[CHANNEL_ACTIVE_COMMAND] = command;
@@ -743,16 +743,16 @@ bool Engine::command_by_address(uint16_t handler, uint16_t &cmd)
 	case ADDR_AudioCmd_SetChannelDuration: return cmd_set_property(cmd, CHANNEL_LENGTH);
 	case ADDR_AudioCmd_SetChannelSweep: return cmd_set_property(cmd, CHANNEL_SWEEP);
 	case ADDR_AudioCmd_SetChannelVibratoDisabled:
-		ram(wCurChannelFlags) |= CHANNEL_UPDATES;
+		wram_.cur_channel_flags() |= CHANNEL_UPDATES;
 		return cmd_set_property(cmd, CHANNEL_VIBRATO_DISABLED);
 	case ADDR_AudioCmd_SetChannelUnk1e:
-		ram(wCurChannelFlags) |= CHANFLAGS_UPDATE_FREQUENCY;
+		wram_.cur_channel_flags() |= CHANFLAGS_UPDATE_FREQUENCY;
 		return cmd_set_property(cmd, CHANNEL_UNK_1E);
 	case ADDR_AudioCmd_Pan:
-		ram(wCurChannelFlags) |= CHANFLAGS_UPDATE_SO;
+		wram_.cur_channel_flags() |= CHANFLAGS_UPDATE_SO;
 		return cmd_set_signed(cmd, CHANNEL_SINGLE_PAN);
 	case ADDR_AudioCmd_SetChannelUnk1d:
-		ram(wCurChannelFlags) |= CHANFLAGS_UPDATE_FREQUENCY;
+		wram_.cur_channel_flags() |= CHANFLAGS_UPDATE_FREQUENCY;
 		return cmd_set_signed(cmd, CHANNEL_UNK_1D);
 	case ADDR_AudioCmd_SetChannelFadeInEnvelope: return cmd_set_high_nybble(cmd, CHANNEL_FADE_IN_ENVELOPE);
 	case ADDR_Func_309e8: return cmd_set_low_nybble(cmd, CHANNEL_FADE_IN_ENVELOPE);
@@ -777,11 +777,11 @@ bool Engine::cmd_clear_flags(uint16_t &)
 // Func_30727: a command from a second table, with its own argument byte
 bool Engine::cmd_extended(uint16_t &cmd)
 {
-	uint8_t index = ram(wAudioCmdArg);
+	uint8_t index = wram_.audio_cmd_arg();
 	cmd++;
 	if (index >= 0x0c)
 		return cmd_clear_flags(cmd);
-	ram(wAudioCmdArg) = read_command_byte(cmd);
+	wram_.audio_cmd_arg() = read_command_byte(cmd);
 	return run_command(ADDR_PointerTable_3070f, index, cmd);
 }
 
@@ -835,7 +835,7 @@ bool Engine::cmd_ret(uint16_t &cmd)
 bool Engine::cmd_loop(uint16_t &cmd)
 {
 	Channel ch = cur_channel();
-	uint8_t count = ram(wAudioCmdArg);
+	uint8_t count = wram_.audio_cmd_arg();
 	cmd++;
 	if (!count)
 		return cmd_jump(cmd);
@@ -850,8 +850,8 @@ bool Engine::cmd_loop(uint16_t &cmd)
 
 bool Engine::cmd_set_tempo(uint16_t &cmd)
 {
-	uint16_t base = ram(wAudioEngineFlags).bit(AUDIOENG_HANDLING_SFX_F) ? wSFXBaseTempo : wMusicBaseTempo;
-	ram(base) = ram(wAudioCmdArg);
+	uint16_t base = wram_.audio_engine_flags().bit(AUDIOENG_HANDLING_SFX_F) ? wSFXBaseTempo : wMusicBaseTempo;
+	ram(base) = wram_.audio_cmd_arg();
 	cmd++;
 	calculate_tempo(base);
 	return true;
@@ -860,7 +860,7 @@ bool Engine::cmd_set_tempo(uint16_t &cmd)
 // SetChannelProperty
 bool Engine::cmd_set_property(uint16_t &cmd, int field)
 {
-	cur_channel()[field] = ram(wAudioCmdArg);
+	cur_channel()[field] = wram_.audio_cmd_arg();
 	cmd++;
 	return true;
 }
@@ -869,24 +869,24 @@ bool Engine::cmd_set_property(uint16_t &cmd, int field)
 // note's own percussion sound for WAVE_28.
 bool Engine::cmd_set_wave(uint16_t &cmd)
 {
-	uint8_t wave = ram(wAudioCmdArg);
+	uint8_t wave = wram_.audio_cmd_arg();
 	cmd++;
 	if (wave == WAVE_28) {
-		ram(wCurChannelFlags) |= CHANFLAGS_UPDATE_PERCUSSION;
+		wram_.cur_channel_flags() |= CHANFLAGS_UPDATE_PERCUSSION;
 		return true;
 	}
 	uint16_t data = static_cast<uint16_t>(ADDR_Waves + wave * 6);
 	Channel ch = cur_channel();
 	for (int i = 0; i < 5; i++)
 		ch[CHANNEL_TIMBRE + i] = mem_[static_cast<uint16_t>(data + i)];
-	ram(wCurChannelFlags) &= ~CHANFLAGS_UPDATE_PERCUSSION;
+	wram_.cur_channel_flags() &= ~CHANFLAGS_UPDATE_PERCUSSION;
 	return true;
 }
 
 bool Engine::cmd_set_pitch_offset(uint16_t &cmd)
 {
 	Channel ch = cur_channel();
-	uint8_t offset = static_cast<uint8_t>(rlca(ram(wAudioCmdArg)) - 0x80);
+	uint8_t offset = static_cast<uint8_t>(rlca(wram_.audio_cmd_arg()) - 0x80);
 	cmd++;
 	ch[CHANNEL_PITCH_OFFSET] = offset;
 	return set_pitch_product(ch, offset, ch[CHANNEL_PITCH_OFFSET_MULT]);
@@ -895,7 +895,7 @@ bool Engine::cmd_set_pitch_offset(uint16_t &cmd)
 bool Engine::cmd_set_pitch_offset_multiplier(uint16_t &cmd)
 {
 	Channel ch = cur_channel();
-	uint8_t mult = ram(wAudioCmdArg);
+	uint8_t mult = wram_.audio_cmd_arg();
 	cmd++;
 	ch[CHANNEL_PITCH_OFFSET_MULT] = mult;
 	return set_pitch_product(ch, ch[CHANNEL_PITCH_OFFSET], mult);
@@ -911,14 +911,14 @@ bool Engine::set_pitch_product(Channel ch, uint8_t offset, uint8_t mult)
 	else
 		product = static_cast<uint16_t>(~(multiply(static_cast<uint8_t>(~magnitude), mult) - 1));
 	ch.word(CHANNEL_PITCH_PRODUCT) = product;
-	ram(wCurChannelFlags) |= CHANFLAGS_UPDATE_FREQUENCY;
+	wram_.cur_channel_flags() |= CHANFLAGS_UPDATE_FREQUENCY;
 	return true;
 }
 
 bool Engine::cmd_set_vibrato_speed(uint16_t &cmd)
 {
 	Channel ch = cur_channel();
-	uint8_t speed = ram(wAudioCmdArg);
+	uint8_t speed = wram_.audio_cmd_arg();
 	cmd++;
 	ch[CHANNEL_VIBRATO_SPEED] = speed;
 	if (!static_cast<uint8_t>(speed << 1))
@@ -928,8 +928,8 @@ bool Engine::cmd_set_vibrato_speed(uint16_t &cmd)
 
 bool Engine::cmd_set_volume(uint16_t &cmd)
 {
-	ram(wCurChannelFlags) |= CHANFLAGS_UPDATE_VOLUME;
-	cur_channel()[CHANNEL_VOLUME] = rlca(ram(wAudioCmdArg));
+	wram_.cur_channel_flags() |= CHANFLAGS_UPDATE_VOLUME;
+	cur_channel()[CHANNEL_VOLUME] = rlca(wram_.audio_cmd_arg());
 	cmd++;
 	return true;
 }
@@ -937,7 +937,7 @@ bool Engine::cmd_set_volume(uint16_t &cmd)
 // Func_3098b: a signed value, centred on $80
 bool Engine::cmd_set_signed(uint16_t &cmd, int field)
 {
-	cur_channel()[field] = static_cast<uint8_t>(rlca(ram(wAudioCmdArg)) - 0x80);
+	cur_channel()[field] = static_cast<uint8_t>(rlca(wram_.audio_cmd_arg()) - 0x80);
 	cmd++;
 	return true;
 }
@@ -945,7 +945,7 @@ bool Engine::cmd_set_signed(uint16_t &cmd, int field)
 bool Engine::cmd_set_high_nybble(uint16_t &cmd, int field)
 {
 	Byte value = cur_channel()[field];
-	value = static_cast<uint8_t>((swap(ram(wAudioCmdArg)) & 0xf0) | (value & 0x0f));
+	value = static_cast<uint8_t>((swap(wram_.audio_cmd_arg()) & 0xf0) | (value & 0x0f));
 	cmd++;
 	return true;
 }
@@ -953,7 +953,7 @@ bool Engine::cmd_set_high_nybble(uint16_t &cmd, int field)
 bool Engine::cmd_set_low_nybble(uint16_t &cmd, int field)
 {
 	Byte value = cur_channel()[field];
-	value = static_cast<uint8_t>((ram(wAudioCmdArg) & 0x0f) | (value & 0xf0));
+	value = static_cast<uint8_t>((wram_.audio_cmd_arg() & 0x0f) | (value & 0xf0));
 	cmd++;
 	return true;
 }
@@ -967,7 +967,7 @@ bool Engine::cmd_note(uint16_t &cmd, uint8_t duration)
 	Channel ch = cur_channel();
 	ch[CHANNEL_UNK_0B] = duration;
 	uint8_t seen = 0;
-	uint8_t arg = ram(wAudioCmdArg);
+	uint8_t arg = wram_.audio_cmd_arg();
 	for (bool first = true;; first = false) {
 		if (!first) {
 			cmd++;
@@ -994,15 +994,15 @@ bool Engine::cmd_note(uint16_t &cmd, uint8_t duration)
 	}
 
 	uint8_t note = static_cast<uint8_t>(ch[CHANNEL_PITCH] + ch[CHANNEL_SEMITONE_OFFSET]);
-	ram(wSoundEngineParam3) = note;
-	ram(wSoundEngineParam4) = note;
+	wram_.sound_engine_param3() = note;
+	wram_.sound_engine_param4() = note;
 	ch[CHANNEL_VIBRATO_COUNTER] = ch[CHANNEL_VIBRATO_DELAY];
 
-	if (ram(wCurChannelFlags) & CHANFLAGS_UPDATE_PERCUSSION) {
+	if (wram_.cur_channel_flags() & CHANFLAGS_UPDATE_PERCUSSION) {
 		uint16_t data = static_cast<uint16_t>(ADDR_Waves + static_cast<uint8_t>(note + 4) * 6);
 		for (int i = 0; i < 5; i++)
 			ch[CHANNEL_TIMBRE + i] = mem_[static_cast<uint16_t>(data + i)];
-		ram(wSoundEngineParam4) = mem_[static_cast<uint16_t>(data + 5)];
+		wram_.sound_engine_param4() = mem_[static_cast<uint16_t>(data + 5)];
 	}
 
 	// the timbre selects the track: duty cycles for the two square waves,
@@ -1020,12 +1020,12 @@ bool Engine::cmd_note(uint16_t &cmd, uint8_t duration)
 			set_tracks(wTrack1, 1, static_cast<uint8_t>(rAUD1ENV));
 	}
 
-	uint8_t owner = ram(wNumAudioChannels);
-	if (ram(wAudioEngineFlags).bit(AUDIOENG_HANDLING_SFX_F))
+	uint8_t owner = wram_.num_audio_channels();
+	if (wram_.audio_engine_flags().bit(AUDIOENG_HANDLING_SFX_F))
 		owner |= 0x80;
-	ram(wTempTrackUnk02) = owner;
+	wram_.temp_track_unk02() = owner;
 	uint8_t priority = ch[CHANNEL_PRIORITY];
-	ram(wTempTrackPriority) = priority;
+	wram_.temp_track_priority() = priority;
 
 	Track tr = cur_track();
 	uint8_t track_flags = tr.flags();
@@ -1037,17 +1037,17 @@ bool Engine::cmd_note(uint16_t &cmd, uint8_t duration)
 	}
 	if (take) {
 		turn_sound_register_off();
-		uint16_t channel = ram_word(wCurChannelPtr);
+		uint16_t channel = wram_.cur_channel_ptr().word();
 		tr = cur_track();
 		tr.flags() = TRACKFLAGS_4 | TRACKFLAGS_5 | TRACKFLAGS_6 | TRACKFLAGS_7;
-		tr[TRACK_PRIORITY] = ram(wTempTrackPriority);
-		tr[TRACK_UNK02] = ram(wTempTrackUnk02);
-		tr[TRACK_UNK03] = ram(wSoundEngineParam3);
+		tr[TRACK_PRIORITY] = wram_.temp_track_priority();
+		tr[TRACK_UNK02] = wram_.temp_track_unk02();
+		tr[TRACK_UNK03] = wram_.sound_engine_param3();
 		tr.word(TRACK_CHANNEL_PTR) = channel;
 		for (int i = 0; i < 7; i++) // CHANNEL_UNK_0A .. CHANNEL_FADE_OUT_ENVELOPE
 			tr[TRACK_UNK06 + i] = mem_[static_cast<uint16_t>(channel + CHANNEL_UNK_0A + i)];
 		tr[TRACK_UNK0D] = 0;
-		tr[TRACK_UNK0E] = ram(wSoundEngineParam4);
+		tr[TRACK_UNK0E] = wram_.sound_engine_param4();
 	}
 	// the note's arguments are all read: cmd stays where it was
 	return true;
@@ -1058,17 +1058,17 @@ bool Engine::cmd_note(uint16_t &cmd, uint8_t duration)
 bool Engine::cmd_stop_note(uint16_t &cmd)
 {
 	Channel ch = cur_channel();
-	uint8_t arg = ram(wAudioCmdArg);
+	uint8_t arg = wram_.audio_cmd_arg();
 	if (!(arg & 0x80) && arg >= 0x24) {
 		cmd++;
 		ch[CHANNEL_PITCH] = arg;
 	}
 	uint8_t note = static_cast<uint8_t>(ch[CHANNEL_PITCH] + ch[CHANNEL_SEMITONE_OFFSET]);
-	ram(wSoundEngineParam3) = note;
+	wram_.sound_engine_param3() = note;
 
 	set_all_tracks();
-	uint8_t owner = ram(wNumAudioChannels);
-	if (ram(wAudioEngineFlags).bit(AUDIOENG_HANDLING_SFX_F))
+	uint8_t owner = wram_.num_audio_channels();
+	if (wram_.audio_engine_flags().bit(AUDIOENG_HANDLING_SFX_F))
 		owner |= 0x80;
 	for (;;) {
 		Track tr = cur_track();
@@ -1143,8 +1143,8 @@ uint8_t Engine::set_track_fade_out_volume(Track tr)
 // bits: when they change, its volume needs updating.
 uint8_t Engine::check_sound3_envelope(uint8_t envelope, uint8_t old)
 {
-	if (ram(wCurSoundRegister) == SOUND3 && ((envelope ^ old) & 0xc0))
-		ram(wCurChannelFlags) |= CHANFLAGS_UPDATE_VOLUME;
+	if (wram_.cur_sound_register() == SOUND3 && ((envelope ^ old) & 0xc0))
+		wram_.cur_channel_flags() |= CHANFLAGS_UPDATE_VOLUME;
 	return envelope;
 }
 
@@ -1159,20 +1159,20 @@ void Engine::update_track_output()
 	if (!(flags & TRACKFLAGS_7))
 		return;
 	uint16_t channel = tr.word(TRACK_CHANNEL_PTR);
-	ram_word(wCurChannelPtr) = channel;
+	wram_.cur_channel_ptr().word() = channel;
 	uint8_t channel_flags = mem_[channel];
 	if (channel_flags < CHANNEL_PLAYING) {
 		release_track(tr);
 		return;
 	}
-	ram(wCurChannelFlags) = channel_flags;
+	wram_.cur_channel_flags() = channel_flags;
 
 	constexpr int ENVELOPE = TRACK_VOLUME_ENVELOPE;
 	constexpr int STEP = TRACK_VOLUME_ENVELOPE + 1; // the envelope's step counter
 	enum class Step { L30c95, L30ce9, L30d22, L30d70, L30cba, L30d3b, L30d77, L30d84, L30d95, L30d9d } step;
 
 	if (!(flags & TRACKFLAGS_6)) {
-		if (!ram(w3d01a))
+		if (!wram_.unk_3d01a())
 			++tr[TRACK_FREQUENCY];
 		++tr[TRACK_FREQUENCY];
 		if (flags & TRACKFLAGS_5)
@@ -1184,7 +1184,7 @@ void Engine::update_track_output()
 		if (tr.flags() & TRACKFLAGS_5) {
 			// a new note: fade in
 			set_timbre();
-			ram(wCurChannelFlags) |= CHANNEL_UPDATES;
+			wram_.cur_channel_flags() |= CHANNEL_UPDATES;
 			set_track_volume(tr);
 			uint8_t rate = rrca(static_cast<uint8_t>(~swap(tr[TRACK_FADE_IN_ENVELOPE]))) & 0x07;
 			if (!rate) {
@@ -1212,7 +1212,7 @@ void Engine::update_track_output()
 	for (;;) {
 		switch (step) {
 		case Step::L30c95: {
-			if (ram(wCurChannelFlags) & CHANFLAGS_UPDATE_VOLUME)
+			if (wram_.cur_channel_flags() & CHANFLAGS_UPDATE_VOLUME)
 				set_track_volume(tr);
 			if (static_cast<uint8_t>((tr[ENVELOPE] & 0x07) - 1) < tr[STEP]) {
 				tr[STEP] = 0;
@@ -1250,7 +1250,7 @@ void Engine::update_track_output()
 		}
 
 		case Step::L30ce9: {
-			if (ram(wCurChannelFlags) & CHANFLAGS_UPDATE_VOLUME)
+			if (wram_.cur_channel_flags() & CHANFLAGS_UPDATE_VOLUME)
 				set_track_fade_out_volume(tr);
 			uint8_t rate = tr[ENVELOPE] & 0x07;
 			if (!rate) {
@@ -1327,22 +1327,22 @@ void Engine::update_track_output()
 			return;
 
 		case Step::L30d84:
-			if (ram(wCurSoundRegister) != SOUND3)
-				ram(wCurChannelFlags) &= ~CHANFLAGS_UPDATE_VOLUME;
+			if (wram_.cur_sound_register() != SOUND3)
+				wram_.cur_channel_flags() &= ~CHANFLAGS_UPDATE_VOLUME;
 			step = Step::L30d9d;
 			break;
 
 		case Step::L30d95:
-			ram(wCurChannelFlags) |= CHANFLAGS_UPDATE_VOLUME;
+			wram_.cur_channel_flags() |= CHANFLAGS_UPDATE_VOLUME;
 			step = Step::L30d9d;
 			break;
 
 		case Step::L30d9d:
-			if (ram(wCurChannelFlags) & CHANFLAGS_UPDATE_FREQUENCY)
+			if (wram_.cur_channel_flags() & CHANFLAGS_UPDATE_FREQUENCY)
 				set_frequency();
-			if (ram(wCurChannelFlags) & CHANFLAGS_UPDATE_SO)
+			if (wram_.cur_channel_flags() & CHANFLAGS_UPDATE_SO)
 				set_sound_output();
-			if (ram(wCurChannelFlags) & CHANFLAGS_UPDATE_VOLUME)
+			if (wram_.cur_channel_flags() & CHANFLAGS_UPDATE_VOLUME)
 				set_volume_envelope();
 			return;
 		}
@@ -1355,7 +1355,7 @@ void Engine::update_track_output()
 void Engine::set_timbre()
 {
 	Track tr = cur_track();
-	uint8_t reg = ram(wCurSoundRegister);
+	uint8_t reg = wram_.cur_sound_register();
 	uint8_t timbre = tr[TRACK_TIMBRE];
 	uint8_t length = tr[TRACK_LENGTH];
 
@@ -1381,9 +1381,9 @@ void Engine::set_timbre()
 			high = 0x40;
 		}
 		mem_[rAUD3HIGH] = high;
-		if (ram(wCurWaveSample) == sample)
+		if (wram_.cur_wave_sample() == sample)
 			return;
-		ram(wCurWaveSample) = sample;
+		wram_.cur_wave_sample() = sample;
 		uint16_t data = static_cast<uint16_t>(ADDR_WaveSamples + sample * 16);
 		for (int i = 0; i < AUD3WAVE_SIZE; i++)
 			mem_[static_cast<uint16_t>(_AUD3WAVERAM + i)] = mem_[static_cast<uint16_t>(data + i)];
@@ -1406,7 +1406,7 @@ void Engine::set_frequency()
 	uint16_t frequency = cur_channel().word(CHANNEL_FREQUENCY);
 	Track tr = cur_track();
 	uint8_t note = static_cast<uint8_t>(tr[TRACK_UNK0E] + (frequency >> 8));
-	uint8_t reg = ram(wCurSoundRegister);
+	uint8_t reg = wram_.cur_sound_register();
 
 	if (reg > SOUND3) {
 		// noise: the note sets the clock shift and divider
@@ -1448,7 +1448,7 @@ void Engine::set_frequency()
 void Engine::set_sound_output()
 {
 	uint8_t so_flags = cur_channel()[CHANNEL_SO_FLAGS];
-	uint8_t reg = ram(wCurSoundRegister);
+	uint8_t reg = wram_.cur_sound_register();
 	uint8_t mask;
 	if (reg < SOUND2)
 		mask = AUDTERM_1_RIGHT | AUDTERM_1_LEFT;
@@ -1470,7 +1470,7 @@ void Engine::set_volume_envelope()
 {
 	Track tr = cur_track();
 	uint8_t envelope = tr[TRACK_VOLUME_ENVELOPE];
-	uint8_t reg = ram(wCurSoundRegister);
+	uint8_t reg = wram_.cur_sound_register();
 	if (reg < SOUND3) {
 		mem_[io(reg)] = envelope;
 		mem_[io(static_cast<uint8_t>(reg + 2))] = tr[TRACK_FREQUENCY + 1];
@@ -1490,7 +1490,7 @@ void Engine::set_volume_envelope()
 
 void Engine::turn_sound_register_off()
 {
-	uint8_t reg = ram(wCurSoundRegister);
+	uint8_t reg = wram_.cur_sound_register();
 	if (reg == SOUND3) {
 		mem_[rAUD3ENA] = AUD3ENA_OFF;
 		return;

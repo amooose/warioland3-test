@@ -50,7 +50,7 @@ void fill_2x2(Memory mem, uint16_t addr, uint8_t value)
 
 void ActionHelp::run_state()
 {
-	switch (ram(wSubState)) {
+	switch (wram_.sub_state()) {
 	case 0: routines_.call(ADDR_SlowFadeBGToWhite); break;
 	case 1: init(); break;
 	case 2: routines_.call(ADDR_DarkenBGToPal_Fast); break;
@@ -72,7 +72,7 @@ void ActionHelp::unrealistic()
 
 bool ActionHelp::main_power_up() const
 {
-	return (ram(wActionHelpPowerUp) & POWER_UP_MASK) < NUM_MAIN_POWER_UPS;
+	return (wram_.action_help_power_up() & POWER_UP_MASK) < NUM_MAIN_POWER_UPS;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,16 +82,16 @@ void ActionHelp::init()
 {
 	routines_.disable_lcd();
 	play_music(mem_, MUSIC_ACTION_HELP);
-	ram(wActionHelpState) = 0;
-	ram(wTimer) = 0;
+	wram_.action_help_state() = 0;
+	wram_.timer() = 0;
 
-	ram(wActionHelpPowerUp) = pick_power_up();
+	wram_.action_help_power_up() = pick_power_up();
 
-	ram(wAnimatedTilesFrameDuration) = 0;
-	ram(wAnimatedTilesGfx) = 0;
-	ram(wAnimatedTilesFrameCount) = 0;
-	ram(wAnimatedTilesFrame) = 0;
-	ram(wRoomAnimatedTilesEnabled) = 0;
+	wram_.animated_tiles_frame_duration() = 0;
+	wram_.animated_tiles_gfx() = 0;
+	wram_.animated_tiles_frame_count() = 0;
+	wram_.animated_tiles_frame() = 0;
+	wram_.room_animated_tiles_enabled() = 0;
 
 	routines_.call(ADDR_ClearBGMap0);
 	routines_.clear_virtual_oam();
@@ -102,12 +102,12 @@ void ActionHelp::init()
 	set_vblank();
 
 	ram(rSCX) = 0;
-	ram(wSCX) = 0;
+	wram_.scx() = 0;
 	ram(rSCY) = 0x04;
-	ram(wSCY) = 0x04;
+	wram_.scy() = 0x04;
 
 	// the cursor under the power-up shown, and the input prompts
-	uint8_t power_up = ram(wActionHelpPowerUp);
+	uint8_t power_up = wram_.action_help_power_up();
 	uint8_t cursor_x = static_cast<uint8_t>((power_up << 4 | power_up >> 4) + 8);
 	object(wMenuObj1).init(SCREEN_HEIGHT_PX, cursor_x, ADDR_Frameset_1e6b8e);
 	object(wMenuObj2).init(0x77, 0x3f, ADDR_Frameset_1e6b76);
@@ -117,9 +117,9 @@ void ActionHelp::init()
 	load_sprite(buttons);
 
 	// in the title screen's demo, the power-ups Wario has are coloured
-	if ((ram(wPowerUpLevel) & ACTION_HELP_TITLE_SCREEN) && power_up < NUM_MAIN_POWER_UPS) {
+	if ((wram_.power_up_level() & ACTION_HELP_TITLE_SCREEN) && power_up < NUM_MAIN_POWER_UPS) {
 		ram(rVBK) = VRAM1;
-		uint8_t level = ram(wPowerUpLevel) & POWER_UP_MASK;
+		uint8_t level = wram_.power_up_level() & POWER_UP_MASK;
 		colour_slot(level, 0x03);
 		if (level >= power_up)
 			colour_slot(power_up, mem_[ADDR_PowerUpOBPals + power_up]);
@@ -128,7 +128,7 @@ void ActionHelp::init()
 	ram(rVBK) = 0;
 	routines_.clear_unused_virtual_oam();
 	ram(rLCDC) = LCDC_ON | LCDC_BG_9C00 | LCDC_OBJ_16 | LCDC_OBJ_ON | LCDC_BG_ON;
-	++ram(wSubState);
+	++wram_.sub_state();
 }
 
 // Wario's power-up or transformation; in the title screen's demo, the next
@@ -136,22 +136,22 @@ void ActionHelp::init()
 uint8_t ActionHelp::pick_power_up()
 {
 	uint8_t demo = NO_POWER_UP;
-	if (ram(wPowerUpLevel) & ACTION_HELP_TITLE_SCREEN)
-		demo = ram(hDemoPowerUp);
+	if (wram_.power_up_level() & ACTION_HELP_TITLE_SCREEN)
+		demo = hram_.demo_power_up();
 
 	uint8_t power_up;
-	switch (ram(wTransformation)) {
+	switch (wram_.transformation()) {
 	case TRANSFORMATION_OWL_WARIO: power_up = POWER_UP_OWL; break;
 	case TRANSFORMATION_RAIL: power_up = POWER_UP_RAIL; break;
 	case TRANSFORMATION_VAMPIRE_WARIO: power_up = POWER_UP_VAMPIRE; break;
-	default: power_up = ram(wPowerUpLevel) & POWER_UP_MASK; break;
+	default: power_up = wram_.power_up_level() & POWER_UP_MASK; break;
 	}
 	power_up = static_cast<uint8_t>(power_up + demo);
 	if (power_up >= NUM_TOTAL_POWER_UPS)
 		power_up = static_cast<uint8_t>(power_up - NUM_TOTAL_POWER_UPS);
 
-	uint8_t next_demo = static_cast<uint8_t>(ram(hDemoPowerUp) + 1);
-	ram(hDemoPowerUp) = next_demo >= NUM_TOTAL_POWER_UPS ? 0 : next_demo;
+	uint8_t next_demo = static_cast<uint8_t>(hram_.demo_power_up() + 1);
+	hram_.demo_power_up() = next_demo >= NUM_TOTAL_POWER_UPS ? 0 : next_demo;
 	return power_up;
 }
 
@@ -160,18 +160,18 @@ void ActionHelp::update()
 	// lower the overall volume
 	routines_.execute_audio_mod(AUDIOMOD_VOLUME, 0x20, SFX_CHANNELS, MUSIC_CHANNELS >> 4);
 
-	if (!(ram(wPowerUpLevel) & 0x80) && (ram(wJoypadPressed) & (PAD_A | PAD_B | PAD_START))) {
+	if (!(wram_.power_up_level() & 0x80) && (wram_.joypad_pressed() & (PAD_A | PAD_B | PAD_START))) {
 		close();
 		return;
 	}
-	++ram(wActionHelpCounter);
+	++wram_.action_help_counter();
 
 	if (!main_power_up()) {
 		routines_.in_bank(BANK_ExecuteSpecialPowerUpActionHelp, ADDR_ExecuteSpecialPowerUpActionHelp,
 			[&] { run_special_power_up(); });
 	} else {
 		routines_.call(ADDR_ProcessDPadRepeat);
-		if (!(ram(wPowerUpLevel) & (ACTION_HELP_TITLE_SCREEN | ACTION_HELP_LEVEL_CLEAR)))
+		if (!(wram_.power_up_level() & (ACTION_HELP_TITLE_SCREEN | ACTION_HELP_LEVEL_CLEAR)))
 			select_power_up();
 		run_main_power_up();
 		update_menu_object(object(wMenuObj1)); // the cursor
@@ -183,18 +183,18 @@ void ActionHelp::update()
 
 void ActionHelp::close()
 {
-	if (ram(wPowerUpLevel) & ACTION_HELP_TITLE_SCREEN) {
+	if (wram_.power_up_level() & ACTION_HELP_TITLE_SCREEN) {
 		routines_.call(ADDR_InitWithoutDemoPowerUpReset); // back to the title
 		return;
 	}
 	// back to the pause menu
-	ram(wAnimatedTilesFrameDuration) = 0;
-	ram(wAnimatedTilesGfx) = 0;
-	ram(wAnimatedTilesFrameCount) = 0;
-	ram(wAnimatedTilesFrame) = 0;
-	ram(w3d50d) = 0;
+	wram_.animated_tiles_frame_duration() = 0;
+	wram_.animated_tiles_gfx() = 0;
+	wram_.animated_tiles_frame_count() = 0;
+	wram_.animated_tiles_frame() = 0;
+	wram_.unk_3d50d() = 0;
 	routines_.call(ADDR_ResumeNormalVolume);
-	++ram(wSubState);
+	++wram_.sub_state();
 }
 
 void ActionHelp::update_menu_object(MenuObject obj)
@@ -205,7 +205,7 @@ void ActionHelp::update_menu_object(MenuObject obj)
 
 void ActionHelp::run_main_power_up()
 {
-	uint8_t power_up = ram(wActionHelpPowerUp);
+	uint8_t power_up = wram_.action_help_power_up();
 	if (power_up >= NUM_MAIN_POWER_UPS) {
 		unrealistic();
 		return;
@@ -215,7 +215,7 @@ void ActionHelp::run_main_power_up()
 
 void ActionHelp::run_special_power_up()
 {
-	uint8_t index = static_cast<uint8_t>(ram(wActionHelpPowerUp) - POWER_UP_OWL);
+	uint8_t index = static_cast<uint8_t>(wram_.action_help_power_up() - POWER_UP_OWL);
 	if (index >= NUM_SPECIAL_POWER_UPS) {
 		unrealistic();
 		return;
@@ -235,28 +235,28 @@ void ActionHelp::set_vblank()
 // goes back to its colour, the one picked shows its own palette.
 void ActionHelp::select_power_up()
 {
-	Byte power_up = ram(wActionHelpPowerUp);
-	uint8_t pressed = ram(wJoypadPressed);
+	Byte power_up = wram_.action_help_power_up();
+	uint8_t pressed = wram_.joypad_pressed();
 	uint8_t previous = power_up;
 	if (pressed & PAD_RIGHT) {
 		if (power_up == NUM_MAIN_POWER_UPS - 1)
 			return;
 		++power_up;
-		ram(wActionHelpState) = 0;
+		wram_.action_help_state() = 0;
 		object(wMenuObj1).x() += 0x10;
 	} else if (pressed & PAD_LEFT) {
 		if (!power_up)
 			return;
 		--power_up;
-		ram(wActionHelpState) = 0;
+		wram_.action_help_state() = 0;
 		object(wMenuObj1).x() -= 0x10;
 	} else {
 		return;
 	}
 
-	ram(wActionHelpBlackedOut) = TRUE;
+	wram_.action_help_blacked_out() = TRUE;
 	ram(rVBK) = VRAM1;
-	uint8_t level = ram(wPowerUpLevel) & POWER_UP_MASK;
+	uint8_t level = wram_.power_up_level() & POWER_UP_MASK;
 	if (level >= previous) {
 		routines_.call(ADDR_WaitNextHBlank);
 		colour_slot(previous, 0x03);
@@ -283,7 +283,7 @@ void ActionHelp::colour_slot(uint8_t slot, uint8_t attributes)
 
 void ActionHelp::load_common_pals()
 {
-	ram(wActionHelpBlackedOut) = TRUE;
+	wram_.action_help_blacked_out() = TRUE;
 	routines_.load_pals_to_temp_pals1(ADDR_Pals_1e4eef);
 }
 
@@ -293,7 +293,7 @@ void ActionHelp::load_power_up_pals()
 {
 	bool main = main_power_up();
 	routines_.load_pals_to_temp_pals2(main ? ADDR_Pals_1e4f2f : ADDR_Pals_1e4f7f);
-	uint8_t power_up = ram(wActionHelpPowerUp);
+	uint8_t power_up = wram_.action_help_power_up();
 	if (main ? power_up < GARLIC : power_up != POWER_UP_VAMPIRE)
 		return;
 	routines_.copy_short(main ? ADDR_Pals_1e4f6f : ADDR_Pals_1e4fbf, wTempPals2, 2 * PAL_SIZE);
@@ -318,7 +318,7 @@ void ActionHelp::load_bg_maps()
 
 	uint8_t empty = NUM_BAR_SLOTS;
 	if (main_power_up()) {
-		uint8_t level = ram(wPowerUpLevel) & POWER_UP_MASK;
+		uint8_t level = wram_.power_up_level() & POWER_UP_MASK;
 		if (level) {
 			ram(rVBK) = VRAM1;
 			for (uint8_t slot = 0; slot < level; slot++)

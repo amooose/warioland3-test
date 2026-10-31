@@ -24,7 +24,7 @@ constexpr uint8_t VRAM1 = BANK_v1Tiles0;
 
 void Golf::run_golf_state()
 {
-	switch (ram(wSubState)) {
+	switch (wram_.sub_state()) {
 	case 0: routines_.call(ADDR_FastFadeToWhite); break;
 	case 1: init_lobby(); break;
 	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
@@ -45,7 +45,7 @@ void Golf::run_golf_state()
 
 void Golf::run_building_state()
 {
-	switch (ram(wSubState)) {
+	switch (wram_.sub_state()) {
 	case 0: routines_.call(ADDR_FastFadeToWhite); break;
 	case 1: init_building(); break;
 	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
@@ -100,8 +100,8 @@ void GolfScreen::reset_scroll()
 {
 	ram(rSCY) = 0;
 	ram(rSCX) = 0;
-	ram(wSCY) = 0;
-	ram(wSCX) = 0;
+	wram_.scy() = 0;
+	wram_.scx() = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,40 +111,40 @@ void Golf::init_lobby()
 {
 	routines_.disable_lcd();
 	routines_.clear_virtual_oam();
-	if (!ram(w1d800))
+	if (!wram_.unk_1d800())
 		routines_.save_backup_vram();
-	ram(w1d800) = 0x02;
-	ram(wRoomAnimatedTilesEnabled) = 0;
+	wram_.unk_1d800() = 0x02;
+	wram_.room_animated_tiles_enabled() = 0;
 	clear_golf_ram_from(wPredeterminedGolfHole);
 	routines_.load_pals_to_temp_pals1(ADDR_Pals_1ca1cf);
 	routines_.load_pals_to_temp_pals2(ADDR_Pals_1ca20f);
 	load_lobby_gfx();
 
-	if (!ram(wGolfMenuOption)) {
-		ram(wGolfWarioState) = GOLF_WARIO_WAITING;
-		ram(wGolfWarioYPos) = SCREEN_HEIGHT_PX;
-		ram(wGolfWarioXPos) = 0x38;
+	if (!wram_.golf_menu_option()) {
+		wram_.golf_wario_state() = GOLF_WARIO_WAITING;
+		wram_.golf_wario_y_pos() = SCREEN_HEIGHT_PX;
+		wram_.golf_wario_x_pos() = 0x38;
 	} else {
 		// back from a hole: coming out of the pipe
-		ram(wGolfWarioState) = GOLF_WARIO_GOING_IN_PIPE;
-		ram(wGolfWarioYPos) = 0xa0;
-		ram(wGolfWarioXPos) = 0x80;
-		ram(wGolfLobbyState) = GOLFLOBBYSTATE_EXIT_PIPE;
+		wram_.golf_wario_state() = GOLF_WARIO_GOING_IN_PIPE;
+		wram_.golf_wario_y_pos() = 0xa0;
+		wram_.golf_wario_x_pos() = 0x80;
+		wram_.golf_lobby_state() = GOLFLOBBYSTATE_EXIT_PIPE;
 	}
 	handle_lobby_wario_sprite();
 
-	ram(wGolfMenuOption) = 0;
+	wram_.golf_menu_option() = 0;
 	ram(wGolfNumCoins + 0) = ram(wNumCoins + 0);
 	ram(wGolfNumCoins + 1) = ram(wNumCoins + 1);
-	if (!ram(wNumCoins + 0) && ram(wNumCoins + 1) < ram(wGolfPrice))
+	if (!ram(wNumCoins + 0) && ram(wNumCoins + 1) < wram_.golf_price())
 		object(wGolfObj4).state() = COININFO_NOT_ENOUGH_COINS;
 
-	ram(wGolfVBlankMode) = 0x01;
+	wram_.golf_vblank_mode() = 0x01;
 	GolfHole(gb_).set_lobby_vblank();
 	play_music2(mem_, MUSIC_GOLF_LOBBY);
 	reset_scroll();
 	ram(rLCDC) = LCDC_DEFAULT;
-	++ram(wSubState);
+	++wram_.sub_state();
 }
 
 // Loads the lobby's gfx, and sets the price of a round from the number of
@@ -161,13 +161,13 @@ void Golf::load_lobby_gfx()
 	uint8_t treasures = ram(wNumCollectedTreasures + 1); // BCD
 	uint8_t price_tiles; // the first of the price's 4 tiles
 	if (ram(wNumCollectedTreasures + 0) || treasures >= GOLF_TREASURES_TIER_3) {
-		ram(wGolfPrice) = GOLF_PRICE_TIER_3;
+		wram_.golf_price() = GOLF_PRICE_TIER_3;
 		price_tiles = 0xfc;
 	} else if (treasures >= GOLF_TREASURES_TIER_2) {
-		ram(wGolfPrice) = GOLF_PRICE_TIER_2;
+		wram_.golf_price() = GOLF_PRICE_TIER_2;
 		price_tiles = 0xf8;
 	} else {
-		ram(wGolfPrice) = GOLF_PRICE_TIER_1; // already on the sign
+		wram_.golf_price() = GOLF_PRICE_TIER_1; // already on the sign
 		return;
 	}
 	ram(v0BGMap0 + 8 * TILEMAP_WIDTH + 11) = price_tiles;
@@ -187,7 +187,7 @@ void Golf::handle_lobby()
 
 void Golf::handle_lobby_states()
 {
-	switch (ram(wGolfLobbyState)) {
+	switch (wram_.golf_lobby_state()) {
 	case GOLFLOBBYSTATE_WAIT_INPUT: lobby_waiting_input(); break;
 	case GOLFLOBBYSTATE_WALK_RIGHT: lobby_walking_right(); break;
 	case GOLFLOBBYSTATE_WALK_LEFT: lobby_walking_left(); break;
@@ -200,24 +200,24 @@ void Golf::handle_lobby_states()
 
 void Golf::set_wario_state(uint8_t state)
 {
-	ram(wGolfWarioState) = state;
-	ram(wGolfVBlankMode) = 0x01;
+	wram_.golf_wario_state() = state;
+	wram_.golf_vblank_mode() = 0x01;
 }
 
 void Golf::lobby_wait_input()
 {
-	ram(wGolfCounter) = 0;
-	ram(wGolfWarioDuration) = 0;
-	ram(wGolfWarioFramesetOffset) = 0;
-	ram(wGolfLobbyState) = GOLFLOBBYSTATE_WAIT_INPUT;
+	wram_.golf_counter() = 0;
+	wram_.golf_wario_duration() = 0;
+	wram_.golf_wario_frameset_offset() = 0;
+	wram_.golf_lobby_state() = GOLFLOBBYSTATE_WAIT_INPUT;
 }
 
 // Down at the pipe pays for a round, up at the door leaves, left and right
 // walk between them.
 void Golf::lobby_waiting_input()
 {
-	uint8_t pressed = ram(wJoypadPressed);
-	uint8_t x = ram(wGolfWarioXCoord);
+	uint8_t pressed = wram_.joypad_pressed();
+	uint8_t x = wram_.golf_wario_x_coord();
 	if (pressed & PAD_DOWN) {
 		if (x != 0x78)
 			return;
@@ -232,58 +232,58 @@ void Golf::lobby_waiting_input()
 		}
 		play_sfx(mem_, SFX_PIPE_ENTER);
 		bool borrow;
-		ram(wNumCoins + 1) = bcd_sub(ram(wNumCoins + 1), ram(wGolfPrice), borrow);
+		ram(wNumCoins + 1) = bcd_sub(ram(wNumCoins + 1), wram_.golf_price(), borrow);
 		ram(wNumCoins + 0) = static_cast<uint8_t>(ram(wNumCoins + 0) - borrow);
 		set_wario_state(GOLF_WARIO_GOING_IN_PIPE);
-		ram(wGolfWarioXPos) = 0x80;
-		ram(wGolfCounter) = 0;
-		ram(wGolfWarioDuration) = 0;
-		ram(wGolfWarioFramesetOffset) = 0;
-		ram(wGolfLobbyState) = GOLFLOBBYSTATE_ENTER_PIPE;
+		wram_.golf_wario_x_pos() = 0x80;
+		wram_.golf_counter() = 0;
+		wram_.golf_wario_duration() = 0;
+		wram_.golf_wario_frameset_offset() = 0;
+		wram_.golf_lobby_state() = GOLFLOBBYSTATE_ENTER_PIPE;
 	} else if (pressed & PAD_UP) {
 		if (x != 0x38)
 			return;
 		play_sfx(mem_, SFX_0E6);
-		ram(wGolfWarioDir) = 0;
-		ram(wGolfWarioDuration) = 0;
-		ram(wGolfWarioFramesetOffset) = 0;
+		wram_.golf_wario_dir() = 0;
+		wram_.golf_wario_duration() = 0;
+		wram_.golf_wario_frameset_offset() = 0;
 		set_wario_state(GOLF_WARIO_TURNING);
-		ram(wGolfLobbyState) = GOLFLOBBYSTATE_ENTER_DOOR;
+		wram_.golf_lobby_state() = GOLFLOBBYSTATE_ENTER_DOOR;
 	} else if (pressed & PAD_RIGHT) {
 		if (x >= 0x78)
 			return;
-		ram(wGolfWarioDir) = 0;
-		ram(wGolfWarioDuration) = 0;
-		ram(wGolfWarioFramesetOffset) = 0;
-		ram(wGolfWarioState) = GOLF_WARIO_TURNING;
-		ram(wGolfWarioYVel) = 4;
-		ram(wGolfVBlankMode) = 0x01;
-		ram(wGolfLobbyState) = GOLFLOBBYSTATE_WALK_RIGHT;
+		wram_.golf_wario_dir() = 0;
+		wram_.golf_wario_duration() = 0;
+		wram_.golf_wario_frameset_offset() = 0;
+		wram_.golf_wario_state() = GOLF_WARIO_TURNING;
+		wram_.golf_wario_y_vel() = 4;
+		wram_.golf_vblank_mode() = 0x01;
+		wram_.golf_lobby_state() = GOLFLOBBYSTATE_WALK_RIGHT;
 	} else if (pressed & PAD_LEFT) {
 		if (x < 0x78)
 			return;
-		ram(wGolfWarioDuration) = 0;
-		ram(wGolfWarioFramesetOffset) = 0;
+		wram_.golf_wario_duration() = 0;
+		wram_.golf_wario_frameset_offset() = 0;
 		set_wario_state(GOLF_WARIO_TURNING);
-		ram(wGolfWarioDir) = 0x01;
-		ram(wGolfLobbyState) = GOLFLOBBYSTATE_WALK_LEFT;
+		wram_.golf_wario_dir() = 0x01;
+		wram_.golf_lobby_state() = GOLFLOBBYSTATE_WALK_LEFT;
 	}
 }
 
 // Wario turns around before walking (wGolfCounter counts the turn).
 bool Golf::lobby_turning(bool clear_dir)
 {
-	uint8_t counter = ram(wGolfCounter);
+	uint8_t counter = wram_.golf_counter();
 	if (!counter)
 		return false;
 	if (counter >= 2)
 		return true;
 	// done turning, start walking
-	ram(wGolfCounter) = static_cast<uint8_t>(counter + 1);
+	wram_.golf_counter() = static_cast<uint8_t>(counter + 1);
 	if (clear_dir)
-		ram(wGolfWarioDir) = 0;
-	ram(wGolfWarioDuration) = 0;
-	ram(wGolfWarioFramesetOffset) = 0;
+		wram_.golf_wario_dir() = 0;
+	wram_.golf_wario_duration() = 0;
+	wram_.golf_wario_frameset_offset() = 0;
 	set_wario_state(GOLF_WARIO_WALKING);
 	return false;
 }
@@ -293,23 +293,23 @@ void Golf::lobby_walking_right()
 {
 	if (!lobby_turning(true))
 		return;
-	if (ram(wGolfWarioXPos) >= 0x58) {
-		uint8_t y_vel = ram(wGolfWarioYVel);
-		uint8_t counter = static_cast<uint8_t>(ram(wGolfCounter) + 1);
-		ram(wGolfCounter) = counter;
+	if (wram_.golf_wario_x_pos() >= 0x58) {
+		uint8_t y_vel = wram_.golf_wario_y_vel();
+		uint8_t counter = static_cast<uint8_t>(wram_.golf_counter() + 1);
+		wram_.golf_counter() = counter;
 		if (!(counter & 1))
-			--ram(wGolfWarioYVel);
-		ram(wGolfWarioYPos) = static_cast<uint8_t>(ram(wGolfWarioYPos) - y_vel);
-		if (y_vel >= static_cast<uint8_t>(-16) && ram(wGolfWarioYPos) >= 0x80)
-			ram(wGolfWarioYPos) = 0x80; // landed
+			--wram_.golf_wario_y_vel();
+		wram_.golf_wario_y_pos() = static_cast<uint8_t>(wram_.golf_wario_y_pos() - y_vel);
+		if (y_vel >= static_cast<uint8_t>(-16) && wram_.golf_wario_y_pos() >= 0x80)
+			wram_.golf_wario_y_pos() = 0x80; // landed
 	}
-	if (ram(wGolfWarioXPos) < 0x78) {
-		++ram(wGolfWarioXPos);
+	if (wram_.golf_wario_x_pos() < 0x78) {
+		++wram_.golf_wario_x_pos();
 		return;
 	}
 	// reached the pipe
-	ram(wGolfWarioYPos) = 0x80;
-	ram(wGolfWarioXPos) = 0x78;
+	wram_.golf_wario_y_pos() = 0x80;
+	wram_.golf_wario_x_pos() = 0x78;
 	set_wario_state(GOLF_WARIO_WAITING);
 	lobby_wait_input();
 }
@@ -319,67 +319,67 @@ void Golf::lobby_walking_left()
 {
 	if (!lobby_turning(false))
 		return;
-	if (ram(wGolfWarioYPos) < SCREEN_HEIGHT_PX && ram(wGolfWarioXPos) < 0x64)
-		ram(wGolfWarioYPos) = static_cast<uint8_t>(ram(wGolfWarioYPos) + 2);
-	if (ram(wGolfWarioXPos) != 0x38) {
-		--ram(wGolfWarioXPos);
+	if (wram_.golf_wario_y_pos() < SCREEN_HEIGHT_PX && wram_.golf_wario_x_pos() < 0x64)
+		wram_.golf_wario_y_pos() = static_cast<uint8_t>(wram_.golf_wario_y_pos() + 2);
+	if (wram_.golf_wario_x_pos() != 0x38) {
+		--wram_.golf_wario_x_pos();
 		return;
 	}
 	// reached the door
-	ram(wGolfWarioYPos) = SCREEN_HEIGHT_PX;
-	ram(wGolfWarioXPos) = 0x38;
+	wram_.golf_wario_y_pos() = SCREEN_HEIGHT_PX;
+	wram_.golf_wario_x_pos() = 0x38;
 	set_wario_state(GOLF_WARIO_WAITING);
 	lobby_wait_input();
 }
 
 void Golf::lobby_entering_pipe()
 {
-	if (!ram(wGolfCounter)) {
-		++ram(wGolfCounter);
+	if (!wram_.golf_counter()) {
+		++wram_.golf_counter();
 		ram(wGolfNumCoins + 1) = ram(wNumCoins + 1);
 		ram(wGolfNumCoins + 0) = ram(wNumCoins + 0);
 	}
-	if (ram(wGolfWarioYPos) < 0xb0) {
-		++ram(wGolfWarioYPos);
+	if (wram_.golf_wario_y_pos() < 0xb0) {
+		++wram_.golf_wario_y_pos();
 		return;
 	}
-	ram(wSubState) = SST_GOLF_HOLE;
+	wram_.sub_state() = SST_GOLF_HOLE;
 }
 
 void Golf::lobby_entering_door()
 {
-	uint8_t counter = ram(wGolfCounter);
+	uint8_t counter = wram_.golf_counter();
 	if (!counter)
 		return;
 	if (counter == 1) {
-		ram(wGolfCounter) = 2;
-		ram(wGolfWarioDuration) = 0;
-		ram(wGolfWarioFramesetOffset) = 0;
+		wram_.golf_counter() = 2;
+		wram_.golf_wario_duration() = 0;
+		wram_.golf_wario_frameset_offset() = 0;
 		set_wario_state(GOLF_WARIO_ENTERING_DOOR);
 		return;
 	}
 	if (counter < 28) {
-		ram(wGolfCounter) = static_cast<uint8_t>(counter + 1);
+		wram_.golf_counter() = static_cast<uint8_t>(counter + 1);
 		return;
 	}
-	ram(w1d800) = 0;
-	ram(wGolfMenuOption) = 0;
+	wram_.unk_1d800() = 0;
+	wram_.golf_menu_option() = 0;
 	stop_music2(mem_);
-	ram(wSubState) = SST_GOLF_EXIT;
+	wram_.sub_state() = SST_GOLF_EXIT;
 }
 
 void Golf::lobby_exiting_pipe()
 {
-	uint8_t y = ram(wGolfWarioYPos);
+	uint8_t y = wram_.golf_wario_y_pos();
 	if (y != 0x80) {
 		if (y == 0xa0)
 			play_sfx(mem_, SFX_PIPE_ENTER);
-		ram(wGolfWarioYPos) = static_cast<uint8_t>(y - 1);
+		wram_.golf_wario_y_pos() = static_cast<uint8_t>(y - 1);
 		return;
 	}
-	ram(wGolfWarioState) = GOLF_WARIO_WAITING;
-	ram(wGolfWarioXPos) = 0x78;
-	ram(wGolfVBlankMode) = 0x01;
+	wram_.golf_wario_state() = GOLF_WARIO_WAITING;
+	wram_.golf_wario_x_pos() = 0x78;
+	wram_.golf_vblank_mode() = 0x01;
 	lobby_wait_input();
 }
 
@@ -396,7 +396,7 @@ void Golf::update_lobby_animations()
 		return;
 	coin_info.y() = 0x50;
 	coin_info.x() = 0x38;
-	uint16_t frameset = ram(wLanguage) ? ADDR_Frameset_1cb3d1 : ADDR_Frameset_1cb3d4;
+	uint16_t frameset = wram_.language() ? ADDR_Frameset_1cb3d1 : ADDR_Frameset_1cb3d4;
 	if (routines_.update_golf_object_animation(frameset, coin_info.duration().addr())) {
 		coin_info.state() = COININFO_NOT_ENOUGH_COINS;
 		return;
@@ -407,13 +407,13 @@ void Golf::update_lobby_animations()
 
 void Golf::handle_lobby_wario_sprite()
 {
-	ram(wGolfWarioYCoord) = ram(wGolfWarioYPos);
-	ram(wGolfWarioXCoord) = ram(wGolfWarioXPos);
+	wram_.golf_wario_y_coord() = wram_.golf_wario_y_pos();
+	wram_.golf_wario_x_coord() = wram_.golf_wario_x_pos();
 	routines_.update_golf_wario_animation();
 	GolfHole(gb_).load_wario_state_gfx();
 	// a step sound at the start of each walk cycle
-	if (ram(wGolfWarioState) == GOLF_WARIO_WALKING && ram(wGolfWarioFramesetOffset) == 0x2 &&
-		!ram(wGolfWarioDuration))
+	if (wram_.golf_wario_state() == GOLF_WARIO_WALKING && wram_.golf_wario_frameset_offset() == 0x2 &&
+		!wram_.golf_wario_duration())
 		play_sfx(mem_, SFX_WALK);
 }
 
@@ -441,7 +441,7 @@ void Golf::init_clear_cutscene()
 	routines_.copy(ADDR_VBlank_1c84e0 + 0x0b, wVBlankFunc, 0x0e);
 	reset_scroll();
 	ram(rLCDC) = LCDC_DEFAULT;
-	++ram(wSubState);
+	++wram_.sub_state();
 }
 
 // The trophy rises, then holds.
@@ -449,20 +449,20 @@ void Golf::update_clear_cutscene()
 {
 	GolfObject trophy = object(wGolfObj1);
 	if (trophy.state()) {
-		if (ram(wGolfCounter) >= 0x40) {
-			ram(wSubState) = SST_GOLF_EXIT;
+		if (wram_.golf_counter() >= 0x40) {
+			wram_.sub_state() = SST_GOLF_EXIT;
 			return;
 		}
-		++ram(wGolfCounter);
+		++wram_.golf_counter();
 	} else if (trophy.y() == 0x50) {
-		ram(wGolfCounter) = 0;
+		wram_.golf_counter() = 0;
 		trophy.frameset_offset() = 0;
 		trophy.state() = 1;
 	} else {
-		if (!(ram(wGolfCounter) & 0x0f))
+		if (!(wram_.golf_counter() & 0x0f))
 			play_sfx(mem_, SFX_01F);
-		++ram(wGolfCounter);
-		if (!(ram(wGolfCounter) & 0x03))
+		++wram_.golf_counter();
+		if (!(wram_.golf_counter() & 0x03))
 			--trophy.y();
 	}
 	update_clear_cutscene_animation();
@@ -487,17 +487,17 @@ void Golf::init_building()
 {
 	routines_.disable_lcd();
 	routines_.clear_virtual_oam();
-	ram(wAnimatedTilesFrameDuration) = 0x08;
-	ram(wAnimatedTilesGfx) = 0x0f;
-	ram(wAnimatedTilesFrameCount) = 0;
-	ram(wAnimatedTilesFrame) = 0;
-	ram(wRoomAnimatedTilesEnabled) = 1;
-	if (!ram(w1d800))
+	wram_.animated_tiles_frame_duration() = 0x08;
+	wram_.animated_tiles_gfx() = 0x0f;
+	wram_.animated_tiles_frame_count() = 0;
+	wram_.animated_tiles_frame() = 0;
+	wram_.room_animated_tiles_enabled() = 1;
+	if (!wram_.unk_1d800())
 		routines_.save_backup_vram();
-	if (!ram(wGolfMenuOption))
-		ram(w1d800) = 0x01;
+	if (!wram_.golf_menu_option())
+		wram_.unk_1d800() = 0x01;
 	clear_golf_ram_from(wPredeterminedGolfHole);
-	ram(wHasAllMusicalCoinFlags) = routines_.check_has_all_musical_coin_flags();
+	wram_.has_all_musical_coin_flags() = routines_.check_has_all_musical_coin_flags();
 
 	draw_course_menu();
 	routines_.load_pals_to_temp_pals1(w1db00);
@@ -509,12 +509,12 @@ void Golf::init_building()
 	routines_.play_new_music(MUSIC_GOLF_LOBBY);
 
 	ram(rSCY) = 0;
-	ram(wSCY) = 0;
-	uint8_t scx = ram(wGolfMenuTargetSCX);
+	wram_.scy() = 0;
+	uint8_t scx = wram_.golf_menu_target_scx();
 	ram(rSCX) = scx;
-	ram(wSCX) = scx;
+	wram_.scx() = scx;
 	ram(rLCDC) = LCDC_DEFAULT;
-	++ram(wSubState);
+	++wram_.sub_state();
 }
 
 // The course menu, with the best score of each course.
@@ -524,13 +524,13 @@ void Golf::draw_course_menu()
 	routines_.far_decompress(BANK_GolfMenuGfx, ADDR_GolfMenuGfx, v0Tiles0);
 	ram(rVBK) = VRAM1;
 	routines_.far_decompress(BANK_GolfBuildingCoursesAttrmap, ADDR_GolfBuildingCoursesAttrmap, v1BGMap0);
-	ram(wGolfCourse) = ram(wGolfMenuOption);
+	wram_.golf_course() = wram_.golf_menu_option();
 	load_course();
 	set_course_target_scx();
 	routines_.copy(wGolfCourseTileMap, v0BGMap0 + 6 * TILEMAP_WIDTH, 7 * TILEMAP_WIDTH);
 	ram(rVBK) = 0;
 	// (in the ROM bank load_course left in wTempBank)
-	uint16_t tilemap = ram(wHasAllMusicalCoinFlags) ? ADDR_GolfBuildingCoursesUnlockedTilemap :
+	uint16_t tilemap = wram_.has_all_musical_coin_flags() ? ADDR_GolfBuildingCoursesUnlockedTilemap :
 		ADDR_GolfBuildingCoursesLockedTilemap;
 	SET_HL(gb_, tilemap);
 	SET_BC(gb_, v0BGMap0);
@@ -583,20 +583,20 @@ void Golf::draw_course_menu()
 // The course's tilemap (to wGolfCourseTileMap) and palettes (to w1db00)
 void Golf::load_course()
 {
-	ram(wTempBank) = BANK_GolfBuildingCourse1Tilemap; // BANK("Golf Gfx 2")
-	uint16_t entry = static_cast<uint16_t>(COURSE_DATA + static_cast<uint8_t>(ram(wGolfCourse) * 4));
+	wram_.temp_bank() = BANK_GolfBuildingCourse1Tilemap; // BANK("Golf Gfx 2")
+	uint16_t entry = static_cast<uint16_t>(COURSE_DATA + static_cast<uint8_t>(wram_.golf_course() * 4));
 	routines_.far_copy(mem_.word(entry), wGolfCourseTileMap, 7 * TILEMAP_WIDTH);
 	routines_.copy(mem_.word(static_cast<uint16_t>(entry + 2)), w1db00, 8 * 8);
 }
 
 void Golf::set_course_target_scx()
 {
-	ram(wGolfMenuTargetSCX) = ram(static_cast<uint16_t>(COURSE_SCROLL_X + ram(wGolfCourse)));
+	wram_.golf_menu_target_scx() = ram(static_cast<uint16_t>(COURSE_SCROLL_X + wram_.golf_course()));
 }
 
 void Golf::handle_building()
 {
-	switch (ram(w1dc00)) {
+	switch (wram_.unk_1dc00()) {
 	case 0: handle_course_menu(); break;
 	case 1: scroll_to_course(); break;
 	case 2: stop_scrolling(); break;
@@ -605,10 +605,10 @@ void Golf::handle_building()
 	}
 	update_building_animations();
 	routines_.clear_unused_virtual_oam();
-	if (ram(wSubState) == 0x08) {
+	if (wram_.sub_state() == 0x08) {
 		// leaving
-		ram(w1d800) = 0;
-		ram(wGolfMenuOption) = 0;
+		wram_.unk_1d800() = 0;
+		wram_.golf_menu_option() = 0;
 	}
 	GolfHole(gb_).set_building_vblank();
 }
@@ -617,7 +617,7 @@ void Golf::handle_building()
 // through the courses (the fourth only with all Musical Coins).
 void Golf::handle_course_menu()
 {
-	uint8_t pressed = ram(wJoypadPressed);
+	uint8_t pressed = wram_.joypad_pressed();
 	if (pressed & PAD_A) {
 		if (!ram(wNumCoins + 0) && ram(wNumCoins + 1) < GOLF_BUILDING_PRICE) {
 			play_sfx(mem_, SFX_0E5);
@@ -626,24 +626,24 @@ void Golf::handle_course_menu()
 		bool borrow;
 		ram(wNumCoins + 1) = bcd_sub(ram(wNumCoins + 1), GOLF_BUILDING_PRICE, borrow);
 		ram(wNumCoins + 0) = static_cast<uint8_t>(ram(wNumCoins + 0) - borrow);
-		ram(w1dc00) = 0x03;
+		wram_.unk_1dc00() = 0x03;
 		return;
 	}
 	if (pressed & PAD_B) {
-		ram(wSubState) = 0x08;
+		wram_.sub_state() = 0x08;
 		return;
 	}
-	Byte option = ram(wGolfMenuOption);
-	bool all_courses = ram(wHasAllMusicalCoinFlags);
+	Byte option = wram_.golf_menu_option();
+	bool all_courses = wram_.has_all_musical_coin_flags();
 	if (pressed & PAD_RIGHT) {
-		ram(wGolfMenuScrollingDir) = 0;
+		wram_.golf_menu_scrolling_dir() = 0;
 		uint8_t course = option;
 		if (course == GOLF_COURSE_4 || (course == GOLF_COURSE_3 && !all_courses))
 			option = GOLF_COURSE_1;
 		else
 			option = static_cast<uint8_t>(course + 1);
 	} else if (pressed & PAD_LEFT) {
-		ram(wGolfMenuScrollingDir) = 0x1;
+		wram_.golf_menu_scrolling_dir() = 0x1;
 		uint8_t course = option;
 		if (course)
 			option = static_cast<uint8_t>(course - 1);
@@ -654,9 +654,9 @@ void Golf::handle_course_menu()
 	}
 
 	play_sfx(mem_, SFX_0E2);
-	ram(w1dc00) = 0x01;
-	ram(wGolfVBlankMode) = 0x01;
-	ram(wGolfCourse) = option;
+	wram_.unk_1dc00() = 0x01;
+	wram_.golf_vblank_mode() = 0x01;
+	wram_.golf_course() = option;
 	load_course();
 	routines_.far_copy(ADDR_GolfBuildingCourseScrollingAttrmap, wGoldBuildingCourseAttrMap, 7 * TILEMAP_WIDTH);
 	set_course_target_scx();
@@ -664,29 +664,29 @@ void Golf::handle_course_menu()
 
 void Golf::scroll_to_course()
 {
-	uint8_t target = ram(wGolfMenuTargetSCX);
-	bool left = ram(wGolfMenuScrollingDir);
-	uint8_t scx = ram(wSCX);
+	uint8_t target = wram_.golf_menu_target_scx();
+	bool left = wram_.golf_menu_scrolling_dir();
+	uint8_t scx = wram_.scx();
 	if (scx == target) {
-		ram(w1dc00) = 0x02;
-		ram(wGolfVBlankMode) = 0x02;
+		wram_.unk_1dc00() = 0x02;
+		wram_.golf_vblank_mode() = 0x02;
 		return;
 	}
-	ram(wSCX) = static_cast<uint8_t>(left ? scx - 4 : scx + 4);
+	wram_.scx() = static_cast<uint8_t>(left ? scx - 4 : scx + 4);
 }
 
 void Golf::stop_scrolling()
 {
-	ram(w1dc00) = 0;
-	ram(wGolfVBlankMode) = 0x03;
+	wram_.unk_1dc00() = 0;
+	wram_.golf_vblank_mode() = 0x03;
 }
 
 // Counts the price off the coins, then starts the course's first hole.
 void Golf::pay_for_course()
 {
-	uint8_t counter = ram(wGolfCounter);
+	uint8_t counter = wram_.golf_counter();
 	if (counter < 0x32) { // GOLF_BUILDING_PRICE, in decimal
-		ram(wGolfCounter) = static_cast<uint8_t>(counter + 1);
+		wram_.golf_counter() = static_cast<uint8_t>(counter + 1);
 		if (!(counter & 0x03))
 			play_sfx(mem_, SFX_12B);
 		bool borrow;
@@ -695,8 +695,8 @@ void Golf::pay_for_course()
 		return;
 	}
 	play_sfx(mem_, SFX_SELECTION);
-	ram(wPredeterminedGolfHole) = ram(static_cast<uint16_t>(FIRST_GOLF_HOLES + ram(wGolfMenuOption)));
-	ram(wSubState) = 0x04;
+	wram_.predetermined_golf_hole() = ram(static_cast<uint16_t>(FIRST_GOLF_HOLES + wram_.golf_menu_option()));
+	wram_.sub_state() = 0x04;
 }
 
 void Golf::update_building_animations()
@@ -705,7 +705,7 @@ void Golf::update_building_animations()
 	update_object(object(wGolfObj1), 0x42, 0x58, ADDR_Frameset_1cb59b);
 	update_object(object(wGolfObj3), 0x2a, 0x58, ADDR_Frameset_1cb598);
 	update_object(object(wGolfObj4), SCREEN_WIDTH_PX, 0x58, ADDR_Frameset_1cb59e);
-	if (ram(w1dc00))
+	if (wram_.unk_1dc00())
 		return;
 	update_object(object(wGolfObj5), 0x76, 0x6c, ADDR_Frameset_1cb5a1);
 
@@ -716,7 +716,7 @@ void Golf::update_building_animations()
 	golfer.y() = 0x76;
 	golfer.x() = 0x6c;
 	uint16_t frameset =
-		mem_.word(static_cast<uint16_t>(COURSE_WARIO_FRAMESETS + static_cast<uint8_t>(ram(wGolfMenuOption) * 2)));
+		mem_.word(static_cast<uint16_t>(COURSE_WARIO_FRAMESETS + static_cast<uint8_t>(wram_.golf_menu_option() * 2)));
 	routines_.update_golf_object_animation(frameset, golfer.duration().addr());
 	golfer.frame() = golfer.current_frame();
 	routines_.load_golf_sprite(golfer.sprite());

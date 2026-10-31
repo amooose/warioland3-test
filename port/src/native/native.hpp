@@ -46,6 +46,8 @@ public:
 	void set_bit(int n) { *this |= 1u << n; }
 	void reset_bit(int n) { *this &= ~(1u << n); }
 	uint16_t addr() const { return addr_; }
+	// the dw that starts here
+	class Word word() const;
 
 private:
 	GB *gb_;
@@ -76,6 +78,8 @@ private:
 	GB *gb_;
 	uint16_t addr_;
 };
+
+inline Word Byte::word() const { return Word(gb_, addr_); }
 
 // The Game Boy's address space, as the CPU sees it.
 class Memory {

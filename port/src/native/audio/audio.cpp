@@ -26,7 +26,7 @@ constexpr uint16_t UPDATE_AUDIO_CALLBACK = ADDR_AudioFunc_UpdateAudio + 3;
 class AudioCall {
 public:
 	// trampoline: the AudioFunc_* label the original goes through
-	AudioCall(GB *gb, uint16_t trampoline) : gb_(gb), mem_(gb), trampoline_(trampoline)
+	AudioCall(GB *gb, uint16_t trampoline) : gb_(gb), mem_(gb), wram_(gb), hram_(gb), trampoline_(trampoline)
 	{
 		saved_wram_bank_ = mem_[rWBK];
 		mem_[rWBK] = AUDIO_RAM_BANK;
@@ -35,7 +35,7 @@ public:
 	// PrepareAudioJump_NoCallback: whether the engine is free to run
 	bool prepare()
 	{
-		Byte flags = mem_[wAudioEngineFlags];
+		Byte flags = wram_.audio_engine_flags();
 		if (flags.bit(AUDIOENG_HAS_BACKUP_BANK_F)) {
 			busy();
 			return false;
@@ -48,7 +48,7 @@ public:
 	// PrepareAudioJump_WithCallback
 	bool prepare_with_callback()
 	{
-		Byte flags = mem_[wAudioEngineFlags];
+		Byte flags = wram_.audio_engine_flags();
 		if (!flags.bit(AUDIOENG_HAS_BACKUP_BANK_F)) {
 			flags.set_bit(AUDIOENG_HAS_BACKUP_BANK_F);
 			backup_bank();
@@ -56,7 +56,7 @@ public:
 		}
 		if (!flags.bit(AUDIOENG_HAS_CALLBACK_F)) {
 			flags.set_bit(AUDIOENG_HAS_CALLBACK_F);
-			mem_.word(wAudioBankCallback) = return_address();
+			wram_.audio_bank_callback().word() = return_address();
 		}
 		busy();
 		return false;
@@ -65,20 +65,20 @@ public:
 	// BackupBankAndSwitchToAudioBank
 	void backup_bank()
 	{
-		mem_[wAudioBankBackup] = mem_[wROMBank];
+		wram_.audio_bank_backup() = wram_.rom_bank();
 		map_rom_bank(AUDIO_ENGINE_BANK);
 	}
 
 	// SwitchBackFromAudioBank
-	void switch_back() { map_rom_bank(mem_[wAudioBankBackup]); }
+	void switch_back() { map_rom_bank(wram_.audio_bank_backup()); }
 
 	// ReturnFromAudioJump: runs a deferred update, then maps the caller's
 	// bank back.
 	void finish(Engine &engine)
 	{
-		Byte flags = mem_[wAudioEngineFlags];
+		Byte flags = wram_.audio_engine_flags();
 		while (flags.bit(AUDIOENG_HAS_CALLBACK_F)) {
-			uint16_t callback = mem_.word(wAudioBankCallback);
+			uint16_t callback = wram_.audio_bank_callback().word();
 			flags.reset_bit(AUDIOENG_HAS_CALLBACK_F);
 			if (callback != UPDATE_AUDIO_CALLBACK) {
 				// the original returns to whatever the garbage address holds
@@ -103,7 +103,7 @@ public:
 private:
 	void map_rom_bank(uint8_t bank)
 	{
-		mem_[wROMBank] = bank;
+		wram_.rom_bank() = bank;
 		mem_[rROMB0] = bank;
 	}
 
@@ -114,6 +114,8 @@ private:
 
 	GB *gb_;
 	Memory mem_;
+	wl3::Wram wram_;
+	wl3::Hram hram_;
 	uint16_t trampoline_;
 	uint8_t saved_wram_bank_;
 };

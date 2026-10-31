@@ -16,6 +16,11 @@
 //     with the SHA-1 of the ROM it belongs to, so the port needs neither the
 //     .sym file nor the disassembly at runtime.
 //
+//   gen ram <warioland3.sym> <out.h>
+//     Lists the RAM labels (wFoo, hFoo) with C++ names for the C++ modules
+//     (src/native/ram.hpp): WRAM(foo_bar, wFooBar) / HRAM(...), one per
+//     label, wFooBar -> foo_bar.
+//
 //   gen ports <out.c> <ported/*.c...>
 //     Finds every PORT(Name) / PORT_JUMP(Name) / PORT_EX(Name, ...) and writes the
 //     table that registers them as hooks at startup.
@@ -76,6 +81,81 @@ static int gen_syms(const char *in, const char *out)
 		}
 	}
 	fprintf(o, "\n#endif\n");
+	fclose(f);
+	return fclose(o) != 0;
+}
+
+// wFooBar -> foo_bar (VBlank counts as one word; an unnamed label such as
+// w3d50d -> unk_3d50d). Returns 0 if the result isn't usable.
+static int snake_name(const char *label, char *out, size_t size)
+{
+	char buf[400];
+	snprintf(buf, sizeof(buf), "%s", label + 1); // drop the w / h
+	for (char *p = strstr(buf, "VBlank"); p; p = strstr(p + 1, "VBlank"))
+		p[1] = 'b';
+	int hex = strlen(buf) >= 4;
+	for (const char *p = buf; *p; p++)
+		hex &= isxdigit((unsigned char)*p) && !isupper((unsigned char)*p);
+	size_t n = 0;
+	if (hex || isdigit((unsigned char)buf[0]))
+		n += snprintf(out, size, "unk_");
+	for (size_t i = 0; buf[i] && n + 2 < size; i++) {
+		char c = buf[i];
+		if (isupper((unsigned char)c) && i > 0) {
+			char prev = buf[i - 1], next = buf[i + 1];
+			if (islower((unsigned char)prev) || isdigit((unsigned char)prev) ||
+			    (isupper((unsigned char)prev) && islower((unsigned char)next)))
+				out[n++] = '_';
+		}
+		out[n++] = (char)tolower((unsigned char)c);
+	}
+	out[n] = 0;
+	static const char *const keywords[] = {"new", "delete", "default", "switch", "case",
+		"class", "this", "register", "char", "int", "long", "short", "auto", "break",
+		"continue", "return", "for", "while", "do", "if", "else", "goto", "union", "struct"};
+	for (size_t i = 0; i < sizeof(keywords) / sizeof(*keywords); i++)
+		if (!strcmp(out, keywords[i]) && n + 1 < size) {
+			out[n++] = '_';
+			out[n] = 0;
+		}
+	return valid_c_ident(out);
+}
+
+static int gen_ram(const char *in, const char *out)
+{
+	FILE *f = fopen(in, "r");
+	if (!f) {
+		fprintf(stderr, "gen: can't read %s\n", in);
+		return 1;
+	}
+	FILE *o = fopen(out, "w");
+	if (!o) {
+		fprintf(stderr, "gen: can't write %s\n", out);
+		return 1;
+	}
+	fprintf(o, "// Generated from %s by port/tools/gen.c. Do not edit.\n", base_name(in));
+	fprintf(o, "// The RAM labels' C++ names, for src/native/ram.hpp.\n");
+	static char seen[8192][64];
+	int nseen = 0;
+	char line[512];
+	while (fgets(line, sizeof(line), f)) {
+		unsigned bank, addr;
+		char label[400], name[400];
+		if (line[0] == ';' || sscanf(line, "%x:%x %399s", &bank, &addr, label) != 3)
+			continue;
+		if (addr < 0xc000 || (label[0] != 'w' && label[0] != 'h') || !valid_c_ident(label))
+			continue;
+		if (!snake_name(label, name, sizeof(name) - 8) || strlen(name) >= 56)
+			continue;
+		int dup = 0;
+		for (int i = 0; i < nseen && !dup; i++)
+			dup = !strcmp(seen[i], name);
+		if (dup) // two labels with one name: the second gets its address
+			snprintf(name + strlen(name), 8, "_%04x", addr);
+		if (nseen < 8192)
+			snprintf(seen[nseen++], sizeof(seen[0]), "%s", name);
+		fprintf(o, "%s(%s, %s)\n", label[0] == 'w' ? "WRAM" : "HRAM", name, label);
+	}
 	fclose(f);
 	return fclose(o) != 0;
 }
@@ -244,11 +324,13 @@ int main(int argc, char **argv)
 		return gen_syms(argv[2], argv[3]);
 	if (argc == 5 && !strcmp(argv[1], "symtab"))
 		return gen_symtab(argv[2], argv[3], argv[4]);
+	if (argc == 4 && !strcmp(argv[1], "ram"))
+		return gen_ram(argv[2], argv[3]);
 	if (argc == 4 && !strcmp(argv[1], "consts"))
 		return gen_consts(argv[2], argv[3]);
 	if (argc >= 3 && !strcmp(argv[1], "ports"))
 		return gen_ports(argv[2], argc - 3, argv + 3);
 	fprintf(stderr, "usage: gen syms <in.sym> <out.h> | gen symtab <in.sym> <rom> <out.c> |\n"
-		"       gen consts <state.asm> <out.h> | gen ports <out.c> <files...>\n");
+		"       gen ram <in.sym> <out.h> | gen consts <state.asm> <out.h> | gen ports <out.c> <files...>\n");
 	return 1;
 }

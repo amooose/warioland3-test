@@ -28,7 +28,7 @@ void Screen::unrealistic()
 
 void Title::run_state()
 {
-	switch (ram(wSubState)) {
+	switch (wram_.sub_state()) {
 	case 0: routines_.call(ADDR_FastFadeToWhite); break;
 	case 1: init_intro(); break;
 	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
@@ -49,24 +49,24 @@ void Title::run_state()
 
 void Title::start_overworld()
 {
-	ram(wState) = ST_OVERWORLD;
-	ram(wSubState) = 0;
+	wram_.state() = ST_OVERWORLD;
+	wram_.sub_state() = 0;
 }
 
 void Title::start_overworld_new_game()
 {
-	ram(wTransitionParam) = TRANSITION_NEW_GAME;
+	wram_.transition_param() = TRANSITION_NEW_GAME;
 	start_overworld();
 }
 
 void Title::return_from_action_help()
 {
-	ram(wAnimatedTilesFrameDuration) = 0;
-	ram(wAnimatedTilesGfx) = 0;
-	ram(wAnimatedTilesFrameCount) = 0;
-	ram(wAnimatedTilesFrame) = 0;
-	ram(w3d50d) = 0;
-	ram(wDayNight).set_bit(7);
+	wram_.animated_tiles_frame_duration() = 0;
+	wram_.animated_tiles_gfx() = 0;
+	wram_.animated_tiles_frame_count() = 0;
+	wram_.animated_tiles_frame() = 0;
+	wram_.unk_3d50d() = 0;
+	wram_.day_night().set_bit(7);
 	start_overworld();
 }
 
@@ -83,12 +83,12 @@ void Title::init_intro()
 	load_title_tilemap();
 	set_vblank();
 
-	ram(wSCY) = 0x04;
+	wram_.scy() = 0x04;
 	ram(rSCY) = 0x04;
-	ram(wSCX) = 0;
+	wram_.scx() = 0;
 	ram(rSCX) = 0;
 
-	if (!ram(wceef)) {
+	if (!wram_.unk_ceef()) {
 		init_plane(64, 208, ADDR_Frameset_712c);
 		plane().animate();
 		MenuObject obj1 = object(wMenuObj1);
@@ -102,20 +102,20 @@ void Title::init_intro()
 		obj5.animate();
 		load_intro_sprite(obj4);
 		load_intro_sprite(obj5);
-		ram(wStartMenuSelection) = STARTMENU_NEW_GAME;
+		wram_.start_menu_selection() = STARTMENU_NEW_GAME;
 	} else {
 		// the intro was seen: straight to the menu, the plane crashed
 		init_plane(108, 128, ADDR_Frameset_7198);
 		set_menu_priority();
 
-		bool time_attack = ram(wGameModeFlags).bit(MODE_TIME_ATTACK_F);
+		bool time_attack = wram_.game_mode_flags().bit(MODE_TIME_ATTACK_F);
 		MenuObject obj1 = object(wMenuObj1);
 		obj1.init(0x82, 0x50, time_attack ? ADDR_Frameset_6d1e : ADDR_Frameset_6ce9);
 		obj1.animate();
 		MenuObject obj2 = object(wMenuObj2);
 		obj2.init(0x86, time_attack ? 0x40 : 0x44, ADDR_Frameset_6d1b);
 		obj2.animate();
-		ram(wStartMenuSelection) = STARTMENU_CONTINUE;
+		wram_.start_menu_selection() = STARTMENU_CONTINUE;
 	}
 
 	MenuObject obj3 = object(wMenuObj3);
@@ -123,16 +123,16 @@ void Title::init_intro()
 	obj3.animate();
 
 	ram(rLCDC) = LCDC_DEFAULT;
-	ram(wTimer) = 0;
-	ram(wGlobalCounter) = 0;
-	++ram(wSubState);
+	wram_.timer() = 0;
+	wram_.global_counter() = 0;
+	++wram_.sub_state();
 }
 
 void Title::init_plane(uint8_t y, uint8_t x, uint16_t frameset)
 {
 	plane().init(y, x, frameset);
 	plane().var() = 0;
-	ram(wSFXTimer) = 0;
+	wram_.sfx_timer() = 0;
 }
 
 // Sets the priority flag on the menu options' rows, to hide them behind the
@@ -153,7 +153,7 @@ void Title::set_menu_priority()
 
 void Title::intro_phase1()
 {
-	if (ram(wceef)) {
+	if (wram_.unk_ceef()) {
 		start_title_screen();
 		return;
 	}
@@ -161,7 +161,7 @@ void Title::intro_phase1()
 	move_clouds();
 
 	MenuObject p = plane();
-	Byte timer = ram(wTimer);
+	Byte timer = wram_.timer();
 	switch (p.var()) {
 	case 1: // flies in, slowing down
 		if (p.x() >= 72) {
@@ -171,7 +171,7 @@ void Title::intro_phase1()
 		} else if (p.x() == 48) {
 			timer = 48;
 			++p.var();
-		} else if (!(ram(wGlobalCounter) & 0x03)) {
+		} else if (!(wram_.global_counter() & 0x03)) {
 			--p.x();
 		}
 		break;
@@ -183,13 +183,13 @@ void Title::intro_phase1()
 		++p.var();
 		break;
 	case 3: // dips
-		if (ram(wGlobalCounter) & 0x07)
+		if (wram_.global_counter() & 0x07)
 			break;
 		if (++p.y() == 70)
 			++p.var();
 		break;
 	case 4: // and comes back up, three times
-		if (ram(wGlobalCounter) & 0x07)
+		if (wram_.global_counter() & 0x07)
 			break;
 		if (--p.y() != 64)
 			break;
@@ -202,7 +202,7 @@ void Title::intro_phase1()
 		break;
 	case 5: // flies off to the right
 		if (p.x() != 192) {
-			if (p.x() < 56 && (ram(wGlobalCounter) & 0x03))
+			if (p.x() < 56 && (wram_.global_counter() & 0x03))
 				break;
 			++p.x();
 			break;
@@ -213,9 +213,9 @@ void Title::intro_phase1()
 		p.attributes() = 0;
 		p.set_frameset(ADDR_Frameset_713d);
 		p.var() = 0;
-		ram(wSFXTimer) = 0;
+		wram_.sfx_timer() = 0;
 		timer = 28;
-		++ram(wSubState);
+		++wram_.sub_state();
 		break;
 	default: // the intro music, after 3 seconds
 		if (++timer < 180)
@@ -237,13 +237,13 @@ void Title::intro_phase2()
 	play_plane_sfx_far();
 
 	MenuObject p = plane();
-	Byte timer = ram(wTimer);
+	Byte timer = wram_.timer();
 	switch (p.var()) {
 	case 1:
 		if (--timer)
 			break;
 		p.set_frameset(ADDR_Frameset_7144);
-		ram(wSFXTimer) = 0;
+		wram_.sfx_timer() = 0;
 		timer = 224;
 		++p.var();
 		break;
@@ -255,9 +255,9 @@ void Title::intro_phase2()
 		play_sfx(mem_, SFX_PLANE_EXPLOSION);
 		p.set_frameset(ADDR_Frameset_7165);
 		p.var() = 0;
-		ram(wSFXTimer) = 0;
+		wram_.sfx_timer() = 0;
 		timer = 48;
-		++ram(wSubState);
+		++wram_.sub_state();
 		break;
 	default: // waits, then moves to the centre
 		if (timer) {
@@ -269,7 +269,7 @@ void Title::intro_phase2()
 			++p.var();
 			break;
 		}
-		if (ram(wGlobalCounter) & (p.x() < 72 ? 0x03 : 0x01))
+		if (wram_.global_counter() & (p.x() < 72 ? 0x03 : 0x01))
 			break;
 		--p.x();
 		break;
@@ -307,18 +307,18 @@ void Title::intro_phase3()
 		++p.var();
 		break;
 	case 4: // crashed: the layers line up, and the title screen comes
-		if (ram(wIntroBGXOffsetNear) != 224)
+		if (wram_.intro_bgx_offset_near() != 224)
 			p.x() += 2;
 		landed = true;
 		if (!p.animation_ended())
 			break;
 		p.set_frameset(ADDR_Frameset_7198);
 		p.var() = 0;
-		ram(wTimer) = 0;
+		wram_.timer() = 0;
 		routines_.load_pals_to_temp_pals1(ADDR_Pals_5002);
 		routines_.load_pals_to_temp_pals2(ADDR_Pals_5042);
 		play_music(mem_, MUSIC_TITLE_SCREEN);
-		++ram(wSubState);
+		++wram_.sub_state();
 		break;
 	default: // after the explosion, the nosedive
 		if (!p.animation_ended())
@@ -340,7 +340,7 @@ void Title::intro_phase3()
 bool Title::phase3_fall(uint8_t y)
 {
 	MenuObject p = plane();
-	if (!(ram(wGlobalCounter) & 0x03))
+	if (!(wram_.global_counter() & 0x03))
 		++p.x();
 	++p.y();
 	return p.y() >= y;
@@ -352,26 +352,26 @@ void Title::end_intro()
 	load_intro_sprite(plane());
 	routines_.clear_unused_virtual_oam();
 
-	if (ram(wceef)) {
+	if (wram_.unk_ceef()) {
 		start_title_screen();
 		return;
 	}
-	Byte timer = ram(wTimer);
+	Byte timer = wram_.timer();
 	if (timer < 120) {
 		++timer;
 		return;
 	}
-	if (!(ram(wGlobalCounter) & 0x03))
+	if (!(wram_.global_counter() & 0x03))
 		routines_.call(ADDR_SlowFadeInScreen);
-	if (ram(wSubState) == SST_START_MENU)
+	if (wram_.sub_state() == SST_START_MENU)
 		start_title_screen();
 }
 
 void Title::start_title_screen()
 {
 	play_music(mem_, MUSIC_TITLE_SCREEN);
-	mem_.word(wTimer) = ACTION_HELP_TIMER;
-	ram(wSubState) = SST_START_MENU;
+	wram_.timer().word() = ACTION_HELP_TIMER;
+	wram_.sub_state() = SST_START_MENU;
 }
 
 void Title::draw_intro(MenuObject first, MenuObject second, MenuObject third)
@@ -388,7 +388,7 @@ void Title::draw_intro(MenuObject first, MenuObject second, MenuObject third)
 
 void Title::load_title_pals()
 {
-	if (!ram(wceef)) {
+	if (!wram_.unk_ceef()) {
 		routines_.load_pals_to_temp_pals1(ADDR_Pals_4f82);
 		routines_.load_pals_to_temp_pals2(ADDR_Pals_4fc2);
 	} else {
@@ -423,7 +423,7 @@ void Title::load_time_attack_tiles()
 
 void Title::load_time_attack_text()
 {
-	bool english = ram(wLanguage);
+	bool english = wram_.language();
 	ram(rVBK) = VRAM1;
 	routines_.decompress(english ? ADDR_TimeAttack2ENTextMap : ADDR_TimeAttack2JPTextMap, v1BGMap0);
 	ram(rVBK) = 0;
@@ -451,20 +451,20 @@ void Title::load_start_menu_sprite(MenuObject obj)
 // The far layer every 4 frames, the centre one by 1, the near one by 2.
 void Title::scroll_layers()
 {
-	if (!(ram(wGlobalCounter) & 0x03))
-		--ram(wIntroBGXOffsetFar);
-	--ram(wIntroBGXOffsetCentre);
-	ram(wIntroBGXOffsetNear) -= 2;
+	if (!(wram_.global_counter() & 0x03))
+		--wram_.intro_bgx_offset_far();
+	--wram_.intro_bgx_offset_centre();
+	wram_.intro_bgx_offset_near() -= 2;
 }
 
 // Scrolls the layers on until they line up with the centre.
 void Title::finish_scroll()
 {
-	if (!(ram(wGlobalCounter) & 0x03))
+	if (!(wram_.global_counter() & 0x03))
 		align_layer(wIntroBGXOffsetFar);
 	align_layer(wIntroBGXOffsetCentre);
-	if (ram(wIntroBGXOffsetNear) != 224)
-		ram(wIntroBGXOffsetNear) -= 2;
+	if (wram_.intro_bgx_offset_near() != 224)
+		wram_.intro_bgx_offset_near() -= 2;
 }
 
 // by 1 until it's aligned to 32 pixels, then to wSCX
@@ -473,12 +473,12 @@ void Title::align_layer(uint16_t layer)
 	if (ram(layer) & 0x1f)
 		--ram(layer);
 	else
-		ram(layer) = ram(wSCX);
+		ram(layer) = wram_.scx();
 }
 
 void Title::move_clouds()
 {
-	if (ram(wGlobalCounter) & 0x01)
+	if (wram_.global_counter() & 0x01)
 		move_cloud(object(wMenuObj5).x());
 	move_cloud(object(wMenuObj4).x());
 }
@@ -487,7 +487,7 @@ void Title::move_clouds()
 void Title::move_cloud(Byte x)
 {
 	if (x >= 176) {
-		uint8_t state = ram(wSubState);
+		uint8_t state = wram_.sub_state();
 		if (state >= 5)
 			return;
 		if (state >= 4 && plane().var())
@@ -513,7 +513,7 @@ void Title::play_plane_sfx_far()
 // play_sfx_rept 12, sfx
 void Title::play_plane_sfx(uint16_t sfx)
 {
-	Byte timer = ram(wSFXTimer);
+	Byte timer = wram_.sfx_timer();
 	bool due = timer == 0;
 	--timer;
 	if (!due)
@@ -532,20 +532,20 @@ void Title::start_menu()
 	load_start_menu_sprite(object(wMenuObj3));
 	handle_selection();
 	load_start_menu_sprite(object(wMenuObj1));
-	if (ram(wceef)) {
+	if (wram_.unk_ceef()) {
 		MenuObject obj2 = object(wMenuObj2);
-		if (!(ram(wGlobalCounter) & 0x07))
+		if (!(wram_.global_counter() & 0x07))
 			obj2.attributes() ^= 0x03;
 		load_start_menu_sprite(obj2);
 	}
 	routines_.clear_unused_virtual_oam();
 
-	uint8_t selection = ram(wStartMenuSelection);
+	uint8_t selection = wram_.start_menu_selection();
 	if (selection & STARTMENUF_SELECT) {
 		select_menu_option();
 		return;
 	}
-	Word timer = mem_.word(wTimer);
+	Word timer = wram_.timer().word();
 	if (selection != STARTMENU_NEW_GAME && selection != STARTMENU_CONTINUE) {
 		timer = ACTION_HELP_TIMER;
 		return;
@@ -554,7 +554,7 @@ void Title::start_menu()
 	timer = static_cast<uint16_t>(timer - 1);
 	if (timer)
 		return;
-	ram(wPowerUpLevel) |= ACTION_HELP_TITLE_SCREEN;
+	wram_.power_up_level() |= ACTION_HELP_TITLE_SCREEN;
 	routines_.call(ADDR_OpenActionHelp);
 }
 
@@ -564,27 +564,27 @@ void Title::select_menu_option()
 	MenuObject obj2 = object(wMenuObj2);
 	uint16_t frameset;
 	uint8_t selection;
-	switch (ram(wStartMenuSelection) & 0x0f) {
+	switch (wram_.start_menu_selection() & 0x0f) {
 	case STARTMENU_NEW_GAME:
-		ram(wState) = ST_LANGUAGE_SELECTION;
-		ram(wSubState) = 0;
+		wram_.state() = ST_LANGUAGE_SELECTION;
+		wram_.sub_state() = 0;
 		return;
 	case STARTMENU_CONTINUE:
-		if (ram(wGameModeFlags).bit(MODE_TIME_ATTACK_F)) {
+		if (wram_.game_mode_flags().bit(MODE_TIME_ATTACK_F)) {
 			routines_.disable_lcd();
 			routines_.call(ADDR_FillWhiteBGPal);
 			routines_.call(ADDR_FillWhiteOBPal);
 			ram(rLCDC) = LCDC_DEFAULT;
-			++ram(wSubState);
-		} else if (!(ram(wceef) & 0x3c)) {
+			++wram_.sub_state();
+		} else if (!(wram_.unk_ceef() & 0x3c)) {
 			start_overworld();
 		} else {
-			ram(wState) = ST_LEVEL;
-			ram(wSubState) = 0;
+			wram_.state() = ST_LEVEL;
+			wram_.sub_state() = 0;
 		}
 		return;
 	case STARTMENU_CLEAR_DATA: // asks to confirm
-		ram(wcee4) = 0x81;
+		wram_.unk_cee4() = 0x81;
 		obj2.y() = SCREEN_HEIGHT_PX;
 		obj1.y() = 120;
 		frameset = ADDR_Frameset_6cec;
@@ -596,10 +596,10 @@ void Title::select_menu_option()
 	default: // no: back to the menu
 		obj2.y() = 134;
 		obj1.y() = 130;
-		if (ram(wGameModeFlags).bit(MODE_TIME_ATTACK_F)) {
+		if (wram_.game_mode_flags().bit(MODE_TIME_ATTACK_F)) {
 			frameset = ADDR_Frameset_6d1e;
 		} else {
-			ram(wcee4) = 0x80;
+			wram_.unk_cee4() = 0x80;
 			frameset = ADDR_Frameset_6ce9;
 		}
 		selection = STARTMENU_CONTINUE;
@@ -610,7 +610,7 @@ void Title::select_menu_option()
 
 void Title::set_selection(uint8_t selection, uint16_t frameset)
 {
-	ram(wStartMenuSelection) = selection;
+	wram_.start_menu_selection() = selection;
 	MenuObject obj1 = object(wMenuObj1);
 	obj1.set_frameset(frameset);
 	obj1.animate();
@@ -618,7 +618,7 @@ void Title::set_selection(uint8_t selection, uint16_t frameset)
 
 void Title::handle_selection()
 {
-	uint8_t selection = ram(wStartMenuSelection);
+	uint8_t selection = wram_.start_menu_selection();
 	if (selection & STARTMENUF_SCROLLING)
 		scroll_selection();
 	else if (selection & STARTMENUF_ANIM1) {
@@ -632,8 +632,8 @@ void Title::handle_selection()
 
 void Title::handle_selection_input()
 {
-	uint8_t pressed = ram(wJoypadPressed);
-	Byte selection = ram(wStartMenuSelection);
+	uint8_t pressed = wram_.joypad_pressed();
+	Byte selection = wram_.start_menu_selection();
 	if (pressed & PAD_A) {
 		play_sfx(mem_, SFX_SELECTION);
 		switch (selection & 0x0f) {
@@ -676,7 +676,7 @@ void Title::scroll_selection()
 {
 	Byte y = object(wMenuObj1).y();
 	uint8_t obj2_y;
-	if (ram(wStartMenuSelection) != (STARTMENU_CLEAR_DATA | STARTMENUF_SCROLLING)) {
+	if (wram_.start_menu_selection() != (STARTMENU_CLEAR_DATA | STARTMENUF_SCROLLING)) {
 		if (++y != 130)
 			return;
 		obj2_y = 134;
@@ -686,13 +686,13 @@ void Title::scroll_selection()
 		obj2_y = 118;
 	}
 	object(wMenuObj2).y() = obj2_y;
-	ram(wStartMenuSelection) &= ~STARTMENUF_SCROLLING;
+	wram_.start_menu_selection() &= ~STARTMENUF_SCROLLING;
 }
 
 // The chosen option blinks through palettes, every other frame.
 void Title::blink_selection()
 {
-	if (ram(wGlobalCounter) & 0x01)
+	if (wram_.global_counter() & 0x01)
 		return;
 	MenuObject obj1 = object(wMenuObj1);
 	uint8_t step = obj1.frameset_offset();
@@ -707,7 +707,7 @@ void Title::blink_selection()
 
 void Title::set_select_flag()
 {
-	ram(wStartMenuSelection) |= STARTMENUF_SELECT;
+	wram_.start_menu_selection() |= STARTMENUF_SELECT;
 	object(wMenuObj1).frameset_offset() = 0;
 }
 
@@ -725,19 +725,19 @@ void Title::init_time_attack_description()
 	load_time_attack_text();
 	routines_.call(ADDR_VBlank_TimeAttackDescription);
 
-	ram(wSCY) = 0;
+	wram_.scy() = 0;
 	ram(rSCY) = 0;
-	ram(wSCX) = 0;
+	wram_.scx() = 0;
 	ram(rSCX) = 0;
 	ram(rLCDC) = LCDC_DEFAULT;
-	ram(wTimer) = 0;
-	++ram(wSubState);
+	wram_.timer() = 0;
+	++wram_.sub_state();
 }
 
 void Title::time_attack_description()
 {
 	routines_.call(ADDR_AdjustJapaneseTimeAttackDescriptionWindow);
-	if (!(ram(wJoypadPressed) & PAD_A))
+	if (!(wram_.joypad_pressed() & PAD_A))
 		return;
 	routines_.disable_lcd();
 	routines_.call(ADDR_FillWhiteBGPal);

@@ -15,7 +15,7 @@ namespace wl3::title {
 // What the screens share: the machine, and their objects.
 class Screen {
 public:
-	explicit Screen(GB *gb) : gb_(gb), mem_(gb), routines_(gb) {}
+	explicit Screen(GB *gb) : gb_(gb), mem_(gb), wram_(gb), hram_(gb), routines_(gb) {}
 
 protected:
 	Byte ram(uint16_t addr) const { return mem_[addr]; }
@@ -26,6 +26,8 @@ protected:
 
 	GB *gb_;
 	Memory mem_;
+	Wram wram_;
+	Hram hram_;
 	Routines routines_;
 };
 

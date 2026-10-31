@@ -15,7 +15,7 @@ namespace wl3::action_help {
 
 class ActionHelp {
 public:
-	explicit ActionHelp(GB *gb) : gb_(gb), mem_(gb), routines_(gb) {}
+	explicit ActionHelp(GB *gb) : gb_(gb), mem_(gb), wram_(gb), hram_(gb), routines_(gb) {}
 
 	void run_state(); // _ActionHelpStateTable
 
@@ -49,6 +49,8 @@ private:
 
 	GB *gb_;
 	Memory mem_;
+	Wram wram_;
+	Hram hram_;
 	Routines routines_;
 };
 

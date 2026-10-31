@@ -4,6 +4,7 @@
 #pragma once
 
 #include "native.hpp"
+#include "ram.hpp"
 
 extern "C" void port_farcall(GB *gb, int bank, uint16_t addr);
 

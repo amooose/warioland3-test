@@ -429,7 +429,12 @@ Modules so far:
 registers the routine takes and returns what it returns. `farcall` calls a
 routine through hCallFunc; `in_bank` is farcall for code inside a module
 (it writes hCallFunc's bank and pointer bytes and switches banks as the
-original does). `src/native/menu_object.hpp` is the menu_obj_struct
+original does). RAM by name: `wram_.timer()` is the byte at wTimer, `hram_.demo_power_up()`
+the one at hDemoPowerUp (`src/native/ram.hpp`; names from
+`generated/ram_fields.h`, which `gen ram` makes from the .sym file:
+wFooBar -> foo_bar, unnamed wc08d -> unk_c08d; `.word()` for a dw). Use
+these in module code; `ram(addr)` / `mem_[addr]` remain for I/O registers,
+VRAM and computed addresses. `src/native/menu_object.hpp` is the menu_obj_struct
 (position, frame, UpdateObjAnim animation, LoadSprite).
 
 Init routines usually start with DisableLCD, which waits for V-Blank, so

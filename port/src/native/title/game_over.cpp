@@ -14,7 +14,7 @@ static_assert(wGameOverWarioAnimationEnded == wGameOverWario + 11);
 
 void GameOver::run_state()
 {
-	switch (ram(wSubState)) {
+	switch (wram_.sub_state()) {
 	case 0: routines_.call(ADDR_FastFadeToWhite); break;
 	case 1: init(); break;
 	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
@@ -40,14 +40,14 @@ void GameOver::init()
 	routines_.call(ADDR_VBlank_GameOver);
 
 	ram(rSCX) = 0;
-	ram(wSCX) = 0;
+	wram_.scx() = 0;
 	ram(rSCY) = 0x60;
-	ram(wSCY) = 0x60;
+	wram_.scy() = 0x60;
 
 	MenuObject w = wario();
 	w.init(0x80, 0x50, ADDR_Frameset_aaccb);
 	w.var() = 0;
-	ram(wSFXTimer) = 0;
+	wram_.sfx_timer() = 0;
 	w.animate(BANK_Frameset_aaccb);
 	SET_HL(gb_, wGameOverWario);
 	routines_.call(ADDR_LoadGameOverSprite);
@@ -58,15 +58,15 @@ void GameOver::init()
 	text.load_sprite(ADDR_OAM_dbbd2);
 
 	ram(rLCDC) = LCDC_DEFAULT;
-	ram(wTimer) = 64;
-	++ram(wSubState);
+	wram_.timer() = 64;
+	++wram_.sub_state();
 }
 
 void GameOver::update()
 {
 	MenuObject w = wario();
-	Byte timer = ram(wTimer);
-	Byte scy = ram(wSCY);
+	Byte timer = wram_.timer();
+	Byte scy = wram_.scy();
 	switch (w.var()) {
 	case 1: // the screen scrolls up to the text
 		scy -= 3;
@@ -78,7 +78,7 @@ void GameOver::update()
 		++w.var();
 		break;
 	case 2: // and bounces
-		if (ram(wGlobalCounter) & 0x03)
+		if (wram_.global_counter() & 0x03)
 			return;
 		--timer;
 		if (timer & 0x01) {
@@ -92,11 +92,11 @@ void GameOver::update()
 		++w.var();
 		break;
 	case 3: // until A wakes Wario
-		if (!ram(wJoypadPressed).bit(B_PAD_A))
+		if (!wram_.joypad_pressed().bit(B_PAD_A))
 			break;
 		play_sfx(mem_, SFX_SELECTION);
 		w.set_frameset(ADDR_Frameset_aace2);
-		++ram(wSubState);
+		++wram_.sub_state();
 		break;
 	default:
 		if (--timer)
@@ -111,7 +111,7 @@ void GameOver::update()
 void GameOver::wake_up()
 {
 	if (update_sprites(BANK_Frameset_aaccb, false))
-		++ram(wSubState);
+		++wram_.sub_state();
 }
 
 bool GameOver::update_sprites(uint8_t bank, bool snore)

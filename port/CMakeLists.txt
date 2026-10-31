@@ -60,7 +60,7 @@ file(MAKE_DIRECTORY ${GEN_DIR})
 # What the port takes from the disassembly: its labels (syms.h, sym_table.c)
 # and constants (constants.h).
 set(COMMITTED_GEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/generated)
-set(DISASM_GENERATED syms.h sym_table.c constants.h)
+set(DISASM_GENERATED syms.h sym_table.c constants.h ram_fields.h)
 if(WL3_BUILD_ROM)
 	set(DISASM_GEN_DIR ${GEN_DIR})
 	add_custom_command(
@@ -68,6 +68,11 @@ if(WL3_BUILD_ROM)
 		COMMAND ${GEN_CMD} syms ${SYM} ${GEN_DIR}/syms.h
 		DEPENDS ${GEN_CMD} ${SYM}
 		COMMENT "Generating syms.h from warioland3.sym")
+	add_custom_command(
+		OUTPUT ${GEN_DIR}/ram_fields.h
+		COMMAND ${GEN_CMD} ram ${SYM} ${GEN_DIR}/ram_fields.h
+		DEPENDS ${GEN_CMD} ${SYM}
+		COMMENT "Generating ram_fields.h from warioland3.sym")
 	add_custom_command(
 		OUTPUT ${GEN_DIR}/sym_table.c
 		COMMAND ${GEN_CMD} symtab ${SYM} ${ROM} ${GEN_DIR}/sym_table.c
@@ -96,7 +101,7 @@ if(WL3_BUILD_ROM)
 			${GEN_DIR}/${f} ${COMMITTED_GEN_DIR}/${f})
 	endforeach()
 	add_custom_target(update_generated ${UPDATE_COMMANDS}
-		DEPENDS ${GEN_DIR}/syms.h ${GEN_DIR}/sym_table.c ${GEN_DIR}/constants.h
+		DEPENDS ${GEN_DIR}/syms.h ${GEN_DIR}/sym_table.c ${GEN_DIR}/constants.h ${GEN_DIR}/ram_fields.h
 		COMMENT "Copying the generated headers to port/generated")
 else()
 	set(DISASM_GEN_DIR ${COMMITTED_GEN_DIR})
@@ -145,6 +150,7 @@ add_executable(wl3
 	src/sha1.c
 	${DISASM_GEN_DIR}/syms.h
 	${DISASM_GEN_DIR}/constants.h
+	${DISASM_GEN_DIR}/ram_fields.h
 	${DISASM_GEN_DIR}/sym_table.c
 	${GEN_DIR}/ported_table.c)
 # The disassembly's headers first: an old build directory may still hold

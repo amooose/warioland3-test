@@ -13,6 +13,7 @@
 #pragma once
 
 #include "../native.hpp"
+#include "../ram.hpp"
 
 namespace wl3::audio {
 
@@ -49,7 +50,7 @@ private:
 
 class Engine {
 public:
-	explicit Engine(GB *gb) : gb_(gb), mem_(gb) {}
+	explicit Engine(GB *gb) : gb_(gb), mem_(gb), wram_(gb), hram_(gb) {}
 
 	// The entry points. Each runs with the Audio RAM bank and the audio
 	// engine's ROM bank mapped, like the original's.
@@ -76,8 +77,8 @@ private:
 	Word ram_word(uint16_t addr) const { return mem_.word(addr); }
 
 	// The channel and track being worked on (wCurChannelPtr, wCurTrackPtr).
-	Channel cur_channel() const { return Channel(gb_, ram_word(wCurChannelPtr)); }
-	Track cur_track() const { return Track(gb_, ram_word(wCurTrackPtr)); }
+	Channel cur_channel() const { return Channel(gb_, wram_.cur_channel_ptr().word()); }
+	Track cur_track() const { return Track(gb_, wram_.cur_track_ptr().word()); }
 
 	// Stepping through channels and tracks, keeping the original's cursors.
 	void set_channels(uint16_t first, uint8_t count);
@@ -158,6 +159,8 @@ private:
 
 	GB *gb_;
 	Memory mem_;
+	Wram wram_;
+	Hram hram_;
 };
 
 } // namespace wl3::audio
