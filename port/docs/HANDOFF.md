@@ -55,10 +55,15 @@ scripting and expansion on top. The approach:
 
 **Windows (MSYS2 UCRT64), what the user runs:**
 
-- `build.bat` at the repo root builds. `build.bat run` also starts the
-  game. It stops if the game is running, since that locks `wl3.exe`.
-- `play.bat` starts the game. Arguments are passed through, for example
-  `play.bat --record port\tests\inputs\x.input`.
+- `build.bat` at the repo root builds the game without the interpreter in
+  `port/build-game`; `build.bat dev` builds the development build in
+  `port/build` (the one the tests, tools and Claude sessions use). `run`
+  after either also starts it. It stops if the game is running, since that
+  locks `wl3.exe`.
+- `play.bat` starts `port/build-game/wl3.exe`. Arguments are passed through,
+  for example `play.bat --record port\tests\inputs\x.input`; with
+  `--record`, `--input`, `--hooks`, `--no-hooks` or a test option it runs
+  `port/build/wl3.exe` instead, since recordings need the original's timing.
 - `push.bat` pushes the current branch to
   `https://github.com/amooose/warioland3-test` (commits only).
 - `build.bat` and `play.bat` have `MSYS2_DIR` (default `C:\msys64`) at the

@@ -64,18 +64,22 @@ PowerShell).
    ./port/build/wl3.exe
    ```
 
-After that, `build.bat` in the repository root rebuilds without opening the
-MSYS2 shell (`build.bat run` also starts the game). Edit the paths at its top
-if MSYS2 or RGBDS live somewhere other than `C:\msys64` and `C:\rgbds`. From
-the MSYS2 shell, `port/build.sh` does the same. Close the game before
-building: a running `wl3.exe` can't be replaced.
+After that, `build.bat` in the repository root builds the game, without the
+interpreter, in `port\build-game` (`build.bat run` also starts it), and
+`build.bat dev` builds the development build in `port\build`: the one with the
+interpreter, for the tests and for recording. Edit the paths at its top if
+MSYS2 or RGBDS live somewhere other than `C:\msys64` and `C:\rgbds`. From the
+MSYS2 shell, `port/build.sh` (or `port/build.sh dev`) does the same. Close the
+game before building: a running `wl3.exe` can't be replaced.
 
 `push.bat` pushes the current branch's commits to
 `https://github.com/amooose/warioland3-test`.
 
 `play.bat` starts the game (double-click it, or pass options:
-`play.bat --record my_run.input`). The build also copies `SDL2.dll` next to
-`wl3.exe`, so it runs from Explorer too.
+`play.bat --record my_run.input`). Recording, replaying and the other
+development options run the development build, so build that too
+(`build.bat dev`). The build also copies `SDL2.dll` next to `wl3.exe`, so it
+runs from Explorer too.
 
 The build compiles `warioland3.gbc` from the disassembly first, and then
 generates C constants for every label in it (`build/generated/syms.h`), so

@@ -1,7 +1,10 @@
 @echo off
 rem Build the ROM and the PC port, using MSYS2.
-rem   build.bat        build
-rem   build.bat run    build and start the game
+rem   build.bat            build the game (no interpreter), in port\build-game
+rem   build.bat run        build the game and start it
+rem   build.bat dev        build the development build (interpreter, tests,
+rem                        recording), in port\build
+rem   build.bat dev run    build that and start it
 rem Edit the two paths below if MSYS2 or RGBDS are installed elsewhere.
 setlocal
 set "MSYS2_DIR=C:\msys64"
@@ -27,7 +30,7 @@ rem The MSYS2 login shell starts in its home folder, so pass this folder
 rem as an absolute path and cd there.
 set "REPO=%~dp0"
 set MSYSTEM=UCRT64
-"%MSYS2_DIR%\usr\bin\bash.exe" -lc "cd \"$(cygpath -u \"$REPO\")\" && ./port/build.sh %1"
+"%MSYS2_DIR%\usr\bin\bash.exe" -lc "cd \"$(cygpath -u \"$REPO\")\" && ./port/build.sh %1 %2"
 if errorlevel 1 goto failed
 if defined PAUSE_AT_END pause
 endlocal
