@@ -787,8 +787,21 @@ public:
 	void init(); // _InitTempleScene
 	void update(); // _UpdateTempleScene
 	void reveal(); // HiddenFigureRevealScene
+	void enter_with_music_boxes(); // HandleEnterTempleWithAllMusicBoxesScene
+	void show_music_boxes(); // Func_ad445
+	void figure_appears(); // HandleHiddenFigureReveal
+	void music_boxes(); // HandleTempleMusicBoxes
+	void shake_scene(); // HandleTempleShakeScene
+	void wario_panic(); // HandleTempleWarioPanic
+	void left_hand(); // DoHiddenFigureLeftHandMovement
+	void right_hand(); // DoHiddenFigureRightHandMovement
 
 private:
+	void next_sub(); // Func_ad335
+	void wait_sub(uint8_t frames); // Func_ad330
+	void wait_wario(uint8_t state); // Func_ad329
+	void end_sub(); // Func_ad33c
+	void music_box_hover(int index); // HandleTempleMusicBox1Hover and the like
 	void next_step(); // Func_ad016
 	void wait(uint8_t frames); // Func_ad011
 	void fight(); // SetFightAgainstAHiddenFigure

@@ -547,6 +547,16 @@ Modules so far:
   plane's four falling parts one table-driven routine). bank2b_2.c keeps
   Prologue_Delay/Next/Finish, the sub-step helpers and Func_af130/5 (C
   still uses them) and the unreferenced Func_af01f.
+  `TempleScene` (temple_scene.cpp, entries `_InitTempleScene`,
+  `_UpdateTempleScene` and every sub-scene of the hidden figure's reveal:
+  the music boxes, the shake and the rocks' drops, Wario's panic run, the
+  hands). Scene Wario, the temple objects (UpdateTempleSceneObjs) and the
+  text printing stay C, called by address.
+- Testing gotcha: TaskStop on a background test job kills only its outer
+  shell; the MSYS bash, ctest, fuzz_batch's sh and their wl3 runs go on and
+  hold build/wl3.exe (the next link fails with "Permission denied", and a
+  later run then tests the old binary). Wait for them with PowerShell
+  (Get-Process ctest / wl3 / sh): Git Bash has no tasklist.
 - **pause** (src/native/pause): the pause menu (`PauseMenu`: the options,
   keys and treasures, its state table) and the save screens (`SaveScreen`:
   the progress bar, saving the game or the level in progress to SRAM with
