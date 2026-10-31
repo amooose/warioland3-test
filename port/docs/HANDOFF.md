@@ -425,6 +425,15 @@ Modules so far:
   after the call). No recording reaches Perfect or the GB incompatible
   notice; the fuzzer's synthetic calls check them. The V-Blank functions
   stay C.
+- **overworld, part 1** (src/native/overworld): the outer layer.
+  `HandleOverworld` (entry, every register clobbered) with its state table
+  and level selection, and init.asm: the map's setup (InitOverworld and its
+  `.after_cutscene` entry, the map sides, the scenes, the graphics and BG
+  map loading). The map's workings (bank20 to bank76, cutscene/, epilogue/,
+  temple/, best_times/, treasure_collection/) are still C, called by
+  address; so are Func_803e6 and Func_80bd9 (init.c), which that C calls.
+  HandleOverworld dispatches through a jump table, so the fuzzer is always
+  inconclusive on it: the traces check it.
 - **pause** (src/native/pause): the pause menu (`PauseMenu`: the options,
   keys and treasures, its state table) and the save screens (`SaveScreen`:
   the progress bar, saving the game or the level in progress to SRAM with
