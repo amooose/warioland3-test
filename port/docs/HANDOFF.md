@@ -86,6 +86,13 @@ MSYSTEM=UCRT64 /c/msys64/usr/bin/bash.exe -lc "cd /c/Users/<you>/.../warioland3-
   and `ctest --test-dir <dir>`.
 - Git may refuse the repo ("dubious ownership") when it's owned by
   Administrators: use `git -c safe.directory=* ...`.
+- The labels and constants the port uses from the disassembly are also
+  committed in `generated/` (syms.h, sym_table.c with the ROM's SHA-1,
+  constants.h), so `-DWL3_BUILD_ROM=OFF` builds without RGBDS. After an asm
+  label or constant change, run `cmake --build build --target
+  update_generated` and commit the result; the `generated_*` quick tests
+  fail until then. At runtime the port reads no .sym file and refuses a ROM
+  whose SHA-1 doesn't match the labels it was built with.
 
 ## The batch workflow
 

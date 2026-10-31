@@ -80,8 +80,27 @@ The build compiles `warioland3.gbc` from the disassembly first, and then
 generates C constants for every label in it (`build/generated/syms.h`), so
 ported code always matches the current state of the asm.
 
-No ROM is distributed with this project, and none is needed beyond the one
-you build from this repository.
+### With your own ROM, without the disassembly
+
+The port runs on the original Wario Land 3 ROM, which the disassembly
+rebuilds byte for byte. To build just the port, without RGBDS or make:
+
+```sh
+cmake -B port/build -S port -DWL3_BUILD_ROM=OFF
+cmake --build port/build
+```
+
+This uses the label and constant headers committed in `port/generated/`.
+Put your ROM next to `wl3` as `warioland3.gbc`, or pass `--rom PATH`. The
+port checks its SHA-1 (`bb7877309834441fd03adb7fa65738e5d5b2d7ba`, the
+worldwide Game Boy Color release) and refuses any other. Add
+`-DWL3_ROM=/path/to/your.gbc` to run the tests too.
+
+After changing labels or constants in the asm, refresh the committed copies
+with `cmake --build port/build --target update_generated` (a quick-tier
+test fails until they match).
+
+No ROM is distributed with this project.
 
 ## Playing
 

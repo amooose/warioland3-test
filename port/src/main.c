@@ -6,6 +6,8 @@
 #include "input.h"
 #include "png.h"
 #include "savestate.h"
+#include "sha1.h"
+#include "symtab.h"
 
 #include <SDL.h>
 #include <setjmp.h>
@@ -343,8 +345,8 @@ static void usage(const char *argv0)
 {
 	fprintf(stderr,
 		"usage: %s [options]\n"
-		"  --rom PATH            ROM built from the disassembly (default: " WL3_DEFAULT_ROM ")\n"
-		"  --sym PATH            symbol file (default: ROM path with .sym)\n"
+		"  --rom PATH            your Wario Land 3 ROM (default: " WL3_DEFAULT_ROM ",\n"
+		"                        else warioland3.gbc next to the executable)\n"
 		"  --sav PATH            battery save file (default: ROM path with .sav;\n"
 		"                        headless runs only use one if this is given)\n"
 		"  --scale N             window scale (default 4)\n"
@@ -397,6 +399,46 @@ static char *replace_ext(const char *path, const char *ext)
 	return out;
 }
 
+static bool file_exists(const char *path)
+{
+	FILE *f = fopen(path, "rb");
+	if (f)
+		fclose(f);
+	return f != NULL;
+}
+
+// The default ROM, else warioland3.gbc next to the executable.
+static const char *default_rom(void)
+{
+	if (file_exists(WL3_DEFAULT_ROM))
+		return WL3_DEFAULT_ROM;
+	char *base = SDL_GetBasePath();
+	if (!base)
+		return WL3_DEFAULT_ROM;
+	char *path = malloc(strlen(base) + sizeof("warioland3.gbc"));
+	strcpy(path, base);
+	strcat(path, "warioland3.gbc");
+	SDL_free(base);
+	return file_exists(path) ? path : WL3_DEFAULT_ROM;
+}
+
+// The port's code refers to the ROM by address, so it only works with the
+// exact ROM its labels were built from.
+static bool check_rom(const GB *gb, const char *path)
+{
+	char sha1[41];
+	sha1_hex(gb->rom, gb->rom_size, sha1);
+	if (!strcmp(sha1, wl3_rom_sha1))
+		return true;
+	fprintf(stderr,
+		"%s is not the Wario Land 3 ROM this port was built for\n"
+		"  its SHA-1:  %s\n"
+		"  expected:   %s\n"
+		"(Wario Land 3 for the Game Boy Color, worldwide release)\n",
+		path, sha1, wl3_rom_sha1);
+	return false;
+}
+
 static bool parse_frame_file(char *spec, FrameFile *out)
 {
 	char *colon = strchr(spec, ':');
@@ -411,8 +453,8 @@ static bool parse_frame_file(char *spec, FrameFile *out)
 
 int main(int argc, char **argv)
 {
-	const char *rom_path = WL3_DEFAULT_ROM;
-	const char *sym_path = NULL, *sav_path = NULL, *input_path = NULL, *load_state = NULL;
+	const char *rom_path = NULL;
+	const char *sav_path = NULL, *input_path = NULL, *load_state = NULL;
 	const char *break_sym = NULL;
 	int scale = 4, run_frames = 0;
 	bool no_hooks = false, force_hooks = false, difftest = false;
@@ -430,7 +472,6 @@ int main(int argc, char **argv)
 			return 0;
 		}
 		else if (!strcmp(a, "--rom") && next) rom_path = argv[++i];
-		else if (!strcmp(a, "--sym") && next) sym_path = argv[++i];
 		else if (!strcmp(a, "--sav") && next) sav_path = argv[++i];
 		else if (!strcmp(a, "--scale") && next) scale = atoi(argv[++i]);
 		else if (!strcmp(a, "--input") && next) input_path = argv[++i];
@@ -480,14 +521,10 @@ int main(int argc, char **argv)
 	}
 
 	static GB gb;
-	if (!gb_init(&gb, rom_path))
+	if (!rom_path)
+		rom_path = default_rom();
+	if (!gb_init(&gb, rom_path) || !check_rom(&gb, rom_path))
 		return 1;
-	if (!sym_path)
-		sym_path = replace_ext(rom_path, ".sym");
-	if (!sym_load(sym_path)) {
-		fprintf(stderr, "can't read symbols from %s (build the ROM with make first)\n", sym_path);
-		return 1;
-	}
 	if (break_sym) {
 		int bank;
 		uint16_t addr;

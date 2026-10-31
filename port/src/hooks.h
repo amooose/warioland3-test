@@ -31,8 +31,8 @@ typedef struct {
 	uint64_t calls;
 } Hook;
 
-// Load the rgblink .sym file so hooks can be looked up by label.
-bool sym_load(const char *path);
+// The labels come from the disassembly's .sym file, built into the
+// executable (symtab.h).
 // Returns false if the symbol is unknown.
 bool sym_lookup(const char *name, int *bank, uint16_t *addr);
 // Name of the label at or before an address (for debugging); NULL if none.

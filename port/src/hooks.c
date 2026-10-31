@@ -1,18 +1,16 @@
 // Symbol table and hook registry.
 #include "hooks.h"
+#include "symtab.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct {
-	char *name;
-	int bank;
-	uint16_t addr;
-} Sym;
+typedef SymEntry Sym;
 
-static Sym *syms;
-static int nsyms;
+// The labels built into the executable (sym_table.c)
+static const Sym *const syms = wl3_syms;
+#define nsyms wl3_nsyms
 
 #define MAX_HOOKS 8192
 static Hook hooks[MAX_HOOKS];
@@ -31,31 +29,6 @@ static size_t rom_offset(int bank, uint16_t addr)
 	if (addr < 0x4000)
 		return addr;
 	return (size_t)bank * 0x4000 + (addr - 0x4000);
-}
-
-bool sym_load(const char *path)
-{
-	FILE *f = fopen(path, "r");
-	if (!f)
-		return false;
-	char line[512];
-	int cap = 0;
-	while (fgets(line, sizeof(line), f)) {
-		unsigned bank, addr;
-		char name[400];
-		if (line[0] == ';' || sscanf(line, "%x:%x %399s", &bank, &addr, name) != 3)
-			continue;
-		if (nsyms == cap) {
-			cap = cap ? cap * 2 : 4096;
-			syms = realloc(syms, (size_t)cap * sizeof(Sym));
-		}
-		syms[nsyms].name = strdup(name);
-		syms[nsyms].bank = (int)bank;
-		syms[nsyms].addr = (uint16_t)addr;
-		nsyms++;
-	}
-	fclose(f);
-	return nsyms > 0;
 }
 
 bool sym_lookup(const char *name, int *bank, uint16_t *addr)
