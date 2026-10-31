@@ -533,6 +533,11 @@ Modules so far:
   path helpers (Func_810fc, Func_821a1, Func_82208, Func_82111) and
   SetOWWarioOAM are MapWalk's; bank20.c keeps GetMapLevelCoords (C calls
   it) and unreferenced routines.
+- **overworld, part 8**: bank2b, top down (the scenes first; their shared
+  helpers, scene Wario and the text printing stay C, called by address,
+  until their last C caller goes). `GolfBuilding` (golf_building.cpp,
+  entries `_GolfBuilding` and `Func_adbfe`: the building outside, its
+  palettes by crayon); its V-Blank function stays C (RAM code).
 - **pause** (src/native/pause): the pause menu (`PauseMenu`: the options,
   keys and treasures, its state table) and the save screens (`SaveScreen`:
   the progress bar, saving the game or the level in progress to SRAM with

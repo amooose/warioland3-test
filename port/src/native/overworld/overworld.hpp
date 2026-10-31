@@ -685,6 +685,49 @@ private:
 	Routines routines_;
 };
 
+// The epilogue (bank2b.asm): the old man's thanks, the music boxes, the
+// transformation, the crowd, the gift, and Wario thrown out of the
+// castle with its treasure. Steps in w2d013 (frames in w2d014); most
+// have sub-steps in w2d890 (frames in w2d891).
+class Epilogue {
+public:
+	explicit Epilogue(GB *gb) : gb_(gb), mem_(gb), wram_(gb), routines_(gb) {}
+
+	void init(); // _InitEpilogue
+	void update(); // Func_af13c
+
+private:
+	void unrealistic();
+	void wario_state(uint8_t state); // SetSceneWarioState
+	void set_state(uint16_t state, uint8_t value); // SetSceneObjState
+	void far_pals(uint8_t bank, uint16_t src, uint16_t dest);
+	void decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vram1);
+	void next_step(); // Func_af135
+	void wait(uint8_t frames); // Func_af130
+	void next_sub(); // .asm_af40c
+	void end_sub(); // .asm_af413
+	void wait_wario(uint8_t state); // .asm_af400
+	void wait_fade(); // .Func_af41c
+	void hdma(uint8_t bank, uint8_t vram_bank, uint16_t src, uint8_t dest_hi, uint8_t mode);
+	void load_pals(); // .Func_af1bd
+	void load_gift_pals(); // .Func_af1db
+	void step(); // .Func_af14c
+	void crowd(); // .Func_af8bc
+	void crowd_start(); // .Func_af23e
+	void old_man_talks(); // .Func_af376
+	void music_boxes(); // .Func_af7af
+	void transformation(); // .Func_af741
+	void leave_on_gift(); // .Func_af670
+	void thrown_out(); // .Func_af436
+	void bounce_wario(); // .Func_af57b
+	void bounce_treasure(); // .Func_af60d
+
+	GB *gb_;
+	Memory mem_;
+	Wram wram_;
+	Routines routines_;
+};
+
 // The map's palettes and tile updates (bank21.asm): the day and night
 // transitions (each colour stepped in a ColourFadeStruct), the PalConfig
 // fades (FadePalConfig), the level name's, and the scenes' tile blocks.
