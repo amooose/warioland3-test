@@ -5,6 +5,8 @@
 
 #include "native.hpp"
 
+extern "C" void port_farcall(GB *gb, int bank, uint16_t addr);
+
 namespace wl3 {
 
 class Routines {
@@ -13,6 +15,34 @@ public:
 
 	// any routine, by address (one in a ROMX bank runs from the bank mapped)
 	void call(uint16_t addr) { gb_call(gb_, addr); }
+
+	// the farcall macro: any routine, with the given ROM bank mapped
+	// (through hCallFunc)
+	void farcall(uint8_t bank, uint16_t addr) { port_farcall(gb_, bank, addr); }
+
+	// The farcall macro, for a routine of a C++ module: fn runs with bank
+	// mapped, leaving hCallFunc's bank and pointer (addr, the original
+	// routine) as the original's farcall does.
+	template <class F>
+	void in_bank(uint8_t bank, uint16_t addr, F fn)
+	{
+		Memory mem(gb_);
+		mem[hCallFuncBank] = bank;
+		mem[hCallFuncPointer + 0] = static_cast<uint8_t>(addr);
+		mem[hCallFuncPointer + 1] = static_cast<uint8_t>(addr >> 8);
+		uint8_t saved = mem[wROMBank];
+		switch_bank(bank);
+		fn();
+		switch_bank(saved);
+	}
+
+	// the bankswitch macro
+	void switch_bank(uint8_t bank)
+	{
+		Memory mem(gb_);
+		mem[wROMBank] = bank;
+		mem[rROMB0 + 0x100] = bank;
+	}
 
 	void disable_lcd() { call(ADDR_DisableLCD); }
 	void clear_virtual_oam() { call(ADDR_ClearVirtualOAM); }
@@ -26,6 +56,14 @@ public:
 		SET_HL(gb_, src);
 		SET_BC(gb_, dest);
 		call(ADDR_FarDecompress);
+	}
+
+	// decompresses src (from the ROM bank mapped) to dest
+	void decompress(uint16_t src, uint16_t dest)
+	{
+		SET_HL(gb_, src);
+		SET_BC(gb_, dest);
+		call(ADDR_Decompress);
 	}
 
 	// copies count bytes from src, in the ROM bank wTempBank, to dest
@@ -45,6 +83,24 @@ public:
 		call(ADDR_CopyHLToDE);
 	}
 
+	// CopyHLToDE_BC and CopyHLToDE_Short, with bank mapped (farcall) or
+	// from the bank mapped (bank 0)
+	void copy_bc(uint16_t src, uint16_t dest, uint16_t count, uint8_t bank = 0)
+	{
+		SET_HL(gb_, src);
+		SET_DE(gb_, dest);
+		SET_BC(gb_, count);
+		far_or_near(bank, ADDR_CopyHLToDE_BC);
+	}
+
+	void copy_short(uint16_t src, uint16_t dest, uint8_t count, uint8_t bank = 0)
+	{
+		SET_HL(gb_, src);
+		SET_DE(gb_, dest);
+		gb_->cpu.b = count;
+		far_or_near(bank, ADDR_CopyHLToDE_Short);
+	}
+
 	void load_pals_to_temp_pals1(uint16_t pals)
 	{
 		SET_HL(gb_, pals);
@@ -61,6 +117,16 @@ public:
 	{
 		SET_BC(gb_, music);
 		call(ADDR_PlayNewMusic);
+	}
+
+	// a = mod, b = value, d = SFX channels, e = music channels
+	void execute_audio_mod(uint8_t mod, uint8_t value, uint8_t sfx_channels, uint8_t music_channels)
+	{
+		gb_->cpu.a = mod;
+		gb_->cpu.b = value;
+		gb_->cpu.d = sfx_channels;
+		gb_->cpu.e = music_channels;
+		call(ADDR_ExecuteAudioMod);
 	}
 
 	bool check_has_all_musical_coin_flags()
@@ -88,6 +154,14 @@ public:
 	void update_golf_wario_animation() { call(ADDR_UpdateGolfWarioAnimation); }
 
 private:
+	void far_or_near(uint8_t bank, uint16_t addr)
+	{
+		if (bank)
+			farcall(bank, addr);
+		else
+			call(addr);
+	}
+
 	GB *gb_;
 };
 
@@ -96,6 +170,12 @@ inline void play_sfx(Memory mem, uint16_t sfx)
 {
 	mem[hSFXID + 0] = static_cast<uint8_t>(sfx >> 8);
 	mem[hSFXID + 1] = static_cast<uint8_t>(sfx);
+}
+
+inline void play_music(Memory mem, uint16_t music)
+{
+	mem[hMusicID + 0] = static_cast<uint8_t>(music >> 8);
+	mem[hMusicID + 1] = static_cast<uint8_t>(music);
 }
 
 inline void play_music2(Memory mem, uint16_t music)

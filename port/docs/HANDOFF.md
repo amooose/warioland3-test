@@ -408,10 +408,23 @@ Modules so far:
   restores af and the main loop follows). What stays register-level C is in
   golf/hole_ram.c: the V-Blank functions copied to wVBlankFunc, and
   HoldGolfWarioLastFrame, which home code calls.
+- **title** (src/native/title): the title screen (`Title`: the intro with
+  the plane, the start menu, the time attack description) and the game
+  over screen (`GameOver`), on a shared `Screen`. Entered through
+  `TitleStateTable` (b to l clobbered; a and f as pop_wram leaves them) and
+  `_GameOverStateTable`; `StartOverworldState`,
+  `StartOverworldStateAndNewGameParam`, `Func_4628` and
+  `LoadHiddenFigureGfx`, called from elsewhere, keep exact registers. The
+  rLY-timed raster effects and the V-Blank function stay C
+  (title/raster.c).
 
 `src/native/routines.hpp` wraps the register-level C routines a module calls
 (DisableLCD, FarDecompress, the golf sprite helpers...): each sets the
-registers the routine takes and returns what it returns.
+registers the routine takes and returns what it returns. `farcall` calls a
+routine through hCallFunc; `in_bank` is farcall for code inside a module
+(it writes hCallFunc's bank and pointer bytes and switches banks as the
+original does). `src/native/menu_object.hpp` is the menu_obj_struct
+(position, frame, UpdateObjAnim animation, LoadSprite).
 
 Init routines usually start with DisableLCD, which waits for V-Blank, so
 the fuzzer's checks of them are inconclusive and only the traces check them
