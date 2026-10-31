@@ -1412,6 +1412,31 @@ PORT_LOCAL(_UpdateTempleScene, Entering)
 	}
 }
 
+PORT_LOCAL(_UpdateTempleScene, DelayAndPlayTempleMusic)
+{
+	gb->cpu.a = rd8(gb, wTempleMusicIsPlaying);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a))
+		return; // already playing
+	SET_HL(gb, wTempleMusicDelayCounter);
+	wr8(gb, wTempleMusicDelayCounter, alu_inc(gb, rd8(gb, wTempleMusicDelayCounter)));
+	gb->cpu.a = rd8(gb, wTempleMusicDelayCounter);
+	alu_cp(gb, gb->cpu.a, 90);
+	if (gb->cpu.f & FLAG_C)
+		return;
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wTempleMusicDelayCounter, 0);
+	// play_music2 MUSIC_THE_TEMPLE
+	gb->cpu.a = (uint8_t)(MUSIC_THE_TEMPLE >> 8);
+	wr8(gb, hMusicIDBackup + 0, gb->cpu.a);
+	wr8(gb, hMusicID + 0, gb->cpu.a);
+	gb->cpu.a = (uint8_t)MUSIC_THE_TEMPLE;
+	wr8(gb, hMusicIDBackup + 1, gb->cpu.a);
+	wr8(gb, hMusicID + 1, gb->cpu.a);
+	gb->cpu.a = TRUE;
+	wr8(gb, wTempleMusicIsPlaying, gb->cpu.a);
+}
+
 PORT_LOCAL(_UpdateTempleScene, TalkToHiddenFigure)
 {
 	gb_call(gb, ADDR__UpdateTempleScene + 0x105); // .DelayAndPlayTempleMusic
@@ -3592,3 +3617,43 @@ PORT_LOCAL_JUMP(VBlank_PrologueEpilogue, Func)
 
 // debug_nop: nop / jr back, forever (one turn per dispatch).
 PORT_JUMP(InvalidMusicBoxAction) { JUMP_TO(ADDR_InvalidMusicBoxAction); }
+
+// _GolfBuilding.func, as copied to wVBlankFunc (see ram_code.c): starts the
+// HDMA transfer in wHDMA, if there's one
+PORT_LOCAL_JUMP(_GolfBuilding, func)
+{
+	gb->cpu.a = 2; // BANK("WRAM2")
+	wr8(gb, rWBK, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wSCY);
+	wr8(gb, rSCY, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wSCX);
+	wr8(gb, rSCX, gb->cpu.a);
+	gb->cpu.a = rd8(gb, wHDMABank);
+	if (alu_and(gb, gb->cpu.a, gb->cpu.a)) {
+		gb->cpu.b = gb->cpu.a;
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		wr8(gb, wHDMABank, 0);
+		gb->cpu.a = rd8(gb, wROMBank);
+		push_af(gb);
+		gb->cpu.a = gb->cpu.b;
+		bankswitch(gb, gb->cpu.a);
+		uint16_t hl = wHDMA;
+		gb->cpu.c = (uint8_t)rVDMA_SRC_HIGH;
+		for (int i = 0; i < 5; i++) {
+			if (i)
+				gb->cpu.c = alu_inc(gb, gb->cpu.c);
+			gb->cpu.a = rd8(gb, hl++);
+			wr8(gb, (uint16_t)(0xff00 | gb->cpu.c), gb->cpu.a);
+		}
+		SET_HL(gb, hl);
+		pop_af(gb);
+		bankswitch(gb, gb->cpu.a);
+	}
+	// .done
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rVBK, 0);
+	gb->cpu.a = (uint8_t)(wVirtualOAM >> 8);
+	JUMP_TO(hTransferVirtualOAM);
+}

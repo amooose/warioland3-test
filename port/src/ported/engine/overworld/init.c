@@ -473,6 +473,34 @@ PORT(Func_8065e)
 	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
 }
 
+// InitOverworld.load_map_without_scene: simply loads and shows the
+// overworld map for player to navigate
+static void load_map_without_scene(GB *gb)
+{
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wCurEvent, 0); // EVENT_00
+	gb->cpu.a = SST_OVERWORLD_09;
+	wr8(gb, wSubState, gb->cpu.a);
+	gb_call(gb, ADDR_Func_803e6);
+}
+
+// InitOverworld.after_cutscene, which cutscenes jump back to
+PORT_LOCAL(InitOverworld, after_cutscene)
+{
+	// check if there's a OW scene to play
+	gb->cpu.a = rd8(gb, wCurEvent);
+	gb_call(gb, ADDR_GetOWSceneParams);
+	if (gb->cpu.f & FLAG_Z) {
+		load_map_without_scene(gb);
+		return;
+	}
+	// .play_ow_scene
+	gb_call(gb, ADDR_UpdateStoredTransitionParam);
+	gb->cpu.a = SST_OVERWORLD_OW_SCENE;
+	wr8(gb, wSubState, gb->cpu.a);
+}
+
 PORT(InitOverworld)
 {
 	gb->cpu.a = 2; // BANK("WRAM2")
@@ -593,14 +621,7 @@ epilogue:
 	goto after_cutscene;
 
 load_map_without_scene:
-	// simply loads and shows the overworld map
-	// for player to navigate
-	gb->cpu.a = 0;
-	gb->cpu.f = FLAG_Z; // xor a
-	wr8(gb, wCurEvent, 0); // EVENT_00
-	gb->cpu.a = SST_OVERWORLD_09;
-	wr8(gb, wSubState, gb->cpu.a);
-	gb_call(gb, ADDR_Func_803e6);
+	load_map_without_scene(gb);
 }
 
 // call LoadMapSidePals / call gfx / call LoadOverworldCommonGfx /

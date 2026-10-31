@@ -26,12 +26,11 @@ scripting and expansion on top. The approach:
 ## Current state
 
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`.
-- **Progress (2026-10-30):** 3438 / 3491 routines (98.5%) and 99.7% of
-  the instructions are ported, including the level frame loop
-  (`UpdateLevel`, `UpdateObject`, `ProcessInteractions`), `VBlank`,
-  `JumpTable` and `HandleSound`. While the port plays the recordings, the
-  interpreter now runs 12.4M instructions in all, down from 169M (see
-  "What still runs as asm"). Ordinary porting is done: "Ready to port" only lists
+- **Progress (2026-10-31):** 3497 / 3497 routines are ported. While the
+  port plays the recordings, the interpreter runs no instructions at all
+  (from 169M; see "What still runs as asm"). Only the debug loops, the
+  HRAM copies and the RAM blocks listed below are still interpreted, and
+  no recording reaches them. Ordinary porting is done: "Ready to port" only lists
   routines that can't or needn't be ported (see "Good next batches"). Run
   `cmake --build build --target progress` and read `build/progress.md` for
   the per-directory numbers.
@@ -297,8 +296,9 @@ per label, most run first. It's the real list of work left before the
 interpreter can go. The progress report counts routines, and it treats
 anything calling `hCallFunc` as blocked.
 
-**State (2026-10-30):** over the 11 recordings the interpreter now runs
-2.29M instructions, down from 169M. Everything left is listed here.
+**State (2026-10-31):** over the 12 recordings the interpreter runs 0
+instructions, down from 169M. The profile also lists every interpreted
+address (`bank:addr label+offset`), which is how the last ones were found.
 
 - **RAM hooks** (`ram_hook_register` in hooks.h, the code is in
   src/ported/home/ram_code.c) cover what the game runs from RAM:
@@ -309,7 +309,7 @@ anything calling `hCallFunc` as blocked.
   A RAM hook first checks that the bytes are the code it stands for, and
   otherwise leaves them to the interpreter.
 - **Copied V-Blank functions.** The screens copy an `X.Func ... X.end`
-  block into `wVBlankFunc`. ram_code.c recognises any such block by its
+  (or `X.func ... X.func_end`) block into `wVBlankFunc`. ram_code.c recognises any such block by its
   bytes and runs the native routine of its ROM label, `PORT_LOCAL(X,
   Func)`. Calls inside a block return to `gb->cpu.pc + n`, the block's
   start wherever it runs from. Blocks that switch the ROM bank (the
@@ -317,20 +317,11 @@ anything calling `hCallFunc` as blocked.
   fuzzer at their ROM address, so the traces are what check them.
   `VBlank_1c9f7a.Func` stays asm, because no recording reaches it and the
   fuzzer can't check it.
-- **The main loop** is native in two parts around its `halt`. The
-  interpreter still runs the `halt` and `nop` once a frame, about 0.5M
-  instructions over all recordings. `.GameLoop` exits at the halt inside
-  its own routine, so its fuzz checks are inconclusive; the traces check
-  it.
-- **Collision tails, about 1.5M instructions.** `call_process_block` in
-  collisions.c pushes the asm's return address and jumps to
-  `ProcessBlock`, leaving each caller's `ld b, a / ret` to the
-  interpreter. That's deliberate: a block function that drops its
-  caller's frame then behaves as on the hardware, where a nested
-  `gb_call_ret` would be stranded. It becomes plain C with the rest when
-  the interpreter goes.
-- **Interrupt vectors.** The `jp VBlank` at $0040 runs once per V-Blank.
-  It shows under `JumpTable` in the profile, the nearest label.
+- **The main loop** halts natively and resumes at
+  `InitWithoutDemoPowerUpReset.after_halt`. The fuzzer can't check the
+  halt or the interrupt vectors; the traces do.
+- **The collision tails** go through `gb_call_ret_unwind`, which stops
+  where a block function pops past its caller, as the asm does.
 
 ## Open issues
 
@@ -352,15 +343,7 @@ anything calling `hCallFunc` as blocked.
      `Func_ac042` to `Func_ac051`) are back in `bank2b_1.c`. The root cause
      was never found, so it may still be there under other inputs.
 
-2. **The fuzzer's step budget.** When the routine never runs on an input,
-   the fuzzer makes up a call from the final state; if that call hangs (a
-   wait for H-Blank with the LCD off), the seed hits `MAX_STEPS` and every
-   variant then gets 20 times that, so one routine runs for minutes.
-   `LoadActionHelpBGPals` (ported, and verified on the action help
-   recordings) still costs about 7 minutes on `boot_through_n1`, where its
-   synthetic seeds have the LCD off and nothing is checked. Fix: cap the
-   variants' budget when the seed never finished (difftest.c).
-3. **Coverage gaps.** `UpdateRoomAnimatedPals` (60/104: the palette copy
+2. **Coverage gaps.** `UpdateRoomAnimatedPals` (60/104: the palette copy
    loop only runs in levels with palette cycling), `MizzouProjectileFunc`
    (54/59), `SilkPlatformsFunc` (18/26), `TransitionAfterSave` (18/32),
    `Func_850ff` (24/30). Most transformation states (snowman, ball, fan,
@@ -376,26 +359,25 @@ asm:
   `InvalidMusicBoxAction`, `Func_81e44`.
 - `PushOAM` and `hCallFuncPointer`: code and data copied to HRAM and run
   there, never at their ROM addresses.
-- `Func_af01f` (unreferenced): its asm never gets past `DisableLCD` under
-  the fuzzer, even timed, so nothing would be verified.
+- `Func_af01f` (unreferenced) is ported but can't be checked: its
+  Decompress over uncompressed data writes on into the stack and the asm
+  returns into garbage. The rest uses `_InitEpilogue`'s helpers.
 
-Routines with 0 passed checks on every input are verified by nothing. A
-2026-10-30 audit found 32. The harness changes above fixed 12 of them, and
-one (`Func_1c9cf9`) had been wrong since it was ported. The rest are:
+Routines with 0 passed checks on every input are verified by nothing.
+The 2026-10-31 full fuzz run left 14, down from 35. The checker now
+carries on natively when a routine jumps into one of its own ported
+labels (`CoinFunc` falling into `.Update`), which fixed the dispatchers
+and object `Init` code. The 14 left:
 
-- dispatchers that jump into their own states (`CutsceneNNFunc`,
-  `*OWFunc_VulcanoEruption`, `Func_9d6f0`), whose states are checked one
-  by one;
-- object `Init` code that falls into its own update code (`CoinFunc`,
-  `FireBotFunc.Init`, `HammerBotFunc.Init`, `SpearBotFunc.Init`,
-  `MadSciensteinFunc.Init`, `OmodonmekaFunc` and `.Func_42199`);
-- `Func_84b97.Func_84bad` and `EOWFunc_VulcanoEruption.Func_b774c`
-  (unrealistic on every seed);
-- `InitGolfHole` and `Func_84c0d.Init`, whose checks all see a V-Blank
-  interrupt (unrealistic since VBlank went native). `InitGolfHole` was
-  read against the asm, and its callees pass on their own.
-
-The audit after the last full ctest found 35, all in these groups.
+- the debug loops (`Func_81e44`, `Func_b4001`, `InvalidMusicBoxAction`);
+- the boot code, main loop and V-Blank vector (`InitWithoutDemoPowerUpReset`,
+  `.GameLoop`, `VBlankVector`), checked by the traces;
+- the V-Blank blocks that switch the ROM bank (`VBlank_1c9eb3.Func`,
+  `VBlank_Cutscene.Func`, `VBlank_OWPalTransition.Func`,
+  `VBlank_OWScene.Func`, `VBlank_Overworld.Func`, `VBlank_Title.Func`),
+  checked by the traces;
+- `Func_84b97.Func_84bad` (unrealistic on every seed) and
+  `Func_84c0d.Init` (every check sees a V-Blank interrupt).
 
 Rerun that audit after any batch: sum the passed column per routine over
 `build/Testing/Temporary/LastTest.log`.

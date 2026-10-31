@@ -58,6 +58,9 @@ PORT_JUMP(VBlank)
 	gb->cpu.ime = true;
 }
 
+// Where the boot ROM hands over: nop / jp Start
+PORT_JUMP(EntryPoint) { JUMP_TO(ADDR_Start); }
+
 // The interrupt vectors
 PORT_JUMP(VBlankVector) { JUMP_TO(ADDR_VBlank); }
 PORT_JUMP(LCDVector) { JUMP_TO(wLCDFunc); }

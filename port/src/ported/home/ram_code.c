@@ -74,7 +74,8 @@ static bool transfer_virtual_oam(GB *gb)
 static const uint8_t tile_copy_code[] = {0x2a, 0x57, 0x2a, 0x5f, 0x0a, 0x12, 0x0c};
 
 // The V-Blank functions the screens copy into wVBlankFunc: each is an
-// X.Func ... X.end block in ROM (found in the .sym file), and runs from RAM
+// X.Func ... X.end (or X.func ... X.func_end) block in ROM (found in the
+// .sym file), and runs from RAM
 // byte for byte as it would from ROM. One whose ROM block has a native
 // routine (PORT_LOCAL(X, Func)) runs that instead.
 typedef struct {
@@ -100,9 +101,15 @@ static void find_copied_funcs(void)
 		size_t len = strlen(name);
 		if (len < 6 || (strcmp(name + len - 5, ".Func") && strcmp(name + len - 5, ".func")) || addr >= 0x8000)
 			continue;
+		// X.Func ... X.end, or X.func ... X.func_end
 		char end_name[128];
 		snprintf(end_name, sizeof(end_name), "%.*s.end", (int)(len - 5), name);
-		if (!sym_lookup(end_name, &end_bank, &end) || end_bank != bank || end <= addr || end - addr > 0x200)
+		if (!sym_lookup(end_name, &end_bank, &end)) {
+			snprintf(end_name, sizeof(end_name), "%s_end", name);
+			if (!sym_lookup(end_name, &end_bank, &end))
+				continue;
+		}
+		if (end_bank != bank || end <= addr || end - addr > 0x200)
 			continue;
 		size_t off = addr < 0x4000 ? addr : (size_t)bank * 0x4000 + (addr - 0x4000);
 		copied[ncopied++] = (CopiedFunc){bank, addr, off, end - addr};

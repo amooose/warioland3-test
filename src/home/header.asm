@@ -82,6 +82,7 @@ VBlank:
 	ds $66
 
 SECTION "romheader", ROM0
+EntryPoint::
 	nop
 	jp Start
 	ds $4c

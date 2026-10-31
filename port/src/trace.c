@@ -465,6 +465,20 @@ static bool write_profile(const GB *gb, const char *path)
 	for (size_t i = 0; i < n && l[i].count; i++)
 		fprintf(f, "%llu %d %s %s\n", (unsigned long long)l[i].count, l[i].distinct, l[i].name,
 			l[i].ported ? "ported" : "-");
+	// Then every instruction, by address (RAM as bank 0).
+	fprintf(f, "\n# count bank:addr label+offset\n");
+	qsort(l, n, sizeof(*l), by_off);
+	for (size_t off = 0; off < gb->rom_size + 0x10000; off++) {
+		uint64_t c = gb->asm_profile[off];
+		if (!c)
+			continue;
+		int bank = off >= gb->rom_size ? 0 : (int)(off / 0x4000);
+		unsigned addr = off >= gb->rom_size ? (unsigned)(off - gb->rom_size) :
+			off < 0x4000 ? (unsigned)off : 0x4000 + (unsigned)(off % 0x4000);
+		long k = label_at(l, n, off);
+		fprintf(f, "%llu %02x:%04x %s+%zx\n", (unsigned long long)c, bank, addr, k >= 0 ? l[k].name : "?",
+			k >= 0 ? off - l[k].off : 0);
+	}
 	fclose(f);
 	printf("trace: asm profile written to %s (%llu instructions interpreted)\n", path, (unsigned long long)total);
 	free(l);

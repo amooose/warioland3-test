@@ -3437,3 +3437,70 @@ PORT(_InitEpilogue)
 	SET_HL(gb, wSubState);
 	wr8(gb, wSubState, alu_inc(gb, rd8(gb, wSubState)));
 }
+
+// Unreferenced: sets up the epilogue's crowd scene. The difftest can't check
+// it: decompressing the uncompressed crowd attrmap runs Decompress over raw
+// data, which writes on through WRAM into the stack, and the asm returns
+// into garbage. The rest uses the same helpers as _InitEpilogue.
+PORT_JUMP(Func_af01f)
+{
+	epi_clear_screen(gb);
+	play_music2(gb, MUSIC_EPILOGUE);
+
+	gb->cpu.a = 0x02;
+	wr8(gb, rWBK, 0x02);
+	gb->cpu.a = SCREEN_WIDTH_PX;
+	wr8(gb, rSCX, gb->cpu.a);
+	wr8(gb, wSCX, gb->cpu.a);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, rSCY, 0);
+	wr8(gb, wSCY, 0);
+
+	SET_HL(gb, ADDR_Pals_86add);
+	SET_DE(gb, wTempPals1);
+	gb->cpu.c = 8 * PAL_SIZE;
+	gb->cpu.b = BANK_Pals_86add;
+	CALL(CopyFarBytes);
+	SET_HL(gb, ADDR_Pals_86b1d);
+	SET_DE(gb, wTempPals2);
+	gb->cpu.c = 8 * PAL_SIZE;
+	gb->cpu.b = BANK_Pals_86b1d;
+	CALL(CopyFarBytes);
+
+	epi_decompress_vram1(gb, BANK_FontGfx, ADDR_FontGfx, v1Tiles0);
+
+	// attempting to decompress uncompressed data
+	epi_decompress_vram1(gb, BANK_EpilogueCrowdAttrmap, ADDR_EpilogueCrowdAttrmap, v1BGMap0);
+	epi_decompress(gb, BANK_EpilogueCrowdTilemap, ADDR_EpilogueCrowdTilemap, v0BGMap0);
+
+	gb->cpu.a = 0x60;
+	wr8(gb, wOWUIObj1YCoord, gb->cpu.a);
+	SET_HL(gb, wOWUIObj1YCoord + 1);
+	wr8(gb, wOWUIObj1YCoord + 1, 0x5c);
+	gb->cpu.a = 0xff;
+	wr8(gb, wOWUIObj2YCoord, gb->cpu.a);
+
+	set_wario_state(gb, 0x0c);
+	static const struct { uint16_t obj, state_addr; uint8_t y, x, state; } objs[] = {
+		{wSceneObj10, wSceneObj10State, 0x30, 0x00, 0x1b},
+		{wSceneObj11, wSceneObj11State, 0x35, 0x20, 0x1c},
+		{wSceneObj12, wSceneObj12State, 0x32, 0x70, 0x1b},
+		{wSceneObj13, wSceneObj13State, 0x38, 0xc0, 0x1c},
+	};
+	for (int i = 0; i < 4; i++) {
+		gb->cpu.a = objs[i].y;
+		wr8(gb, objs[i].obj, gb->cpu.a);
+		wr8(gb, objs[i].obj + 1, objs[i].x);
+		set_obj_state(gb, objs[i].state_addr, objs[i].state);
+	}
+
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	wr8(gb, wPalConfig1TotalSteps, 0);
+	wr8(gb, wPalConfig2TotalSteps, 0);
+	wr8(gb, w2d890, 0);
+	wr8(gb, w2d891, 0);
+	epi_apply_lcdc(gb);
+	JUMP_TO(ADDR_Func_af135);
+}

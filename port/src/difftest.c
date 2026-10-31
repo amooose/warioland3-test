@@ -311,6 +311,7 @@ static CheckResult check_once(const GB *base, Hook *h, Report *r, const char **w
 	nat->test.budget = native_budget;
 	nat->test.out_of_budget = native_out_of_budget;
 	volatile bool native_stuck = false; // set across the longjmp
+	volatile unsigned clobbers = h->clobbers;
 	hooks_set_enabled(true);
 	if (setjmp(native_escape)) {
 		native_stuck = true;
@@ -318,6 +319,18 @@ static CheckResult check_once(const GB *base, Hook *h, Report *r, const char **w
 		h->fn(nat);
 		if (!(h->flags & HOOK_MANUAL_RET))
 			nat->cpu.pc = gb_pop16(nat);
+		// A fall-through or jump into one of its own ported labels (CoinFunc
+		// into CoinFunc.Update) has no clean end to compare at; carry on
+		// natively, as the game would, until the code leaves the routine.
+		for (int k = 0; k < 256 && (h->flags & HOOK_MANUAL_RET) && jumps_into_itself(nat, h); k++) {
+			Hook *g = hook_find_any(nat, nat->cpu.pc);
+			if (!g)
+				break;
+			clobbers |= g->clobbers;
+			g->fn(nat);
+			if (!(g->flags & HOOK_MANUAL_RET))
+				nat->cpu.pc = gb_pop16(nat);
+		}
 	}
 	hooks_set_enabled(false);
 	native_accesses = native_budget - nat->test.budget;
@@ -379,7 +392,7 @@ static CheckResult check_once(const GB *base, Hook *h, Report *r, const char **w
 		*why = "the native code exits somewhere other than the asm";
 		return CHECK_FAIL;
 	}
-	return compare(ref, nat, h->clobbers, r) ? CHECK_FAIL : CHECK_PASS;
+	return compare(ref, nat, clobbers, r) ? CHECK_FAIL : CHECK_PASS;
 }
 
 static bool *needs_time; // per hook: known to wait on the hardware

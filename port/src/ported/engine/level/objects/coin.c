@@ -114,6 +114,22 @@ static uint16_t store_y(GB *gb)
 	return hl;
 }
 
+// CoinFunc.got_frame: a = the frame. Sets the update function to .Update
+// and runs it.
+static void got_frame(GB *gb)
+{
+	wr8(gb, wCurObjFrame, gb->cpu.a);
+	uint16_t hl = wCurObjUpdateFunction + 1;
+	gb->cpu.a = (uint8_t)(COIN_UPDATE >> 8);
+	wr8(gb, hl--, gb->cpu.a);
+	gb->cpu.a = (uint8_t)COIN_UPDATE;
+	wr8(gb, hl--, gb->cpu.a);
+	SET_HL(gb, hl);
+	hl = lo_hl(gb, OBJ_FLAGS);
+	wr8(gb, hl, (uint8_t)(rd8(gb, hl) | OBJFLAG_NO_COLLISION));
+	JUMP_TO(COIN_UPDATE); // fallthrough
+}
+
 PORT_JUMP(CoinFunc)
 {
 	gb->cpu.a = alu_and(gb, alu_dec(gb, rd8(gb, wGlobalCounter)), 0x3f);
@@ -127,16 +143,15 @@ PORT_JUMP(CoinFunc)
 	} else {
 		gb->cpu.a = 0;
 	}
-	wr8(gb, wCurObjFrame, gb->cpu.a);
-	uint16_t hl = wCurObjUpdateFunction + 1;
-	gb->cpu.a = (uint8_t)(COIN_UPDATE >> 8);
-	wr8(gb, hl--, gb->cpu.a);
-	gb->cpu.a = (uint8_t)COIN_UPDATE;
-	wr8(gb, hl--, gb->cpu.a);
-	SET_HL(gb, hl);
-	hl = lo_hl(gb, OBJ_FLAGS);
-	wr8(gb, hl, (uint8_t)(rd8(gb, hl) | OBJFLAG_NO_COLLISION));
-	JUMP_TO(COIN_UPDATE); // fallthrough
+	got_frame(gb);
+}
+
+// Colour coins' objects start here
+PORT_LOCAL_JUMP(CoinFunc, ColourCoin)
+{
+	play_sfx(gb, SFX_08E);
+	gb->cpu.a = 8;
+	got_frame(gb);
 }
 
 // Animates the coin, slower and slower, then runs its state.
