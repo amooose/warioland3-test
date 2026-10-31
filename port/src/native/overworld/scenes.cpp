@@ -133,12 +133,11 @@ void Scenes::init()
 
 	for (;;) {
 		wram_.unk_2d078() = 0;
-		gb_->cpu.a = wram_.temp_event();
-		routines_.call(ADDR_CheckIfEventIsUnlocked);
-		uint8_t unlocked = gb_->cpu.a;
-		wram_.unk_2d065() = unlocked;
-		// its c, TRUE unless the last treasure unlocked it: seen before
-		if (unlocked && static_cast<uint8_t>(gb_->cpu.c - 1))
+		Events::Unlocked unlocked = Events(gb_).event_unlocked(wram_.temp_event());
+		wram_.unk_2d065() = unlocked.all;
+		// the asm's c, TRUE unless the last treasure is one of them: seen
+		// before
+		if (unlocked.all && !unlocked.not_last)
 			wram_.unk_2d065() = SEEN;
 		prepare_scene();
 		uint8_t next = static_cast<uint8_t>(wram_.temp_event() + 1);

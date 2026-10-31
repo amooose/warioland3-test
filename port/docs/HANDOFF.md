@@ -517,6 +517,22 @@ Modules so far:
   entries `UpdateMapSideOWAnimations` and `Func_b542e`: the objects'
   idle animations between scenes, Func_b7984 and the like). bank2d.c
   keeps only the unreferenced Func_b4895.
+- **overworld, part 7**: bank21 and the rest of bank20. `Palettes`
+  (palettes.cpp): the day and night transitions (DayNightTransition,
+  Func_84b97, Func_84c0d, OWGreyTransition: each colour stepped in a
+  ColourFadeStruct), FadePalConfig and the fades built on it (the level
+  name's, _PrologueFade, Func_84e43 ...), and the tile blocks (Func_854ee,
+  the frozen sea's columns). FadePalConfig reads and writes in the asm's
+  order (a source in wTargetRGB's page sees its own writes) and leaves
+  b to e and hl as the asm: _PrologueFade and Func_84e43 are farcalled by
+  bank2b's C, and the farcall passes bc, de and hl back. bank21.c keeps
+  the RAM V-Blank function and ApplyPalConfig*. `Events` (events.cpp): the
+  event and treasure checks (CheckIfEventIsUnlocked and the like, the next
+  treasure, the missing-treasure marks, the top bar's selectable
+  buttons), called directly by the C++ that used them by address. The
+  path helpers (Func_810fc, Func_821a1, Func_82208, Func_82111) and
+  SetOWWarioOAM are MapWalk's; bank20.c keeps GetMapLevelCoords (C calls
+  it) and unreferenced routines.
 - **pause** (src/native/pause): the pause menu (`PauseMenu`: the options,
   keys and treasures, its state table) and the save screens (`SaveScreen`:
   the progress bar, saving the game or the level in progress to SRAM with

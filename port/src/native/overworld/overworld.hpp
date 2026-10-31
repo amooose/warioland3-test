@@ -29,6 +29,8 @@ private:
 	uint8_t call_a(uint16_t addr, uint8_t a);
 	bool call_z(uint16_t addr, uint8_t a);
 	bool treasure_collected(uint8_t treasure) { return call_a(ADDR_IsTreasureCollected, treasure); }
+	void set_compass(); // SetCompassSprite
+	void load_compass(); // LoadCompassSprite
 	void stop_music() { stop_music2(mem_); }
 
 	void run_state(); // OverworldStateTable
@@ -199,6 +201,11 @@ public:
 	void update(); // Func_80e89
 	void place_on_level(); // Func_8212c
 	void update_wario(); // Func_82041
+	void set_wario_oam(uint8_t oam); // SetOWWarioOAM
+	uint8_t next_path_leg(); // Func_810fc
+	void path_distances(); // Func_821a1
+	void path_step(); // Func_82208
+	uint16_t level_paths(); // Func_82111
 
 private:
 	void unrealistic();
@@ -228,10 +235,8 @@ private:
 	uint16_t map_level_coords(uint8_t level); // GetMapLevelCoords
 	void get_allowed_dpad_input(); // GetOWAllowedDPadInput
 	void set_next_level(); // Func_820e6
-	uint8_t next_path_leg(); // Func_810fc
 	void face_path(); // Func_81142
 	void update_objects(); // Func_81055
-	void set_wario_oam(uint8_t oam); // SetOWWarioOAM
 	void draw_wario(); // Func_8208d
 
 	GB *gb_;
@@ -606,6 +611,73 @@ private:
 	void leaf(uint16_t phase, uint16_t obj); // Func_b542e.Func_b5435 / .Func_b54ba
 	bool east_busy(); // Func_b7be9
 	void moon(); // Func_b7cb3
+
+	GB *gb_;
+	Memory mem_;
+	Wram wram_;
+	Routines routines_;
+};
+
+// The map's events and their treasures (bank20.asm): which treasures
+// unlock which event (EventTreasures), the next treasure to look for and
+// the marks on levels with treasures left.
+class Events {
+public:
+	explicit Events(GB *gb) : gb_(gb), mem_(gb), wram_(gb), routines_(gb) {}
+
+	struct Unlocked {
+		bool all; // the event's treasures are all collected
+		bool not_last; // none of them was the last one collected (c TRUE)
+	};
+	struct SideLevel {
+		uint8_t side, level;
+	};
+	Unlocked event_unlocked(uint8_t event); // CheckIfEventIsUnlocked
+	uint8_t unlocked_before(uint8_t event); // Func_819c6
+	bool treasure_unlocks_event(); // CheckIfTreasureUnlocksEvent
+	void next_treasure_to_collect(); // GetNextTreasureToCollect
+	SideLevel map_level_id(uint8_t level); // GetMapLevelID
+	SideLevel next_treasure_side_level(); // GetMapSideAndLevelForNextTreasure
+	void show_missing_treasure_indicators(); // ShowMissingTreasureIndicators
+	void set_top_bar_buttons(); // SetDayNightSpellSelectable to UpdateNextPrevMapButtonsSelectable
+	uint8_t accessible_map_flags(); // GetAccessibleMapFlags
+	void load_level_name_if_valid(); // LoadLevelNameIfValid
+
+private:
+	struct Found {
+		uint8_t event;
+		uint16_t next; // where the search stopped
+		bool found;
+	};
+	void unrealistic();
+	bool collected(uint8_t treasure); // IsTreasureCollected
+	Found event_with_treasure(uint8_t treasure); // GetEventWithTreasure
+	void load_event_treasures(uint8_t event); // LoadEventTreasures
+
+	GB *gb_;
+	Memory mem_;
+	Wram wram_;
+	Routines routines_;
+};
+
+// The golf building, outside (bank2b.asm): Wario walks in from the side
+// he came from, to the door, and goes in or off to a side.
+class GolfBuilding {
+public:
+	explicit GolfBuilding(GB *gb) : gb_(gb), mem_(gb), wram_(gb), routines_(gb) {}
+
+	void init(); // _GolfBuilding
+	void update(); // Func_adbfe
+
+private:
+	void unrealistic();
+	void wario_state(uint8_t state); // SetSceneWarioState
+	uint8_t walk(bool right); // ApplySceneWarioMovementLeft / Right
+	void decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vram1);
+	void place_wario(); // _GolfBuilding.Func_ada43
+	void fill_bg_pals(); // _GolfBuilding.FillBGPalettes
+	void leave(); // Func_adbfe.exit
+	void step(); // Func_adbfe.Func_adc2f
 
 	GB *gb_;
 	Memory mem_;

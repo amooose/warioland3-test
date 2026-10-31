@@ -118,9 +118,9 @@ void PathPreview::start_arrows()
 		mem_[SLOTS + i] = 0;
 	for (uint16_t i = 0; i < 0x40; i++)
 		mem_[wOWUIObj1 + i] = 0;
-	routines_.call(ADDR_Func_82111);
-	mem_[LEVEL_PATHS + 0] = gb_->cpu.l;
-	mem_[LEVEL_PATHS + 1] = gb_->cpu.h;
+	uint16_t paths = MapWalk(gb_).level_paths();
+	mem_[LEVEL_PATHS + 0] = static_cast<uint8_t>(paths);
+	mem_[LEVEL_PATHS + 1] = static_cast<uint8_t>(paths >> 8);
 	next_step();
 }
 
@@ -236,11 +236,11 @@ void PathPreview::step_arrow()
 	}
 	case START_PATH: // .Func_816b3
 		next_path_leg();
-		routines_.call(ADDR_Func_821a1);
+		MapWalk(gb_).path_distances();
 		++step;
 		return;
 	case MOVE: // .Func_816be: along the path, as Wario walks
-		routines_.call(ADDR_Func_82208);
+		MapWalk(gb_).path_step();
 		mem_[ARROW_Y] = wram_.owy_coord1();
 		mem_[ARROW_X] = wram_.owx_coord1();
 		if (wram_.unk_2d0a1())
@@ -250,7 +250,7 @@ void PathPreview::step_arrow()
 			++step;
 			return;
 		}
-		routines_.call(ADDR_Func_821a1);
+		MapWalk(gb_).path_distances();
 		face_path(); // .Func_816f6
 		return;
 	case WAIT: { // .Func_816ea: 8 frames at the next level
@@ -272,9 +272,7 @@ void PathPreview::step_arrow()
 // Func_810fc: the path's next leg; its new shape, or $ff at its end
 uint8_t PathPreview::next_path_leg()
 {
-	SET_BC(gb_, wOWPathShape);
-	routines_.call(ADDR_Func_810fc);
-	return gb_->cpu.a;
+	return MapWalk(gb_).next_path_leg();
 }
 
 // .Func_816f6: the arrow pointing along the leg (1 right, 2 left, 3 up,
@@ -334,8 +332,7 @@ void PathPreview::draw_arrows()
 
 void PathPreview::set_wario_oam(uint8_t oam)
 {
-	gb_->cpu.a = oam;
-	routines_.call(ADDR_SetOWWarioOAM);
+	MapWalk(gb_).set_wario_oam(oam);
 }
 
 } // namespace wl3::overworld

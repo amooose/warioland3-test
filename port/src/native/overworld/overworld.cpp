@@ -92,8 +92,8 @@ void Overworld::run_state()
 		ADDR_FadeBGToWhite_Normal, ADDR_InitBestTimeList, ADDR_DarkenBGToPal_Normal, ADDR_BestTimeList,
 		ADDR_FadeBGToWhite_Normal, ADDR_InitTempleScene, ADDR_DarkenBGToPal_Normal, ADDR_UpdateTempleScene,
 		ADDR_Func_80e33,
-		ADDR_FadeBGToWhite_Normal, ADDR_GolfBuilding, ADDR_DarkenBGToPal_Normal, ADDR_Func_80e55,
-		ADDR_FastFadeToWhite, ADDR_InitEpilogue, ADDR_SlowFadeFromWhite, ADDR_Func_80e75, ADDR_Func_80e85,
+		ADDR_FadeBGToWhite_Normal, 0, ADDR_DarkenBGToPal_Normal, 0,
+		ADDR_FastFadeToWhite, 0, ADDR_SlowFadeFromWhite, 0, 0,
 	};
 	uint8_t state = wram_.sub_state();
 	switch (state) {
@@ -105,12 +105,36 @@ void Overworld::run_state()
 	case 11: update_map_side(); return;
 	case 13: TreasureCollection(gb_).init_far(); return;
 	case 15: TreasureCollection(gb_).update_far(); return;
+	// the golf building's and the epilogue's (GolfBuilding, Func_80e55,
+	// InitEpilogue, Func_80e75, Func_80e85)
+	case 32: routines_.farcall(BANK__GolfBuilding, ADDR__GolfBuilding); return;
+	case 34: routines_.farcall(BANK_Func_adbfe, ADDR_Func_adbfe); return;
+	case 36: routines_.farcall(BANK__InitEpilogue, ADDR__InitEpilogue); return;
+	case 38: routines_.farcall(BANK_Func_af13c, ADDR_Func_af13c); return;
+	case 39: routines_.call(ADDR_Func_803e6); return;
 	}
 	if (state >= 40) {
 		unrealistic();
 		return;
 	}
 	routines_.call(STATES[state]);
+}
+
+// SetCompassSprite: the compass, top left, pointing at the side
+void Overworld::set_compass()
+{
+	mem_[wCompassObj] = 0x14; // .coords
+	mem_[wCompassObj + 1] = 0x14;
+	mem_[wCompassObj + 2] = wram_.cur_map_side();
+}
+
+// LoadCompassSprite
+void Overworld::load_compass()
+{
+	SET_HL(gb_, wCompassObj);
+	SET_DE(gb_, ADDR_OAM_aa580);
+	gb_->cpu.b = BANK_OAM_aa580;
+	routines_.call(ADDR_LoadOWSpriteWithScroll);
 }
 
 // The level for wOWLevel: its variant (by the treasures that change it)
@@ -166,10 +190,9 @@ void Overworld::init()
 			routines_.call(ADDR_Func_803e6);
 			return;
 		}
-		gb_->cpu.b = ow_level;
-		routines_.call(ADDR_GetMapLevelID);
-		wram_.next_map_side() = gb_->cpu.b;
-		wram_.map_side_level_id() = gb_->cpu.d;
+		Events::SideLevel at = Events(gb_).map_level_id(ow_level);
+		wram_.next_map_side() = at.side;
+		wram_.map_side_level_id() = at.level;
 	}
 	clear_ow_wram();
 
@@ -192,7 +215,7 @@ void Overworld::init()
 		wram_.cur_event() = EVENT_PROLOGUE;
 		break;
 	default: // a treasure: does it unlock an event?
-		if (call_z(ADDR_CheckIfTreasureUnlocksEvent, static_cast<uint8_t>(transition + 1))) {
+		if (!Events(gb_).treasure_unlocks_event()) {
 			load_map_without_scene();
 			return;
 		}
@@ -243,14 +266,14 @@ void Overworld::update_scene()
 	scenes.draw_unlock_marker();
 	scenes.draw_highlight_marker();
 	routines_.farcall(BANK_Func_b4a37, ADDR_Func_b4a37);
-	routines_.call(ADDR_LoadCompassSprite);
+	load_compass();
 	routines_.clear_unused_virtual_oam();
 }
 
 void Overworld::update_map_side()
 {
 	MapWalk(gb_).update();
-	routines_.call(ADDR_LoadCompassSprite);
+	load_compass();
 	routines_.clear_unused_virtual_oam();
 }
 
@@ -264,7 +287,7 @@ void Overworld::init_map_side()
 	routines_.clear_virtual_oam();
 	routines_.call(ADDR_VBlank_Overworld);
 	clear_ow_wram();
-	routines_.call(ADDR_GetNextTreasureToCollect);
+	Events(gb_).next_treasure_to_collect();
 
 	// day or night (bit 0 of wDayNight)
 	uint8_t day_night = wram_.day_night();
@@ -321,7 +344,7 @@ void Overworld::init_map_side_gfx(uint16_t side)
 // The east, dark until the sun medallion is found.
 void Overworld::init_east_map_side()
 {
-	uint8_t medallion = call_a(ADDR_Func_819c6, EVENT_SUMMON_SUN);
+	uint8_t medallion = Events(gb_).unlocked_before(EVENT_SUMMON_SUN);
 	wram_.got_sun_medallion() = medallion;
 	if (!medallion) {
 		wram_.unk_2d011() = 0x01;
@@ -350,7 +373,7 @@ void Overworld::finish_map_side()
 	wram_.scx() = 0;
 	wram_.virtual_oam_byte_size() = 0;
 	Scenes(gb_).init();
-	routines_.call(ADDR_ShowMissingTreasureIndicators);
+	Events(gb_).show_missing_treasure_indicators();
 	routines_.call(ADDR_Func_80bd9);
 	write_bg_map_from_wram();
 	MapWalk(gb_).place_on_level();
@@ -358,7 +381,7 @@ void Overworld::finish_map_side()
 	wram_.level2() = level;
 	wram_.unk_2d068() = level;
 	wram_.level_arrow_directions1() = 0;
-	call_a(ADDR_SetOWWarioOAM, OWWARIO_DOWN);
+	MapWalk(gb_).set_wario_oam(OWWARIO_DOWN);
 	routines_.farcall(BANK_Func_b4a3d, ADDR_Func_b4a3d);
 	MapWalk(gb_).update_wario();
 	routines_.farcall(BANK_Func_b4aa9, ADDR_Func_b4aa9);
@@ -380,19 +403,16 @@ void Overworld::finish_map_side()
 	wram_.bottom_bar_action() = BOTBAR_CLOSED;
 	wram_.has_magnifying_glass() = treasure_collected(MAGNIFYING_GLASS);
 	wram_.top_bar_selectable_buttons() = 1 << TOPBAR_COLLECTION_F; // always selectable
-	routines_.call(ADDR_SetDayNightSpellSelectable);
-	routines_.call(ADDR_SetCutsceneButtonSelectable);
-	routines_.call(ADDR_SetNextPrevMapButtonsSelectable);
-	routines_.call(ADDR_UpdateNextPrevMapButtonsSelectable);
+	Events(gb_).set_top_bar_buttons();
 	show_top_bar();
 
-	routines_.call(ADDR_LoadLevelNameIfValid);
+	Events(gb_).load_level_name_if_valid();
 	bool at_exit = wram_.map_side_level_id() >= OW_EXITS;
 	if (at_exit)
 		clear_pal7_colours();
 	wram_.unk_2d0e0() = at_exit ? 0 : 1;
 	routines_.farcall(BANK_DrawCoinCount, ADDR_DrawCoinCount);
-	routines_.call(ADDR_SetCompassSprite);
+	set_compass();
 	if (!wram_.ow_bars_state())
 		routines_.call(ADDR_DrawBottomBar);
 	wram_.level_arrow_directions1() = 0;
@@ -456,7 +476,7 @@ void Overworld::init_scene()
 		init_scene_map_side(2, ADDR_Func_80af5);
 		break;
 	case EAST: {
-		uint8_t medallion = call_a(ADDR_Func_819c6, EVENT_SUMMON_SUN);
+		uint8_t medallion = Events(gb_).unlocked_before(EVENT_SUMMON_SUN);
 		wram_.got_sun_medallion() = medallion;
 		if (!medallion)
 			wram_.unk_2d011() = 0x01;
@@ -518,7 +538,7 @@ void Overworld::finish_scene_map_side()
 	copy_level_name_gfx(v1Tiles2 + TILE_SIZE * 0x60);
 	set_vram1(false);
 	wram_.unk_2d0e0() = 0;
-	routines_.call(ADDR_SetCompassSprite);
+	set_compass();
 	wram_.level_arrow_directions1() = 0;
 	wram_.ow_pal_transition_state() = 0;
 	wram_.unk_2d013() = 0;
@@ -643,7 +663,7 @@ void Overworld::load_south_maps()
 {
 	load_bg_maps(BANK_OverworldSouthTilemap, ADDR_OverworldSouthTilemap,
 		BANK_OverworldSouthAttrmap, ADDR_OverworldSouthAttrmap);
-	if (call_z(ADDR_Func_819c6, EVENT_REVEAL_CASTLE))
+	if (!Events(gb_).unlocked_before(EVENT_REVEAL_CASTLE))
 		return;
 	SET_HL(gb_, ADDR_Data_8561f);
 	routines_.farcall(BANK_Func_854ee, ADDR_Func_854ee);
@@ -750,5 +770,13 @@ PORT_COVERED(Func_80b54);
 PORT_COVERED(LoadCloudAndSeaGfx);
 PORT_COVERED(SetStoredTransitionParamAsReturnToMap);
 PORT_COVERED(UpdateStoredTransitionParam);
+PORT_COVERED(SetCompassSprite);
+PORT_COVERED(LoadCompassSprite);
+PORT_COVERED(SetOWWarioOAM);
+PORT_COVERED(GolfBuilding);
+PORT_COVERED(Func_80e55);
+PORT_COVERED(InitEpilogue);
+PORT_COVERED(Func_80e75);
+PORT_COVERED(Func_80e85);
 PORT_COVERED(_LoadMapSidePals);
 PORT_COVERED(_LoadPalsForOWScene);

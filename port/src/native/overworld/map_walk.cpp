@@ -150,7 +150,7 @@ void MapWalk::show_level_name()
 	update_objects();
 	if (wram_.unk_2d0e0())
 		return;
-	routines_.call(ADDR_LoadLevelNameIfValid);
+	Events(gb_).load_level_name_if_valid();
 	next_state();
 }
 
@@ -220,7 +220,7 @@ void MapWalk::start_walk()
 	wram_.unk_2d06f() = static_cast<uint8_t>(mem_[static_cast<uint16_t>(coords + 2)] + y);
 	wram_.unk_2d070() = static_cast<uint8_t>(mem_[static_cast<uint16_t>(coords + 3)] + x);
 	next_path_leg();
-	routines_.call(ADDR_Func_821a1);
+	path_distances();
 	update_objects();
 	wram_.unk_2d014() = 0;
 	next_state();
@@ -230,7 +230,7 @@ void MapWalk::start_walk()
 // 6 frames sets w2d10e's bit 7)
 void MapWalk::walk()
 {
-	routines_.call(ADDR_Func_82208);
+	path_step();
 	Byte run = wram_.unk_2d10e();
 	if (!run.bit(7) && (wram_.joypad_down() & PAD_CTRL_PAD)) {
 		++run;
@@ -238,7 +238,7 @@ void MapWalk::walk()
 			run.set_bit(7);
 	}
 	if (run.bit(7))
-		routines_.call(ADDR_Func_82208);
+		path_step();
 
 	wram_.unk_2d100() = wram_.owy_coord1();
 	wram_.unk_2d101() = wram_.owx_coord1();
@@ -247,7 +247,7 @@ void MapWalk::walk()
 		return;
 	}
 	if (next_path_leg() != 0xff) {
-		routines_.call(ADDR_Func_821a1);
+		path_distances();
 		face_path(); // Func_81142
 		update_objects();
 		return;
@@ -335,10 +335,13 @@ void MapWalk::temple_step()
 		if (wram_.unk_2d0e0())
 			return;
 		break;
-	case 3: // Func_813b4: b and d from one to the other
-		routines_.call(ADDR_GetMapSideAndLevelForNextTreasure);
+	case 3: { // Func_813b4: the next treasure's level name
+		Events::SideLevel at = Events(gb_).next_treasure_side_level();
+		gb_->cpu.b = at.side;
+		gb_->cpu.d = at.level;
 		routines_.call(ADDR_LoadLevelName);
 		break;
+	}
 	case 4: // Func_813ef
 	case 6:
 		wram_.pal_config1_total_steps() = 0;
@@ -514,8 +517,7 @@ void MapWalk::get_allowed_dpad_input()
 // direction, from the level's paths (Func_82111)
 void MapWalk::set_next_level()
 {
-	routines_.call(ADDR_Func_82111);
-	uint16_t paths = REG_HL(gb_);
+	uint16_t paths = level_paths();
 	uint8_t arrows = wram_.level_arrow_directions1();
 	int i = 3; // down (or none: debug_nop is never reached)
 	if (arrows & PAD_RIGHT)
@@ -534,9 +536,108 @@ void MapWalk::set_next_level()
 // end
 uint8_t MapWalk::next_path_leg()
 {
-	SET_BC(gb_, wOWPathShape);
-	routines_.call(ADDR_Func_810fc);
-	return gb_->cpu.a;
+	Byte shape = mem_[wOWPathShape];
+	switch (shape) {
+	case PATH_NONE: // the end (marked in the byte after)
+		mem_[static_cast<uint16_t>((wOWPathShape & 0xff00) | static_cast<uint8_t>(wOWPathShape + 1))] = 0xff;
+		return 0xff;
+	case PATH_BEELINE: // to (w2d06f, w2d070)
+		wram_.owy_coord2() = wram_.unk_2d06f();
+		wram_.owx_coord2() = wram_.unk_2d070();
+		shape = 0;
+		return 0;
+	case PATH_Y_THEN_X:
+		wram_.owy_coord2() = wram_.unk_2d06f();
+		shape = 1;
+		return 1;
+	case PATH_X_THEN_Y:
+		wram_.owx_coord2() = wram_.unk_2d070();
+		shape = 1;
+		return 1;
+	case PATH_S_SHAPE: { // halfway across first
+		uint8_t x = wram_.owx_coord1();
+		int8_t half = static_cast<int8_t>(static_cast<uint8_t>(wram_.unk_2d070() - x)) >> 1;
+		wram_.owx_coord2() = static_cast<uint8_t>(x + half);
+		shape = 2;
+		return 2;
+	}
+	default:
+		unrealistic();
+		return 0;
+	}
+}
+
+// Func_821a1: the leg's distances (wOWYDistance, wOWXDistance) from
+// wOWCoords1 to wOWCoords2, and the line's step: w2d0a0's bit 0 when x's
+// is the longer, bits 1 and 2 going up or left; w2d0a1 the steps left,
+// w2d0a3 the shorter axis' accumulator, w2d0a5/6 the y and x steps
+void MapWalk::path_distances()
+{
+	Byte flags = mem_[w2d0a0];
+	flags = 0;
+	auto distance = [&](uint8_t from, uint8_t to, uint8_t backwards) { // .CalculateDistance
+		if (to >= from)
+			return static_cast<uint8_t>(to - from);
+		flags = flags | backwards;
+		return static_cast<uint8_t>(from - to);
+	};
+	uint8_t dy = distance(wram_.owy_coord1(), wram_.owy_coord2(), 1 << 1);
+	wram_.owy_distance() = dy;
+	uint8_t dx = distance(wram_.owx_coord1(), wram_.owx_coord2(), 1 << 2);
+	wram_.owx_distance() = dx;
+	uint8_t longer = dy, shorter = dx;
+	uint8_t bits = flags;
+	if (dy < dx) {
+		longer = dx;
+		shorter = dy;
+		bits |= 1;
+	}
+	mem_[w2d0a1] = longer;
+	mem_[w2d0a2] = longer;
+	mem_[w2d0a3] = shorter;
+	mem_[w2d0a4] = shorter;
+	flags = bits;
+	mem_[w2d0a5] = (bits & (1 << 1)) ? 0xff : 0x01;
+	mem_[w2d0a6] = (bits & (1 << 2)) ? 0xff : 0x01;
+}
+
+// Func_82208: a step along the leg: the longer axis each time, the
+// shorter when its accumulator passes the longer distance
+void MapWalk::path_step()
+{
+	Byte left = mem_[w2d0a1];
+	if (!left)
+		return;
+	--left;
+	auto step = [this](bool x) { // .asm_82234
+		uint16_t coord = x ? wOWXCoord1 : wOWYCoord1;
+		mem_[coord] = static_cast<uint8_t>(mem_[coord] + mem_[x ? w2d0a6 : w2d0a5]);
+	};
+	uint8_t longer = mem_[w2d0a2];
+	Byte accumulated = mem_[w2d0a3];
+	accumulated = static_cast<uint8_t>(mem_[w2d0a4] + accumulated);
+	bool x_longer = mem_[w2d0a0] & 1;
+	if (accumulated >= longer) { // .Func_82224
+		accumulated = static_cast<uint8_t>(accumulated - longer);
+		step(!x_longer);
+	}
+	step(x_longer); // .Func_8222f
+}
+
+// Func_82111: the level's paths (OWLevelPaths, or OWExitPaths at the
+// exits), by side
+uint16_t MapWalk::level_paths()
+{
+	uint8_t level = wram_.map_side_level_id();
+	uint16_t table = ADDR_OWLevelPaths;
+	if (level >= OW_EXITS) {
+		level = static_cast<uint8_t>(level - OW_EXIT_RIGHT);
+		table = ADDR_OWExitPaths;
+	}
+	uint8_t index = static_cast<uint8_t>(level * 4);
+	// GetCthWordFromAthTable
+	uint16_t side = mem_.word(static_cast<uint16_t>(table + wram_.next_map_side() * 2));
+	return static_cast<uint16_t>(side + index * 2);
 }
 
 // Func_81142: Wario facing along the path's leg
@@ -590,10 +691,22 @@ void MapWalk::update_wario()
 	draw_wario();
 }
 
+// SetOWWarioOAM: Wario's frameset by direction (OWWARIO_*, 0 for none),
+// with the walking or the other sprites
 void MapWalk::set_wario_oam(uint8_t oam)
 {
-	gb_->cpu.a = oam;
-	routines_.call(ADDR_SetOWWarioOAM);
+	static constexpr uint16_t FRAMESETS = ADDR_SetOWWarioOAM + 0x2d; // .framesets
+	mem_[w2d106] = oam;
+	if (!oam)
+		return;
+	uint16_t sprites = oam < 0x05 ? ADDR_OAM_aa329 : ADDR_OAM_aa0cf;
+	uint16_t frameset = mem_.word(static_cast<uint16_t>(FRAMESETS + static_cast<uint8_t>((oam - 1) * 2)));
+	mem_[w2d109] = static_cast<uint8_t>(frameset);
+	mem_[w2d109 + 1] = static_cast<uint8_t>(frameset >> 8);
+	mem_[w2d107] = static_cast<uint8_t>(sprites);
+	mem_[w2d107 + 1] = static_cast<uint8_t>(sprites >> 8);
+	mem_[w2d104] = 0;
+	mem_[w2d104 + 1] = 0;
 }
 
 // Func_8208d: Wario's animation and sprite
@@ -654,3 +767,9 @@ PORT_COVERED(Func_813ef);
 PORT_COVERED(Func_813f6);
 PORT_COVERED(Func_81413);
 PORT_COVERED(Func_8142d);
+
+// Only the map's C++ runs these.
+PORT_COVERED(Func_810fc);
+PORT_COVERED(Func_821a1);
+PORT_COVERED(Func_82208);
+PORT_COVERED(Func_82111);
