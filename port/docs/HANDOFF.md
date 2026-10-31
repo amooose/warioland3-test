@@ -554,8 +554,12 @@ Modules so far:
   `SetSceneWarioState`: the 61 states' animations as a table, each group's
   sprites and tiles). SetSceneWarioState leaves every register as the asm
   (C still calls it); UpdateSceneWario with no state leaves de, hl, a and f
-  as JumpTable to .None does (InitTempleScene's C passes them on). The
-  temple and prologue scene objects and the text printing stay C.
+  as JumpTable to .None does (InitTempleScene's C passes them on).
+  `SceneSprites` (scene_sprites.cpp: the epilogue's, temple's and
+  prologue's object machines, Func_ac0b6, UpdateTempleSceneObjAnimation,
+  Func_ac409, as tables; they find the object by UpdateOWAnimation's hl and
+  its counter by inc c, as the asm, and call a state address outside the
+  scene objects unrealistic). The text printing stays C.
 - Testing gotcha: TaskStop on a background test job kills only its outer
   shell; the MSYS bash, ctest, fuzz_batch's sh and their wl3 runs go on and
   hold build/wl3.exe (the next link fails with "Permission denied", and a

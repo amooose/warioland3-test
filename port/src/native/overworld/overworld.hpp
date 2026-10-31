@@ -847,6 +847,33 @@ private:
 	Routines routines_;
 };
 
+// The bank2b scenes' objects (the epilogue's, the temple's, the
+// prologue's): three state machines over tables of animations.
+class SceneSprites {
+public:
+	explicit SceneSprites(GB *gb) : gb_(gb), mem_(gb), routines_(gb) {}
+
+	void func_ac074(); // Func_ac074
+	void func_ac080(); // Func_ac080
+	void func_ac2b2(); // Func_ac2b2
+	void temple_objs(); // UpdateTempleSceneObjs
+	void prologue_objs(); // UpdatePrologueSceneObjects
+	void func_ac3fd(); // Func_ac3fd
+	void epilogue_obj(uint16_t state); // Func_ac0b6
+	void temple_obj(uint16_t state); // UpdateTempleSceneObjAnimation
+	void prologue_obj(uint16_t state); // Func_ac409
+
+private:
+	void unrealistic();
+	bool scene_obj(uint16_t state);
+	void run(const void *machine, uint16_t state);
+	void carry(uint16_t obj, uint16_t phase); // Func_ac0b6.Func_ac1c3
+
+	GB *gb_;
+	Memory mem_;
+	Routines routines_;
+};
+
 // The map's palettes and tile updates (bank21.asm): the day and night
 // transitions (each colour stepped in a ColourFadeStruct), the PalConfig
 // fades (FadePalConfig), the level name's, and the scenes' tile blocks.
