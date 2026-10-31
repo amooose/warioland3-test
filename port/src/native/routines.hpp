@@ -166,7 +166,7 @@ private:
 	GB *gb_;
 };
 
-// The play_sfx and play_music2 / stop_music2 macros
+// The play_sfx, stop_sfx and play_music2 / stop_music2 macros
 inline void play_sfx(Memory mem, uint16_t sfx)
 {
 	mem[hSFXID + 0] = static_cast<uint8_t>(sfx >> 8);
@@ -191,6 +191,12 @@ inline void play_music2(Memory mem, uint16_t music)
 	mem[hMusicID + 0] = static_cast<uint8_t>(music >> 8);
 	mem[hMusicIDBackup + 1] = static_cast<uint8_t>(music);
 	mem[hMusicID + 1] = static_cast<uint8_t>(music);
+}
+
+inline void stop_sfx(Memory mem)
+{
+	mem[hSFXID + 0] = 0xff;
+	mem[hSFXID + 1] = 0x00;
 }
 
 inline void stop_music2(Memory mem)
