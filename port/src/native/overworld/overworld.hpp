@@ -78,4 +78,37 @@ private:
 	Routines routines_;
 };
 
+// The treasure collection (bank26.asm), the overworld's states 13 and 15.
+class TreasureCollection {
+public:
+	explicit TreasureCollection(GB *gb);
+
+	void init_far(); // InitTreasureCollection
+	void update_far(); // TreasureCollection
+
+private:
+	void init(); // _InitTreasureCollection
+	void update(); // _TreasureCollection
+	void unrealistic();
+	void clear(uint16_t addr, uint16_t size);
+	void decompress(uint8_t bank, uint16_t src, uint16_t dest);
+	void set_scene_obj_state(uint16_t state, uint8_t value); // SetSceneObjState
+	bool routines_treasure_collected(uint8_t treasure);
+	void load_page_gfx(); // LoadCollectionPageTreasureGfx
+	void apply_page_pals(); // ApplyPageTreasuresPals
+	void set_row_and_column(uint16_t dest, uint8_t cell); // GetCollectionCellRowAndColumn
+	void move_cursor(); // GetCollectionCellCoords
+	void handle_input(); // HandleTreasureCollectionInput
+	void change_page();
+	void process_link_state(); // ProcessCollectionLinkState
+	void advance_link_state();
+	void place_link_markers(); // ProcessCollectionLinkState.Func_9a806
+	void animate(); // AnimateTreasureCollection
+
+	GB *gb_;
+	Memory mem_;
+	Wram wram_;
+	Routines routines_;
+};
+
 } // namespace wl3::overworld

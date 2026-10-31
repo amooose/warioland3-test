@@ -434,6 +434,11 @@ Modules so far:
   address; so are Func_803e6 and Func_80bd9 (init.c), which that C calls.
   HandleOverworld dispatches through a jump table, so the fuzzer is always
   inconclusive on it: the traces check it.
+- **overworld, part 2**: the treasure collection (`TreasureCollection`,
+  bank26.asm's screen): pages, the cursor, links between treasures. Checked
+  by `tests/inputs/collection.input` (n1_full_clear, then the top bar and
+  the collection: moving, turning pages, closing). bank26.c keeps the
+  treasure data routines the map and levels call.
 - **pause** (src/native/pause): the pause menu (`PauseMenu`: the options,
   keys and treasures, its state table) and the save screens (`SaveScreen`:
   the progress bar, saving the game or the level in progress to SRAM with

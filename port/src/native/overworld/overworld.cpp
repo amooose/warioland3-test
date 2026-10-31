@@ -103,6 +103,8 @@ void Overworld::run_state()
 	case 7: update_scene(); return;
 	case SST_OVERWORLD_09: init_map_side(); return;
 	case 11: update_map_side(); return;
+	case 13: TreasureCollection(gb_).init_far(); return;
+	case 15: TreasureCollection(gb_).update_far(); return;
 	}
 	if (state >= 40) {
 		unrealistic();
