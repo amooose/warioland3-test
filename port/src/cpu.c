@@ -672,8 +672,11 @@ void gb_call_ret(GB *gb, uint16_t addr, uint16_t ret)
 	// Under test, a push below the stack's bottom is unrealistic (see
 	// test_access). Stop there: native code that recurses (a fuzzed jump
 	// table leading back into its caller) would otherwise nest host stack
-	// frames until the host stack overflows.
-	if (gb->test.active && gb->test.stack_lo && SP < gb->test.stack_lo) {
+	// frames until the host stack overflows. Recursion that keeps SP up
+	// (fuzzed code in wVBlankFunc that re-enables interrupts, so V-Blank
+	// re-enters itself) is caught by depth instead: the game's own nesting
+	// stays around ten.
+	if (gb->test.active && ((gb->test.stack_lo && SP < gb->test.stack_lo) || gb->call_depth >= 256)) {
 		gb->test.unrealistic = true;
 		gb->test.crashed = true;
 	}
