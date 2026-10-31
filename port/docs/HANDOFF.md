@@ -599,6 +599,28 @@ Modules so far:
   `tests/inputs/title_demos.input` (no input, 80000 frames from boot) lets
   the title screen's demo cycle through all 13 demonstrations: its trace is
   what checks them.
+- **level objects** (src/native/level): the enemies and things in levels
+  (src/engine/level/objects), one file each (the simplest share
+  objects/small.cpp), each a class over `Object` (object.hpp: wCurObj's
+  fields, the home object routines called by address). An object's states
+  stay ROM addresses (ADDR_FooFunc + the local label's offset, checked
+  against the .sym) written to wCurObjUpdateFunction, and each state is a
+  hook. Update functions are only called by UpdateObject's hCallFunc, after
+  which UpdateObjectAnimation / UpdateObjectFrame and CheckObjectOnScreen
+  load every register before reading one: every hook clobbers all
+  registers. A few routines take registers in (TreasureFunc's de,
+  PillarPlatformFunc's b) or work through h's page (SmallLeafFunc.Init,
+  UnusedFlowerProjectileCommonFunc, HandFunc.ApplyOffsetToWario: h is
+  wCurObj's page from their real callers; with h in ROM the asm's writes
+  hit the MBC, so the order of the two bytes matters, and set_update
+  writes the high byte first, as the asm). Quirks kept: Nobiiru's sting
+  step stores its new interaction type as the collision box's left (the
+  asm reuses a). The jumptable objects (the rock, Nobiiru, the hand) use
+  tables of handlers; the rock's is checked against the asm's dw list.
+  Locals the C left to the interpreter (the sparks', the tadpole spawner's)
+  are hooked now. Never wrap PORT_EX / PORT_LOCAL_EX in a macro:
+  tools/gen.c finds hooks by their text, and a macro's hooks compile but
+  are never registered (fuzz_batch reports them NOT FOUND).
 
 `src/native/routines.hpp` wraps the register-level C routines a module calls
 (DisableLCD, FarDecompress, the golf sprite helpers...): each sets the
