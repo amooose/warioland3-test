@@ -23,7 +23,9 @@ PORT_JUMP(ReturnToMapFromLevel)
 	JUMP(ReturnToMap); // fallthrough
 }
 
-PORT(ReturnToPauseMenuFromActionHelp)
+// Its caller (Action Help's state table, src/native/action_help) uses no
+// register after it.
+PORT_EX(ReturnToPauseMenuFromActionHelp, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
 	// push_wram $03
 	gb->cpu.a = rd8(gb, rWBK);

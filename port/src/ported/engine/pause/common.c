@@ -1,7 +1,9 @@
 // Port of src/engine/pause/common.asm
 #include "ported.h"
 
-PORT(PauseMenuStateTable)
+// MainStateTable calls it and returns to the main loop, which reloads
+// every register (see src/native/pause).
+PORT_EX(PauseMenuStateTable, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
 	// push_wram BANK("GFX RAM")
 	gb->cpu.a = rd8(gb, rWBK);

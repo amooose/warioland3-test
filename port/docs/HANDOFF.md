@@ -425,6 +425,14 @@ Modules so far:
   after the call). No recording reaches Perfect or the GB incompatible
   notice; the fuzzer's synthetic calls check them. The V-Blank functions
   stay C.
+- **pause** (src/native/pause): the pause menu (`PauseMenu`: the options,
+  keys and treasures, its state table) and the save screens (`SaveScreen`:
+  the progress bar, saving the game or the level in progress to SRAM with
+  checksums and backups). Entries: `_PauseMenuStateTable`,
+  `_ReturnToPauseMenuFromActionHelp` and `LoadPauseMenuSprite` (hl = the
+  object), all clobbering every register. Still C: the checksums and save
+  validation (pause/save/*.c), the save screen's loaders (bank7d.c) and
+  DrawLevelObjectsAfterLevelReturn (home code calls it).
 - **clear** (src/native/clear): the level clear screens (`ClearScreen`):
   treasure and music boxes, the time attack result, the musical coins tally
   with the pencil. The bank-$78 loaders run through `in_bank`. Still C: the
