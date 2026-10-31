@@ -615,8 +615,12 @@ Modules so far:
   hit the MBC, so the order of the two bytes matters, and set_update
   writes the high byte first, as the asm; a `dec [hl]` through h's page
   tests the value it computed, not a read back, which ROM and blocked
-  VRAM wouldn't return; after a SetObjectFramesetPtr, hl is wCurObj's
-  again). Quirks kept: Nobiiru's sting
+  VRAM wouldn't return (Object::dec_at); after a SetObjectFramesetPtr, hl
+  is wCurObj's again). The bosses' `asm_` hooks that enter with hl set
+  (Pesce's, Yellow Belly's) take h's page as a parameter; their internal
+  callers pass `wCurObjState & 0xff00`, never the address itself, and a
+  `ld [hld]` pair is a 16-bit step (Jamano's Func_554bc with e = 0 writes
+  into the page before). Quirks kept: Nobiiru's sting
   step stores its new interaction type as the collision box's left (the
   asm reuses a). The jumptable objects (the rock, Nobiiru, the hand) use
   tables of handlers; the rock's is checked against the asm's dw list.

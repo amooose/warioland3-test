@@ -62,6 +62,15 @@ protected:
 	// keeps HEAVY_OBJ
 	void set_interaction(uint8_t type) { interaction() = (interaction() & HEAVY_OBJ) | type; }
 
+	// dec [hl] at any address: the value it computed (a write to the MBC
+	// doesn't read back)
+	uint8_t dec_at(uint16_t addr)
+	{
+		uint8_t v = static_cast<uint8_t>(mem_[addr] - 1);
+		mem_[addr] = v;
+		return v;
+	}
+
 	// no action for a frame (no_actions_for 1)
 	void no_actions() { mem_[wCurObjAction] = (1 << NO_ACTIONS_F) | 1; }
 
