@@ -311,7 +311,7 @@ void Overworld::init_map_side()
 
 void Overworld::init_map_side_gfx(uint16_t side)
 {
-	routines_.farcall(BANK__LoadMapSidePals, ADDR__LoadMapSidePals);
+	routines_.in_bank(BANK__LoadMapSidePals, ADDR__LoadMapSidePals, [&] { load_map_side_pals(false); });
 	decompress(SIDE_GFX[side].gfx_bank, SIDE_GFX[side].gfx, v0Tiles0);
 	load_common_gfx();
 	decompress(BANK_OverworldArrowsGfx, ADDR_OverworldArrowsGfx, v0Tiles1);
@@ -605,7 +605,30 @@ void Overworld::load_pals_for_scene()
 		if (mem_[REG_HL(gb_)] >= OW_EXITS)
 			wram_.ow_exit_unlocked() = TRUE;
 	}
-	routines_.farcall(BANK__LoadPalsForOWScene, ADDR__LoadPalsForOWScene);
+	routines_.in_bank(BANK__LoadPalsForOWScene, ADDR__LoadPalsForOWScene, [&] { load_map_side_pals(true); });
+}
+
+// The map side's palettes (bank21.asm): by day or night, coloured once all
+// the crayons are found (in a scene, the north side not until the scene of
+// the last crayon is over); in a scene, an unlocked exit greyed.
+void Overworld::load_map_side_pals(bool scene)
+{
+	uint8_t side = wram_.cur_map_side();
+	uint16_t bg = static_cast<uint16_t>(ADDR_Pals_84000 + side * 40 * PAL_SIZE); // GetMapSidePalGroup1
+	if ((wram_.crayon_flags() & ALL_CRAYONS) == ALL_CRAYONS) {
+		uint8_t last = wram_.last_transition_param();
+		bool crayon_scene = scene && last >= CRAYON_RED_T && last <= CRAYON_PINK_T;
+		if (side == NORTH && !crayon_scene)
+			bg = ADDR_Pals_84500;
+		else if (side == WEST)
+			bg = ADDR_Pals_84640;
+	}
+	if (wram_.unk_2d011())
+		bg = static_cast<uint16_t>(bg + 24 * PAL_SIZE); // night
+	routines_.load_pals_to_temp_pals1(bg);
+	routines_.load_pals_to_temp_pals2(static_cast<uint16_t>(ADDR_Pals_84900 + side * 8 * PAL_SIZE));
+	if (scene && wram_.ow_exit_unlocked())
+		routines_.call(ADDR_LoadGreyOWPals);
 }
 
 void Overworld::load_west_maps()
@@ -726,3 +749,5 @@ PORT_COVERED(Func_80b54);
 PORT_COVERED(LoadCloudAndSeaGfx);
 PORT_COVERED(SetStoredTransitionParamAsReturnToMap);
 PORT_COVERED(UpdateStoredTransitionParam);
+PORT_COVERED(_LoadMapSidePals);
+PORT_COVERED(_LoadPalsForOWScene);

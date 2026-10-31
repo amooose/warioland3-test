@@ -839,32 +839,6 @@ PORT(ApplyPalFadeColours)
 	SET_DE(gb, de);
 }
 
-PORT(_LoadMapSidePals)
-{
-	gb_call(gb, ADDR_GetMapSidePalGroup1);
-	// .UpdatePalsIfGotAllCrayons
-	gb->cpu.a = alu_and(gb, rd8(gb, wCrayonFlags), ALL_CRAYONS);
-	alu_cp(gb, gb->cpu.a, ALL_CRAYONS);
-	if (gb->cpu.f & FLAG_Z) {
-		gb->cpu.a = alu_and(gb, rd8(gb, wCurMapSide), rd8(gb, wCurMapSide));
-		if (gb->cpu.f & FLAG_Z) {
-			SET_HL(gb, ADDR_Pals_84500);
-		} else {
-			gb->cpu.a = alu_dec(gb, gb->cpu.a);
-			if (gb->cpu.f & FLAG_Z)
-				SET_HL(gb, ADDR_Pals_84640);
-		}
-	}
-	gb->cpu.a = alu_and(gb, rd8(gb, w2d011), rd8(gb, w2d011));
-	if (!(gb->cpu.f & FLAG_Z)) {
-		SET_DE(gb, 24 * PAL_SIZE);
-		SET_HL(gb, alu_add16(gb, REG_HL(gb), 24 * PAL_SIZE));
-	}
-	CALL(LoadPalsToTempPals1);
-	gb_call(gb, ADDR_GetMapSidePalGroup2);
-	CALL(LoadPalsToTempPals2);
-}
-
 PORT(LoadBaseAndTargetOWPals)
 {
 	gb_call(gb, ADDR_GetOWPals);
@@ -893,45 +867,6 @@ PORT(LoadBaseAndTargetOWPals)
 	gb->cpu.a = 0;
 	gb->cpu.f = FLAG_Z; // xor a
 	wr8(gb, w2d809, 0);
-}
-
-PORT(_LoadPalsForOWScene)
-{
-	gb_call(gb, ADDR_GetMapSidePalGroup1);
-	// .GetCrayonPal
-	gb->cpu.a = alu_and(gb, rd8(gb, wCrayonFlags), ALL_CRAYONS);
-	alu_cp(gb, gb->cpu.a, ALL_CRAYONS);
-	if (gb->cpu.f & FLAG_Z) {
-		gb->cpu.a = alu_and(gb, rd8(gb, wCurMapSide), rd8(gb, wCurMapSide));
-		if (gb->cpu.f & FLAG_Z) {
-			// .north
-			gb->cpu.a = rd8(gb, wLastTransitionParam);
-			alu_cp(gb, gb->cpu.a, CRAYON_RED_T);
-			bool crayon = false;
-			if (!(gb->cpu.f & FLAG_C)) {
-				alu_cp(gb, gb->cpu.a, CRAYON_PINK_T + 1);
-				crayon = gb->cpu.f & FLAG_C;
-			}
-			if (!crayon)
-				SET_HL(gb, ADDR_Pals_84500);
-		} else {
-			gb->cpu.a = alu_dec(gb, gb->cpu.a);
-			if (gb->cpu.f & FLAG_Z)
-				SET_HL(gb, ADDR_Pals_84640); // .west
-		}
-	}
-	gb->cpu.a = alu_and(gb, rd8(gb, w2d011), rd8(gb, w2d011));
-	if (!(gb->cpu.f & FLAG_Z)) {
-		SET_DE(gb, 24 * PAL_SIZE);
-		SET_HL(gb, alu_add16(gb, REG_HL(gb), 24 * PAL_SIZE));
-	}
-	CALL(LoadPalsToTempPals1);
-	gb_call(gb, ADDR_GetMapSidePalGroup2);
-	CALL(LoadPalsToTempPals2);
-	gb->cpu.a = alu_and(gb, rd8(gb, wOWExitUnlocked), rd8(gb, wOWExitUnlocked));
-	if (gb->cpu.f & FLAG_Z)
-		return;
-	gb_call(gb, ADDR_LoadGreyOWPals);
 }
 
 // _PrologueFade.CopyPalsToBGAndOBPals

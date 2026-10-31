@@ -64,6 +64,7 @@ private:
 	void set_stored_transition_param_as_return_to_map(); // SetStoredTransitionParamAsReturnToMap
 	void update_stored_transition_param(); // UpdateStoredTransitionParam
 	void load_pals_for_scene(); // LoadPalsForOWScene
+	void load_map_side_pals(bool scene); // _LoadMapSidePals, _LoadPalsForOWScene
 	void load_west_maps(); // Func_80ae7
 	void load_south_maps(); // Func_80af5
 	void load_east_maps(); // Func_80b1b
@@ -106,6 +107,26 @@ private:
 	void animate(); // AnimateTreasureCollection
 
 	GB *gb_;
+	Memory mem_;
+	Wram wram_;
+	Routines routines_;
+};
+
+// The map's common animations (bank76.asm): clouds, sea and cliffs.
+class CommonAnimations {
+public:
+	explicit CommonAnimations(GB *gb) : mem_(gb), wram_(gb), routines_(gb) {}
+
+	void update(); // UpdateCommonOWAnimations
+	void load_gfx(); // _LoadCloudAndSeaGfx
+
+private:
+	bool tick(uint16_t addr);
+	void copy_tiles(uint16_t src, uint16_t dest, uint8_t dest_offset, int bit);
+	void update_big_clouds(uint16_t addr, uint8_t offset);
+	void update_sea(uint16_t addr);
+	void update_small_clouds(uint16_t addr);
+
 	Memory mem_;
 	Wram wram_;
 	Routines routines_;

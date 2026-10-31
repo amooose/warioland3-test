@@ -439,6 +439,14 @@ Modules so far:
   by `tests/inputs/collection.input` (n1_full_clear, then the top bar and
   the collection: moving, turning pages, closing). bank26.c keeps the
   treasure data routines the map and levels call.
+- **overworld, part 3**: the map's common animations (`CommonAnimations`,
+  bank76.asm: clouds, sea, cliffs; entries `UpdateCommonOWAnimations` and
+  `_LoadCloudAndSeaGfx`, only farcalled, so they clobber every register)
+  and the map side palettes (bank21's `_LoadMapSidePals` and
+  `_LoadPalsForOWScene`, now `Overworld::load_map_side_pals`).
+  Lesson: write rotates as rotates (`rlca`, `rra` through the carry a
+  `sla` just set), not shifts. Only the fuzzer's out-of-range inputs show
+  the difference; the traces never do.
 - **pause** (src/native/pause): the pause menu (`PauseMenu`: the options,
   keys and treasures, its state table) and the save screens (`SaveScreen`:
   the progress bar, saving the game or the level in progress to SRAM with
