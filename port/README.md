@@ -11,18 +11,19 @@ The game is a mix of native C and the original code:
 - **Native hardware layer** (`src/ppu.c`, `src/apu.c`, `src/mem.c`, `src/main.c`):
   the Game Boy Color's screen, sound, memory map, input and save RAM, presented
   through SDL2.
-- **SM83 interpreter** (`src/cpu.c`): runs every routine that hasn't been
-  ported yet, straight from the ROM this repository builds.
-- **Ported routines** (`src/ported/`): hand-written C replacements for asm
-  routines, registered by their label from the disassembly. When execution
-  reaches a ported routine, the C version runs instead.
+- **Ported routines** (`src/ported/`): hand-written C replacements for every
+  asm routine, registered by their label from the disassembly. The CPU loop
+  (`src/cpu.c`) runs the native routine at each address the game reaches.
+- **SM83 interpreter** (`src/interp.c`, development builds only): runs the
+  original code, for the tools below to compare against.
 - **Differential tester** (`src/difftest.c`): plays the game and, every time a
   ported routine is called, runs both the original asm and the C version from
   the same state and compares the entire machine state afterwards. Porting
   mistakes show up immediately, on the exact call where they happen.
 
-As more routines are ported, less runs in the interpreter. Once everything is
-native, the interpreter goes away. See [docs/ROADMAP.md](docs/ROADMAP.md) for
+Every routine is now native: the game runs without the interpreter (see
+"Building just the game" below), which stays in development builds for the
+tests. See [docs/ROADMAP.md](docs/ROADMAP.md) for
 the plan and [docs/PORTING.md](docs/PORTING.md) for how to port routines.
 
 ## Building
@@ -99,6 +100,19 @@ worldwide Game Boy Color release) and refuses any other. Add
 After changing labels or constants in the asm, refresh the committed copies
 with `cmake --build port/build --target update_generated` (a quick-tier
 test fails until they match).
+
+### Building just the game
+
+`-DWL3_INTERPRETER=OFF` leaves out the interpreter and everything that uses
+it (the difftest, fuzzer and traces):
+
+```sh
+cmake -B port/build -S port -DWL3_BUILD_ROM=OFF -DWL3_INTERPRETER=OFF
+cmake --build port/build
+```
+
+Recordings made with it use the native routines' timing; replay them in a
+development build with `--hooks --input`.
 
 No ROM is distributed with this project.
 

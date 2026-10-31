@@ -411,9 +411,18 @@ PORT_LOCAL_JUMP(VBlank_1c9f36, Func)
 	vb_transfer_oam(gb);
 }
 
-// VBlank_1c9f7a.Func stays asm: no recording reaches it, and it switches the
-// ROM bank, so every fuzz check of it at its ROM address is inconclusive;
-// nothing would verify a port.
+// VBlank_1c9eb3.Func without the WX and LCDC writes. No recording reaches
+// it, and it switches the ROM bank, so every fuzz check of it at its ROM
+// address is inconclusive: it was checked against the ROM bytes by hand.
+PORT_LOCAL_JUMP(VBlank_1c9f7a, Func)
+{
+	vb_golf_wbk(gb);
+	vb_xor_a(gb);
+	wr8(gb, wGolfVBlankMode, gb->cpu.a);
+	vb_scx(gb);
+	vb_wario_tiles_dma(gb, 0x7f);
+	vb_transfer_oam(gb);
+}
 
 PORT_LOCAL_JUMP(VBlank_1c9fe1, Func)
 {

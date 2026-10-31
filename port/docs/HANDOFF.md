@@ -315,6 +315,23 @@ anything calling `hCallFunc` as blocked.
 instructions, down from 169M. The profile also lists every interpreted
 address (`bank:addr label+offset`), which is how the last ones were found.
 
+**The game runs without the interpreter.** It lives in src/interp.c, built
+only with `WL3_INTERPRETER` (ON by default; the difftest, fuzzer, traces,
+`--no-hooks` and `--break` need it). With it OFF, cpu.c's
+`no_native_routine` stops with the label and the last native routines run
+when the game reaches an address without a hook, except the `debug_nop`
+loop (`nop / jr :-`), where it stays as time goes on. The calls between
+routines still go through emulated addresses and the stack (gb_call_ret,
+JUMP_TO): turning those into direct C calls is the next step.
+
+`tools/audit_targets.py <repo> <cc>` checks statically that every constant
+jump or call target in the ported code has a hook (24 `AH(...)` hits in
+power_ups/ are false positives: bank $7e routines called from bank $79
+files). Run it after porting changes; on 2026-10-31 it found 5 local labels
+and the `HandleTopBarDPad` loops that only the interpreter could run. Every
+recording plays to the end in a build without the interpreter, with the
+same per-frame state as the development build with `--hooks`.
+
 - **RAM hooks** (`ram_hook_register` in hooks.h, the code is in
   src/ported/home/ram_code.c) cover what the game runs from RAM:
   - `hCallFunc`, the HRAM trampoline behind every farcall and hcall;

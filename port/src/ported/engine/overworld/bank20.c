@@ -3729,6 +3729,66 @@ static uint8_t alu_rrc(GB *gb, uint8_t v)
 	return r;
 }
 
+#define TOPBAR_D_RIGHT (ADDR_HandleTopBarDPad + 0x19) // .d_right
+#define TOPBAR_D_LEFT (ADDR_HandleTopBarDPad + 0x34)  // .d_left
+
+// HandleTopBarDPad.got_selection
+static void topbar_got_selection(GB *gb)
+{
+	wr8(gb, REG_HL(gb), gb->cpu.b); // ld [hl], b (hl = wTopBarSelection)
+	gb_call(gb, ADDR_ShowTopBarSelectedButton);
+	gb_call(gb, ADDR_LoadTopBarButtonAttributes);
+	gb_call(gb, ADDR_ApplyTopBarButtonAttributes);
+	play_sfx(gb, SFX_0E2);
+	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_Z) | FLAG_C); // scf
+	RET();
+}
+
+// .d_right: find the first item to the right that can be selectable. With
+// b = 0 the asm loops forever; so does this, one pass per dispatch (time
+// and interrupts go on, as on the hardware).
+static void topbar_d_right(GB *gb)
+{
+	do {
+		bool stuck = !gb->cpu.b;
+		gb->cpu.a = gb->cpu.d;
+		gb->cpu.b = alu_rrc(gb, gb->cpu.b);
+		if (gb->cpu.f & FLAG_C) {
+			RET();
+			return;
+		}
+		if (stuck) {
+			alu_and(gb, gb->cpu.a, gb->cpu.b);
+			gb->cpu.a = 0;
+			JUMP_TO(TOPBAR_D_RIGHT);
+			return;
+		}
+	} while (!alu_and(gb, gb->cpu.a, gb->cpu.b));
+	topbar_got_selection(gb);
+}
+
+// .d_left: find the first item to the left that can be selectable (loops
+// forever like .d_right with b = 0)
+static void topbar_d_left(GB *gb)
+{
+	do {
+		bool stuck = !gb->cpu.b;
+		gb->cpu.a = gb->cpu.d;
+		gb->cpu.b = alu_sla(gb, gb->cpu.b);
+		if (alu_bit(gb, gb->cpu.b, TOPBAR_PREV_MAP_F + 1)) {
+			RET();
+			return;
+		}
+		if (stuck) {
+			alu_and(gb, gb->cpu.a, gb->cpu.b);
+			gb->cpu.a = 0;
+			JUMP_TO(TOPBAR_D_LEFT);
+			return;
+		}
+	} while (!alu_and(gb, gb->cpu.a, gb->cpu.b));
+	topbar_got_selection(gb);
+}
+
 PORT_JUMP(HandleTopBarDPad)
 {
 	gb->cpu.a = 0;
@@ -3737,47 +3797,16 @@ PORT_JUMP(HandleTopBarDPad)
 	SET_HL(gb, wTopBarSelection);
 	gb->cpu.c = rd8(gb, wJoypadPressed);
 	gb->cpu.a = gb->cpu.d = rd8(gb, wTopBarSelectableButtons);
-	if (alu_bit(gb, gb->cpu.c, B_PAD_RIGHT)) {
-		// .d_right
-		do {
-			if (!gb->cpu.b) {
-				JUMP_TO(ADDR_HandleTopBarDPad + 0x19); // loops forever, in asm
-				return;
-			}
-			gb->cpu.a = gb->cpu.d;
-			gb->cpu.b = alu_rrc(gb, gb->cpu.b);
-			if (gb->cpu.f & FLAG_C) {
-				RET();
-				return;
-			}
-		} while (!alu_and(gb, gb->cpu.a, gb->cpu.b));
-	} else if (alu_bit(gb, gb->cpu.c, B_PAD_LEFT)) {
-		// .d_left
-		do {
-			if (!gb->cpu.b) {
-				JUMP_TO(ADDR_HandleTopBarDPad + 0x34); // loops forever, in asm
-				return;
-			}
-			gb->cpu.a = gb->cpu.d;
-			gb->cpu.b = alu_sla(gb, gb->cpu.b);
-			if (alu_bit(gb, gb->cpu.b, TOPBAR_PREV_MAP_F + 1)) {
-				RET();
-				return;
-			}
-		} while (!alu_and(gb, gb->cpu.a, gb->cpu.b));
-	} else {
+	if (alu_bit(gb, gb->cpu.c, B_PAD_RIGHT))
+		topbar_d_right(gb);
+	else if (alu_bit(gb, gb->cpu.c, B_PAD_LEFT))
+		topbar_d_left(gb);
+	else
 		RET();
-		return;
-	}
-	// .got_selection
-	wr8(gb, wTopBarSelection, gb->cpu.b);
-	gb_call(gb, ADDR_ShowTopBarSelectedButton);
-	gb_call(gb, ADDR_LoadTopBarButtonAttributes);
-	gb_call(gb, ADDR_ApplyTopBarButtonAttributes);
-	play_sfx(gb, SFX_0E2);
-	gb->cpu.f = (uint8_t)((gb->cpu.f & FLAG_Z) | FLAG_C); // scf
-	RET();
 }
+
+PORT_LOCAL_JUMP(HandleTopBarDPad, d_right) { topbar_d_right(gb); }
+PORT_LOCAL_JUMP(HandleTopBarDPad, d_left) { topbar_d_left(gb); }
 
 PORT(GolfBuilding) { FARCALL(_GolfBuilding); }
 PORT(InitEpilogue) { FARCALL(_InitEpilogue); }
@@ -3805,6 +3834,13 @@ PORT(Func_8143d)
 	gb->cpu.a = rd8(gb, w2d88f);
 	wr8(gb, wOWXCoord1, gb->cpu.a);
 	wr8(gb, w2d101, gb->cpu.a);
+}
+
+// Func_8143d.Func_8146f: ld a, [w2d0e3] / jumptable
+PORT_LOCAL_JUMP(Func_8143d, Func_8146f)
+{
+	gb->cpu.a = rd8(gb, w2d0e3);
+	JUMP_TO(jumptable(gb, ADDR_Func_8143d + 0x32 + 4));
 }
 
 // debug_nop: nop / jr back, forever (one turn per dispatch).

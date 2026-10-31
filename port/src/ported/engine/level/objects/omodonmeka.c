@@ -730,6 +730,8 @@ PORT_LOCAL_JUMP(OmodonmekaWithOmodonFunc, Func_42714)
 }
 
 // The Omodon riding it.
+static void func_42767_4277f(GB *gb);
+
 PORT(Func_42767)
 {
 	uint16_t hl = wCurObjFlags;
@@ -745,8 +747,13 @@ PORT(Func_42767)
 		wr8(gb, hl, (uint8_t)(rd8(gb, hl) & ~OBJFLAG_STEPPED));
 		return;
 	}
-	// .asm_4277f
-	hl = wCurObjState;
+	func_42767_4277f(gb);
+}
+
+// Func_42767.asm_4277f
+static void func_42767_4277f(GB *gb)
+{
+	uint16_t hl = wCurObjState;
 	gb->cpu.a = 0x2e;
 	wr8(gb, hl--, 0x2e);
 	hl = DEC_L(hl);
@@ -763,6 +770,8 @@ PORT(Func_42767)
 	wr8(gb, hl, alu_dec(gb, rd8(gb, hl)));
 	SET_HL(gb, hl);
 }
+
+PORT_LOCAL(Func_42767, asm_4277f) { func_42767_4277f(gb); }
 
 // Looks for the active object (flags $41) whose OBJ_UNK_01/02 is c:b (or
 // e:d), starting at hl = wObj1. Returns the slot's low byte, or -1; hl ends

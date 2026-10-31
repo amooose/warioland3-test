@@ -1,13 +1,15 @@
 // Wario Land 3 PC port: SDL2 frontend and command line.
-#include "difftest.h"
 #include "gb.h"
 #include "hooks.h"
-#include "trace.h"
 #include "input.h"
 #include "png.h"
 #include "savestate.h"
 #include "sha1.h"
 #include "symtab.h"
+#if WL3_INTERPRETER
+#include "difftest.h"
+#include "trace.h"
+#endif
 
 #include <SDL.h>
 #include <setjmp.h>
@@ -550,8 +552,20 @@ int main(int argc, char **argv)
 	// Recordings and replays therefore use the original's timing: then a
 	// recording stays valid however much of the game gets ported, and
 	// replays exactly in the difftest (which always uses that timing).
+#if WL3_INTERPRETER
 	if (no_hooks || ((fe.record_path || input_path) && !force_hooks))
 		hooks_set_enabled(false);
+#else
+	// Without the interpreter, everything runs natively; a recording made
+	// here replays the same way elsewhere with --hooks.
+	(void)force_hooks;
+	if (no_hooks || difftest || coverage_path || fuzz || trace_write_path || trace_check_path ||
+		asm_profile_path || break_sym) {
+		fprintf(stderr, "--no-hooks, --difftest, --coverage, --fuzz, --trace-write, --trace-check,\n"
+			"--asm-profile and --break need the interpreter: build with -DWL3_INTERPRETER=ON\n");
+		return 1;
+	}
+#endif
 
 	if (input_path) {
 		if (!input_load(&fe.script, input_path)) {
@@ -563,6 +577,7 @@ int main(int argc, char **argv)
 			load_state = fe.script.state_path;
 	}
 
+#if WL3_INTERPRETER
 	if (difftest || coverage_path || fuzz || trace_write_path || trace_check_path) {
 		if (load_state && !savestate_load_file(&gb, load_state))
 			return 1;
@@ -581,6 +596,9 @@ int main(int argc, char **argv)
 		}
 		return difftest_run(&gb, script, end) ? 0 : 1;
 	}
+#else
+	(void)fuzz_variants, (void)fuzz_routine, (void)fuzz_shard_i, (void)fuzz_shard_n, (void)fuzz_verbose;
+#endif
 
 	// Headless runs are tests and tools: they leave the player's save alone
 	// unless asked otherwise.

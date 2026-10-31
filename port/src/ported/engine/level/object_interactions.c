@@ -662,7 +662,8 @@ static int sting_touch(GB *gb)
 	return 1;
 }
 
-PORT_JUMP(Func_208f2)
+// Func_208f2 is jr .start, so the routine and .start run the same code.
+static void func_208f2_start(GB *gb)
 {
 	if (sting_touch(gb))
 		return;
@@ -683,6 +684,9 @@ PORT_JUMP(Func_208f2)
 	FARCALL(StartDive);
 	RET();
 }
+
+PORT_JUMP(Func_208f2) { func_208f2_start(gb); }
+PORT_LOCAL_JUMP(Func_208f2, start) { func_208f2_start(gb); }
 
 PORT_JUMP(Func_20899)
 {

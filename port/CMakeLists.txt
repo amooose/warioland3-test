@@ -111,10 +111,21 @@ file(GLOB_RECURSE ASM_SOURCES CONFIGURE_DEPENDS ${REPO_ROOT}/src/*.asm)
 list(JOIN ASM_SOURCES "\n" ASM_SOURCE_LIST)
 file(WRITE ${GEN_DIR}/asm_sources.txt "${ASM_SOURCE_LIST}\n")
 
+# The interpreter runs the original code, which the difftest, the fuzzer and
+# the traces compare the native routines against. The game itself runs
+# without it (every routine is native): -DWL3_INTERPRETER=OFF builds just
+# the game, with none of the tests or development tools.
+option(WL3_INTERPRETER "Include the SM83 interpreter and the tools that use it" ON)
+if(WL3_INTERPRETER)
+	set(INTERPRETER_SOURCES src/interp.c src/difftest.c src/trace.c)
+else()
+	set(INTERPRETER_SOURCES)
+endif()
+
 add_executable(wl3
 	src/apu.c
 	src/cpu.c
-	src/difftest.c
+	${INTERPRETER_SOURCES}
 	src/gb.c
 	src/hooks.c
 	src/input.c
@@ -124,7 +135,6 @@ add_executable(wl3
 	src/ported.c
 	src/ppu.c
 	src/savestate.c
-	src/trace.c
 	${PORTED_SOURCES}
 	src/sha1.c
 	${DISASM_GEN_DIR}/syms.h
@@ -134,6 +144,11 @@ add_executable(wl3
 # The disassembly's headers first: an old build directory may still hold
 # its own copies in generated/.
 target_include_directories(wl3 PRIVATE src ${DISASM_GEN_DIR} ${GEN_DIR})
+if(WL3_INTERPRETER)
+	target_compile_definitions(wl3 PRIVATE WL3_INTERPRETER=1)
+else()
+	target_compile_definitions(wl3 PRIVATE WL3_INTERPRETER=0)
+endif()
 # SDL2main (Windows entry point) must come before SDL2 on the link line.
 if(TARGET SDL2::SDL2main)
 	target_link_libraries(wl3 PRIVATE SDL2::SDL2main)
@@ -175,11 +190,14 @@ if(WL3_BUILD_ROM)
 		set_tests_properties(generated_${f} PROPERTIES LABELS quick)
 	endforeach()
 endif()
-# One difftest per input script in tests/inputs. They need the ROM.
-if(ROM)
+# One difftest per input script in tests/inputs. They need the ROM and the
+# interpreter.
+if(ROM AND WL3_INTERPRETER)
 	file(GLOB TEST_INPUTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/inputs/*.input)
 else()
-	message(STATUS "No ROM: set WL3_ROM to your Wario Land 3 ROM to run the tests")
+	if(NOT ROM)
+		message(STATUS "No ROM: set WL3_ROM to your Wario Land 3 ROM to run the tests")
+	endif()
 	set(TEST_INPUTS)
 endif()
 set(COVERAGE_COMMANDS)

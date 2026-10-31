@@ -255,6 +255,11 @@ uint16_t gb_pop16(GB *gb);
 // cpu.c
 // Execute one instruction (or service an interrupt). Returns T-cycles used.
 int cpu_step(GB *gb);
+#if WL3_INTERPRETER
+// Runs one instruction of the original code at PC (interp.c); returns its
+// cycles. Only in the development build.
+int interp_exec(GB *gb);
+#endif
 // Call the routine at addr (in the currently mapped bank) and run it to
 // completion, through hooks or the interpreter. Used by native code to call
 // routines that may or may not have been ported yet.

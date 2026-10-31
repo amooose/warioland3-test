@@ -1487,7 +1487,11 @@ PORT_JUMP(InitCutscene15)
 {
 	PALS1(Pals_b81c0);
 	PALS2(Pals_b8e80);
-	// .asm_9c367
+	JUMP_TO(ADDR_InitCutscene15 + 0x10); // fallthrough
+}
+
+PORT_LOCAL_JUMP(InitCutscene15, asm_9c367)
+{
 	gb->cpu.a = LCDC_WINDOW;
 	wr8(gb, wLCDCFlagsToFlip, gb->cpu.a);
 	gb->cpu.a = 0x28;
