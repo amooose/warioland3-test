@@ -19,7 +19,8 @@ PORT(UnreferencedMuteSound)
 }
 
 // unreferenced
-PORT(UnreferencedUnmuteSound)
+// ends with bc and de as PlayNewMusic_SetNoise leaves them (unreferenced)
+PORT_EX(UnreferencedUnmuteSound, 0, R_B | R_C | R_D | R_E)
 {
 	gb->cpu.a = alu_and(gb, rd8(gb, wSoundMuted), rd8(gb, wSoundMuted));
 	if (!gb->cpu.a)
@@ -34,8 +35,10 @@ PORT(UnreferencedUnmuteSound)
 	CALL(PlayNewMusic_SetNoise);
 }
 
-// handle playing SFX and music
-PORT(HandleSound)
+// handle playing SFX and music. The audio entry points leave bc and de as
+// the engine's loops did (see src/native/audio): nothing after HandleSound
+// reads them before setting them (the main loop goes on to UpdateJoypad).
+PORT_EX(HandleSound, 0, R_B | R_C | R_D | R_E)
 {
 	gb->cpu.a = alu_and(gb, rd8(gb, wSoundMuted), rd8(gb, wSoundMuted));
 	if (gb->cpu.a)
@@ -154,9 +157,12 @@ PORT_LOCAL_JUMP(InitWithoutDemoPowerUpReset, GameLoop)
 	JUMP_TO(GAME_LOOP_HALT + 1);
 }
 
-PORT_LOCAL_JUMP(InitWithoutDemoPowerUpReset, after_halt) { JUMP_TO(WAIT_VBLANK_EXEC); } // nop
+// .after_halt and .wait_vblank_exec end back at .GameLoop, where no register
+// is live: bc and de are as HandleSound leaves them (see HandleSound).
+#define LOOP_CLOBBERS (R_B | R_C | R_D | R_E)
+PORT_LOCAL_EX(InitWithoutDemoPowerUpReset, after_halt, HOOK_MANUAL_RET, LOOP_CLOBBERS) { JUMP_TO(WAIT_VBLANK_EXEC); } // nop
 
-PORT_LOCAL_JUMP(InitWithoutDemoPowerUpReset, wait_vblank_exec)
+PORT_LOCAL_EX(InitWithoutDemoPowerUpReset, wait_vblank_exec, HOOK_MANUAL_RET, LOOP_CLOBBERS)
 {
 	gb->cpu.a = rd8(gb, wVBlankFuncExecuted);
 	if (!alu_and(gb, gb->cpu.a, gb->cpu.a)) {

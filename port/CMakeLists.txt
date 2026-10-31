@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
-project(wl3 C)
+project(wl3 C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+# The C++ modules (src/native)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(NOT CMAKE_BUILD_TYPE)
 	set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
@@ -99,7 +102,10 @@ else()
 	set(DISASM_GEN_DIR ${COMMITTED_GEN_DIR})
 endif()
 
-file(GLOB_RECURSE PORTED_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/ported/*.c)
+# The ported routines: register-exact C (src/ported) and C++ modules
+# (src/native). Both register hooks with PORT macros.
+file(GLOB_RECURSE PORTED_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/ported/*.c
+	${CMAKE_CURRENT_SOURCE_DIR}/src/native/*.cpp)
 add_custom_command(
 	OUTPUT ${GEN_DIR}/ported_table.c
 	COMMAND ${GEN_CMD} ports ${GEN_DIR}/ported_table.c ${PORTED_SOURCES}

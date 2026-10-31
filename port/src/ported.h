@@ -18,25 +18,6 @@
 #include "constants.h" // generated: every constant in src/constants etc.
 #include "syms.h" // generated: every label in the disassembly
 
-// Registers, for clobber masks.
-enum {
-	R_A = 1 << 0,
-	R_F = 1 << 1,
-	R_B = 1 << 2,
-	R_C = 1 << 3,
-	R_D = 1 << 4,
-	R_E = 1 << 5,
-	R_H = 1 << 6,
-	R_L = 1 << 7,
-};
-
-typedef struct {
-	const char *name;
-	HookFn fn;
-	unsigned flags;
-	unsigned clobbers; // R_* registers whose exit value doesn't have to match
-} PortInfo;
-
 void port_register(const PortInfo *info);
 
 #define PORT_EX(name, flags, clobbers) \

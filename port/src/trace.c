@@ -107,10 +107,14 @@ static size_t dead_stack(const GB *gb, size_t *start)
 	return (size_t)(gb->cpu.sp - stack_bottom);
 }
 
+// The CPU state at the top of the main loop. Its registers aren't compared:
+// none is live there (UpdateJoypad and MainStateTable's jump table set the
+// ones they use first), and the C++ modules leave some as the original's
+// don't (see src/native/native.hpp).
 static void cpu_bytes(const GB *gb, uint8_t out[16])
 {
 	const CPU *c = &gb->cpu;
-	uint8_t b[16] = {c->a, c->f, c->b, c->c, c->d, c->e, c->h, c->l, (uint8_t)c->sp, (uint8_t)(c->sp >> 8),
+	uint8_t b[16] = {0, 0, 0, 0, 0, 0, 0, 0, (uint8_t)c->sp, (uint8_t)(c->sp >> 8),
 		(uint8_t)gb->rom_bank, (uint8_t)(gb->rom_bank >> 8), (uint8_t)gb->sram_bank, gb->sram_enabled,
 		c->double_speed, gb->ie};
 	memcpy(out, b, 16);

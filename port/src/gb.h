@@ -12,6 +12,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define GB_SCREEN_W 160
 #define GB_SCREEN_H 144
 
@@ -288,5 +292,9 @@ void apu_reset(GB *gb);
 void apu_tick(GB *gb, int cycles);
 uint8_t apu_read(GB *gb, uint8_t reg);
 void apu_write(GB *gb, uint8_t reg, uint8_t val);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

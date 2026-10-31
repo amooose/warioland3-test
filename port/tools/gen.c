@@ -189,6 +189,9 @@ static int gen_ports(const char *out, int nfiles, char **files)
 			// PORT_RAM(Name): native as a RAM hook (ram_code.c), no ROM hook
 			if (!strncmp(line, "PORT_RAM", 8))
 				continue;
+			// PORT_COVERED(Name): implemented inside a C++ module, no hook
+			if (!strncmp(line, "PORT_COVERED", 12))
+				continue;
 			const char *p = line + 4;
 			while (*p == '_' || (*p >= 'A' && *p <= 'Z'))
 				p++;

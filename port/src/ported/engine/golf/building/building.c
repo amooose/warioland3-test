@@ -450,7 +450,9 @@ PORT_JUMP(Func_1c86dd)
 	JUMP_TO(ADDR_Func_1c9fae); // same bank
 }
 
-PORT(Func_1c8586)
+// It ends with bc and de as PlayNewMusic leaves them, which no caller up to
+// the main loop reads (see src/native/audio).
+PORT_EX(Func_1c8586, 0, R_B | R_C | R_D | R_E)
 {
 	CALL(DisableLCD);
 	CALL(ClearVirtualOAM);

@@ -14,7 +14,30 @@
 
 #include "gb.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef void (*HookFn)(GB *gb);
+
+// Registers, for clobber masks.
+enum {
+	R_A = 1 << 0,
+	R_F = 1 << 1,
+	R_B = 1 << 2,
+	R_C = 1 << 3,
+	R_D = 1 << 4,
+	R_E = 1 << 5,
+	R_H = 1 << 6,
+	R_L = 1 << 7,
+};
+
+typedef struct {
+	const char *name;
+	HookFn fn;
+	unsigned flags;
+	unsigned clobbers; // R_* registers whose exit value doesn't have to match
+} PortInfo;
 
 enum {
 	HOOK_MANUAL_RET = 1 << 0,
@@ -72,5 +95,9 @@ RamHookFn ram_hook_find(uint16_t pc);
 void ported_register_all(void);
 // Registers the RAM hooks (src/ported/home/ram_code.c).
 void ram_hooks_register_all(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

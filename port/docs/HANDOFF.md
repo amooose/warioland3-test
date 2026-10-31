@@ -360,6 +360,46 @@ same per-frame state as the development build with `--hooks`.
 - **The collision tails** go through `gb_call_ret_unwind`, which stops
   where a block function pops past its caller, as the asm does.
 
+## C++ modules (src/native)
+
+On branch `claude/native-c`, the register-exact C is being rewritten, one
+self-contained subsystem at a time, as modern C++: classes, locals and
+return values, no registers or flags, no return addresses on the emulated
+stack. The first is the sound engine (src/native/audio), which replaced
+src/ported/audio/engine.c, home/audio.c and home/audio_functions.c.
+
+- **State stays in game memory.** A module keeps its state where the game
+  does (the Audio RAM bank), byte for byte, read and written through
+  `Byte` / `Word` (native.hpp), which go through the memory map like the
+  original's accesses. Save states, the rest of the game and the tests see
+  the same bytes. `Channel` and `Track` are views over the channel and track
+  structs by their CHANNEL_* / TRACK_* fields.
+- **Entry points keep a register contract.** Only the subsystem's entry
+  points are hooks (C++ `PORT` / `PORT_EX`). Each leaves the registers the
+  original leaves where its callers could see them, and declares the rest
+  clobbered. The original's internal routines get `PORT_COVERED(Label);`
+  so the progress report counts them.
+- **Clobbered registers must be dead.** A clobbered register is only fine if
+  nothing reads it before setting it. That was checked by reading the asm
+  of every caller chain, and each routine on such a chain carries the same
+  clobber mask with a comment: HandleSound, Func_1c8586,
+  GolfBuildingStateTable, UnreferencedUnmuteSound and the main loop's
+  .after_halt / .wait_vblank_exec. When a caller does read one, give the
+  entry the original's exact value instead: ExecuteAudioMod leaves bc / de
+  as the original's mod functions do, because action help reads them
+  (found by the action_help trace).
+- **Verification is the same as for C ports:** the fuzzer checks each entry
+  point against the asm (all memory, I/O, the ROM bank and the contract
+  registers; the dead stack below SP is ignored), and the traces check
+  whole recordings. The traces no longer compare registers at the top of
+  the main loop, where none is live.
+- **Timing:** a module is one native call where the C ports were many, so
+  less emulated time passes per frame. Mid-frame raster timing moves (more
+  "screen alone differs" frames in the traces); nothing else does.
+
+Next candidates: subsystems with a narrow boundary, like the audio engine
+had. Check a candidate's entry points and their callers' register use first.
+
 ## Open issues
 
 1. **`Prologue_WarioFallFromPlane`** (may be stale) (`src/ported/engine/overworld/bank2b_2.c`,
