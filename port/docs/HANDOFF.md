@@ -500,6 +500,23 @@ Modules so far:
   best time list's V-Blank function (RAM code). Watch for
   names constants.h already defines as macros (`OBJ_STATE`): a C++
   constant of the same name won't compile.
+- **overworld, part 6**: bank2d. `SceneObjects` (scene_objects.cpp,
+  entries `Func_b4a37`, `Func_b4a3d`, `Func_b4aa9`: the map scene objects'
+  per-state animation scripts, as tables of `ObjAnim` rows decoded from
+  the asm jumptables, with the few specials: palette, next object, BG
+  palette 5, a sound at the end). `MapFunctions` (map_functions.cpp: the
+  45 scenes the four sides' events play, entry `_DoOWFunction` and each
+  N/W/S/EOWFunc_* hooked with every register clobbered for the fuzzer;
+  the shared steps AdvanceOWFunc, WaitOWFunc, WaitOWObjState, EndOWFunc,
+  LoadOWSceneLevelName and the falling offsets are covered; the quakes'
+  shaking Func_b71fc is a table of scroll steps). The magic seed and the
+  snake are one routine each with per-side parameters. `SceneInit`
+  (scene_init.cpp, entry `_InitOWObjects`: every scene's objects, tiles
+  and graphics by w2d065, the InitOWObjects_* tables and the
+  LoadOverworld*Gfx loaders) and `SideAnimations` (side_animations.cpp,
+  entries `UpdateMapSideOWAnimations` and `Func_b542e`: the objects'
+  idle animations between scenes, Func_b7984 and the like). bank2d.c
+  keeps only the unreferenced Func_b4895.
 - **pause** (src/native/pause): the pause menu (`PauseMenu`: the options,
   keys and treasures, its state table) and the save screens (`SaveScreen`:
   the progress bar, saving the game or the level in progress to SRAM with

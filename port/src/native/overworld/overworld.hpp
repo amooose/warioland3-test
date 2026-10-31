@@ -12,6 +12,7 @@
 
 #include "../menu_object.hpp"
 #include "../routines.hpp"
+#include <initializer_list>
 
 namespace wl3::overworld {
 
@@ -403,6 +404,261 @@ private:
 	void run(uint8_t side, uint16_t state); // Func_b4fa2 and the like
 	void run_state(uint8_t side, uint16_t state, uint8_t s); // Func_b4fab and the like
 	void after(uint8_t special);
+
+	GB *gb_;
+	Memory mem_;
+	Wram wram_;
+	Routines routines_;
+};
+
+// The map's functions (bank2d.asm, _DoOWFunction's NOWFunc_* and the
+// like): the events' scenes on each side, step by step (w2d062, its frames
+// in wOWFuncCounter). Each is hooked at its own address, so they convert
+// one at a time.
+class MapFunctions {
+public:
+	explicit MapFunctions(GB *gb) : gb_(gb), mem_(gb), wram_(gb), routines_(gb) {}
+
+	void run(); // _DoOWFunction
+
+	// north
+	void cut_tree(); // NOWFunc_CutTree
+	void open_gate(); // NOWFunc_OpenGate
+	void north_magic_seed(); // NOWFunc_MagicSeed
+	void north_summon_snake(); // NOWFunc_SummonSnake
+	void fall_leaves(); // NOWFunc_FallLeaves
+	void play_music_box(); // NOWFunc_PlayMusicBox
+	void crayon(); // NOWFunc_Crayon
+	void north_bottom_bar(); // NOWFunc_BottomBar
+	void day_night_spell(); // NOWFunc_DayNightSpell
+	void prologue(); // NOWFunc_Prologue
+	// west
+	void rain(); // WOWFunc_Rain
+	void clear_tornado(); // WOWFunc_ClearTornado
+	void elevator_working(); // WOWFunc_ElevatorWorking
+	void west_magic_seed(); // WOWFunc_MagicSeed
+	void west_summon_snake(); // WOWFunc_SummonSnake
+	void west_earthquake(); // WOWFunc_Earthquake
+	void west_volcano(); // WOWFunc_VulcanoEruption
+	void red_music_box(); // WOWFunc_RedMusicBox
+	// south
+	void south_magic_seed(); // SOWFunc_MagicSeed
+	void yellow_music_box(); // SOWFunc_YellowMusicBox
+	void south_summon_snake(); // SOWFunc_SummonSnake
+	void canyon_thunder(); // SOWFunc_CanyonThunder
+	void raise_tower(); // SOWFunc_RaiseTower
+	void fan(); // SOWFunc_Fan
+	void south_earthquake(); // SOWFunc_Earthquake
+	void green_music_box(); // SOWFunc_GreenMusicBox
+	void explosives(); // SOWFunc_Explosives, EOWFunc_Explosives
+	void full_moon(); // SOWFunc_FullMoon
+	void send_seeds(); // SOWFunc_SendSeeds
+	// east
+	void freeze_sea(); // EOWFunc_FreezeSea
+	void east_earthquake(); // EOWFunc_Earthquake
+	void burn_vines(); // EOWFunc_BurnVines
+	void show_warped_void(); // EOWFunc_ShowWarpedVoid
+	void raise_pipe(); // EOWFunc_RaisePipe
+	void daytime(); // EOWFunc_Daytime
+	void form_castle(); // EOWFunc_FormCastle
+	void east_volcano(); // EOWFunc_VulcanoEruption
+	void finish(); // EndOWFunc
+	void shake(); // Func_b71fc
+	void rumble(); // Func_b6055
+	void update_tornado(); // UpdateOWTornado
+
+private:
+	void unrealistic();
+	uint8_t step() { return wram_.unk_2d062(); }
+	void next_step(); // AdvanceOWFunc
+	void wait(uint8_t frames); // WaitOWFunc
+	void wait_state(uint16_t state, uint8_t value); // WaitOWObjState
+	void load_level_name(); // LoadOWSceneLevelName
+	void wait_level_name(); // WaitOWSceneLevelNameFadeIn
+	uint8_t falling_offset(uint16_t counter); // GetSceneFallingYOffset
+	bool move(uint16_t obj, uint16_t data); // ApplyOWMovement; whether still moving
+	void set_state(uint16_t state, uint8_t value); // SetSceneObjState
+
+	struct Seed {
+		uint8_t land_y, land, landed, grow, grown; // y, then scene object 4's states
+	};
+	void magic_seed(const Seed &seed);
+	struct Snake {
+		uint8_t wait; // before the level name
+		uint16_t flag; // the notes moving
+		uint8_t notes_x; // where the snake comes out
+		uint16_t obj; // the snake
+		uint8_t state, out_frame;
+		int in_frame; // the frame it's back in at (north), or -1
+	};
+	void summon_snake(const Snake &snake);
+	void tile_update(uint16_t data); // Func_b5868
+	void rain_pals(); // WOWFunc_Rain.UpdatePals
+	void pal_config(uint16_t config, uint8_t reg, uint16_t src);
+	void flash(uint16_t colours, uint8_t count); // Func_b69a6
+	void load_one_pal(uint8_t bank, uint16_t pals, uint8_t pal);
+	void show_button(uint16_t block);
+	void shake_steps();
+	void start_shaking(uint8_t script);
+	void stop_shaking();
+	void quake(bool on);
+	uint8_t seed_x_offset(uint16_t counter);
+	void castle_pals();
+	struct Fountain {
+		uint16_t flag, state; // the phase (and its frames after), the object's state
+		uint8_t start;
+		int done; // the object's state when it's up, or -1
+	};
+	void lava_fountain(const Fountain &fountain);
+	void freeze_tiles(uint16_t base, uint16_t offset, uint8_t bank, uint16_t update);
+	void crumble_cliffs();
+	void load_pals(uint8_t bank, uint16_t src, uint16_t dest);
+	void canyon_flash();
+	void bolt_flash();
+	void canyon_pals(uint16_t pals);
+	void canyon_white();
+	void canyon_bolts();
+	struct Bob {
+		bool zero;
+		uint8_t a;
+	};
+	Bob bob_tower(uint8_t period, uint8_t step_mask);
+	bool blow_gusts(uint16_t flag, uint16_t obj);
+	struct Place {
+		uint8_t y, x, state;
+	};
+	struct Rock {
+		uint16_t flag, obj; // the phase (and a byte after it), the object
+		int8_t dx;
+		uint8_t phases; // 8, or 2 for a single place
+		Place places[4];
+	};
+	void fly_rock(const Rock &rock);
+
+	void move_leaf(uint16_t flag, uint16_t leaf, uint16_t twin, uint16_t twin_flag, bool sfx);
+	void move_twin(uint16_t flag, uint16_t leaf);
+
+	GB *gb_;
+	Memory mem_;
+	Wram wram_;
+	Routines routines_;
+};
+
+// The map scenes' objects at their start (bank2d.asm, _InitOWObjects): each
+// side's events place their scene objects (and tiles, palettes, graphics)
+// by w2d065: 0 before the event, 0x80 to play it, 1 after.
+class SceneInit {
+public:
+	explicit SceneInit(GB *gb) : gb_(gb), mem_(gb), wram_(gb), routines_(gb) {}
+
+	void run(); // _InitOWObjects
+
+private:
+	struct Place {
+		uint8_t y, x, state;
+	};
+	void unrealistic();
+	void place(uint16_t obj, Place place); // InitSceneObjParams
+	void tiles(uint16_t data); // Func_b586d
+	void priority(uint16_t attrs, uint8_t count); // SetBGMapBytesPriority
+	void decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vram1);
+	void gfx(uint8_t bank, uint16_t src, uint8_t tile); // the LoadOverworld*Gfx
+	bool unlockable() const;
+
+	void north(uint8_t param, uint8_t c); // InitOWObjects_North
+	void west(uint8_t param, uint8_t c); // InitOWObjects_West
+	void south(uint8_t param, uint8_t c); // InitOWObjects_South
+	void east(uint8_t param, uint8_t c); // InitOWObjects_East
+	void bottom_bar(); // Func_b417a
+	void top_bar(); // Func_b4247
+
+	GB *gb_;
+	Memory mem_;
+	Wram wram_;
+	Routines routines_;
+};
+
+// The map sides' scene objects between scenes (bank2d.asm,
+// UpdateMapSideOWAnimations): each side's objects by state, peeking out,
+// switching day and night, the leaves falling.
+class SideAnimations {
+public:
+	explicit SideAnimations(GB *gb) : gb_(gb), mem_(gb), wram_(gb), routines_(gb) {}
+
+	void update(); // UpdateMapSideOWAnimations
+	void fall_leaves(); // Func_b542e
+
+private:
+	struct Peek {
+		uint16_t flag, timer; // out (and how long it's waited)
+		uint8_t level_a, level_b; // the map's levels it shows at
+		uint16_t state; // the object's
+		uint8_t hide, show;
+	};
+	void unrealistic();
+	void set_state(uint16_t state, uint8_t value); // SetSceneObjState
+	bool by_day() const { return !mem_[w2d011]; }
+	void north(uint8_t state); // Func_b7984
+	void west(uint8_t state); // Func_b7a6d
+	void south(uint8_t state); // Func_b7c18
+	void east(uint8_t state); // Func_b7b61
+	void peek(const Peek &peek); // Func_b7a32, Func_b7b26, Func_b7c5c
+	void leaf(uint16_t phase, uint16_t obj); // Func_b542e.Func_b5435 / .Func_b54ba
+	bool east_busy(); // Func_b7be9
+	void moon(); // Func_b7cb3
+
+	GB *gb_;
+	Memory mem_;
+	Wram wram_;
+	Routines routines_;
+};
+
+// The map's palettes and tile updates (bank21.asm): the day and night
+// transitions (each colour stepped in a ColourFadeStruct), the PalConfig
+// fades (FadePalConfig), the level name's, and the scenes' tile blocks.
+class Palettes {
+public:
+	explicit Palettes(GB *gb) : gb_(gb), mem_(gb), wram_(gb), routines_(gb) {}
+
+	void day_night(); // DayNightTransition
+	void to_daytime(); // Func_84b97
+	void spell_transition(); // Func_84c0d
+	void grey_transition(); // OWGreyTransition
+	void load_grey(); // LoadGreyOWPals
+	bool fade_in_level_name(); // FadeInLevelName; whether still fading
+	void fade_out_level_name(); // Func_852e5
+	void func_84e43();
+	void func_84fff();
+	void func_85046();
+	void func_850b9();
+	void func_850ff();
+	void func_85145();
+	void func_8518c();
+	void prologue_fade(); // _PrologueFade
+	void star_indicator_pals(); // LoadOWStarIndicatorPals
+	void update_tiles(uint16_t data); // Func_854ee
+	void freeze_column(uint16_t base); // Func_85a68, Func_85aa2, Func_85acb
+
+private:
+	void unrealistic();
+	bool fade_pal_config(uint16_t steps); // FadePalConfig; whether short of 0x20
+	bool fade_bg(); // FadeBGPalConfig
+	bool fade_bg_slow(); // Func_851bc
+	bool fade_ob_slow(); // Func_851d1
+	void config(uint16_t config, uint16_t src, uint8_t index, uint8_t count);
+	bool fade_all(bool ob);
+	void next_w2d013();
+	void to_fade_structs(uint16_t src, uint16_t dest); // CopyPalToColourFadeStructs
+	void init_fade_structs(); // InitColourFadeStructs
+	void apply_fade_structs(); // ApplyPalFadeColours
+	void next_transition(); // DayNightTransition.AdvanceTable
+	uint16_t ow_pals(uint8_t which); // GetOWPals
+	void load_base_and_target(uint8_t which); // LoadBaseAndTargetOWPals
+	void transition_vblank(); // VBlank_OWPalTransition
+	void start_transition(); // DayNightTransition.LoadBaseAndTargetPals
+	void fade_colours(); // DayNightTransition.FadeColours
+	void skip_transition(); // SkipDayNightTransition
+	void switch_day_night(); // DayNightTransition.SwitchDayNight
 
 	GB *gb_;
 	Memory mem_;
