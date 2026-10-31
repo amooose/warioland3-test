@@ -538,6 +538,15 @@ Modules so far:
   until their last C caller goes). `GolfBuilding` (golf_building.cpp,
   entries `_GolfBuilding` and `Func_adbfe`: the building outside, its
   palettes by crayon); its V-Blank function stays C (RAM code).
+  `Epilogue` (epilogue.cpp, entries `_InitEpilogue`, `Func_af13c`: the old
+  man's thanks, the music boxes, the transformation, the crowd, the gift,
+  Wario thrown out of the castle; no recording reaches its later steps, so
+  they're checked by the fuzzer alone). `Prologue` (prologue.cpp, entry
+  `Prologue`, which PrologueFunc's C farcalls: its registers are left by
+  Func_ac3fd, as the asm's; every sub-scene hooked for the fuzzer, the
+  plane's four falling parts one table-driven routine). bank2b_2.c keeps
+  Prologue_Delay/Next/Finish, the sub-step helpers and Func_af130/5 (C
+  still uses them) and the unreferenced Func_af01f.
 - **pause** (src/native/pause): the pause menu (`PauseMenu`: the options,
   keys and treasures, its state table) and the save screens (`SaveScreen`:
   the progress bar, saving the game or the level in progress to SRAM with

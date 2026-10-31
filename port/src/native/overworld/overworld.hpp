@@ -728,6 +728,89 @@ private:
 	Routines routines_;
 };
 
+// The prologue (bank2b.asm, PrologueFunc's cutscene): Wario falls from
+// the plane, finds the cave and the music box, is sucked in and wakes in
+// the temple. Steps in w2d013 (frames in w2d014); the long sub-scenes
+// (Prologue_Wario*) still run by address.
+class Prologue {
+public:
+	explicit Prologue(GB *gb) : gb_(gb), mem_(gb), wram_(gb), routines_(gb) {}
+
+	void update(); // Prologue
+	void music_box_close_up(); // Func_ae1de
+	void enter_cave(); // Prologue_WarioEnterCave
+	void sucked_into_music_box(); // Prologue_WarioSuckedIntoMusicBox
+	void wario_flicker(); // Func_ae523
+	void wake_up(); // Func_ae55c
+	void bow(); // Func_ae641
+	void walk_off(); // Func_ae668
+	void fall_from_plane(); // Prologue_WarioFallFromPlane
+	void walk_to_cave(); // Prologue_WarioWalkToCaveEntrance
+	void plane_parts(); // Func_ae8bb
+
+private:
+	void unrealistic();
+	void next_sub(); // Func_ae1ce
+	void wait_sub(uint8_t frames); // Func_ae1c9
+	void end_sub(); // Func_ae1d5
+	uint8_t walk_right(); // ApplySceneWarioMovementRight
+	uint8_t walk_left(); // ApplySceneWarioMovementLeft
+	void wait_wario(uint8_t state); // Func_ae1c2
+	void bounce(); // Prologue_WarioFallFromPlane.DoBounce
+	void next_action(uint16_t counter); // Func_ae915
+	void plane_part(int index); // Func_ae924 and the like
+	void music_box_glow(); // Func_ae2dd
+	void wario_state(uint8_t state); // SetSceneWarioState
+	void set_state(uint16_t state, uint8_t value); // SetSceneObjState
+	void far_copy(uint8_t bank, uint16_t src, uint16_t dest, uint8_t count);
+	void next_step(); // Prologue_Next
+	void wait(uint8_t frames); // Prologue_Delay
+	void set_fade(uint8_t fade); // .Func_ae009
+	void place_music_box(); // .Func_ae067
+	void load_pals(uint16_t pals); // .Func_ae0ab
+	void hdma(uint8_t vram_bank, uint16_t src, uint8_t dest_hi, uint8_t mode);
+	void step(); // .PlayCutscene
+
+	GB *gb_;
+	Memory mem_;
+	Wram wram_;
+	Routines routines_;
+};
+
+// The temple, inside (bank2b.asm): Wario walks in, the hidden figure
+// tells him what's next (or, with the gold music box, reveals himself:
+// HiddenFigureRevealScene, still by address) and he walks out.
+class TempleScene {
+public:
+	explicit TempleScene(GB *gb) : gb_(gb), mem_(gb), wram_(gb), routines_(gb) {}
+
+	void init(); // _InitTempleScene
+	void update(); // _UpdateTempleScene
+	void reveal(); // HiddenFigureRevealScene
+
+private:
+	void next_step(); // Func_ad016
+	void wait(uint8_t frames); // Func_ad011
+	void fight(); // SetFightAgainstAHiddenFigure
+	void hdma(uint8_t vram_bank, uint16_t src, uint8_t dest_hi);
+	void panic_then_next(); // .Func_ad16a
+	void close_mouth(); // .HandleHiddenFigureMouthClosing
+	void set_state(uint16_t state, uint8_t value); // SetSceneObjState
+	void unrealistic();
+	void wario_state(uint8_t state); // SetSceneWarioState
+	void decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vram1);
+	void load_far(uint16_t routine, uint8_t bank, uint16_t src);
+	void next_state(); // .NextState
+	void step(); // .UpdateScene
+	void leave(); // .exit
+	void temple_music(); // .DelayAndPlayTempleMusic
+
+	GB *gb_;
+	Memory mem_;
+	Wram wram_;
+	Routines routines_;
+};
+
 // The map's palettes and tile updates (bank21.asm): the day and night
 // transitions (each colour stepped in a ColourFadeStruct), the PalConfig
 // fades (FadePalConfig), the level name's, and the scenes' tile blocks.
