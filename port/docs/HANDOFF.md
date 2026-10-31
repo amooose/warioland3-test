@@ -613,7 +613,10 @@ Modules so far:
   UnusedFlowerProjectileCommonFunc, HandFunc.ApplyOffsetToWario: h is
   wCurObj's page from their real callers; with h in ROM the asm's writes
   hit the MBC, so the order of the two bytes matters, and set_update
-  writes the high byte first, as the asm). Quirks kept: Nobiiru's sting
+  writes the high byte first, as the asm; a `dec [hl]` through h's page
+  tests the value it computed, not a read back, which ROM and blocked
+  VRAM wouldn't return; after a SetObjectFramesetPtr, hl is wCurObj's
+  again). Quirks kept: Nobiiru's sting
   step stores its new interaction type as the collision box's left (the
   asm reuses a). The jumptable objects (the rock, Nobiiru, the hand) use
   tables of handlers; the rock's is checked against the asm's dw list.
