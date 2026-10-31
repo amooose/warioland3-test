@@ -39,35 +39,6 @@ PORT(InitSceneObjParams)
 	SET_DE(gb, de);
 }
 
-// Animates the scene object at wCurSceneObjPtr.
-PORT_JUMP(UpdateCurOWObjAnimation)
-{
-	gb->cpu.b = 0x2a; // bank of the overworld framesets
-	gb->cpu.l = rd8(gb, wCurSceneObjPtr + 0) | (1 << 2); // set 2, l
-	gb->cpu.a = rd8(gb, wCurSceneObjPtr + 1);
-	gb->cpu.h = gb->cpu.a;
-	JUMP(UpdateOWAnimation);
-}
-
-// When the animation of the scene object in hl has finished, resets it and
-// sets its unk6 to b.
-PORT(Func_b4a0d)
-{
-	alu_cp(gb, rd8(gb, wOWAnimationFinished), 0xff);
-	if (!(gb->cpu.f & FLAG_Z)) {
-		gb->cpu.a = rd8(gb, wOWAnimationFinished);
-		return;
-	}
-	uint16_t hl = (uint16_t)(REG_HL(gb) | (1 << 2)); // set 2, l
-	gb->cpu.f = FLAG_Z; // xor a
-	wr8(gb, hl++, 0);   // duration
-	wr8(gb, hl++, 0);   // frameset offset
-	gb->cpu.a = gb->cpu.b;
-	wr8(gb, hl, gb->cpu.a); // unk6
-	SET_HL(gb, hl);
-	SET_BC(gb, hl);
-}
-
 // xor a / ld hl, wOWFuncCounter / ld [hli], a / inc [hl]
 static void advance_ow_func(GB *gb)
 {
@@ -121,26 +92,6 @@ PORT_JUMP(WaitOWObjState)
 	JUMP_TO(ADDR_AdvanceOWFunc); // jr
 }
 
-static void cur_scene_obj_sprite(GB *gb)
-{
-	gb->cpu.b = 0x2a;
-	gb->cpu.l = rd8(gb, wCurSceneObjPtr + 0);
-	gb->cpu.a = rd8(gb, wCurSceneObjPtr + 1);
-	gb->cpu.h = gb->cpu.a;
-}
-
-PORT_JUMP(LoadCurSceneObjSpriteWithScroll)
-{
-	cur_scene_obj_sprite(gb);
-	JUMP(LoadOWSpriteWithScroll);
-}
-
-PORT_JUMP(LoadCurSceneObjSprite)
-{
-	cur_scene_obj_sprite(gb);
-	JUMP(LoadOWSprite);
-}
-
 PORT(Func_b4000) {}
 
 PORT(Func_b791d) {}
@@ -175,30 +126,6 @@ PORT_JUMP(Func_b4162)
 {
 	gb->cpu.b = 0x00;
 	JUMP_TO(ADDR_Func_b4143);
-}
-
-PORT_JUMP(Func_b4e50)
-{
-	SET_DE(gb, ADDR_OAM_a884a);
-	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
-}
-
-PORT_JUMP(Func_b507f)
-{
-	SET_DE(gb, ADDR_OAM_a8000);
-	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
-}
-
-PORT_JUMP(Func_b4e4d)
-{
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	JUMP_TO(ADDR_Func_b4e50); // fallthrough
-}
-
-PORT_JUMP(Func_b507c)
-{
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	JUMP_TO(ADDR_Func_b507f); // fallthrough
 }
 
 // ld hl, obj / ld de, data / call InitSceneObjParams
@@ -438,28 +365,6 @@ PORT(UpdateOWTornado)
 	play_sfx(gb, SFX_11D);
 }
 
-PORT_JUMP(Func_b4e7c) { SET_DE(gb, ADDR_Frameset_a8de2); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b5004) { SET_DE(gb, ADDR_Frameset_a85cd); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b500e) { SET_DE(gb, ADDR_Frameset_a85d0); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b5018) { SET_DE(gb, ADDR_Frameset_a862a); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b50a7) { SET_DE(gb, ADDR_Frameset_a877a); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b50ac) { SET_DE(gb, ADDR_Frameset_a877d); JUMP_TO(ADDR_Func_b507c); }
-
-// bc = OW obj
-PORT_JUMP(Func_b4e8b)
-{
-	gb_push16(gb, REG_BC(gb));
-	SET_DE(gb, ADDR_Frameset_a8e29);
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	uint16_t hl = gb_pop16(gb);
-	gb->cpu.a = alu_and(gb, rd8(gb, w2d011), rd8(gb, w2d011));
-	gb->cpu.b = (gb->cpu.f & FLAG_Z) ? 0x00 : 0x06;
-	hl = (uint16_t)((hl | (1 << 0)) & ~(1 << 2)); // set 0, l / res 2, l
-	wr8(gb, hl, gb->cpu.b);
-	SET_HL(gb, hl);
-	JUMP_TO(ADDR_Func_b4e50);
-}
-
 // a = [w2d062]: rst JumpTable on the table right after it
 static void ow_func_jumptable(GB *gb, uint16_t routine)
 {
@@ -554,82 +459,11 @@ PORT_JUMP(Func_b403e)
 	JUMP_TO(ADDR_Func_b4082);
 }
 
-// ld a, c / and $f8 / ld hl, wCurSceneObjPtr / ld [hli], a / ld [hl], b /
-// ld a, [bc]
-static void set_cur_scene_obj_ptr(GB *gb)
-{
-	gb->cpu.a = alu_and(gb, gb->cpu.c, 0xf8);
-	wr8(gb, wCurSceneObjPtr + 0, gb->cpu.a);
-	wr8(gb, wCurSceneObjPtr + 1, gb->cpu.b);
-	SET_HL(gb, wCurSceneObjPtr + 1);
-	gb->cpu.a = rd8(gb, REG_BC(gb));
-}
-
-// bc = scene obj state
-PORT_JUMP(Func_b4fa2)
-{
-	set_cur_scene_obj_ptr(gb);
-	JUMP_TO(ADDR_Func_b4fab); // fallthrough
-}
-
-PORT_JUMP(Func_b4fab)
-{
-	JUMP_TO(jumptable(gb, ADDR_Func_b4fab + 1));
-}
-
-// bc = scene obj state
-PORT_JUMP(Func_b4dfb)
-{
-	set_cur_scene_obj_ptr(gb);
-	JUMP_TO(ADDR_Func_b4e04); // fallthrough
-}
-
-PORT_JUMP(Func_b4e04)
-{
-	JUMP_TO(jumptable(gb, ADDR_Func_b4e04 + 1));
-}
-
 PORT_JUMP(Func_b7a6d)
 {
 	gb->cpu.a = rd8(gb, REG_BC(gb));
 	JUMP_TO(jumptable(gb, ADDR_Func_b7a6d + 2));
 }
-
-PORT_JUMP(Func_b4a37)
-{
-	gb_call(gb, ADDR_Func_b4a3d);
-	JUMP_TO(ADDR_Func_b4aa9);
-}
-
-PORT_JUMP(Func_b508a)
-{
-	gb_call(gb, ADDR_Func_b4a0d);
-	if (gb->cpu.f & FLAG_Z)
-		JUMP_TO(ADDR_Func_b4fab);
-	else
-		JUMP_TO(ADDR_Func_b507f);
-}
-
-PORT_JUMP(Func_b5085)
-{
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	gb->cpu.b = 0x00;
-	JUMP_TO(ADDR_Func_b508a); // fallthrough
-}
-
-// ld de, frameset / call UpdateCurOWObjAnimation / ld b, state / jp target
-static void anim_b_jump(GB *gb, uint16_t frameset, uint8_t state, uint16_t target)
-{
-	SET_DE(gb, frameset);
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	gb->cpu.b = state;
-	JUMP_TO(target);
-}
-
-PORT_JUMP(Func_b5009) { SET_DE(gb, ADDR_Frameset_a8590); JUMP_TO(ADDR_Func_b5085); }
-PORT_JUMP(Func_b5013) { SET_DE(gb, ADDR_Frameset_a85d3); JUMP_TO(ADDR_Func_b5085); }
-PORT_JUMP(Func_b5093) { anim_b_jump(gb, ADDR_Frameset_a8782, 0x18, ADDR_Func_b508a); }
-PORT_JUMP(Func_b509d) { anim_b_jump(gb, ADDR_Frameset_a8793, 0x19, ADDR_Func_b508a); }
 
 PORT_JUMP(_DoOWFunction)
 {
@@ -731,57 +565,6 @@ PORT_LOCAL_JUMP(UpdateMapSideOWAnimations, East)
 {
 	static const uint16_t states[] = {wSceneObj5State, wSceneObj7State};
 	for_each_obj_state(gb, ADDR_UpdateMapSideOWAnimations + 0x5a, ADDR_Func_b7b61, states, 2);
-}
-
-static const uint16_t scene_objs_1_to_4[] = {wSceneObj1State, wSceneObj2State, wSceneObj3State, wSceneObj4State};
-
-PORT_JUMP(Func_b4a3d)
-{
-	gb->cpu.a = rd8(gb, wCurMapSide);
-	JUMP_TO(jumptable(gb, ADDR_Func_b4a3d + 4));
-}
-PORT_LOCAL_JUMP(Func_b4a3d, North) { for_each_obj_state(gb, ADDR_Func_b4a3d + 0xc, ADDR_Func_b4fa2, scene_objs_1_to_4, 4); }
-PORT_LOCAL_JUMP(Func_b4a3d, West) { for_each_obj_state(gb, ADDR_Func_b4a3d + 0x24, ADDR_Func_b4dfb, scene_objs_1_to_4, 4); }
-PORT_LOCAL_JUMP(Func_b4a3d, South) { for_each_obj_state(gb, ADDR_Func_b4a3d + 0x3c, ADDR_Func_b4cc2, scene_objs_1_to_4, 4); }
-PORT_LOCAL_JUMP(Func_b4a3d, East) { for_each_obj_state(gb, ADDR_Func_b4a3d + 0x54, ADDR_Func_b4b99, scene_objs_1_to_4, 4); }
-
-PORT_JUMP(Func_b4aa9)
-{
-	gb->cpu.a = rd8(gb, wCurMapSide);
-	JUMP_TO(jumptable(gb, ADDR_Func_b4aa9 + 4));
-}
-PORT_LOCAL_JUMP(Func_b4aa9, North)
-{
-	static const uint16_t states[] = {
-		wSceneObj5State, wSceneObj6State, wSceneObj7State, wSceneObj8State, wSceneObj9State,
-		wSceneObj10State, wSceneObj13State, wSceneObj14State, wSceneObj15State,
-	};
-	for_each_obj_state(gb, ADDR_Func_b4aa9 + 0xc, ADDR_Func_b4fa2, states, 9);
-}
-PORT_LOCAL_JUMP(Func_b4aa9, West)
-{
-	static const uint16_t states[] = {
-		wSceneObj5State, wSceneObj6State, wSceneObj7State, wSceneObj8State, wSceneObj10State,
-		wSceneObj11State, wSceneObj12State, wSceneObj13State, wSceneObj14State, wSceneObj15State,
-	};
-	for_each_obj_state(gb, ADDR_Func_b4aa9 + 0x42, ADDR_Func_b4dfb, states, 10);
-}
-PORT_LOCAL_JUMP(Func_b4aa9, South)
-{
-	static const uint16_t states[] = {
-		wSceneObj5State, wSceneObj6State, wSceneObj7State, wSceneObj8State,
-		wSceneObj9State, wSceneObj10State, wSceneObj14State, wSceneObj15State,
-	};
-	for_each_obj_state(gb, ADDR_Func_b4aa9 + 0x7e, ADDR_Func_b4cc2, states, 8);
-}
-PORT_LOCAL_JUMP(Func_b4aa9, East)
-{
-	static const uint16_t states[] = {
-		wSceneObj5State, wSceneObj6State, wSceneObj7State, wSceneObj8State,
-		wSceneObj9State, wSceneObj10State, wSceneObj11State, wSceneObj12State,
-		wSceneObj13State, wSceneObj14State, wSceneObj15State,
-	};
-	for_each_obj_state(gb, ADDR_Func_b4aa9 + 0xae, ADDR_Func_b4b99, states, 11);
 }
 
 // bc = scene obj state
@@ -1177,35 +960,6 @@ PORT(GetSceneFallingYOffset)
 	gb->cpu.a = rd8(gb, hl);
 }
 
-PORT_JUMP(Func_b4e5b)
-{
-	gb_call(gb, ADDR_Func_b4a0d);
-	if (gb->cpu.f & FLAG_Z)
-		JUMP_TO(ADDR_Func_b4e04);
-	else
-		JUMP_TO(ADDR_Func_b4e50);
-}
-
-PORT_JUMP(Func_b4e65)
-{
-	SET_DE(gb, ADDR_OAM_a8f57);
-	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
-}
-
-PORT_JUMP(Func_b4c5a)
-{
-	SET_DE(gb, ADDR_OAM_a980c);
-	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
-}
-
-PORT_JUMP(Func_b4da3)
-{
-	SET_DE(gb, ADDR_OAM_a9161);
-	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
-}
-
-PORT(Func_b4dd4) { play_sfx(gb, SFX_12F); }
-
 PORT(Func_b4873) {}
 
 PORT_JUMP(Func_b4874)
@@ -1257,182 +1011,7 @@ PORT(LoadOverworldSmokeGfx) { decompress_tiles0(gb, BANK_OverworldSmokeGfx, ADDR
 
 // --- more scene object animation states ---
 
-PORT(Func_b4f58)
-{
-	uint16_t hl = wTempPals1 + 5 * PAL_SIZE;
-	gb->cpu.a = rd8(gb, wSceneObj11Frame);
-	alu_cp(gb, gb->cpu.a, 0x57);
-	if (!(gb->cpu.f & FLAG_Z)) {
-		gb->cpu.a = rd8(gb, wSceneObj11State);
-		gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
-		if (!(gb->cpu.f & FLAG_Z))
-			hl = ADDR_Func_b4f58 + 0x22; // .pal
-	}
-	SET_HL(gb, hl);
-	SET_DE(gb, wTempBGPals + 5 * PAL_SIZE);
-	gb->cpu.b = 1 * PAL_SIZE;
-	CALL(CopyHLToDE);
-	SET_HL(gb, wPalConfig1);
-	gb->cpu.a = (uint8_t)rBGPI;
-	wr8(gb, wPalConfig1, gb->cpu.a);
-}
-
-PORT_JUMP(Func_b50e1)
-{
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	SET_DE(gb, ADDR_OAM_aa580);
-	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
-}
-
-PORT_JUMP(Func_b50ea)
-{
-	SET_DE(gb, ADDR_Frameset_aa252);
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	SET_DE(gb, ADDR_OAM_aa0cf);
-	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
-}
-
-PORT_JUMP(Func_b5114)
-{
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	SET_DE(gb, ADDR_OAM_a9fe2); // .asm_b5117
-	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
-}
-
-PORT_JUMP(Func_b50fb) { anim_b_jump(gb, ADDR_Frameset_aa0c1, 0x27, ADDR_Func_b5114 + 0xe); } // .asm_b5122
-PORT_JUMP(Func_b510a) { anim_b_jump(gb, ADDR_Frameset_aa0bc, 0x25, ADDR_Func_b5114 + 0xe); } // .asm_b5122
-
-PORT_JUMP(Func_b5136)
-{
-	SET_DE(gb, ADDR_Frameset_a883b);
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	gb->cpu.b = 0x00;
-	gb_call(gb, ADDR_Func_b4a0d);
-	if (gb->cpu.f & FLAG_Z) {
-		JUMP_TO(ADDR_Func_b4fab);
-		return;
-	}
-	SET_DE(gb, ADDR_OAM_a87fa);
-	JUMP_TO(ADDR_LoadCurSceneObjSprite);
-}
-
-PORT_JUMP(Func_b5027) { anim_b_jump(gb, ADDR_Frameset_a8639, 0x09, ADDR_Func_b508a); }
-PORT_JUMP(Func_b5036) { anim_b_jump(gb, ADDR_Frameset_a8646, 0x0b, ADDR_Func_b508a); }
-PORT_JUMP(Func_b5045) { anim_b_jump(gb, ADDR_Frameset_a867f, 0x0e, ADDR_Func_b508a); }
-PORT_JUMP(Func_b504f) { anim_b_jump(gb, ADDR_Frameset_a86da, 0x0e, ADDR_Func_b508a); }
-PORT_JUMP(Func_b50b6) { anim_b_jump(gb, ADDR_Frameset_a873d, 0x0e, ADDR_Func_b508a); }
-PORT_JUMP(Func_b50c0) { anim_b_jump(gb, ADDR_Frameset_a87d2, 0x20, ADDR_Func_b508a); }
-
 // --- scene object animation stubs (b4e56..b5130) ---
-
-PORT_JUMP(Func_b4e56)
-{
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	gb->cpu.b = 0x00;
-	JUMP_TO(ADDR_Func_b4e5b); // fallthrough
-}
-
-PORT_JUMP(Func_b4e62)
-{
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	JUMP_TO(ADDR_Func_b4e65); // fallthrough
-}
-
-PORT_JUMP(Func_b4e6b)
-{
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	gb->cpu.b = 0x00;
-	JUMP_TO(ADDR_Func_b4e70); // fallthrough
-}
-
-PORT_JUMP(Func_b4e70)
-{
-	gb_call(gb, ADDR_Func_b4a0d);
-	if (gb->cpu.f & FLAG_Z)
-		JUMP_TO(ADDR_Func_b4e04);
-	else
-		JUMP_TO(ADDR_Func_b4e65);
-}
-
-PORT_JUMP(Func_b4e77) { SET_DE(gb, ADDR_Frameset_a8de9); JUMP_TO(ADDR_Func_b4e56); }
-PORT_JUMP(Func_b4e81) { SET_DE(gb, ADDR_Frameset_a8dd1); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b4e86) { SET_DE(gb, ADDR_Frameset_a8e1e); JUMP_TO(ADDR_Func_b4e56); }
-PORT_JUMP(Func_b4ea4) { SET_DE(gb, ADDR_Frameset_a8e2c); JUMP_TO(ADDR_Func_b4e4d); }
-
-PORT(Func_b4ea9)
-{
-	SET_DE(gb, ADDR_Frameset_a8e5d);
-	gb_call(gb, ADDR_Func_b4e56);
-	gb->cpu.a = rd8(gb, wSceneObj7State);
-	gb->cpu.a = alu_and(gb, gb->cpu.a, gb->cpu.a);
-	if (!(gb->cpu.f & FLAG_Z))
-		return;
-	wr8(gb, wSceneObj8Duration, gb->cpu.a);
-	gb->cpu.a = 0x08;
-	wr8(gb, wSceneObj8State, gb->cpu.a);
-}
-
-PORT_JUMP(Func_b4ebd) { SET_DE(gb, ADDR_Frameset_a8e6c); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b4ec2) { SET_DE(gb, ADDR_Frameset_a8df8); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b4ec8) { anim_b_jump(gb, ADDR_Frameset_a8e04, 0x0c, ADDR_Func_b4e5b); }
-PORT_JUMP(Func_b4ed2) { SET_DE(gb, ADDR_Frameset_a8e01); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b4ed8) { anim_b_jump(gb, ADDR_Frameset_a8e11, 0x0e, ADDR_Func_b4e5b); }
-PORT_JUMP(Func_b4ee3) { SET_DE(gb, ADDR_Frameset_a8f17); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b4ee9) { anim_b_jump(gb, ADDR_Frameset_a9090, 0x11, ADDR_Func_b4e70); }
-PORT_JUMP(Func_b4ef4) { anim_b_jump(gb, ADDR_Frameset_a90eb, 0x11, ADDR_Func_b4e70); }
-PORT_JUMP(Func_b4eff) { SET_DE(gb, ADDR_Frameset_a9140); JUMP_TO(ADDR_Func_b4e62); }
-PORT_JUMP(Func_b4f05) { SET_DE(gb, ADDR_Frameset_a9143); JUMP_TO(ADDR_Func_b4e62); }
-PORT_JUMP(Func_b4f0b) { anim_b_jump(gb, ADDR_Frameset_a914e, 0x11, ADDR_Func_b4e70); }
-PORT_JUMP(Func_b4f16) { SET_DE(gb, ADDR_Frameset_a8e9d); JUMP_TO(ADDR_Func_b4e56); }
-PORT_JUMP(Func_b4f1c) { SET_DE(gb, ADDR_Frameset_a8eac); JUMP_TO(ADDR_Func_b4e56); }
-PORT_JUMP(Func_b4f22) { SET_DE(gb, ADDR_Frameset_a8eb7); JUMP_TO(ADDR_Func_b4e56); }
-PORT_JUMP(Func_b4f28) { SET_DE(gb, ADDR_Frameset_a8ec2); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b4f2e) { SET_DE(gb, ADDR_Frameset_a8ec7); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b4f34) { SET_DE(gb, ADDR_Frameset_a8eca); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b4f3a) { SET_DE(gb, ADDR_Frameset_a8eca); JUMP_TO(ADDR_Func_b4e56); }
-PORT_JUMP(Func_b4f40) { SET_DE(gb, ADDR_Frameset_a8ed3); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b4f46) { SET_DE(gb, ADDR_Frameset_a8eda); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b4f4c) { SET_DE(gb, ADDR_Frameset_a8ee1); JUMP_TO(ADDR_Func_b4e4d); }
-
-PORT_JUMP(Func_b4f52)
-{
-	SET_DE(gb, ADDR_Frameset_a8ee8);
-	gb_call(gb, ADDR_Func_b4e4d);
-	JUMP_TO(ADDR_Func_b4f58); // fallthrough
-}
-
-PORT_JUMP(Func_b4f82)
-{
-	SET_DE(gb, ADDR_Frameset_a8ee8);
-	gb_call(gb, ADDR_Func_b4e56);
-	JUMP_TO(ADDR_Func_b4f58);
-}
-
-PORT_JUMP(Func_b4f8a) { SET_DE(gb, ADDR_Frameset_a8f28); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b4f90) { SET_DE(gb, ADDR_Frameset_a8f31); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b4f96) { SET_DE(gb, ADDR_Frameset_a8f47); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b4f9c) { SET_DE(gb, ADDR_Frameset_a8f3a); JUMP_TO(ADDR_Func_b4e4d); }
-PORT_JUMP(Func_b501d) { SET_DE(gb, ADDR_Frameset_a8653); JUMP_TO(ADDR_Func_b5085); }
-PORT_JUMP(Func_b5022) { SET_DE(gb, ADDR_Frameset_a862d); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b5031) { SET_DE(gb, ADDR_Frameset_a8636); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b5040) { SET_DE(gb, ADDR_Frameset_a866e); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b5059) { SET_DE(gb, ADDR_Frameset_a872f); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b505e) { SET_DE(gb, ADDR_Frameset_a8732); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b5063) { SET_DE(gb, ADDR_Frameset_a8750); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b5068) { SET_DE(gb, ADDR_Frameset_a8761); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b506d) { SET_DE(gb, ADDR_Frameset_a879a); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b5072) { SET_DE(gb, ADDR_Frameset_a8764); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b5077) { SET_DE(gb, ADDR_Frameset_a876f); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b50b1) { SET_DE(gb, ADDR_Frameset_a879f); JUMP_TO(ADDR_Func_b5085); }
-PORT_JUMP(Func_b50ca) { SET_DE(gb, ADDR_Frameset_a87d9); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b50cf) { SET_DE(gb, ADDR_Frameset_a87dc); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b50d4) { SET_DE(gb, ADDR_Frameset_a87df); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b50d9) { SET_DE(gb, ADDR_Frameset_aa5f5); JUMP_TO(ADDR_Func_b50e1); }
-PORT_JUMP(Func_b50de) { SET_DE(gb, ADDR_Frameset_aa5f8); JUMP_TO(ADDR_Func_b50e1); }
-PORT_JUMP(Func_b50f6) { SET_DE(gb, ADDR_Frameset_aa0a3); JUMP_TO(ADDR_Func_b5114); }
-PORT_JUMP(Func_b5105) { SET_DE(gb, ADDR_Frameset_aa09d); JUMP_TO(ADDR_Func_b5114); }
-PORT_JUMP(Func_b512a) { SET_DE(gb, ADDR_Frameset_a87e8); JUMP_TO(ADDR_Func_b507c); }
-PORT_JUMP(Func_b5130) { SET_DE(gb, ADDR_Frameset_a87f1); JUMP_TO(ADDR_Func_b507c); }
 
 // ---- InitOWObjects_South / _East entries ----
 
@@ -1855,30 +1434,6 @@ PORT(Func_b4895)
 	SET_DE(gb, de);
 	gb->cpu.a = rd8(gb, de);
 	wr8(gb, REG_HL(gb), gb->cpu.a);
-}
-
-PORT_JUMP(Func_b4c57)
-{
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	JUMP_TO(ADDR_Func_b4c5a); // fallthrough
-}
-
-PORT_JUMP(Func_b4da0)
-{
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	JUMP_TO(ADDR_Func_b4da3); // fallthrough
-}
-
-PORT_JUMP(Func_b4dc0)
-{
-	SET_DE(gb, ADDR_Frameset_a97d4);
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	gb->cpu.a = rd8(gb, wOWAnimationFinished);
-	alu_cp(gb, gb->cpu.a, 0xff);
-	if (gb->cpu.f & FLAG_Z)
-		gb_call(gb, ADDR_Func_b4dd4);
-	SET_DE(gb, ADDR_OAM_a9161);
-	JUMP_TO(ADDR_LoadCurSceneObjSpriteWithScroll);
 }
 
 // ld hl, state / ld b, n / jp WaitOWObjState
@@ -3604,52 +3159,6 @@ PORT_LOCAL_JUMP(EOWFunc_Explosives, Func_b6dcd)
 	}
 	JUMP_TO(ADDR_AdvanceOWFunc);
 }
-
-// Frameset setters reached through the Func_b4ba2 / Func_b4ccb jumptables
-PORT_JUMP(Func_b4be9) { SET_DE(gb, ADDR_Frameset_a9e61); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4bee) { SET_DE(gb, ADDR_Frameset_a9e72); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4bf3) { SET_DE(gb, ADDR_Frameset_a9e75); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4bf8) { SET_DE(gb, ADDR_Frameset_a9e94); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c02) { SET_DE(gb, ADDR_Frameset_a9e8c); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c07) { SET_DE(gb, ADDR_Frameset_a9e91); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c16) { SET_DE(gb, ADDR_Frameset_a9ed3); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c25) { SET_DE(gb, ADDR_Frameset_a9ef1); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c2a) { SET_DE(gb, ADDR_Frameset_a9ee3); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c39) { SET_DE(gb, ADDR_Frameset_a9efd); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c3e) { SET_DE(gb, ADDR_Frameset_a9ee0); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c43) { SET_DE(gb, ADDR_Frameset_a9f02); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c48) { SET_DE(gb, ADDR_Frameset_a9f0d); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c4d) { SET_DE(gb, ADDR_Frameset_a9ecd); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c52) { SET_DE(gb, ADDR_Frameset_a9ed0); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c6d) { SET_DE(gb, ADDR_Frameset_a9eaa); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c72) { SET_DE(gb, ADDR_Frameset_a9eb3); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c77) { SET_DE(gb, ADDR_Frameset_a9ebc); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c7c) { SET_DE(gb, ADDR_Frameset_a9ec5); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c86) { SET_DE(gb, ADDR_Frameset_a9f36); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4c9f) { SET_DE(gb, ADDR_Frameset_a9fa7); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4cae) { SET_DE(gb, ADDR_Frameset_a9fc9); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4cb3) { SET_DE(gb, ADDR_Frameset_a9fbb); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4cb8) { SET_DE(gb, ADDR_Frameset_a9fc2); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4cbd) { SET_DE(gb, ADDR_Frameset_a9fdf); JUMP_TO(ADDR_Func_b4c57); }
-PORT_JUMP(Func_b4d0e) { SET_DE(gb, ADDR_Frameset_a96c0); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d1f) { SET_DE(gb, ADDR_Frameset_a967d); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d25) { SET_DE(gb, ADDR_Frameset_a9680); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d2b) { SET_DE(gb, ADDR_Frameset_a9674); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d3c) { SET_DE(gb, ADDR_Frameset_a96af); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d4b) { SET_DE(gb, ADDR_Frameset_a96bd); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d50) { SET_DE(gb, ADDR_Frameset_a96d1); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d55) { SET_DE(gb, ADDR_Frameset_a969a); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d5a) { SET_DE(gb, ADDR_Frameset_a96a3); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d5f) { SET_DE(gb, ADDR_Frameset_a96a6); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d64) { SET_DE(gb, ADDR_Frameset_a96a9); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d69) { SET_DE(gb, ADDR_Frameset_a96ac); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d6e) { SET_DE(gb, ADDR_Frameset_a96d8); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d91) { SET_DE(gb, ADDR_Frameset_a979f); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4d96) { SET_DE(gb, ADDR_Frameset_a97a2); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4db6) { SET_DE(gb, ADDR_Frameset_a97e1); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4dbb) { SET_DE(gb, ADDR_Frameset_a97ec); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4df1) { SET_DE(gb, ADDR_Frameset_a97fe); JUMP_TO(ADDR_Func_b4da0); }
-PORT_JUMP(Func_b4df6) { SET_DE(gb, ADDR_Frameset_a9803); JUMP_TO(ADDR_Func_b4da0); }
 
 PORT_JUMP(Func_b7b61)
 {
@@ -5558,90 +5067,6 @@ PORT_LOCAL(EOWFunc_VulcanoEruption, Func_b77a6)
 // object's state, its pointer kept in wCurSceneObjPtr, then a jump table
 // of animation states. A state whose animation finishes moves on to the
 // next one (Func_b4a0d) and dispatches again.
-
-// ld a, c / and $f8 / ld hl, wCurSceneObjPtr / ld [hli], a / ld [hl], b /
-// ld a, [bc]
-static void set_cur_scene_obj(GB *gb)
-{
-	gb->cpu.a = alu_and(gb, gb->cpu.c, 0xf8);
-	wr8(gb, wCurSceneObjPtr + 0, gb->cpu.a);
-	wr8(gb, wCurSceneObjPtr + 1, gb->cpu.b);
-	SET_HL(gb, wCurSceneObjPtr + 1);
-	gb->cpu.a = rd8(gb, REG_BC(gb));
-}
-
-// ld de, frameset / call UpdateCurOWObjAnimation / ld b, state / jr next
-static void anim_then(GB *gb, uint16_t frameset, uint8_t state, uint16_t next)
-{
-	SET_DE(gb, frameset);
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	gb->cpu.b = state;
-	JUMP_TO(next);
-}
-
-PORT_JUMP(Func_b4b99)
-{
-	set_cur_scene_obj(gb);
-	JUMP_TO(ADDR_Func_b4ba2); // fallthrough
-}
-
-PORT_JUMP(Func_b4ba2) { JUMP_TO(jumptable(gb, ADDR_Func_b4ba2 + 1)); }
-
-PORT_JUMP(Func_b4bfd) { SET_DE(gb, ADDR_Frameset_a9e7a); JUMP_TO(ADDR_Func_b4c60); }
-PORT_JUMP(Func_b4c0c) { SET_DE(gb, ADDR_Frameset_a9fd0); JUMP_TO(ADDR_Func_b4c60); }
-PORT_JUMP(Func_b4c11) { SET_DE(gb, ADDR_Frameset_a9e99); JUMP_TO(ADDR_Func_b4c60); }
-PORT_JUMP(Func_b4c81) { SET_DE(gb, ADDR_Frameset_a9ec8); JUMP_TO(ADDR_Func_b4c60); }
-PORT_JUMP(Func_b4c1b) { anim_then(gb, ADDR_Frameset_a9eea, 0x0b, ADDR_Func_b4c65); }
-PORT_JUMP(Func_b4c2f) { anim_then(gb, ADDR_Frameset_a9ef6, 0x0e, ADDR_Func_b4c65); }
-PORT_JUMP(Func_b4c8b) { anim_then(gb, ADDR_Frameset_a9f47, 0x1b, ADDR_Func_b4c65); }
-PORT_JUMP(Func_b4c95) { anim_then(gb, ADDR_Frameset_a9f76, 0x19, ADDR_Func_b4c65); }
-PORT_JUMP(Func_b4ca4) { anim_then(gb, ADDR_Frameset_a9faa, 0x1c, ADDR_Func_b4c65); }
-
-PORT_JUMP(Func_b4c60)
-{
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	gb->cpu.b = 0x00;
-	JUMP_TO(ADDR_Func_b4c65); // fallthrough
-}
-
-PORT_JUMP(Func_b4c65)
-{
-	gb_call(gb, ADDR_Func_b4a0d);
-	JUMP_TO((gb->cpu.f & FLAG_Z) ? ADDR_Func_b4ba2 : ADDR_Func_b4c5a);
-}
-
-PORT_JUMP(Func_b4cc2)
-{
-	set_cur_scene_obj(gb);
-	JUMP_TO(ADDR_Func_b4ccb); // fallthrough
-}
-
-PORT_JUMP(Func_b4ccb) { JUMP_TO(jumptable(gb, ADDR_Func_b4ccb + 1)); }
-
-PORT_JUMP(Func_b4d73) { SET_DE(gb, ADDR_Frameset_a96e1); JUMP_TO(ADDR_Func_b4da9); }
-PORT_JUMP(Func_b4d78) { SET_DE(gb, ADDR_Frameset_a96ea); JUMP_TO(ADDR_Func_b4da9); }
-PORT_JUMP(Func_b4d9b) { SET_DE(gb, ADDR_Frameset_a97ad); JUMP_TO(ADDR_Func_b4da9); }
-PORT_JUMP(Func_b4ddd) { SET_DE(gb, ADDR_Frameset_a97c5); JUMP_TO(ADDR_Func_b4da9); }
-PORT_JUMP(Func_b4de2) { SET_DE(gb, ADDR_Frameset_a97ef); JUMP_TO(ADDR_Func_b4da9); }
-PORT_JUMP(Func_b4d14) { anim_then(gb, ADDR_Frameset_a968d, 0x01, ADDR_Func_b4dae); }
-PORT_JUMP(Func_b4d31) { anim_then(gb, ADDR_Frameset_a9680, 0x03, ADDR_Func_b4dae); }
-PORT_JUMP(Func_b4d41) { anim_then(gb, ADDR_Frameset_a96b2, 0x09, ADDR_Func_b4dae); }
-PORT_JUMP(Func_b4d7d) { anim_then(gb, ADDR_Frameset_a96ef, 0x15, ADDR_Func_b4dae); }
-PORT_JUMP(Func_b4d87) { anim_then(gb, ADDR_Frameset_a974a, 0x15, ADDR_Func_b4dae); }
-PORT_JUMP(Func_b4de7) { anim_then(gb, ADDR_Frameset_a97b2, 0x15, ADDR_Func_b4dae); }
-
-PORT_JUMP(Func_b4da9)
-{
-	gb_call(gb, ADDR_UpdateCurOWObjAnimation);
-	gb->cpu.b = 0x00;
-	JUMP_TO(ADDR_Func_b4dae); // fallthrough
-}
-
-PORT_JUMP(Func_b4dae)
-{
-	gb_call(gb, ADDR_Func_b4a0d);
-	JUMP_TO((gb->cpu.f & FLAG_Z) ? ADDR_Func_b4ccb : ADDR_Func_b4da3);
-}
 
 PORT_JUMP(InitOWObjects_South)
 {
