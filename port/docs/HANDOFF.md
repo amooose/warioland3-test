@@ -429,22 +429,25 @@ helper left. Batch 1 found two (UpdateTempleScene, LoadHiddenFigureGfx).
 Neither caller read them, so both now declare ALL_REGISTERS, with the
 reason beside the hook.
 
-Cleanup status (2026-11-01): plain C++ now for home's memory, palettes,
-fades, sprites/animations, system/input, overworld helpers (home/*.hpp);
-the modules' state table wrappers (run_state_table); the font loaders and
-number printers (engine/font_counts); Action Help's palettes; the
-cutscenes' loaders (cutscenes/loaders.cpp, generated from a table);
-the overworld state table's states, V-Blank setters and level coordinates.
+Cleanup status (2026-11-01, branch claude/cleanup): plain C++ now for
+home's memory, palettes, fades, sprites/animations, system/input and
+overworld helpers (home/*.hpp); the modules' state table wrappers
+(run_state_table); the font loaders and number printers
+(engine/font_counts); Action Help's palettes; the cutscenes' loaders
+(cutscenes/loaders.cpp, generated from a table) and start; the overworld
+state table (no addresses left), its V-Blank setters, level coordinates
+and small routines (overworld/small.cpp); the epilogue's state table.
 Stays register-level by nature: the header (rst, interrupt vectors),
-start.cpp (boot, main loop), the RAM-run V-Blank .Func bodies, the
-title's LY-timed raster code, MainStateTable's dispatch. Left to do: the
-overworld's remaining register-level banks (bank20/21/26/2b, cutscene
-init, prologue/epilogue helpers; ~15 hooks called by address from the
-overworld modules: DrawCoinCount, GetCrayonFlags, SwitchDayNight,
-DoDayNightSpell, Func_803e6, Func_80bd9, CheckIfEventHasCutscene...),
-then the level engine (src/native/level, ~17k lines) with home's
-level-tied files (object_mechanics, wario_mechanics, load_room,
-load_level, door/floor transitions, room_transition).
+start.cpp (boot, main loop), the RAM-run V-Blank .Func bodies (and
+ApplyPalConfig1/2 they call), the title's LY-timed raster code,
+MainStateTable's dispatch, and hooks nothing calls any more (bank2b's
+old prologue/epilogue helpers). Left: the level engine (src/native/level,
+~17k lines, ~250 hooks reached from outside, mostly through the object
+data tables and home/object_mechanics) together with home's level-tied
+files (object_mechanics, wario_mechanics, load_room, load_level,
+door/floor transitions, room_transition) and bank26's treasure data
+(LoadLevelTreasureData, Func_9aab5), which the level and the clear
+screen share.
 
 Modules so far:
 
