@@ -4202,4 +4202,5 @@ PORT_EX(UpdateState_GrabIdling, HOOK_MANUAL_RET, 0) { WarioStates1(gb).port_Upda
 PORT_EX(UpdateState_GrabWalking, HOOK_MANUAL_RET, 0) { WarioStates1(gb).port_UpdateState_GrabWalking(); }
 PORT_EX(UpdateState_Attacking, HOOK_MANUAL_RET, 0) { WarioStates1(gb).port_UpdateState_Attacking(); }
 PORT_EX(UpdateWarioStates_Group1, HOOK_MANUAL_RET, 0) { WarioStates1(gb).port_UpdateWarioStates_Group1(); }
-PORT_EX(UpdateWarioStates, HOOK_MANUAL_RET, 0) { WarioStates1(gb).port_UpdateWarioStates(); }
+// update_level farcalls it and reloads every register it uses after
+PORT_EX(UpdateWarioStates, HOOK_MANUAL_RET, ALL_REGISTERS) { WarioStates1(gb).port_UpdateWarioStates(); }
