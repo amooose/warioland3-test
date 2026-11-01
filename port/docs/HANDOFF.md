@@ -637,6 +637,21 @@ Modules so far:
   are hooked now. Never wrap PORT_EX / PORT_LOCAL_EX in a macro:
   tools/gen.c finds hooks by their text, and a macro's hooks compile but
   are never registered (fuzz_batch reports them NOT FOUND).
+- **level engine** (src/native/level/*.cpp): the state table and
+  InitLevel (level.cpp), particles, object loading, room graphics, the
+  camera, the edge drawing and room-start row queues (scroll.cpp), the
+  block queue and edge spawning, room starts and the level's frame.
+  Unlike the objects, their callers are still register-level C (Wario's
+  states, object interactions, home), so every entry point leaves the
+  original's registers and flags; `src/native/flags.hpp` computes the
+  flags an instruction leaves. They keep the asm's pushes, and the room
+  starts and the frame keep its return addresses (`Routines::call_ret`,
+  `farcall_ret`), since the room drawing's queue overrun reads the stack.
+  Pitfalls seen: `sla e / sla e / rl d` is block * 4 with bit 7 lost; a
+  `ld [hli]` steps across a page where the `inc e` after it doesn't
+  (CreateObject_GotPos); `NONE` and `OWL` are macros (constants.h), so
+  enum values can't use them. collisions.c stays C until the Wario states
+  (its callers) move.
 
 `src/native/routines.hpp` wraps the register-level C routines a module calls
 (DisableLCD, FarDecompress, the golf sprite helpers...): each sets the
