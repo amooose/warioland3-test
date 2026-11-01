@@ -379,11 +379,12 @@ PORT_EX(PauseMenuStateTable, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 	wl3::run_state_table(gb, 0x03, BANK__PauseMenuStateTable, ADDR__PauseMenuStateTable, [&] { PauseMenu(gb).run_state(); });
 }
 
-// Called from ReturnToPauseMenuFromActionHelp, whose caller (Action Help's
-// state table) uses no register after it.
-PORT_EX(_ReturnToPauseMenuFromActionHelp, 0, ALL_REGISTERS)
+// Action Help's state table calls it (push_wram BANK("GFX RAM") around
+// _ReturnToPauseMenuFromActionHelp) and uses no register after it.
+PORT_EX(ReturnToPauseMenuFromActionHelp, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
-	PauseMenu(gb).return_from_action_help();
+	wl3::run_state_table(gb, 0x03, BANK__ReturnToPauseMenuFromActionHelp, ADDR__ReturnToPauseMenuFromActionHelp,
+		[&] { PauseMenu(gb).return_from_action_help(); });
 }
 
 // hl = the object; farcalled from the musical coins screen too, which uses
@@ -395,6 +396,7 @@ PORT_EX(LoadPauseMenuSprite, 0, ALL_REGISTERS)
 
 // The routines implemented inside this module (they have no hooks).
 PORT_COVERED(_PauseMenuStateTable);
+PORT_COVERED(_ReturnToPauseMenuFromActionHelp);
 PORT_COVERED(InitPauseMenu);
 PORT_COVERED(InitPauseMenu_SkipBackupVRAM);
 PORT_COVERED(UpdatePauseMenu);

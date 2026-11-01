@@ -34,21 +34,6 @@ public:
 		JUMP(ReturnToMap); // fallthrough
 	}
 
-	// Its caller (Action Help's state table, src/native/action_help) uses no
-	// register after it.
-	void port_ReturnToPauseMenuFromActionHelp()
-	{
-		// push_wram $03
-		cpu_.a = rd8(rWBK);
-		push_af();
-		cpu_.a = 0x03;
-		wr8(rWBK, cpu_.a);
-		FARCALL(_ReturnToPauseMenuFromActionHelp);
-		// pop_wram
-		pop_af();
-		wr8(rWBK, cpu_.a);
-	}
-
 	void port_ReturnToLevelFromGolf()
 	{
 		CALL(DisableLCD);
@@ -90,5 +75,4 @@ using wl3::home::HomeReturnLevel;
 PORT_EX(ReturnToPendingLevelState, 0, 0) { HomeReturnLevel(gb).port_ReturnToPendingLevelState(); }
 PORT_EX(ReturnToMap, 0, 0) { HomeReturnLevel(gb).port_ReturnToMap(); }
 PORT_EX(ReturnToMapFromLevel, HOOK_MANUAL_RET, 0) { HomeReturnLevel(gb).port_ReturnToMapFromLevel(); }
-PORT_EX(ReturnToPauseMenuFromActionHelp, 0, R_B | R_C | R_D | R_E | R_H | R_L) { HomeReturnLevel(gb).port_ReturnToPauseMenuFromActionHelp(); }
 PORT_EX(ReturnToLevelFromGolf, HOOK_MANUAL_RET, 0) { HomeReturnLevel(gb).port_ReturnToLevelFromGolf(); }

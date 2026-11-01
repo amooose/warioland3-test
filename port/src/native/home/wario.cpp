@@ -4,6 +4,8 @@
 #include "../flags.hpp"
 #include "memory.hpp"
 
+#include <initializer_list>
+
 namespace wl3::home {
 
 namespace {
@@ -70,6 +72,40 @@ void cap_walk_vel(GB *gb)
 	bool fall = falling(mem);
 	if (mem[wWalkVelIndex] >= (fall ? 0x08 : 0x10))
 		mem[wWalkVelIndex] = fall ? 0x04 : 0x0c;
+}
+
+namespace {
+
+// count palettes from src to the palette data register, one per H-Blank
+void apply_pals_in_hblank(GB *gb, uint16_t src, uint16_t data_reg, int count)
+{
+	Memory mem(gb);
+	while (count--) {
+		while (!(mem[rSTAT] & STAT_MODE))
+			idle(gb, 32);
+		while (mem[rSTAT] & STAT_MODE)
+			idle(gb, 32);
+		for (int i = 0; i < PAL_SIZE; i++)
+			mem[data_reg] = mem[src++];
+	}
+}
+
+} // namespace
+
+void clear_transformation_values(GB *gb)
+{
+	Memory mem(gb);
+	if (mem[wTransformation] == TRANSFORMATION_BLIND) { // .RestoreBlindPalettes
+		mem[rBGPI] = BGPI_AUTOINC | 0;
+		apply_pals_in_hblank(gb, wTempPals1, rBGPD, 8);
+		mem[rOBPI] = OBPI_AUTOINC | (3 * PAL_SIZE);
+		apply_pals_in_hblank(gb, wTempPals2 + 3 * PAL_SIZE, rOBPD, 4);
+	}
+	for (uint16_t at : std::initializer_list<uint16_t>{wInvincibleCounter, wTransformation, wTransformationProgress, wStingTouchState, wTouchState,
+			wca94, wIsIntangible, static_cast<uint16_t>(wTransformationDuration + 0),
+			static_cast<uint16_t>(wTransformationDuration + 1), wAutoMoveState, wInvisibleFrame,
+			wSwimmingDirectionInput})
+		mem[at] = 0;
 }
 
 } // namespace wl3::home
@@ -155,4 +191,18 @@ PORT_EX(Func_1762, 0, 0)
 	cap_walk_vel(gb);
 	gb->cpu.f = flags::cp(walk, fall ? 0x08 : 0x10);
 	gb->cpu.a = mem[wWalkVelIndex];
+}
+
+// after Blind, the palette copies' hl, b and c
+PORT_EX(ClearTransformationValues, 0, 0)
+{
+	bool blind = wl3::Memory(gb)[wTransformation] == TRANSFORMATION_BLIND;
+	clear_transformation_values(gb);
+	if (blind) {
+		SET_HL(gb, wTempPals2 + 3 * PAL_SIZE + 4 * PAL_SIZE);
+		gb->cpu.b = 0;
+		gb->cpu.c = static_cast<uint8_t>(rOBPD);
+	}
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
 }

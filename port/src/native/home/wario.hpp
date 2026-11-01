@@ -20,5 +20,8 @@ void open_action_help(GB *gb); // OpenActionHelp
 // Func_1762: caps wWalkVelIndex at $0c from $10 (on the ground or rising),
 // at $04 from $08 while falling
 void cap_walk_vel(GB *gb);
+// ClearTransformationValues: back to normal Wario (after Blind, the
+// palettes it darkened are restored, one per H-Blank)
+void clear_transformation_values(GB *gb);
 
 } // namespace wl3::home
