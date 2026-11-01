@@ -65,7 +65,7 @@ void SaveScreen::transition_after_save()
 		break;
 	default: // back to the map
 		routines_.disable_lcd();
-		routines_.call(ADDR_LoadBackupVRAM);
+		routines_.load_backup_vram();
 		wram_.reset_disabled() = 0;
 		mem_[rLCDC] = LCDC_ON | LCDC_WIN_9C00 | LCDC_WIN_ON | LCDC_OBJ_16 | LCDC_OBJ_ON | LCDC_BG_ON;
 		wram_.state() = ST_OVERWORLD;

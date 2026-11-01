@@ -4,6 +4,8 @@
 // follow it in some.
 #pragma once
 
+#include "home/memory.hpp"
+#include "home/sprites.hpp"
 #include "native.hpp"
 
 extern "C" void port_farcall(GB *gb, int bank, uint16_t addr);
@@ -48,11 +50,11 @@ public:
 	// whether the animation restarted (wObjAnimWasReset)
 	bool animate(uint8_t bank = 0)
 	{
-		SET_HL(gb_, static_cast<uint16_t>(base_ + 7));
+		uint16_t frameset = static_cast<uint16_t>(base_ + 7);
 		if (bank)
-			port_farcall(gb_, bank, ADDR_UpdateObjAnim);
+			home::farcall(gb_, bank, ADDR_UpdateObjAnim, [&] { home::update_obj_anim(gb_, frameset); });
 		else
-			gb_call(gb_, ADDR_UpdateObjAnim);
+			home::update_obj_anim(gb_, frameset);
 		return Byte(gb_, wObjAnimWasReset);
 	}
 
@@ -60,8 +62,8 @@ public:
 	// too, as hCallFunc maps it)
 	bool animate_far(uint8_t bank)
 	{
-		SET_HL(gb_, static_cast<uint16_t>(base_ + 7));
-		port_farcall(gb_, bank, ADDR_UpdateObjAnim);
+		uint16_t frameset = static_cast<uint16_t>(base_ + 7);
+		home::farcall(gb_, bank, ADDR_UpdateObjAnim, [&] { home::update_obj_anim(gb_, frameset); });
 		return Byte(gb_, wObjAnimWasReset);
 	}
 
@@ -71,8 +73,7 @@ public:
 	void load_sprite(uint16_t oam, bool scrolled = true)
 	{
 		set_cur_sprite(scrolled);
-		SET_HL(gb_, oam);
-		gb_call(gb_, ADDR_LoadSprite);
+		home::load_sprite(gb_, oam);
 	}
 
 	// wCurSprite*, for LoadSprite: its y relative to the background (or,

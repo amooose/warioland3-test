@@ -6,6 +6,7 @@
 
 #include "home/memory.hpp"
 #include "home/pals.hpp"
+#include "home/sprites.hpp"
 #include "native.hpp"
 #include "ram.hpp"
 
@@ -51,7 +52,8 @@ public:
 	void disable_lcd() { home::disable_lcd(gb_); }
 	void clear_virtual_oam() { home::clear_virtual_oam(gb_); }
 	void clear_unused_virtual_oam() { home::clear_unused_virtual_oam(gb_); }
-	void save_backup_vram() { call(ADDR_SaveBackupVRAM); }
+	void save_backup_vram() { home::save_backup_vram(gb_); }
+	void load_backup_vram() { home::load_backup_vram(gb_); }
 
 	// decompresses src from the given ROM bank (wTempBank) to dest
 	void far_decompress(uint8_t bank, uint16_t src, uint16_t dest)
