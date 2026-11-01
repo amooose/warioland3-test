@@ -3,6 +3,7 @@
 // side by its exits. w2d013 is the state, w2d014 counts its frames. See
 // overworld.hpp.
 #include "overworld.hpp"
+#include "../home/system.hpp"
 
 namespace wl3::overworld {
 
@@ -42,7 +43,7 @@ void MapWalk::unrealistic()
 // Func_80e89
 void MapWalk::update()
 {
-	routines_.call(ADDR_ProcessDPadRepeat);
+	home::process_dpad_repeat(gb_);
 	routines_.farcall(BANK_UpdateMapSideOWAnimations, ADDR_UpdateMapSideOWAnimations);
 	routines_.farcall(BANK_UpdateCommonOWAnimations, ADDR_UpdateCommonOWAnimations);
 	TopBar(gb_).update();

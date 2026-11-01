@@ -2,6 +2,7 @@
 // in their colours, a cursor, and links between treasures that go together.
 // See overworld.hpp.
 #include "overworld.hpp"
+#include "../home/system.hpp"
 
 namespace wl3::overworld {
 
@@ -216,7 +217,7 @@ void TreasureCollection::move_cursor()
 
 void TreasureCollection::update()
 {
-	routines_.call(ADDR_ProcessDPadRepeat);
+	home::process_dpad_repeat(gb_);
 	handle_input();
 	animate();
 	routines_.clear_unused_virtual_oam();

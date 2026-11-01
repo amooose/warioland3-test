@@ -1,6 +1,7 @@
 // The cutscenes' dispatch and shared helpers (bank27.asm). See
 // cutscenes.hpp.
 #include "cutscenes.hpp"
+#include "../home/system.hpp"
 
 namespace wl3::cutscenes {
 
@@ -22,7 +23,7 @@ void Cutscenes::unrealistic()
 // DoCutsceneFunc
 void Cutscenes::update()
 {
-	routines_.call(ADDR_ProcessDPadRepeat);
+	home::process_dpad_repeat(gb_);
 	++wram_.unk_2d014();
 	uint8_t event = wram_.event_with_cutscene();
 	if (event >= NUM_EVENTS) { // .OutOfBoundsCutscene: debug_nop

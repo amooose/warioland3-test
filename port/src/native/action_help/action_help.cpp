@@ -1,5 +1,6 @@
 // Action Help; see action_help.hpp.
 #include "action_help.hpp"
+#include "../home/system.hpp"
 #include "demo.hpp"
 
 namespace wl3::action_help {
@@ -152,7 +153,7 @@ void ActionHelp::update()
 		routines_.in_bank(BANK_ExecuteSpecialPowerUpActionHelp, ADDR_ExecuteSpecialPowerUpActionHelp,
 			[&] { run_special_power_up(); });
 	} else {
-		routines_.call(ADDR_ProcessDPadRepeat);
+		home::process_dpad_repeat(gb_);
 		if (!(wram_.power_up_level() & (ACTION_HELP_TITLE_SCREEN | ACTION_HELP_LEVEL_CLEAR)))
 			select_power_up();
 		run_main_power_up();
