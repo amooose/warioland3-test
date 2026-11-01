@@ -136,16 +136,12 @@ public:
 	// animation finished.
 	bool update_golf_object_animation(uint16_t frameset, uint16_t duration)
 	{
-		SET_DE(gb_, frameset);
-		SET_HL(gb_, duration);
-		call(ADDR_UpdateGolfObjectAnimation);
-		return gb_->cpu.c;
+		return home::update_golf_object_animation(gb_, frameset, duration);
 	}
 
 	void load_golf_sprite(uint16_t sprite)
 	{
-		SET_HL(gb_, sprite);
-		call(ADDR_LoadGolfSprite);
+		home::load_golf_sprite(gb_, sprite);
 	}
 
 	void update_golf_wario_animation() { call(ADDR_UpdateGolfWarioAnimation); }

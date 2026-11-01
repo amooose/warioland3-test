@@ -52,6 +52,16 @@ SpriteEnd load_credits_music_box_sprite(GB *gb, uint16_t obj);
 // v0Tiles0
 void load_wario_gfx(GB *gb);
 
+// UpdateGolfObjectAnimation: a golf object's animation step (duration,
+// then the offset and the frame after it; frameset entries are (frame,
+// duration), ended by $ff, which keeps the last frame in
+// wGolfAnimLastFrame and starts over); true when it started over.
+// new_duration: the duration it read for the next frame, if any
+bool update_golf_object_animation(GB *gb, uint16_t frameset, uint16_t duration, uint8_t *new_duration = nullptr);
+// LoadGolfSprite: the golf object's 4 bytes at obj (y, x, frame,
+// attributes, as OAM takes them), from the OAM data at wGolfOAMPtr
+SpriteEnd load_golf_sprite(GB *gb, uint16_t obj);
+
 void save_backup_vram(GB *gb); // SaveBackupVRAM: scroll, palettes and VRAM to WRAM 3-7
 void load_backup_vram(GB *gb); // LoadBackupVRAM: and back
 

@@ -47,72 +47,6 @@ public:
 		SET_HL(gb_, hl);
 	}
 
-	// hl = golf object duration, de = frameset
-	// outputs in c whether animation finished
-	void port_UpdateGolfObjectAnimation()
-	{
-		uint16_t hl = REG_HL(gb_);
-		cpu_.c = 0x00;
-		cpu_.a = alu_.sub(rd8(hl), 1);
-		wr8(hl++, cpu_.a);
-		if (!(cpu_.f & FLAG_C)) {
-			SET_HL(gb_, hl);
-			return;
-		}
-		cpu_.a = alu_.add(rd8(hl++), cpu_.e);
-		cpu_.c = cpu_.a;
-		cpu_.a = alu_.adc(cpu_.d, 0x00);
-		cpu_.b = cpu_.a;
-		uint16_t bc = REG_BC(gb_);
-		cpu_.a = rd8(bc);
-		alu_.cp(cpu_.a, 0xff);
-		if (cpu_.f & FLAG_Z) {
-			// .finished_animation
-			uint16_t de = REG_DE(gb_);
-			cpu_.a = rd8(hl);
-			wr8(wGolfAnimLastFrame, cpu_.a);
-			cpu_.a = rd8(de);
-			wr8(hl--, cpu_.a);
-			de++;
-			cpu_.a = 0x2;
-			wr8(hl--, cpu_.a);
-			cpu_.a = rd8(de);
-			wr8(hl, cpu_.a);
-			SET_DE(gb_, de);
-			SET_HL(gb_, hl);
-			cpu_.c = 1; // TRUE
-			return;
-		}
-		bc++;
-		wr8(hl--, cpu_.a); // frame
-		cpu_.a = alu_.add(rd8(hl), 0x2);
-		wr8(hl--, cpu_.a);
-		cpu_.a = rd8(bc);
-		wr8(hl, cpu_.a); // duration
-		SET_HL(gb_, hl);
-		cpu_.b = (uint8_t)(bc >> 8);
-		cpu_.c = 0; // FALSE
-	}
-
-	// hl = golf object sprite, wGolfOAMPtr = oam pointer
-	void port_LoadGolfSprite()
-	{
-		uint16_t hl = REG_HL(gb_);
-		cpu_.a = rd8(hl++);
-		wr8(wCurSpriteYCoord, cpu_.a);
-		cpu_.a = rd8(hl++);
-		wr8(wCurSpriteXCoord, cpu_.a);
-		cpu_.a = rd8(hl++);
-		wr8(wCurSpriteFrame, cpu_.a);
-		cpu_.a = rd8(hl);
-		wr8(wCurSpriteAttributes, cpu_.a);
-		cpu_.a = rd8(wGolfOAMPtr + 0);
-		cpu_.h = cpu_.a;
-		cpu_.a = rd8(wGolfOAMPtr + 1);
-		cpu_.l = cpu_.a;
-		CALL(LoadSprite);
-	}
-
 	// updates Golf Wario sprite, given its state
 	// and which direction it is facing
 	void port_UpdateGolfWarioAnimation()
@@ -181,6 +115,4 @@ using wl3::home::HomeLoadGolfSprite;
 
 PORT_EX(Func_2c30, 0, 0) { HomeLoadGolfSprite(gb).port_Func_2c30(); }
 PORT_EX(Func_2c46, 0, 0) { HomeLoadGolfSprite(gb).port_Func_2c46(); }
-PORT_EX(UpdateGolfObjectAnimation, 0, 0) { HomeLoadGolfSprite(gb).port_UpdateGolfObjectAnimation(); }
-PORT_EX(LoadGolfSprite, 0, 0) { HomeLoadGolfSprite(gb).port_LoadGolfSprite(); }
 PORT_EX(UpdateGolfWarioAnimation, 0, 0) { HomeLoadGolfSprite(gb).port_UpdateGolfWarioAnimation(); }

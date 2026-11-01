@@ -168,6 +168,45 @@ SpriteEnd load_credits_music_box_sprite(GB *gb, uint16_t obj)
 	return load_sprite_in(gb, mem[wTempBank], table, ADDR_LoadCreditsMusicBoxSprite);
 }
 
+bool update_golf_object_animation(GB *gb, uint16_t frameset, uint16_t duration, uint8_t *new_duration)
+{
+	Memory mem(gb);
+	uint8_t left = static_cast<uint8_t>(mem[duration] - 1);
+	mem[duration] = left;
+	if (left != 0xff)
+		return false;
+	uint16_t offset = static_cast<uint16_t>(duration + 1), frame = static_cast<uint16_t>(duration + 2);
+	uint16_t entry = static_cast<uint16_t>(frameset + mem[offset]);
+	uint8_t next = mem[entry];
+	if (next == 0xff) {
+		mem[wGolfAnimLastFrame] = mem[frame];
+		mem[frame] = mem[frameset];
+		mem[offset] = 2;
+		uint8_t next_duration = mem[static_cast<uint16_t>(frameset + 1)];
+		mem[duration] = next_duration;
+		if (new_duration)
+			*new_duration = next_duration;
+		return true;
+	}
+	mem[frame] = next;
+	mem[offset] = static_cast<uint8_t>(mem[offset] + 2);
+	uint8_t next_duration = mem[static_cast<uint16_t>(entry + 1)];
+	mem[duration] = next_duration;
+	if (new_duration)
+		*new_duration = next_duration;
+	return false;
+}
+
+SpriteEnd load_golf_sprite(GB *gb, uint16_t obj)
+{
+	Memory mem(gb);
+	mem[wCurSpriteYCoord] = mem[obj];
+	mem[wCurSpriteXCoord] = mem[static_cast<uint16_t>(obj + 1)];
+	mem[wCurSpriteFrame] = mem[static_cast<uint16_t>(obj + 2)];
+	mem[wCurSpriteAttributes] = mem[static_cast<uint16_t>(obj + 3)];
+	return load_sprite(gb, static_cast<uint16_t>(mem[wGolfOAMPtr + 0] << 8 | mem[wGolfOAMPtr + 1]));
+}
+
 void load_wario_gfx(GB *gb)
 {
 	Memory mem(gb);
@@ -409,4 +448,41 @@ PORT_EX(LoadWarioGfx, 0, 0)
 {
 	load_wario_gfx(gb);
 	gb->cpu.a = TRUE;
+}
+
+// hl = the duration, de = the frameset; c = TRUE when it started over
+PORT_EX(UpdateGolfObjectAnimation, 0, 0)
+{
+	wl3::Memory mem(gb);
+	uint16_t duration = REG_HL(gb), frameset = REG_DE(gb);
+	uint8_t left = static_cast<uint8_t>(mem[duration] - 1);
+	uint8_t offset = mem[static_cast<uint16_t>(duration + 1)];
+	uint16_t entry = static_cast<uint16_t>(frameset + offset);
+	uint8_t next_duration = 0;
+	bool over = update_golf_object_animation(gb, frameset, duration, &next_duration);
+	gb->cpu.c = 0;
+	if (left != 0xff) {
+		gb->cpu.a = left;
+		gb->cpu.f = flags::sub(static_cast<uint8_t>(left + 1), 1);
+		SET_HL(gb, static_cast<uint16_t>(duration + 1));
+		return;
+	}
+	SET_HL(gb, duration);
+	if (over) {
+		gb->cpu.b = static_cast<uint8_t>(entry >> 8);
+		gb->cpu.c = 1;
+		SET_DE(gb, static_cast<uint16_t>(frameset + 1));
+		gb->cpu.a = next_duration;
+		gb->cpu.f = flags::cp(0xff, 0xff);
+		return;
+	}
+	gb->cpu.b = static_cast<uint8_t>((entry + 1) >> 8);
+	gb->cpu.a = next_duration;
+	gb->cpu.f = flags::add(offset, 2);
+}
+
+// hl = the golf object's sprite
+PORT_EX(LoadGolfSprite, 0, 0)
+{
+	set_sprite_regs(gb, load_golf_sprite(gb, REG_HL(gb)));
 }
