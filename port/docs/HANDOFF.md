@@ -449,6 +449,27 @@ door/floor transitions, room_transition) and bank26's treasure data
 (LoadLevelTreasureData, Func_9aab5), which the level and the clear
 screen share.
 
+Level engine plan (step 4; started 2026-11-01 with home's Wario
+primitives, home/wario.cpp, and the golf objects' animation):
+- The entries update_level calls (UpdateWarioStates, UpdateObjects,
+  ProcessInteractions, through farcall_ret) are followed by code that
+  reloads every register, so their contracts can be ALL_REGISTERS; check
+  each asm caller first, as for the state tables.
+- ProcessBlock's block functions can unwind past their caller into the
+  Wario state or object that ran the collision check (they pop its return
+  address); update_level passes real return addresses for that. In plain
+  C++, a collision check returns whether it unwound, and its caller
+  returns at once, in place of reading the stack.
+- Convert a Wario state group (or an object routine set) at a time to
+  plain member functions over home::move_wario_x and the other plain
+  primitives; check the new internals with temporary ALL_REGISTERS hooks
+  and many variants, as for the save data, then remove the hooks; run the
+  full fuzz tier for each batch.
+- Home's level-tied files (load_room, load_level, decompress_level_data,
+  door/floor/room transitions, wario_mechanics1, object_mechanics,
+  object_pos, IsOnSlipperyGround) go with the level code that calls
+  them.
+
 Modules so far:
 
 - **audio** (src/native/audio): the sound engine; 13 entry points.
