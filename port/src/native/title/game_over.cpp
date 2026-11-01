@@ -152,8 +152,7 @@ void GameOver::load_tilemap()
 	routines_.decompress(ADDR_GameOverTilemap, v0BGMap0);
 }
 
-// The hidden figure behind the final battle. Its registers end as the last
-// Decompress leaves them, as the original's do.
+// The hidden figure behind the final battle.
 void GameOver::load_hidden_figure_gfx()
 {
 	routines_.load_pals_to_temp_pals1(ADDR_Pals_db000);
@@ -183,7 +182,9 @@ PORT_EX(_GameOverStateTable, 0, ALL_REGISTERS)
 	GameOver(gb).run_state();
 }
 
-PORT(LoadHiddenFigureGfx)
+// Farcalled from InitLevel only: there, hCallFunc's pop af gives back f,
+// a is set next, and LevelStateTable clobbers b to l.
+PORT_EX(LoadHiddenFigureGfx, 0, ALL_REGISTERS)
 {
 	GameOver(gb).load_hidden_figure_gfx();
 }

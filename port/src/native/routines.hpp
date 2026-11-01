@@ -1,8 +1,11 @@
-// Calling the routines that are still register-level C (src/ported) from
-// C++: each wrapper loads the registers the routine takes, calls it as the
-// original's call would, and returns what it returns.
+// Calling home routines from C++. Those with plain C++ versions (home/
+// memory.hpp...) are called directly; for the rest, each wrapper loads the
+// registers the routine takes, calls it as the original's call would, and
+// returns what it returns.
 #pragma once
 
+#include "home/memory.hpp"
+#include "home/pals.hpp"
 #include "native.hpp"
 #include "ram.hpp"
 
@@ -34,14 +37,7 @@ public:
 	template <class F>
 	void in_bank(uint8_t bank, uint16_t addr, F fn)
 	{
-		Memory mem(gb_);
-		mem[hCallFuncBank] = bank;
-		mem[hCallFuncPointer + 0] = static_cast<uint8_t>(addr);
-		mem[hCallFuncPointer + 1] = static_cast<uint8_t>(addr >> 8);
-		uint8_t saved = mem[wROMBank];
-		switch_bank(bank);
-		fn();
-		switch_bank(saved);
+		home::farcall(gb_, bank, addr, fn);
 	}
 
 	// the bankswitch macro
@@ -52,73 +48,63 @@ public:
 		mem[rROMB0 + 0x100] = bank;
 	}
 
-	void disable_lcd() { call(ADDR_DisableLCD); }
-	void clear_virtual_oam() { call(ADDR_ClearVirtualOAM); }
-	void clear_unused_virtual_oam() { call(ADDR_ClearUnusedVirtualOAM); }
+	void disable_lcd() { home::disable_lcd(gb_); }
+	void clear_virtual_oam() { home::clear_virtual_oam(gb_); }
+	void clear_unused_virtual_oam() { home::clear_unused_virtual_oam(gb_); }
 	void save_backup_vram() { call(ADDR_SaveBackupVRAM); }
 
 	// decompresses src from the given ROM bank (wTempBank) to dest
 	void far_decompress(uint8_t bank, uint16_t src, uint16_t dest)
 	{
 		Memory(gb_).byte(wTempBank) = bank;
-		SET_HL(gb_, src);
-		SET_BC(gb_, dest);
-		call(ADDR_FarDecompress);
+		home::far_decompress(gb_, src, dest);
 	}
 
 	// decompresses src (from the ROM bank mapped) to dest
 	void decompress(uint16_t src, uint16_t dest)
 	{
-		SET_HL(gb_, src);
-		SET_BC(gb_, dest);
-		call(ADDR_Decompress);
+		home::decompress(gb_, src, dest);
 	}
 
 	// copies count bytes from src, in the ROM bank wTempBank, to dest
 	void far_copy(uint16_t src, uint16_t dest, uint16_t count)
 	{
-		SET_HL(gb_, src);
-		SET_DE(gb_, dest);
-		SET_BC(gb_, count);
-		call(ADDR_FarCopyHLToDE_BC2);
+		home::far_copy(gb_, src, dest, count ? count : 0x10000);
 	}
 
 	void copy(uint16_t src, uint16_t dest, uint8_t count)
 	{
-		SET_HL(gb_, src);
-		SET_DE(gb_, dest);
-		gb_->cpu.b = count;
-		call(ADDR_CopyHLToDE);
+		home::copy(gb_, src, dest, count ? count : 0x100);
 	}
 
 	// CopyHLToDE_BC and CopyHLToDE_Short, with bank mapped (farcall) or
 	// from the bank mapped (bank 0)
 	void copy_bc(uint16_t src, uint16_t dest, uint16_t count, uint8_t bank = 0)
 	{
-		SET_HL(gb_, src);
-		SET_DE(gb_, dest);
-		SET_BC(gb_, count);
-		far_or_near(bank, ADDR_CopyHLToDE_BC);
+		auto copy = [&] { home::copy(gb_, src, dest, count ? count : 0x10000); };
+		if (bank)
+			home::farcall(gb_, bank, ADDR_CopyHLToDE_BC, copy);
+		else
+			copy();
 	}
 
 	void copy_short(uint16_t src, uint16_t dest, uint8_t count, uint8_t bank = 0)
 	{
-		SET_HL(gb_, src);
-		SET_DE(gb_, dest);
-		gb_->cpu.b = count;
-		far_or_near(bank, ADDR_CopyHLToDE_Short);
+		auto copy = [&] { home::copy_short(gb_, src, dest, count); };
+		if (bank)
+			home::farcall(gb_, bank, ADDR_CopyHLToDE_Short, copy);
+		else
+			copy();
 	}
 
 	void load_pals_to_temp_pals1(uint16_t pals)
 	{
-		SET_HL(gb_, pals);
-		call(ADDR_LoadPalsToTempPals1);
+		home::load_pals_to_temp_pals1(gb_, pals);
 	}
 
 	void load_pals_to_temp_pals2(uint16_t pals)
 	{
-		SET_HL(gb_, pals);
-		call(ADDR_LoadPalsToTempPals2);
+		home::load_pals_to_temp_pals2(gb_, pals);
 	}
 
 	void play_new_music(uint16_t music)
@@ -162,14 +148,6 @@ public:
 	void update_golf_wario_animation() { call(ADDR_UpdateGolfWarioAnimation); }
 
 private:
-	void far_or_near(uint8_t bank, uint16_t addr)
-	{
-		if (bank)
-			farcall(bank, addr);
-		else
-			call(addr);
-	}
-
 	GB *gb_;
 };
 

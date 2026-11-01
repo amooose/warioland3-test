@@ -413,6 +413,22 @@ remove the hooks. That found an ordering bug in the save module that the
 entry's fuzzing had missed: a step marker written before a checksum
 that counts it.
 
+Home is a library, so its routines become plain functions (home/memory.hpp:
+copy, fill, decompress, the far variants, the OAM and BG map clears,
+ClearVRAM/ClearWRAM, DisableLCD; home/pals.hpp: the palette loads and
+stores) that `Routines` calls directly. Their hooks stay as thin register
+wrappers for register-level callers, leaving exactly the registers the asm
+leaves. `home::bankswitch`, `home::hcall` and `home::farcall` switch banks
+as home code (hCallFunc) does, so a module calling them from ROMX code
+isn't flagged as switching banks under itself. `Routines::in_bank` uses
+them too.
+
+When a shared helper stops leaving registers, run the full fuzz tier: a
+module entry with an exact contract may have been passing on registers a
+helper left. Batch 1 found two (UpdateTempleScene, LoadHiddenFigureGfx).
+Neither caller read them, so both now declare ALL_REGISTERS, with the
+reason beside the hook.
+
 Modules so far:
 
 - **audio** (src/native/audio): the sound engine; 13 entry points.
@@ -429,8 +445,9 @@ Modules so far:
   over screen (`GameOver`), on a shared `Screen`. Entered through
   `TitleStateTable` (b to l clobbered; a and f as pop_wram leaves them) and
   `_GameOverStateTable`; `StartOverworldState`,
-  `StartOverworldStateAndNewGameParam`, `Func_4628` and
-  `LoadHiddenFigureGfx`, called from elsewhere, keep exact registers. The
+  `StartOverworldStateAndNewGameParam` and `Func_4628`, called from
+  elsewhere, keep exact registers; `LoadHiddenFigureGfx` clobbers them all
+  (InitLevel reads none after it). The
   rLY-timed raster effects and the V-Blank function stay C
   (title/raster.c).
 - **screens** (src/native/screens): the GB incompatible notice, the

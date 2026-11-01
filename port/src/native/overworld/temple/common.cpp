@@ -42,5 +42,6 @@ public:
 using wl3::overworld::OverworldTempleCommon;
 
 PORT_EX(InitTempleScene, 0, 0) { OverworldTempleCommon(gb).port_InitTempleScene(); }
-PORT_EX(UpdateTempleScene, 0, 0) { OverworldTempleCommon(gb).port_UpdateTempleScene(); }
+// an overworld state table entry: the main loop reloads every register
+PORT_EX(UpdateTempleScene, 0, ALL_REGISTERS) { OverworldTempleCommon(gb).port_UpdateTempleScene(); }
 PORT_EX(Func_80e33, 0, 0) { OverworldTempleCommon(gb).port_Func_80e33(); }
