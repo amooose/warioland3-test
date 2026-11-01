@@ -1,6 +1,7 @@
 // What the demonstrations show (common1.asm and common2.asm): the prompts,
 // Wario's looks, the enemies and objects, and their sprites; see demo.hpp.
 #include "demo.hpp"
+#include "pals.hpp"
 
 namespace wl3::action_help {
 
@@ -16,8 +17,8 @@ void Demo::init_demo()
 	wram_.action_help_frozen() = 0;
 	wram_.room_animated_tiles_enabled() = 0;
 	wram_.scy() = 0x04;
-	routines_.farcall(BANK_Func_1e48bc, ADDR_Func_1e48bc);
-	routines_.farcall(BANK_Func_1e4a47, ADDR_Func_1e4a47);
+	routines_.in_bank(BANK_Func_1e48bc, ADDR_Func_1e48bc, [&] { load_blacked_out_bg_pals(gb_); });
+	routines_.in_bank(BANK_Func_1e4a47, ADDR_Func_1e4a47, [&] { load_ob_pals_4_to_7(gb_); });
 	clear_dpad();
 	clear_buttons();
 	timer() = 0x60;

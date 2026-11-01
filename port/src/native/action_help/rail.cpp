@@ -1,5 +1,6 @@
 // The Rail demonstration; see demo.hpp.
 #include "demo.hpp"
+#include "pals.hpp"
 
 namespace wl3::action_help {
 
@@ -76,7 +77,7 @@ void RailDemo::start()
 	mem_[wActionHelpWarioOAMPtr + 1] = static_cast<uint8_t>(ADDR_OAM_1fee05);
 	wram_.action_help_wario_oam_bank() = BANK_OAM_1fee05;
 	init_object(enemy(), 0x20, 0x4c, ADDR_Frameset_1e6fc2, ADDR_OAM_1e6f86, BANK_OAM_1e6f86);
-	call(ADDR_LoadActionHelpPalsWithoutWater);
+	action_help::load_pals_without_water(gb_); // a call, not a farcall
 	next_state();
 }
 

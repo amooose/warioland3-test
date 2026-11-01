@@ -105,7 +105,7 @@ protected:
 	void load_wario_sprite(); // LoadActionHelpWarioSprite
 
 	void call(uint16_t addr) { routines_.call(addr); }
-	void load_pals_without_water(); // LoadActionHelpPalsWithoutWater (C)
+	void load_pals_without_water(); // LoadActionHelpPalsWithoutWater, farcalled
 
 	// common1.asm: the shared states
 	void init_demo(); // ActionHelp_Init

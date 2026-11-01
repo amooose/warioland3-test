@@ -1,6 +1,7 @@
 // The Swimming Flippers demonstration, and what the swimming demonstrations
 // share; see demo.hpp.
 #include "demo.hpp"
+#include "pals.hpp"
 
 namespace wl3::action_help {
 
@@ -68,7 +69,7 @@ void WaterDemo::start()
 	wram_.animated_tiles_gfx() = ANIMATED_TILES_GFX_02;
 	wram_.room_animated_tiles_enabled() = TRUE;
 	timer() = 0x30;
-	routines_.farcall(BANK_LoadActionHelpPalsWithWater, ADDR_LoadActionHelpPalsWithWater);
+	routines_.in_bank(BANK_LoadActionHelpPalsWithWater, ADDR_LoadActionHelpPalsWithWater, [&] { load_pals_with_water(gb_); });
 	next_state();
 }
 

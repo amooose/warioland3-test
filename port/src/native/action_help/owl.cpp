@@ -1,5 +1,6 @@
 // The Owl demonstration; see demo.hpp.
 #include "demo.hpp"
+#include "pals.hpp"
 
 namespace wl3::action_help {
 
@@ -61,7 +62,7 @@ void OwlDemo::start()
 	mem_[wActionHelpWarioOAMPtr + 1] = static_cast<uint8_t>(ADDR_OAM_1fddb4);
 	wram_.action_help_wario_oam_bank() = BANK_OAM_1fddb4;
 	hide_block_debris_far(enemy());
-	call(ADDR_LoadActionHelpPalsWithoutWater);
+	action_help::load_pals_without_water(gb_); // a call, not a farcall
 	next_state();
 }
 

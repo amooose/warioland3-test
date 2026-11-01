@@ -1,5 +1,6 @@
 // The Vampire demonstration; see demo.hpp.
 #include "demo.hpp"
+#include "pals.hpp"
 
 namespace wl3::action_help {
 
@@ -87,7 +88,7 @@ void VampireDemo::start()
 	mem_[wActionHelpWarioOAMPtr + 0] = static_cast<uint8_t>(ADDR_OAM_1fd498 >> 8);
 	mem_[wActionHelpWarioOAMPtr + 1] = static_cast<uint8_t>(ADDR_OAM_1fd498);
 	wram_.action_help_wario_oam_bank() = BANK_OAM_1fd498;
-	call(ADDR_LoadActionHelpPalsWithoutWater);
+	action_help::load_pals_without_water(gb_); // a call, not a farcall
 	next_state();
 }
 

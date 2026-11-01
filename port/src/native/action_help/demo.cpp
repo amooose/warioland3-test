@@ -1,5 +1,6 @@
 // What the power-up demonstrations share; see demo.hpp.
 #include "demo.hpp"
+#include "pals.hpp"
 
 namespace wl3::action_help {
 
@@ -261,7 +262,7 @@ void Demo::animate_wario(uint8_t bank)
 
 void Demo::load_pals_without_water()
 {
-	routines_.farcall(BANK_LoadActionHelpPalsWithoutWater, ADDR_LoadActionHelpPalsWithoutWater);
+	routines_.in_bank(BANK_LoadActionHelpPalsWithoutWater, ADDR_LoadActionHelpPalsWithoutWater, [&] { action_help::load_pals_without_water(gb_); });
 }
 
 } // namespace wl3::action_help
