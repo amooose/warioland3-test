@@ -473,8 +473,19 @@ primitives, home/wario.cpp, and the golf objects' animation):
   RET() dropped, the dispatcher a switch); watch for "else RET();" before
   a shared return and for computed jumps (JUMP_TO(target)), which become
   member function pointers. Group 1's dispatcher switches on a (the asm
-  doesn't reload wWarioState). Next the same for update_objects and
-  object_interactions, then the handler bodies' registers -> locals.
+  doesn't reload wWarioState). object_interactions too:
+  ProcessInteractions loops natively, an interaction that jumps to
+  .next_obj sets next_obj_ (121 internal hooks gone). Run alone (temporary
+  hooks), the handlers that go on to the next object differ from the asm
+  in wObjPtr only; ProcessInteractions checks them.
+- update_objects is left as it is for now: 60 of its 82 labels are the
+  object helpers the objects call by address, it calls the collision
+  routines with return addresses that matter, and DoObjectAction jumps
+  through the object action tables (targets in other files), so each
+  jump needs deciding whether its target keeps a hook. Take it with the
+  objects' own cleanup.
+- Next: the handler bodies' registers -> locals (Wario states,
+  interactions), a handler at a time.
 - Home's level-tied files (load_room, load_level, decompress_level_data,
   door/floor/room transitions, wario_mechanics1, object_mechanics,
   object_pos, IsOnSlipperyGround) go with the level code that calls
