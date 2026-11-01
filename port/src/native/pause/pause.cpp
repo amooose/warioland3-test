@@ -1,4 +1,5 @@
 // The pause menu; see pause.hpp.
+#include "../engine/font_counts.hpp"
 #include "pause.hpp"
 
 namespace wl3::pause {
@@ -111,8 +112,7 @@ void PauseMenu::init_menu()
 	routines_.in_bank(BANK_LoadPauseMenuGfx, ADDR_LoadPauseMenuGfx, [&] { load_gfx(); });
 	routines_.in_bank(BANK_Func_1f403f, ADDR_Func_1f403f, [&] { draw_maps(); });
 	print_music_coins();
-	SET_HL(gb_, v0BGMap1 + 15 * TILEMAP_WIDTH + 14);
-	routines_.farcall(BANK_PrintNumberCoins, ADDR_PrintNumberCoins);
+		routines_.in_bank(BANK_PrintNumberCoins, ADDR_PrintNumberCoins, [&] { engine::print_number_coins(gb_, v0BGMap1 + 15 * TILEMAP_WIDTH + 14); });
 	routines_.call(ADDR_VBlank_PauseMenu);
 	mem_[rSCY] = 0;
 	mem_[rSCX] = 0;

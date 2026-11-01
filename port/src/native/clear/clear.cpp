@@ -1,4 +1,5 @@
 // The level clear screens; see clear.hpp.
+#include "../engine/font_counts.hpp"
 #include "clear.hpp"
 
 namespace wl3::clear {
@@ -147,8 +148,7 @@ void ClearScreen::init()
 		mem_[rVBK] = 0;
 		routines_.decompress(ADDR_ClearScreenTreasureTilemap, v0BGMap0);
 	});
-	SET_HL(gb_, v0BGMap0 + 16 * TILEMAP_WIDTH + 6);
-	routines_.farcall(BANK_PrintNumberCoins, ADDR_PrintNumberCoins);
+		routines_.in_bank(BANK_PrintNumberCoins, ADDR_PrintNumberCoins, [&] { engine::print_number_coins(gb_, v0BGMap0 + 16 * TILEMAP_WIDTH + 6); });
 
 	// the treasures of the level's colours
 	static constexpr struct { int flag; uint8_t x; uint8_t tile; } TREASURES[4] = {

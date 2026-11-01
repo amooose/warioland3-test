@@ -12,34 +12,6 @@ class EnginePrintCounts : public AsmModule {
 public:
 	using AsmModule::AsmModule;
 
-	// hl = BG map address
-	void port_PrintNumberCoins()
-	{
-		SET_BC(gb_, (uint16_t)-TILEMAP_WIDTH);
-		SET_DE(gb_, TILEMAP_WIDTH);
-		uint16_t hl = REG_HL(gb_);
-		for (int i = 0; i < 3; i++) {
-			uint8_t a;
-			if (i == 0) {
-				a = alu_.and_(rd8(wNumCoins), 0x0f); // hundreds
-			} else if (i == 1) {
-				a = alu_.swap(rd8(wNumCoins + 1));
-				a = alu_.and_(a, 0x0f); // tens
-			} else {
-				a = alu_.and_(rd8(wNumCoins + 1), 0x0f); // ones
-			}
-			a = alu_.add(a, a);
-			a = alu_.add(a, 0xa0);
-			wr8(hl, a);
-			hl = alu_.add16(hl, TILEMAP_WIDTH);
-			a = alu_.inc(a);
-			wr8(hl++, a);
-			hl = alu_.add16(hl, (uint16_t)-TILEMAP_WIDTH);
-			cpu_.a = a;
-		}
-		SET_HL(gb_, hl);
-	}
-
 	// sets flags in wKeyAndTreasureFlags corresponding to the collected
 	// treasures in wOWLevel
 	void port_GetOWLevelCollectedTreasures()
@@ -78,34 +50,6 @@ public:
 		pop_af(); // pop_wram
 		wr8(rWBK, cpu_.a);
 	}
-
-	// ld [hl], a / add hl, de / inc a / ld [hli], a / add hl, bc
-	uint16_t print_digit(uint16_t hl, uint8_t digit)
-	{
-		cpu_.a = alu_.add(digit, digit); // *2
-		cpu_.a = alu_.add(cpu_.a, 0xa0);
-		wr8(hl, cpu_.a);
-		hl = alu_.add16(hl, REG_DE(gb_));
-		cpu_.a = alu_.inc(cpu_.a);
-		wr8(hl++, cpu_.a);
-		return alu_.add16(hl, REG_BC(gb_));
-	}
-
-	void port_PrintNumCollectedTreasures()
-	{
-		SET_BC(gb_, (uint16_t)-TILEMAP_WIDTH);
-		SET_DE(gb_, TILEMAP_WIDTH);
-		uint16_t hl = REG_HL(gb_);
-
-		// hundreds
-		hl = print_digit(hl, alu_.and_(rd8(wNumCollectedTreasures + 0), 0x0f));
-		// tens
-		cpu_.a = alu_.swap(rd8(wNumCollectedTreasures + 1));
-		hl = print_digit(hl, alu_.and_(cpu_.a, 0x0f));
-		// ones
-		hl = print_digit(hl, alu_.and_(rd8(wNumCollectedTreasures + 1), 0x0f));
-		SET_HL(gb_, hl);
-	}
 };
 
 } // namespace
@@ -114,6 +58,4 @@ public:
 
 using wl3::engine::EnginePrintCounts;
 
-PORT_EX(PrintNumberCoins, 0, 0) { EnginePrintCounts(gb).port_PrintNumberCoins(); }
 PORT_EX(GetOWLevelCollectedTreasures, 0, 0) { EnginePrintCounts(gb).port_GetOWLevelCollectedTreasures(); }
-PORT_EX(PrintNumCollectedTreasures, 0, 0) { EnginePrintCounts(gb).port_PrintNumCollectedTreasures(); }

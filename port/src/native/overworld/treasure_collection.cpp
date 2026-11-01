@@ -1,6 +1,7 @@
 // The treasure collection (bank26.asm): pages of treasures, the ones found
 // in their colours, a cursor, and links between treasures that go together.
 // See overworld.hpp.
+#include "../engine/font_counts.hpp"
 #include "overworld.hpp"
 #include "../home/system.hpp"
 
@@ -119,8 +120,7 @@ void TreasureCollection::init()
 	mem_[rVBK] = 1;
 	routines_.copy_bc(wAttrmap, v0BGMap1, 18 * TILEMAP_WIDTH);
 	mem_[rVBK] = 0;
-	SET_HL(gb_, v0BGMap1 + 1 * TILEMAP_WIDTH + 2);
-	routines_.farcall(BANK_PrintNumCollectedTreasures, ADDR_PrintNumCollectedTreasures);
+		routines_.in_bank(BANK_PrintNumCollectedTreasures, ADDR_PrintNumCollectedTreasures, [&] { engine::print_num_collected_treasures(gb_, v0BGMap1 + 1 * TILEMAP_WIDTH + 2); });
 
 	set_scene_obj_state(wSceneObj1State, 0x01); // the cursor
 	// the page arrows

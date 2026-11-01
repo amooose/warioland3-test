@@ -1,4 +1,5 @@
 // The title screen; see title.hpp.
+#include "../engine/font_counts.hpp"
 #include "title.hpp"
 
 #include <initializer_list>
@@ -416,7 +417,7 @@ void Title::load_title_tilemap()
 void Title::load_time_attack_tiles()
 {
 	ram(rVBK) = VRAM1;
-	routines_.farcall(BANK_LoadFontTiles, ADDR_LoadFontTiles);
+	routines_.in_bank(BANK_LoadFontTiles, ADDR_LoadFontTiles, [&] { engine::load_font_tiles(gb_); });
 	ram(rVBK) = 0;
 	routines_.copy_bc(ADDR_PrologueBackgroundGfx, v0Tiles2, 0x80 * TILE_SIZE, BANK_PrologueBackgroundGfx);
 }

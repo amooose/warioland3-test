@@ -1,4 +1,5 @@
 // The small screens; see screens.hpp.
+#include "../engine/font_counts.hpp"
 #include "screens.hpp"
 
 namespace wl3::screens {
@@ -38,8 +39,8 @@ void GBIncompatible::init()
 	routines_.disable_lcd();
 	routines_.call(ADDR_ClearBGMap0);
 	routines_.clear_virtual_oam();
-	routines_.farcall(BANK_LoadGBIncompatibleScreenGfx, ADDR_LoadGBIncompatibleScreenGfx);
-	routines_.farcall(BANK_LoadGBIncompatibleScreenMap, ADDR_LoadGBIncompatibleScreenMap);
+	routines_.in_bank(BANK_LoadGBIncompatibleScreenGfx, ADDR_LoadGBIncompatibleScreenGfx, [&] { engine::load_gb_incompatible_screen_gfx(gb_); });
+	routines_.in_bank(BANK_LoadGBIncompatibleScreenMap, ADDR_LoadGBIncompatibleScreenMap, [&] { engine::load_gb_incompatible_screen_map(gb_); });
 	routines_.call(ADDR_VBlank_GBIncompatible);
 
 	wram_.scx() = 0;
@@ -70,9 +71,9 @@ void LanguageSelection::init()
 	routines_.disable_lcd();
 	routines_.call(ADDR_FillBGMap0_With7f);
 	routines_.clear_virtual_oam();
-	routines_.farcall(BANK_LoadFontPals, ADDR_LoadFontPals);
-	routines_.farcall(BANK_LoadFontTiles, ADDR_LoadFontTiles);
-	routines_.farcall(BANK_LoadLanguageSelectionText, ADDR_LoadLanguageSelectionText);
+	routines_.in_bank(BANK_LoadFontPals, ADDR_LoadFontPals, [&] { engine::load_font_pals(gb_); });
+	routines_.in_bank(BANK_LoadFontTiles, ADDR_LoadFontTiles, [&] { engine::load_font_tiles(gb_); });
+	routines_.in_bank(BANK_LoadLanguageSelectionText, ADDR_LoadLanguageSelectionText, [&] { engine::load_language_selection_text(gb_); });
 	routines_.copy(VBLANK_LANGUAGE_FUNC, wVBlankFunc, VBLANK_LANGUAGE_FUNC_SIZE);
 
 	wram_.scy() = 0;
