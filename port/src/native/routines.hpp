@@ -4,6 +4,7 @@
 // returns what it returns.
 #pragma once
 
+#include "home/fades.hpp"
 #include "home/memory.hpp"
 #include "home/pals.hpp"
 #include "home/sprites.hpp"

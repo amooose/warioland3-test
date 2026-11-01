@@ -234,9 +234,9 @@ void GolfHole::run_state()
 void GolfHole::run_unreferenced_state()
 {
 	switch (wram_.sub_state()) {
-	case 0: routines_.call(ADDR_FastFadeToWhite); break;
+	case 0: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case 1: init(); break;
-	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
+	case 2: home::darken_bg_to_pal(gb_, FADE_SPEED_SLOW); break;
 	case 3: handle(); break;
 	case 4: break; // Func_1c8fb7: nothing
 	default: unrealistic(); break;

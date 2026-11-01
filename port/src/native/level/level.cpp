@@ -54,12 +54,12 @@ private:
 void LevelState::run_state()
 {
 	switch (wram_.sub_state()) {
-	case 0: routines_.call(ADDR_FastFadeToWhite); break;
+	case 0: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case 1: init(); break;
-	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
+	case 2: home::darken_bg_to_pal(gb_, FADE_SPEED_SLOW); break;
 	case 3: routines_.call(ADDR_UpdateLevel); break;
 	case 4: routines_.call(ADDR_DoorTransition); break;
-	case 5: routines_.call(ADDR_FastFadeToWhite); break;
+	case 5: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case 6: routines_.call(ADDR_StartRoom_FromTransition); break;
 	case SST_LEVEL_MULTI_BLOCK: routines_.call(ADDR_ProcessMultiBlock); break;
 	case 8: case 9: case 10: case 11: case 12: case 13: case 14: case 15:

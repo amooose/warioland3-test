@@ -24,9 +24,9 @@ void Screen::unrealistic()
 void GBIncompatible::run_state()
 {
 	switch (wram_.sub_state()) {
-	case 0: routines_.call(ADDR_FastFadeToWhite); break;
+	case 0: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case 1: init(); break;
-	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
+	case 2: home::darken_bg_to_pal(gb_, FADE_SPEED_SLOW); break;
 	case 3: break; // ExitGBIncompatible: it stays
 	case 4: case 5: case 6: case 7: routines_.call(ADDR_DebugReset); break;
 	default: unrealistic(); break;
@@ -56,9 +56,9 @@ void GBIncompatible::init()
 void LanguageSelection::run_state()
 {
 	switch (wram_.sub_state()) {
-	case 0: routines_.call(ADDR_FastFadeToWhite); break;
+	case 0: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case 1: init(); break;
-	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
+	case 2: home::darken_bg_to_pal(gb_, FADE_SPEED_SLOW); break;
 	case 3: update(); break;
 	case 4: case 5: case 6: case 7: case 8: case 9: routines_.call(ADDR_DebugReset); break;
 	default: unrealistic(); break;
@@ -132,9 +132,9 @@ void LanguageSelection::draw_cursor()
 void Perfect::run_state()
 {
 	switch (wram_.sub_state()) {
-	case 0: routines_.call(ADDR_SlowFadeBGToWhite); break;
+	case 0: home::fade_bg_to_white(gb_, FADE_SPEED_FAST); break;
 	case 1: init(); break;
-	case 2: routines_.call(ADDR_DarkenBGToPal_Fast); break;
+	case 2: home::darken_bg_to_pal(gb_, FADE_SPEED_FAST); break;
 	case 3: update(); break;
 	case 4: case 5: case 6: case 7: case 8: case 9: case 10: case 11: case 12:
 		routines_.call(ADDR_DebugReset);
@@ -183,7 +183,7 @@ void Perfect::update()
 
 	Byte timer = wram_.timer();
 	if ((!timer || !--timer) && !(wram_.global_counter() & 0x07)) {
-		routines_.call(ADDR_SlowFadeInScreen);
+		home::slow_fade_in_screen(gb_);
 		if (wram_.sub_state() != 3) {
 			wram_.sub_state() = 3;
 			next_colours();

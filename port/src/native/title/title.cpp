@@ -29,15 +29,15 @@ void Screen::unrealistic()
 void Title::run_state()
 {
 	switch (wram_.sub_state()) {
-	case 0: routines_.call(ADDR_FastFadeToWhite); break;
+	case 0: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case 1: init_intro(); break;
-	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
+	case 2: home::darken_bg_to_pal(gb_, FADE_SPEED_SLOW); break;
 	case 3: intro_phase1(); break;
 	case 4: intro_phase2(); break;
 	case 5: intro_phase3(); break;
 	case 6: end_intro(); break;
 	case SST_START_MENU: start_menu(); break;
-	case SST_START_MENU + 1: routines_.call(ADDR_SlowFadeBGToWhite); break;
+	case SST_START_MENU + 1: home::fade_bg_to_white(gb_, FADE_SPEED_FAST); break;
 	case SST_START_MENU + 2: init_time_attack_description(); break;
 	case SST_START_MENU + 3: time_attack_description(); break;
 	case 11: case 12: case 13: case 14: case 15: case 16:
@@ -362,7 +362,7 @@ void Title::end_intro()
 		return;
 	}
 	if (!(wram_.global_counter() & 0x03))
-		routines_.call(ADDR_SlowFadeInScreen);
+		home::slow_fade_in_screen(gb_);
 	if (wram_.sub_state() == SST_START_MENU)
 		start_title_screen();
 }

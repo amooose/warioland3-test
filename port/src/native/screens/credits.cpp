@@ -34,9 +34,9 @@ uint16_t next_in_page(uint16_t addr)
 void Credits::run_state()
 {
 	switch (wram_.sub_state()) {
-	case 0: routines_.call(ADDR_FastFadeToWhite); break;
+	case 0: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case 1: init(); break;
-	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
+	case 2: home::darken_bg_to_pal(gb_, FADE_SPEED_SLOW); break;
 	case 3: show(); break;
 	case 4: music_box_plays(); break;
 	case 5: close_up(); break;
@@ -285,7 +285,7 @@ void Credits::wind_key(bool slowly)
 	// Func_160318: the screen fades in
 	if (wram_.global_counter() & 0x0f)
 		return;
-	routines_.call(ADDR_SlowFadeInScreen);
+	home::slow_fade_in_screen(gb_);
 	wram_.timer() = 180;
 }
 

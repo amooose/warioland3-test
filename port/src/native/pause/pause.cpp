@@ -13,13 +13,13 @@ void PauseMenu::run_state()
 {
 	uint8_t state = wram_.sub_state();
 	switch (state) {
-	case 0: routines_.call(ADDR_SlowFadeBGToWhite); return;
+	case 0: home::fade_bg_to_white(gb_, FADE_SPEED_FAST); return;
 	case 1: init(); return;
-	case 2: routines_.call(ADDR_DarkenBGToPal_Fast); return;
+	case 2: home::darken_bg_to_pal(gb_, FADE_SPEED_FAST); return;
 	case 3: update(); return;
-	case 4: routines_.call(ADDR_SlowFadeBGToWhite); return;
+	case 4: home::fade_bg_to_white(gb_, FADE_SPEED_FAST); return;
 	case 5: exit(); return;
-	case 6: routines_.call(ADDR_DarkenBGToPal_Fast); return;
+	case 6: home::darken_bg_to_pal(gb_, FADE_SPEED_FAST); return;
 	case 7: routines_.call(ADDR_ReturnToPendingLevelState); return;
 	}
 	// the three ways to save: from the pause menu (the level in progress),
@@ -33,9 +33,9 @@ void PauseMenu::run_state()
 		SaveScreen save(gb_);
 		bool level = i == 0;
 		switch (state - STARTS[i]) {
-		case 0: case 4: routines_.call(ADDR_SlowFadeBGToWhite); return;
+		case 0: case 4: home::fade_bg_to_white(gb_, FADE_SPEED_FAST); return;
 		case 1: save.init(!level); return;
-		case 2: case 6: routines_.call(ADDR_DarkenBGToPal_Fast); return;
+		case 2: case 6: home::darken_bg_to_pal(gb_, FADE_SPEED_FAST); return;
 		case 3: save.fill_bar(); return;
 		case 5:
 			if (level)
@@ -48,7 +48,7 @@ void PauseMenu::run_state()
 			if (level)
 				routines_.call(ADDR_Init); // ResetAfterPauseMenuSave
 			else
-				routines_.call(ADDR_SlowFadeBGToWhite);
+				home::fade_bg_to_white(gb_, FADE_SPEED_FAST);
 			return;
 		case 9:
 			if (i == 1)

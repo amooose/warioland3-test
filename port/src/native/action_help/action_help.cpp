@@ -34,11 +34,11 @@ void fill_2x2(Memory mem, uint16_t addr, uint8_t value)
 void ActionHelp::run_state()
 {
 	switch (wram_.sub_state()) {
-	case 0: routines_.call(ADDR_SlowFadeBGToWhite); break;
+	case 0: home::fade_bg_to_white(gb_, FADE_SPEED_FAST); break;
 	case 1: init(); break;
-	case 2: routines_.call(ADDR_DarkenBGToPal_Fast); break;
+	case 2: home::darken_bg_to_pal(gb_, FADE_SPEED_FAST); break;
 	case 3: update(); break;
-	case 4: routines_.call(ADDR_SlowFadeBGToWhite); break;
+	case 4: home::fade_bg_to_white(gb_, FADE_SPEED_FAST); break;
 	case 5: routines_.call(ADDR_ReturnToPauseMenuFromActionHelp); break;
 	case 6: case 7: case 8: case 9: case 10: case 11: case 12: case 13: case 14:
 		routines_.call(ADDR_DebugReset);

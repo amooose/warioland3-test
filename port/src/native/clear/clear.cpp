@@ -56,17 +56,17 @@ uint8_t level_row(uint8_t level, uint8_t &column)
 void ClearScreen::run_state()
 {
 	switch (wram_.sub_state()) {
-	case 0: routines_.call(ADDR_FastFadeToWhite); break;
+	case 0: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case 1: init(); break;
-	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
+	case 2: home::darken_bg_to_pal(gb_, FADE_SPEED_SLOW); break;
 	case 3: update(); break;
-	case SST_CLEAR_TIME_ATTACK: routines_.call(ADDR_SlowFadeBGToWhite); break;
+	case SST_CLEAR_TIME_ATTACK: home::fade_bg_to_white(gb_, FADE_SPEED_FAST); break;
 	case SST_CLEAR_TIME_ATTACK + 1: init_time_attack(); break;
-	case SST_CLEAR_TIME_ATTACK + 2: routines_.call(ADDR_DarkenBGToPal_Fast); break;
+	case SST_CLEAR_TIME_ATTACK + 2: home::darken_bg_to_pal(gb_, FADE_SPEED_FAST); break;
 	case SST_CLEAR_TIME_ATTACK + 3: update_time_attack(); break;
-	case SST_CLEAR_MUSICAL_COINS: routines_.call(ADDR_SlowFadeBGToWhite); break;
+	case SST_CLEAR_MUSICAL_COINS: home::fade_bg_to_white(gb_, FADE_SPEED_FAST); break;
 	case SST_CLEAR_MUSICAL_COINS + 1: init_musical_coins(); break;
-	case SST_CLEAR_MUSICAL_COINS + 2: routines_.call(ADDR_DarkenBGToPal_Fast); break;
+	case SST_CLEAR_MUSICAL_COINS + 2: home::darken_bg_to_pal(gb_, FADE_SPEED_FAST); break;
 	case SST_CLEAR_MUSICAL_COINS + 3: count_coins(); break;
 	case SST_CLEAR_MUSICAL_COINS + 4: pencil_moves(); break;
 	case SST_CLEAR_MUSICAL_COINS + 5: pencil_scribbles(); break;

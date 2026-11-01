@@ -25,19 +25,19 @@ constexpr uint8_t VRAM1 = BANK_v1Tiles0;
 void Golf::run_golf_state()
 {
 	switch (wram_.sub_state()) {
-	case 0: routines_.call(ADDR_FastFadeToWhite); break;
+	case 0: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case 1: init_lobby(); break;
-	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
+	case 2: home::darken_bg_to_pal(gb_, FADE_SPEED_SLOW); break;
 	case 3: handle_lobby(); break;
-	case SST_GOLF_HOLE: routines_.call(ADDR_FastFadeToWhite); break;
+	case SST_GOLF_HOLE: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case SST_GOLF_HOLE + 1: GolfHole(gb_).init(); break;
-	case SST_GOLF_HOLE + 2: routines_.call(ADDR_SlowFadeFromWhite); break;
+	case SST_GOLF_HOLE + 2: home::darken_bg_to_pal(gb_, FADE_SPEED_SLOW); break;
 	case SST_GOLF_HOLE + 3: GolfHole(gb_).handle(); break;
-	case SST_GOLF_EXIT: routines_.call(ADDR_FastFadeToWhite); break;
+	case SST_GOLF_EXIT: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case SST_GOLF_EXIT + 1: routines_.call(ADDR_ReturnToLevelFromGolf); break;
-	case SST_GOLF_CLEAR: routines_.call(ADDR_FastFadeToWhite); break;
+	case SST_GOLF_CLEAR: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case SST_GOLF_CLEAR + 1: init_clear_cutscene(); break;
-	case SST_GOLF_CLEAR + 2: routines_.call(ADDR_SlowFadeFromWhite); break;
+	case SST_GOLF_CLEAR + 2: home::darken_bg_to_pal(gb_, FADE_SPEED_SLOW); break;
 	case SST_GOLF_CLEAR + 3: update_clear_cutscene(); break;
 	default: unrealistic(); break;
 	}
@@ -46,13 +46,13 @@ void Golf::run_golf_state()
 void Golf::run_building_state()
 {
 	switch (wram_.sub_state()) {
-	case 0: routines_.call(ADDR_FastFadeToWhite); break;
+	case 0: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case 1: init_building(); break;
-	case 2: routines_.call(ADDR_SlowFadeFromWhite); break;
+	case 2: home::darken_bg_to_pal(gb_, FADE_SPEED_SLOW); break;
 	case 3: handle_building(); break;
-	case 4: routines_.call(ADDR_FastFadeToWhite); break;
+	case 4: home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); break;
 	case 5: GolfHole(gb_).init(); break;
-	case 6: routines_.call(ADDR_SlowFadeFromWhite); break;
+	case 6: home::darken_bg_to_pal(gb_, FADE_SPEED_SLOW); break;
 	case 7: GolfHole(gb_).handle(); break;
 	case 8: routines_.call(ADDR_ReturnToMap); break;
 	default: unrealistic(); break;
