@@ -82,13 +82,6 @@ void Overworld::handle()
 
 void Overworld::run_state()
 {
-	// the states still register-level, by address (0: a C++ one, below)
-	static constexpr uint16_t STATES[40] = {
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	};
 	uint8_t state = wram_.sub_state();
 	switch (state) {
 	// the fades in and out of each part of the map
@@ -130,11 +123,7 @@ void Overworld::run_state()
 	case 38: routines_.farcall(BANK_Func_af13c, ADDR_Func_af13c); return;
 	case 39: save_after_level(gb_); return;
 	}
-	if (state >= 40) {
-		unrealistic();
-		return;
-	}
-	routines_.call(STATES[state]);
+	unrealistic(); // past the table's 40 states
 }
 
 // UpdateCutscene: a cutscene the top bar started is skipped with B, once
