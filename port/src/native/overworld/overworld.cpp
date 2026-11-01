@@ -320,7 +320,7 @@ void Overworld::init_map_side()
 	stop_music();
 	mem_[rWBK] = WRAM2;
 	routines_.clear_virtual_oam();
-	routines_.call(ADDR_VBlank_Overworld);
+	set_vblank_overworld(gb_);
 	clear_ow_wram();
 	Events(gb_).next_treasure_to_collect();
 
@@ -487,7 +487,7 @@ void Overworld::init_scene()
 	routines_.disable_lcd();
 	stop_music();
 	clear_ow_wram();
-	routines_.call(ADDR_VBlank_OWScene);
+	set_vblank_ow_scene(gb_);
 	routines_.clear_virtual_oam();
 	wram_.unk_2d011() = 0;
 	wram_.unk_2d018() = wram_.unk_2d015();

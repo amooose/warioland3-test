@@ -226,9 +226,7 @@ void PathPreview::step_arrow()
 			step = DONE;
 			return;
 		}
-		gb_->cpu.a = level;
-		routines_.call(ADDR_GetMapLevelCoords);
-		uint16_t coords = REG_HL(gb_);
+		uint16_t coords = map_level_coords(gb_, level);
 		wram_.unk_2d06f() = mem_[coords];
 		wram_.unk_2d070() = mem_[static_cast<uint16_t>(coords + 1)];
 		++step;

@@ -17,6 +17,14 @@
 
 namespace wl3::overworld {
 
+// VBlank_Overworld / VBlank_OWScene: their .Func (vblank.cpp, run from
+// RAM) to wVBlankFunc
+void set_vblank_overworld(GB *gb);
+void set_vblank_ow_scene(GB *gb);
+// GetMapLevelCoords: where a level of the current map side is (its y and
+// x), from MapLevelCoords
+uint16_t map_level_coords(GB *gb, uint8_t level);
+
 class Overworld {
 public:
 	explicit Overworld(GB *gb) : gb_(gb), mem_(gb), wram_(gb), hram_(gb), routines_(gb) {}

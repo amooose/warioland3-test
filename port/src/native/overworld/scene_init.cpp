@@ -192,7 +192,7 @@ void SceneInit::bottom_bar()
 		wSceneObj9Attributes, wSceneObj10Attributes})
 		mem_[attributes] |= 1 << 2;
 	routines_.farcall(BANK_Func_80bd9, ADDR_Func_80bd9);
-	routines_.farcall(BANK_VBlank_Overworld, ADDR_VBlank_Overworld);
+	routines_.in_bank(BANK_VBlank_Overworld, ADDR_VBlank_Overworld, [&] { set_vblank_overworld(gb_); });
 	decompress(BANK_OverworldBottomBarTreasuresTilemap, ADDR_OverworldBottomBarTreasuresTilemap, v0BGMap1, false);
 	decompress(BANK_OverworldBottomBarTreasuresAttrmap, ADDR_OverworldBottomBarTreasuresAttrmap, v1BGMap1, true);
 	mem_[wWX] = 0;
@@ -218,7 +218,7 @@ void SceneInit::top_bar()
 	mem_[rVBK] = 0;
 	home::copy_far_bytes(gb_, BANK_Pals_84a20, ADDR_Pals_84a20, wTempPals2 + 4 * PAL_SIZE, 4 * PAL_SIZE);
 	place(wSceneObj5, {0x00, 0x60, 0x00});
-	routines_.farcall(BANK_VBlank_Overworld, ADDR_VBlank_Overworld);
+	routines_.in_bank(BANK_VBlank_Overworld, ADDR_VBlank_Overworld, [&] { set_vblank_overworld(gb_); });
 	routines_.farcall(BANK_DrawCoinCount, ADDR_DrawCoinCount);
 	mem_[wSceneObj6State] = 0;
 	mem_[wSceneObj7State] = 0;

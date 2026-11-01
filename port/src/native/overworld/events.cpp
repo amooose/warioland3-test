@@ -179,9 +179,7 @@ void Events::show_missing_treasure_indicators()
 			routines_.farcall(BANK_GetOWLevelCollectedTreasures, ADDR_GetOWLevelCollectedTreasures);
 			if ((wram_.key_and_treasure_flags() & TREASURES_MASK) != TREASURES_MASK) {
 				// .PlaceTreasureMissingIndicator
-				gb_->cpu.a = mem_[w2dffe];
-				routines_.call(ADDR_GetMapLevelCoords);
-				uint16_t coords = REG_HL(gb_);
+				uint16_t coords = map_level_coords(gb_, mem_[w2dffe]);
 				wram_.owy_coord1() = mem_[coords];
 				wram_.owx_coord1() = mem_[coords + 1];
 				SET_HL(gb_, wOWCoords1);

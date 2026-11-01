@@ -566,7 +566,7 @@ void MapFunctions::day_night_spell()
 		if (mem_[wOWPalTransitionState])
 			return;
 		gb_->cpu.ime = false; // di
-		routines_.farcall(BANK_VBlank_Overworld, ADDR_VBlank_Overworld);
+		routines_.in_bank(BANK_VBlank_Overworld, ADDR_VBlank_Overworld, [&] { set_vblank_overworld(gb_); });
 		gb_->cpu.ime = true; // ei
 		gb_->cpu.ime_delay = 0;
 		next_step();
@@ -2213,7 +2213,7 @@ void MapFunctions::daytime()
 		if (mem_[wOWPalTransitionState])
 			return;
 		gb_->cpu.ime = false; // di
-		routines_.farcall(BANK_VBlank_OWScene, ADDR_VBlank_OWScene);
+		routines_.in_bank(BANK_VBlank_OWScene, ADDR_VBlank_OWScene, [&] { set_vblank_ow_scene(gb_); });
 		gb_->cpu.ime = true; // ei
 		gb_->cpu.ime_delay = 0;
 		next_step();

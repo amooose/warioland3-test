@@ -67,9 +67,7 @@ uint16_t Scenes::cth_word(uint16_t table, uint8_t a, uint8_t c)
 // GetMapLevelCoords
 uint16_t Scenes::map_level_coords(uint8_t level)
 {
-	gb_->cpu.a = level;
-	routines_.call(ADDR_GetMapLevelCoords);
-	return REG_HL(gb_);
+	return overworld::map_level_coords(gb_, level);
 }
 
 // GetOWCoordInTilemap: the tile at the coords in hl (also left in
@@ -479,7 +477,7 @@ bool Scenes::common_step(uint8_t step)
 		if (wram_.ow_pal_transition_state())
 			return true;
 		gb_->cpu.ime = false; // di
-		routines_.call(ADDR_VBlank_OWScene);
+		set_vblank_ow_scene(gb_);
 		gb_->cpu.ime = true; // ei
 		gb_->cpu.ime_delay = 0;
 		next_step();

@@ -109,7 +109,7 @@ void MapWalk::start_music()
 	if (wram_.ow_pal_transition_state())
 		return;
 	gb_->cpu.ime = false; // di
-	routines_.call(ADDR_VBlank_Overworld);
+	set_vblank_overworld(gb_);
 	gb_->cpu.ime = true; // ei
 	gb_->cpu.ime_delay = 0;
 }
@@ -461,9 +461,7 @@ void MapWalk::load_map_level_from_level_index()
 // GetMapLevelCoords: the level's entry in MapLevelCoords
 uint16_t MapWalk::map_level_coords(uint8_t level)
 {
-	gb_->cpu.a = level;
-	routines_.call(ADDR_GetMapLevelCoords);
-	return REG_HL(gb_);
+	return overworld::map_level_coords(gb_, level);
 }
 
 // Func_8212c: Wario at the level, w2d069 / w2d06a its coords

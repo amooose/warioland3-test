@@ -235,7 +235,7 @@ void TopBar::do_day_night_transition()
 	routines_.farcall(BANK_DayNightTransition, ADDR_DayNightTransition);
 	if (!wram_.ow_pal_transition_state()) {
 		gb_->cpu.ime = false; // di
-		routines_.call(ADDR_VBlank_Overworld);
+		set_vblank_overworld(gb_);
 		gb_->cpu.ime = true; // ei
 		gb_->cpu.ime_delay = 0;
 		wram_.ow_bars_state() = OWBARS_INPUT_TOP;

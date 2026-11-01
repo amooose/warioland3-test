@@ -3,8 +3,21 @@
 // keeping the original's registers, flags and return addresses for its
 // callers (see src/native/asm_module.hpp).
 #include "../asm_module.hpp"
+#include "../home/memory.hpp"
+#include "overworld.hpp"
 
 namespace wl3::overworld {
+
+void set_vblank_overworld(GB *gb)
+{
+	home::copy(gb, ADDR_VBlank_Overworld + 0x0c, wVBlankFunc, ADDR_VBlank_OWScene - (ADDR_VBlank_Overworld + 0x0c));
+}
+
+void set_vblank_ow_scene(GB *gb)
+{
+	home::copy(gb, ADDR_VBlank_OWScene + 0x0c, wVBlankFunc,
+		ADDR_UnreferencedOpenTreasureCollection - (ADDR_VBlank_OWScene + 0x0c));
+}
 
 namespace {
 
@@ -14,22 +27,6 @@ public:
 
 	// Both copy their .Func, the VBlank handler that runs from WRAM, to
 	// wVBlankFunc. The handlers themselves stay asm.
-
-	void port_VBlank_Overworld()
-	{
-		SET_HL(gb_, ADDR_VBlank_Overworld + 0x0c); // .Func
-		SET_DE(gb_, wVBlankFunc);
-		cpu_.b = (uint8_t)(ADDR_VBlank_OWScene - (ADDR_VBlank_Overworld + 0x0c)); // .end - .Func
-		CALL(CopyHLToDE);
-	}
-
-	void port_VBlank_OWScene()
-	{
-		SET_HL(gb_, ADDR_VBlank_OWScene + 0x0c); // .Func
-		SET_DE(gb_, wVBlankFunc);
-		cpu_.b = (uint8_t)(ADDR_UnreferencedOpenTreasureCollection - (ADDR_VBlank_OWScene + 0x0c)); // .end - .Func
-		CALL(CopyHLToDE);
-	}
 
 	// ld [$ff00+c], a
 	void ldh_c()
@@ -236,7 +233,9 @@ public:
 
 using wl3::overworld::OverworldVblank;
 
-PORT_EX(VBlank_Overworld, 0, 0) { OverworldVblank(gb).port_VBlank_Overworld(); }
-PORT_EX(VBlank_OWScene, 0, 0) { OverworldVblank(gb).port_VBlank_OWScene(); }
 PORT_LOCAL_EX(VBlank_Overworld, Func, HOOK_MANUAL_RET, 0) { OverworldVblank(gb).port_VBlank_Overworld__Func(); }
 PORT_LOCAL_EX(VBlank_OWScene, Func, HOOK_MANUAL_RET, 0) { OverworldVblank(gb).port_VBlank_OWScene__Func(); }
+
+// Only C++ modules set these now.
+PORT_COVERED(VBlank_Overworld);
+PORT_COVERED(VBlank_OWScene);
