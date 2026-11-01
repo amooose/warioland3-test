@@ -2,10 +2,10 @@
 // (return, save, Action Help, back to the map) with the level's keys and
 // treasures, and its state table.
 //
-// The save screens and saving (save.asm) are `SaveScreen`. Still C: the
-// checksums and save validation (pause/save/*.c), the save screen's
-// graphics loaders (bank7d.c), and DrawLevelObjectsAfterLevelReturn, which
-// home code calls.
+// The save screens and saving (save.asm) are `SaveScreen`, the checksums
+// and save validation `SaveData`. Still register-level: the save screen's
+// graphics loaders (bank7d.cpp), its V-Blank functions (save/vblank.cpp),
+// and DrawLevelObjectsAfterLevelReturn, which home code calls.
 #pragma once
 
 #include "../menu_object.hpp"
@@ -79,7 +79,7 @@ private:
 	uint16_t copy_treasures(uint16_t dest);
 	void save_game_data(uint16_t dest);
 	void save_level_data(uint16_t dest);
-	uint16_t checksum(uint16_t routine, uint16_t dest);
+	uint16_t checksum(uint16_t sum, uint16_t dest);
 	void write_sum(uint16_t dest, uint16_t sum);
 	void write_echoes(uint8_t step, uint16_t echo1, uint16_t echo2, uint16_t sum);
 	void switch_sram(uint8_t bank); // sramswitch
@@ -89,6 +89,54 @@ private:
 	Memory mem_;
 	Wram wram_;
 	Routines routines_;
+};
+
+// checksum.asm and validate_save.asm: the save's checksums, and on boot
+// checking the save and its backups, keeping the newest good copy.
+// Checksums are 16-bit byte sums, stored high byte first.
+class SaveData {
+public:
+	explicit SaveData(GB *gb) : mem_(gb), wram_(gb) {}
+
+	void validate(); // ValidateSaveData
+	void increment_save_counter(); // IncrementSaveCounter
+	uint16_t game_data_checksum(); // CalculateGameDataChecksum
+	uint16_t wram_data_checksum(); // CalculateWRAMDataChecksum
+	uint16_t backup_sram_checksum1(); // CalculateBackupSRAMChecksum1
+	uint16_t backup_sram_checksum2(); // CalculateBackupSRAMChecksum2
+	void back_up_sram(); // Func_1f14c6
+
+private:
+	// checksum.asm
+	uint16_t sum(uint16_t sum, uint16_t &addr, uint16_t count);
+	uint16_t sum_long(uint16_t sum, uint16_t &addr, uint16_t count);
+	uint16_t level_data_checksum(uint16_t addr); // Func_1f0b5b
+	uint16_t backup_sram_checksum(uint8_t bank, uint16_t start, uint16_t sram2);
+
+	// validate_save.asm
+	bool check_vals(uint16_t addr, const uint8_t (&vals)[4]) const; // CheckSaveVals1/2
+	uint16_t game_data_checksum_at(uint16_t addr); // Func_1f0d60.CalculateChecksumAtHL
+	void match_checksums(uint16_t sum, uint16_t echo1, uint16_t echo2); // .GetMatchingChecksum
+	bool checksum_ok(uint16_t sum) const;
+	void check(); // Func_1f0d60
+	void restore(); // Func_1f1246
+	void restore_game_data(uint16_t src);
+	void restore_wram(uint16_t src);
+	void restore_backup_sram();
+	void copy_sram(uint8_t from, uint8_t to); // a whole SRAM bank
+	void copy(uint16_t src, uint16_t dest, uint16_t count);
+
+	void mark(uint8_t step);
+	void clear_check_vals(uint16_t addr);
+	void clear_save(uint8_t step, uint16_t addr);
+	uint16_t read_sum(uint16_t addr) const;
+	void write_sum(uint16_t addr, uint16_t sum);
+	void write_sums(uint8_t step, const uint16_t (&dest)[3], uint16_t sum);
+	void switch_sram(uint8_t bank); // sramswitch
+	void switch_wram(uint8_t bank) { mem_[rWBK] = bank; }
+
+	Memory mem_;
+	Wram wram_;
 };
 
 } // namespace wl3::pause

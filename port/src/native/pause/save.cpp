@@ -157,11 +157,9 @@ void SaveScreen::save_level_data(uint16_t dest)
 	mem_[rWBK] = wram_bank;
 }
 
-// a checksum routine's result (de); also kept in wChecksum
-uint16_t SaveScreen::checksum(uint16_t routine, uint16_t dest)
+// a checksum, at dest and in wChecksum
+uint16_t SaveScreen::checksum(uint16_t sum, uint16_t dest)
 {
-	routines_.call(routine);
-	uint16_t sum = REG_DE(gb_);
 	write_sum(dest, sum);
 	mem_[wChecksum + 0] = static_cast<uint8_t>(sum >> 8);
 	mem_[wChecksum + 1] = static_cast<uint8_t>(sum);
@@ -201,13 +199,13 @@ void SaveScreen::show_complete_box()
 void SaveScreen::save()
 {
 	routines_.disable_lcd();
-	routines_.call(ADDR_IncrementSaveCounter);
+	SaveData(gb_).increment_save_counter();
 	uint8_t sram_bank = wram_.sram_bank();
 	switch_sram(0);
 	mark(0x10);
 	save_game_data(sCheckVals);
 	mark(0x11);
-	uint16_t sum = checksum(ADDR_CalculateGameDataChecksum, sGameDataChecksum);
+	uint16_t sum = checksum(SaveData(gb_).game_data_checksum(), sGameDataChecksum);
 	write_echoes(0x12, sGameDataChecksumEcho1, sGameDataChecksumEcho2, sum);
 	mark(0x20);
 	save_game_data(sBackupCheckVals);
@@ -234,17 +232,17 @@ void SaveScreen::save_level()
 	mem_[rWBK] = BANK_w3d280;
 	routines_.copy(w3d280 + 12 * PAL_SIZE, wcaa1, 4 * PAL_SIZE); // palettes 12 to 15
 	mem_[rWBK] = wram_bank;
-	routines_.call(ADDR_IncrementSaveCounter);
+	SaveData(gb_).increment_save_counter();
 	uint8_t sram_bank = wram_.sram_bank();
 	switch_sram(0);
 
 	mark(0x30);
 	save_level_data(s0a000);
 	mark(0x31);
-	uint16_t sum = checksum(ADDR_CalculateWRAMDataChecksum, sWRAMChecksum);
+	uint16_t sum = checksum(SaveData(gb_).wram_data_checksum(), sWRAMChecksum);
 	write_echoes(0x32, sWRAMChecksumEcho1, sWRAMChecksumEcho2, sum);
 	mark(0x41);
-	sum = checksum(ADDR_CalculateBackupSRAMChecksum1, s0a79d);
+	sum = checksum(SaveData(gb_).backup_sram_checksum1(), s0a79d);
 	write_echoes(0x42, s0a7ed, s0afad, sum);
 
 	static constexpr struct { uint8_t step; uint16_t data, sum, echo1, echo2; } BACKUPS[3] = {
@@ -254,11 +252,11 @@ void SaveScreen::save_level()
 	};
 	for (const auto &b : BACKUPS) {
 		if (b.step == 0x80)
-			routines_.call(ADDR_Func_1f14c6);
+			SaveData(gb_).back_up_sram();
 		mark(b.step);
 		save_level_data(b.data);
 		mark(static_cast<uint8_t>(b.step + 1));
-		sum = checksum(ADDR_CalculateWRAMDataChecksum, b.sum);
+		sum = checksum(SaveData(gb_).wram_data_checksum(), b.sum);
 		write_echoes(static_cast<uint8_t>(b.step + 2), b.echo1, b.echo2, sum);
 	}
 	mark(0);

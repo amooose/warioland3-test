@@ -400,6 +400,19 @@ src/ported/audio/engine.c, home/audio.c and home/audio_functions.c.
   less emulated time passes per frame. Mid-frame raster timing moves (more
   "screen alone differs" frames in the traces); nothing else does.
 
+Cleanup (branch claude/cleanup, from tag native-cpp-complete): the
+register-level C++ that tools/c2cpp.py made is rewritten module by
+module in this style. To find a group's entry points, list which of its
+hooks are referenced from outside its asm tree (a scratch script did this
+by scanning the .asm and src/native for each label). Internal routines
+lose their hooks (PORT_COVERED) and become plain calls, so the fuzzer only
+reaches them through the entries. To check them on their own, add
+temporary ALL_REGISTERS hooks for the rewritten internals (all memory is
+still compared), fuzz with many variants (`--fuzz-variants 3000`), then
+remove the hooks. That found an ordering bug in the save module that the
+entry's fuzzing had missed: a step marker written before a checksum
+that counts it.
+
 Modules so far:
 
 - **audio** (src/native/audio): the sound engine; 13 entry points.
@@ -580,9 +593,13 @@ Modules so far:
   the progress bar, saving the game or the level in progress to SRAM with
   checksums and backups). Entries: `_PauseMenuStateTable`,
   `_ReturnToPauseMenuFromActionHelp` and `LoadPauseMenuSprite` (hl = the
-  object), all clobbering every register. Still C: the checksums and save
-  validation (pause/save/*.c), the save screen's loaders (bank7d.c) and
-  DrawLevelObjectsAfterLevelReturn (home code calls it).
+  object), all clobbering every register. `SaveData` (save_data.cpp) is
+  the checksums and the boot-time save validation, plain C++ called
+  directly by `SaveScreen`; its one entry is `ValidateSaveData`
+  (ALL_REGISTERS: Start reads none after it). Still register-level: the
+  save screen's loaders (bank7d.cpp), its V-Blank functions
+  (save/vblank.cpp) and DrawLevelObjectsAfterLevelReturn (home code calls
+  it).
 - **clear** (src/native/clear): the level clear screens (`ClearScreen`):
   treasure and music boxes, the time attack result, the musical coins tally
   with the pencil. The bank-$78 loaders run through `in_bank`. Still C: the
