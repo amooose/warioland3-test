@@ -12,29 +12,6 @@ class HomeWarioMechanics2 : public AsmModule {
 public:
 	using AsmModule::AsmModule;
 
-	void port_OpenActionHelp()
-	{
-		cpu_.a = ST_ACTION_HELP;
-		wr8(wState, ST_ACTION_HELP);
-		wr8(wState + 1, 0); // wSubState
-		SET_HL(gb_, wState + 1);
-	}
-
-	// Caps wWalkVelIndex: at $0c from $10 on the ground or while jumping up,
-	// at $04 from $08 while falling.
-	void port_Func_1762()
-	{
-		cpu_.a = rd8(wJumpVelIndex);
-		alu_.cp(cpu_.a, FALLING_JUMP_VEL_INDEX);
-		bool falling = !(cpu_.f & FLAG_C);
-		cpu_.a = rd8(wWalkVelIndex);
-		alu_.cp(cpu_.a, falling ? 0x08 : 0x10);
-		if (cpu_.f & FLAG_C)
-			return;
-		cpu_.a = falling ? 0x04 : 0x0c;
-		wr8(wWalkVelIndex, cpu_.a);
-	}
-
 	// Copies wWarioPos to hPos with x moved to the left or right edge of the
 	// collision box, 3 pixels in, as the asm does it: from wWarioXPos + 1 down.
 	void get_pos_at_box_edge(bool left)
@@ -105,7 +82,5 @@ public:
 
 using wl3::home::HomeWarioMechanics2;
 
-PORT_EX(OpenActionHelp, 0, 0) { HomeWarioMechanics2(gb).port_OpenActionHelp(); }
-PORT_EX(Func_1762, 0, 0) { HomeWarioMechanics2(gb).port_Func_1762(); }
 PORT_EX(IsOnSlipperyGround, 0, 0) { HomeWarioMechanics2(gb).port_IsOnSlipperyGround(); }
 PORT_EX(ReleaseOwl, 0, 0) { HomeWarioMechanics2(gb).port_ReleaseOwl(); }
