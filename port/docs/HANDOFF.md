@@ -429,6 +429,23 @@ helper left. Batch 1 found two (UpdateTempleScene, LoadHiddenFigureGfx).
 Neither caller read them, so both now declare ALL_REGISTERS, with the
 reason beside the hook.
 
+Cleanup status (2026-11-01): plain C++ now for home's memory, palettes,
+fades, sprites/animations, system/input, overworld helpers (home/*.hpp);
+the modules' state table wrappers (run_state_table); the font loaders and
+number printers (engine/font_counts); Action Help's palettes; the
+cutscenes' loaders (cutscenes/loaders.cpp, generated from a table);
+the overworld state table's states, V-Blank setters and level coordinates.
+Stays register-level by nature: the header (rst, interrupt vectors),
+start.cpp (boot, main loop), the RAM-run V-Blank .Func bodies, the
+title's LY-timed raster code, MainStateTable's dispatch. Left to do: the
+overworld's remaining register-level banks (bank20/21/26/2b, cutscene
+init, prologue/epilogue helpers; ~15 hooks called by address from the
+overworld modules: DrawCoinCount, GetCrayonFlags, SwitchDayNight,
+DoDayNightSpell, Func_803e6, Func_80bd9, CheckIfEventHasCutscene...),
+then the level engine (src/native/level, ~17k lines) with home's
+level-tied files (object_mechanics, wario_mechanics, load_room,
+load_level, door/floor transitions, room_transition).
+
 Modules so far:
 
 - **audio** (src/native/audio): the sound engine; 13 entry points.
