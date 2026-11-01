@@ -85,7 +85,7 @@ void Overworld::run_state()
 	// the states still register-level, by address (0: a C++ one, below)
 	static constexpr uint16_t STATES[40] = {
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, ADDR_InitCutscene, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	};
@@ -112,6 +112,7 @@ void Overworld::run_state()
 	case 11: update_map_side(); return;
 	case 13: TreasureCollection(gb_).init_far(); return;
 	case 15: TreasureCollection(gb_).update_far(); return;
+	case 17: routines_.in_bank(BANK__InitCutscene, ADDR__InitCutscene, [&] { init_cutscene(gb_); }); return; // InitCutscene
 	case 19: update_cutscene(); return;
 	case 21: after_cutscene(); return; // Func_80db1
 	// InitBestTimeList, BestTimeList, InitTempleScene, UpdateTempleScene
@@ -257,7 +258,7 @@ void Overworld::init()
 		break;
 	}
 	set_stored_transition_param_as_return_to_map();
-	routines_.farcall(BANK_CheckIfEventHasCutscene, ADDR_CheckIfEventHasCutscene);
+	routines_.in_bank(BANK_CheckIfEventHasCutscene, ADDR_CheckIfEventHasCutscene, [&] { check_if_event_has_cutscene(gb_); });
 	if (wram_.event_with_cutscene()) {
 		play_scene(SST_OVERWORLD_CUTSCENE);
 		return;

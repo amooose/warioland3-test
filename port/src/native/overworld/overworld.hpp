@@ -33,6 +33,8 @@ void save_after_level(GB *gb); // Func_803e6
 void check_best_times(GB *gb); // Func_80de0
 void draw_coin_count(GB *gb); // DrawCoinCount
 uint8_t level_with_treasure(GB *gb, uint8_t treasure); // GetLevelThatContainsTreasure
+void check_if_event_has_cutscene(GB *gb); // CheckIfEventHasCutscene
+void init_cutscene(GB *gb); // _InitCutscene
 
 class Overworld {
 public:

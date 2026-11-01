@@ -2,7 +2,9 @@
 // best_times/common.asm) the overworld modules call; see overworld.hpp.
 #include "overworld.hpp"
 
+#include "../cutscenes/cutscenes.hpp"
 #include "../home/memory.hpp"
+#include "../routines.hpp"
 #include "../home/system.hpp"
 
 namespace wl3::overworld {
@@ -90,6 +92,45 @@ uint8_t level_with_treasure(GB *gb, uint8_t treasure)
 	return index >> 2;
 }
 
+// CheckIfEventHasCutscene (cutscene/init.asm): wCurEvent to
+// wEventWithCutscene if its CutsceneInitFunctions entry isn't
+// NoInitCutscene, else 0
+void check_if_event_has_cutscene(GB *gb)
+{
+	Memory mem(gb);
+	uint8_t event = mem[wCurEvent];
+	mem[wEventWithCutscene] = 0;
+	uint16_t init = mem.word(static_cast<uint16_t>(ADDR_CutsceneInitFunctions + event * 2));
+	if (init != ADDR_NoInitCutscene)
+		mem[wEventWithCutscene] = event;
+}
+
+// _InitCutscene (cutscene/init.asm): the screen off and cleared, the
+// cutscene's V-Blank function and init, then the LCD back on (with the
+// flags the cutscene asked flipped)
+void init_cutscene(GB *gb)
+{
+	Memory mem(gb);
+	home::disable_lcd(gb);
+	home::clear_virtual_oam(gb);
+	stop_music2(mem);
+	home::fill(gb, wLCDCFlagsToFlip, 0, 0x30);
+	home::copy(gb, ADDR_VBlank_Cutscene + 0x0c, wVBlankFunc, 0x51); // VBlank_Cutscene
+	cutscenes::Cutscenes(gb).init(); // InitEventCutscene
+	mem[rSCY] = 0;
+	mem[wSCY] = 0;
+	mem[rSCX] = 0;
+	mem[wSCX] = 0;
+	mem[w2d801] = 0;
+	mem[w2d013] = 0;
+	mem[w2d014] = 0;
+	mem[wPalConfig1TotalSteps] = 0;
+	mem[wPalConfig2TotalSteps] = 0;
+	mem[rLCDC] = static_cast<uint8_t>((LCDC_BG_ON | LCDC_OBJ_ON | LCDC_OBJ_16 | LCDC_WIN_9C00 | LCDC_ON) ^ mem[wLCDCFlagsToFlip]);
+	mem[wLCDCFlagsToFlip] = 0;
+	++mem[wSubState];
+}
+
 } // namespace wl3::overworld
 
 // Only the overworld modules (C++) call these.
@@ -101,3 +142,6 @@ PORT_COVERED(Func_803e6);
 PORT_COVERED(Func_80de0);
 PORT_COVERED(DrawCoinCount);
 PORT_COVERED(GetLevelThatContainsTreasure);
+PORT_COVERED(CheckIfEventHasCutscene);
+PORT_COVERED(InitCutscene);
+PORT_COVERED(_InitCutscene);
