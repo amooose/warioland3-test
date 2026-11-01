@@ -650,8 +650,10 @@ Modules so far:
   Pitfalls seen: `sla e / sla e / rl d` is block * 4 with bit 7 lost; a
   `ld [hli]` steps across a page where the `inc e` after it doesn't
   (CreateObject_GotPos); `NONE` and `OWL` are macros (constants.h), so
-  enum values can't use them. collisions.c stays C until the Wario states
-  (its callers) move.
+  enum values can't use them. Collisions and the block functions are C++
+  too (collisions.cpp, block_functions.cpp): they keep ProcessBlock's
+  unwinding and bank checks (a block function can pop past its caller or
+  come back in another bank) and every jump between block functions.
 
 `src/native/routines.hpp` wraps the register-level C routines a module calls
 (DisableLCD, FarDecompress, the golf sprite helpers...): each sets the
