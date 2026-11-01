@@ -116,6 +116,19 @@ public:
 		cpu_.f = static_cast<uint8_t>((r ? 0 : FLAG_Z) | ((v & 1) ? FLAG_C : 0));
 		return r;
 	}
+	// rlc r / rrc r (the CB ones)
+	uint8_t rlc(uint8_t v)
+	{
+		uint8_t r = static_cast<uint8_t>(v << 1 | v >> 7);
+		cpu_.f = static_cast<uint8_t>((r ? 0 : FLAG_Z) | ((v & 0x80) ? FLAG_C : 0));
+		return r;
+	}
+	uint8_t rrc(uint8_t v)
+	{
+		uint8_t r = static_cast<uint8_t>(v >> 1 | v << 7);
+		cpu_.f = static_cast<uint8_t>((r ? 0 : FLAG_Z) | ((v & 1) ? FLAG_C : 0));
+		return r;
+	}
 	// rla / rra / rlca / rrca: z clear
 	uint8_t rla(uint8_t v)
 	{

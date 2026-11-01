@@ -111,7 +111,7 @@ Each step that worked in the cloud session:
    matching that file's helpers and conventions.
    - The Wario state helpers (`st`, `ld_and`, `clear`, `load_gfx`,
      `set_oam`, `frameset_by_dir`, `anim`...) are now members of
-     `AsmModule` (src/native/level/asm_module.hpp), with the level engine
+     `AsmModule` (src/native/asm_module.hpp), with the level engine
      (all C++).
    - `home/fade.c` has `fade_begin`, `fade_end` and `unpack_rgb` /
      `pack_cur_rgb`.
@@ -656,10 +656,17 @@ Modules so far:
   come back in another bank) and every jump between block functions.
   The object engine (update_objects.cpp, object_interactions.cpp) was
   converted with tools/c2cpp.py: it turns a register-level C file into a
-  class over `AsmModule` (src/native/level/asm_module.hpp, the C helpers
+  class over `AsmModule` (src/native/asm_module.hpp, the C helpers
   as members on the real CPU state, `Alu` in src/native/alu.hpp for the
   flags), with the same logic, then gets reviewed and fuzzed like any
   port. Never wrap PORT_EX in a macro; the tool writes each hook out.
+  Every other register-level C file (home/, the overworld leftovers,
+  pause/save, golf, action help, title, the small screens) went through
+  the same tool into src/native/<subsystem>/ (class named after the
+  path, e.g. `HomeFade`). The only C left in src/ported is
+  home/ram_code.c, the emulator's RAM-code hooks, which stays C. A
+  routine taking a C function pointer becomes a member-function pointer
+  (`fade_to_pals1(&HomeFade::darken)`).
 
 `src/native/routines.hpp` wraps the register-level C routines a module calls
 (DisableLCD, FarDecompress, the golf sprite helpers...): each sets the

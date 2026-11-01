@@ -5,7 +5,7 @@
 //
 // Objects (C++) and register-level C call these, so they keep the
 // original's registers, flags and return addresses (see asm_module.hpp).
-#include "asm_module.hpp"
+#include "../asm_module.hpp"
 
 namespace wl3::level {
 

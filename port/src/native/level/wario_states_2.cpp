@@ -4,7 +4,7 @@
 // Register-level C and the level's frame call these, so they keep the
 // original's registers, flags and return addresses (see asm_module.hpp).
 // Converted with tools/c2cpp.py, then fuzzed hook by hook.
-#include "asm_module.hpp"
+#include "../asm_module.hpp"
 
 namespace wl3::level {
 

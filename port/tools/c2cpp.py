@@ -1,11 +1,14 @@
-# c2cpp.py in.c Class out.cpp "header comment": a register-level ported C
-# file -> a C++ class over AsmModule (src/native/level/asm_module.hpp), the
+# c2cpp.py in.c Class out.cpp "header comment" [namespace]: a register-level
+# ported C file -> a C++ class over AsmModule (src/native/asm_module.hpp), the
 # same logic: static functions and PORT bodies become members, the C
 # helpers (gb, alu_*, rd8/wr8...) the base class's, and each hook calls its
 # member. Review the output; it must still be fuzzed.
 import re, sys
 
 src, cls, out, comment = sys.argv[1:5]
+ns = sys.argv[5] if len(sys.argv) > 5 else 'wl3::level'
+import os
+inc = os.path.relpath(os.path.abspath('src/native/asm_module.hpp'), os.path.dirname(os.path.abspath(out))).replace(os.sep, '/')  # run from port/
 c = open(src, encoding='utf-8').read()
 
 # drop the includes and file-wide helper macros the base provides
@@ -52,6 +55,7 @@ c = re.sub(r'^static const\b', 'static constexpr', c, flags=re.M)
 
 # the CPU, the ALU and memory
 c = c.replace('gb->cpu.', 'cpu_.').replace('CPU->', 'cpu_.').replace('&gb->cpu', '&cpu_')
+c = re.sub(r'gb->', 'gb_->', c)
 c = c.replace('gb->rom_bank', 'gb_->rom_bank').replace('gb->test', 'gb_->test').replace('gb->no_tick', 'gb_->no_tick')
 ren = {'and': 'and_', 'or': 'or_', 'xor': 'xor_'}
 c = re.sub(r'\balu_(\w+)\(gb, ', lambda m: 'alu_.' + ren.get(m.group(1), m.group(1)) + '(', c)
@@ -77,9 +81,9 @@ for label, flags, clob, name in hooks:
 		lines.append(f'PORT_EX({label}, {flags}, {clob}) {{ {cls}(gb).port_{name}(); }}')
 
 text = f'''{comment}
-#include "asm_module.hpp"
+#include "{inc}"
 
-namespace wl3::level {{
+namespace {ns} {{
 
 namespace {{
 
@@ -92,9 +96,9 @@ public:
 
 }} // namespace
 
-}} // namespace wl3::level
+}} // namespace {ns}
 
-using wl3::level::{cls};
+using {ns}::{cls};
 
 {chr(10).join(lines)}
 '''

@@ -6,7 +6,7 @@
 //
 // Called by the level's frame and register-level C, so these keep the
 // original's registers, flags and return addresses (see asm_module.hpp).
-#include "asm_module.hpp"
+#include "../asm_module.hpp"
 
 namespace wl3::level {
 
