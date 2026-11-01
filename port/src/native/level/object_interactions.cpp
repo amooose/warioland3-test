@@ -16,7 +16,6 @@ class ObjectInteractions : public AsmModule {
 public:
 	using AsmModule::AsmModule;
 
-	#define ProcessInteractions_next_obj (ADDR_ProcessInteractions + 0x28)
 	#define ProcessInteractions_table (ADDR_ProcessInteractions + 0x150) // after the $ef
 
 	// a = [lo] + [hi]-style "ld a, [x] / add [hl] / sub e"
@@ -28,8 +27,8 @@ public:
 	}
 
 	// ProcessInteractions from .loop_objects (or .next_obj), up to the
-	// interaction's jumptable (or the ret at the end of the objects)
-	void pi_run(bool next)
+	// interaction's jumptable: whether it got there (or past the objects)
+	bool pi_run(bool next)
 	{
 		uint16_t hl;
 		if (next)
@@ -37,10 +36,8 @@ public:
 	loop_objects:
 		cpu_.a = cpu_.h;
 		alu_.cp(cpu_.a, (uint8_t)((wObjects >> 8) + 1));
-		if (ZF) {
-			RET();
-			return;
-		}
+		if (ZF)
+			return false; // past the last object
 		wr8(wObjPtr + 0, cpu_.a);
 		cpu_.a = cpu_.l;
 		wr8(wObjPtr + 1, cpu_.a);
@@ -207,25 +204,121 @@ public:
 		cpu_.a = rd8(hl);
 		cpu_.h = rd8((uint16_t)(hl + 1));
 		cpu_.l = cpu_.a;
-		JUMP_TO(REG_HL(gb_));
+		return true; // hl = the interaction
 	}
 
 	void port_ProcessInteractions()
 	{
 		if (ld_and(wIsIntangible) || ld_and(wIsFloorTransition) || ld_and(wAutoMoveState)) {
-			RET();
 			return;
 		}
 		xor_a();
 		wr8(wIsOnSteppableObject, 0);
 		SET_HL(gb_, wObjects);
-		pi_run(false);
+		// each interaction ends the loop (the asm's ret) or goes on with the
+		// next object (its jp .next_obj)
+		for (bool next = false; pi_run(next); next = true) {
+			next_obj_ = false;
+			interaction(REG_HL(gb_));
+			if (!next_obj_)
+				return;
+		}
 	}
 
-	void port_ProcessInteractions__next_obj()
+	// the interaction at handler, as the asm's jumptable (.table) jumps there
+	void interaction(uint16_t handler)
 	{
-		pi_run(true);
+		switch (handler) {
+		case ADDR_Func_20b6b: port_Func_20b6b(); return;
+		case ADDR_Func_20d1d: port_Func_20d1d(); return;
+		case ADDR_ObjInteraction_FrontSting: port_ObjInteraction_FrontSting(); return;
+		case ADDR_ObjInteraction_BackSting: port_ObjInteraction_BackSting(); return;
+		case ADDR_ObjInteraction_TopSting: port_ObjInteraction_TopSting(); return;
+		case ADDR_ObjInteraction_FullSting: port_ObjInteraction_FullSting(); return;
+		case ADDR_Func_20d81: port_Func_20d81(); return;
+		case ADDR_Func_20d8c: port_Func_20d8c(); return;
+		case ADDR_Func_20deb: port_Func_20deb(); return;
+		case ADDR_Func_20e39: port_Func_20e39(); return;
+		case ADDR_Func_20e60: port_Func_20e60(); return;
+		case ADDR_Func_20e6a: port_Func_20e6a(); return;
+		case ADDR_ObjInteraction_Walkable: port_ObjInteraction_Walkable(); return;
+		case ADDR_ObjInteraction_MusicalCoin: port_ObjInteraction_MusicalCoin(); return;
+		case ADDR_ObjInteraction_Fire: port_ObjInteraction_Fire(); return;
+		case ADDR_ObjInteraction_Richtertoffen: port_ObjInteraction_Richtertoffen(); return;
+		case ADDR_ObjInteraction_GreyKey: port_ObjInteraction_GreyKey(); return;
+		case ADDR_ObjInteraction_RedKey: port_ObjInteraction_RedKey(); return;
+		case ADDR_ObjInteraction_GreenKey: port_ObjInteraction_GreenKey(); return;
+		case ADDR_ObjInteraction_BlueKey: port_ObjInteraction_BlueKey(); return;
+		case ADDR_ObjInteraction_GreyTreasure: port_ObjInteraction_GreyTreasure(); return;
+		case ADDR_ObjInteraction_RedTreasure: port_ObjInteraction_RedTreasure(); return;
+		case ADDR_ObjInteraction_GreenTreasure: port_ObjInteraction_GreenTreasure(); return;
+		case ADDR_ObjInteraction_BlueTreasure: port_ObjInteraction_BlueTreasure(); return;
+		case ADDR_ObjInteraction_Omodonmeka: port_ObjInteraction_Omodonmeka(); return;
+		case ADDR_ObjInteraction_Silky: port_ObjInteraction_Silky(); return;
+		case ADDR_ObjInteraction_Food: port_ObjInteraction_Food(); return;
+		case ADDR_ObjInteraction_RegularCoin: port_ObjInteraction_RegularCoin(); return;
+		case ADDR_ObjInteraction_Electric: port_ObjInteraction_Electric(); return;
+		case ADDR_ObjInteraction_InvisibilityPotion: port_ObjInteraction_InvisibilityPotion(); return;
+		case ADDR_ObjInteraction_Pneumo: port_ObjInteraction_Pneumo(); return;
+		case ADDR_ObjInteraction_ZombieHead: port_ObjInteraction_ZombieHead(); return;
+		case ADDR_ObjInteraction_Bouncy: port_ObjInteraction_Bouncy(); return;
+		case ADDR_ObjInteraction_FireBot: port_ObjInteraction_FireBot(); return;
+		case ADDR_ObjInteraction_Solid: port_ObjInteraction_Solid(); return;
+		case ADDR_ObjInteraction_Omodon: port_ObjInteraction_Omodon(); return;
+		case ADDR_ObjInteraction_OrangeBird: port_ObjInteraction_OrangeBird(); return;
+		case ADDR_ObjInteraction_Vampire: port_ObjInteraction_Vampire(); return;
+		case ADDR_ObjInteraction_Bubble: port_ObjInteraction_Bubble(); return;
+		case ADDR_ObjInteraction_Ice: port_ObjInteraction_Ice(); return;
+		case ADDR_ObjInteraction_Owl: port_ObjInteraction_Owl(); return;
+		case ADDR_ObjInteraction_Rail: port_ObjInteraction_Rail(); return;
+		case ADDR_ObjInteraction_Haridama: port_ObjInteraction_Haridama(); return;
+		case ADDR_ObjInteraction_AnonsterWave: port_ObjInteraction_AnonsterWave(); return;
+		case ADDR_ObjInteraction_AnonsterSilk: port_ObjInteraction_AnonsterSilk(); return;
+		case ADDR_ObjInteraction_Snow: port_ObjInteraction_Snow(); return;
+		case ADDR_ObjInteraction_UnlitTorch: port_ObjInteraction_UnlitTorch(); return;
+		case ADDR_ObjInteraction_Stove: port_ObjInteraction_Stove(); return;
+		case ADDR_ObjInteraction_RoboMouse: port_ObjInteraction_RoboMouse(); return;
+		case ADDR_Func_21af1: port_Func_21af1(); return;
+		case ADDR_ObjInteraction_DollBoyHammer: port_ObjInteraction_DollBoyHammer(); return;
+		case ADDR_ObjInteraction_RollingRock: port_ObjInteraction_RollingRock(); return;
+		case ADDR_ObjInteraction_Wormwould: port_ObjInteraction_Wormwould(); return;
+		case ADDR_ObjInteraction_Beam: port_ObjInteraction_Beam(); return;
+		case ADDR_Func_21b78: port_Func_21b78(); return;
+		case ADDR_ObjInteraction_YellowBellyArrow: port_ObjInteraction_YellowBellyArrow(); return;
+		case ADDR_ObjInteraction_Teruteru: port_ObjInteraction_Teruteru(); return;
+		case ADDR_ObjInteraction_WaterDrop: port_ObjInteraction_WaterDrop(); return;
+		case ADDR_ObjInteraction_Pesce: port_ObjInteraction_Pesce(); return;
+		case ADDR_Func_21c56: port_Func_21c56(); return;
+		case ADDR_ObjInteraction_Tadpole: port_ObjInteraction_Tadpole(); return;
+		case ADDR_ObjInteraction_Hebarii: port_ObjInteraction_Hebarii(); return;
+		case ADDR_ObjInteraction_PrinceFroggy: port_ObjInteraction_PrinceFroggy(); return;
+		case ADDR_ObjInteraction_Hand: port_ObjInteraction_Hand(); return;
+		case ADDR_ObjInteraction_WaterTeleporting: port_ObjInteraction_WaterTeleporting(); return;
+		case ADDR_ObjInteraction_Scowler: port_ObjInteraction_Scowler(); return;
+		case ADDR_ObjInteraction_Ink: port_ObjInteraction_Ink(); return;
+		case ADDR_Func_207ed: port_Func_207ed(); return;
+		case ADDR_ObjInteraction_Jamano: port_ObjInteraction_Jamano(); return;
+		case ADDR_ObjInteraction_Turtle: port_ObjInteraction_Turtle(); return;
+		case ADDR_Func_21d3b: port_Func_21d3b(); return;
+		case ADDR_Func_21d64: port_Func_21d64(); return;
+		case ADDR_Func_21d6f: port_Func_21d6f(); return;
+		case ADDR_Func_21d88: port_Func_21d88(); return;
+		case ADDR_ObjInteraction_ColourCoin: port_ObjInteraction_ColourCoin(); return;
+		case ADDR_ObjInteraction_MagicalSpiral: port_ObjInteraction_MagicalSpiral(); return;
+		case ADDR_ObjInteraction_BottomSting: port_ObjInteraction_BottomSting(); return;
+		case ADDR_ObjInteraction_Shoot: port_ObjInteraction_Shoot(); return;
+		case ADDR_Func_21e9c: port_Func_21e9c(); return;
+		case ADDR_Func_21ea6: port_Func_21ea6(); return;
+		case ADDR_Func_21ecd: port_Func_21ecd(); return;
+		case ADDR_Func_21f01: port_Func_21f01(); return;
+		case ADDR_Func_21f28: port_Func_21f28(); return;
+		case ADDR_ObjInteraction_None: port_ObjInteraction_None(); return;
+		}
+		if (gb_->test.active)
+			gb_->test.unrealistic = true;
 	}
+
+	bool next_obj_ = false; // an interaction went on to .next_obj
 
 	// b = OBJACTION_* constant
 	// Sets the action of the object at wObjPtr, and records which side Wario
@@ -249,25 +342,25 @@ public:
 	void port_Func_20a63()
 	{
 		cpu_.b = OBJACTION_07;
-		gb_call(gb_, ADDR_SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_Func_20a69()
 	{
 		cpu_.b = OBJACTION_0D;
-		gb_call(gb_, ADDR_SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_Func_21cc9()
 	{
 		cpu_.b = OBJACTION_13;
-		gb_call(gb_, ADDR_SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_CollectKey()
 	{
 		play_sfx(SFX_KEY);
-		gb_call(gb_, ADDR_Func_20a63);
+		port_Func_20a63();
 		cpu_.a = ST_COLLECT_KEY;
 		wr8(wState, ST_COLLECT_KEY);
 		cpu_.a = 0;
@@ -299,7 +392,7 @@ public:
 	void port_VanishObjectAndKnockBackIfZombie()
 	{
 		cpu_.b = OBJACTION_VANISH_TOUCH;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		ld_cp(wTransformation, TRANSFORMATION_ZOMBIE_WARIO);
 		if (!ZF)
 			return;
@@ -310,7 +403,7 @@ public:
 	{
 		xor_a();
 		wr8(wWarioStateCounter, 0);
-		LJUMP(SetState_OnFire); // fallthrough
+		port_SetState_OnFire(); // fallthrough
 	}
 
 	// ld hl, wKeyAndTreasureFlags / set bit, [hl] / jr CollectKey
@@ -318,7 +411,7 @@ public:
 	{
 		SET_HL(gb_, wKeyAndTreasureFlags);
 		wr8(wKeyAndTreasureFlags, (uint8_t)(rd8(wKeyAndTreasureFlags) | (1 << bit)));
-		LJUMP(CollectKey);
+		port_CollectKey();
 	}
 
 	void port_ObjInteraction_RedKey() { obj_key(RED_KEY_F); }
@@ -329,7 +422,7 @@ public:
 	void port_Func_20fe8()
 	{
 		cpu_.b = OBJACTION_06;
-		LJUMP(SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_ObjInteraction_None()
@@ -339,35 +432,33 @@ public:
 	void port_ObjInteraction_Ink()
 	{
 		cpu_.b = OBJACTION_06;
-		LJUMP(SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_Func_2092d()
 	{
 		cpu_.b = OBJACTION_VANISH_TOUCH;
-		LJUMP(SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_ObjInteraction_Hand()
 	{
 		if (ld_and(wInvincibleCounter) || ld_and(wTransformation)) {
-			RET();
 			return;
 		}
 		play_sfx(SFX_FAT_WALK);
 		FARCALL(SetState_DraggedDown);
-		LJUMP(Func_21cc9); // fallthrough
+		port_Func_21cc9(); // fallthrough
 	}
 
 	void port_ObjInteraction_UnlitTorch()
 	{
 		ld_cp(wTransformation, TRANSFORMATION_HOT_WARIO);
 		if (!ZF) {
-			RET();
 			return;
 		}
 		cpu_.b = OBJACTION_0E;
-		LJUMP(SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_SetState_FlatStretching()
@@ -436,23 +527,22 @@ public:
 	void port_ObjInteraction_Food()
 	{
 		if (ld_and(wIsCrouching)) {
-			LJUMP(Func_20a69);
+			port_Func_20a69();
 			return;
 		}
 		if (ld_and(wInvincibleCounter)) {
-			RET();
 			return;
 		}
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_20a69);
+			port_Func_20a69();
 			return;
 		}
 		alu_.cp(cpu_.a, TRANSFORMATION_FAT_WARIO);
 		if (ZF) {
-			LJUMP(Func_20a69);
+			port_Func_20a69();
 			return;
 		}
-		LCALL(Func_20a63);
+		port_Func_20a63();
 		st(wTransformation, TRANSFORMATION_FAT_WARIO);
 		touch_states(TOUCH_BUMP, 0x02);
 		st(wTransformationDuration + 0, (uint8_t)(FAT_WARIO_DURATION >> 8));
@@ -472,7 +562,6 @@ public:
 		set_oam(BANK_OAM_1742d, ADDR_OAM_1742d);
 		frameset_by_dir(ADDR_Frameset_1789c, ADDR_Frameset_178c3);
 		anim(OAM1);
-		RET();
 	}
 
 	void port_ObjInteraction_Electric()
@@ -482,7 +571,7 @@ public:
 		cpu_.a = alu_.or_(rd8(wInteractionSide), CF ? INTERACTION_LEFT : INTERACTION_RIGHT);
 		wr8(wInteractionSide, cpu_.a);
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 
 		if (ld_and(wInvincibleCounter))
 			return;
@@ -536,21 +625,21 @@ public:
 	{
 		add_coins(0x1);
 		play_sfx(SFX_REGULAR_COIN);
-		LJUMP(Func_20a63);
+		port_Func_20a63();
 	}
 
 
 	void port_CollectMusicalCoin()
 	{
 		add_coins(0x10);
-		LCALL(Func_20a63);
-		JUMP_TO(ProcessInteractions_next_obj);
+		port_Func_20a63();
+		next_obj_ = true;
 	}
 
 	void port_ObjInteraction_ColourCoin()
 	{
 		play_sfx(SFX_COLOUR_COIN);
-		LJUMP(CollectMusicalCoin); // fallthrough
+		port_CollectMusicalCoin(); // fallthrough
 	}
 
 	void port_ObjInteraction_MusicalCoin()
@@ -559,17 +648,17 @@ public:
 		cpu_.a = rd8(wNumMusicalCoins);
 		alu_.cp(cpu_.a, NUM_LEVEL_MUSICAL_COINS);
 		if (!CF) {
-			JUMP_TO(ProcessInteractions_next_obj);
+			next_obj_ = true;
 			return;
 		}
 		wr8(wNumMusicalCoins, alu_.inc(cpu_.a));
 		play_sfx(SFX_MUSICAL_COIN);
-		LJUMP(CollectMusicalCoin);
+		port_CollectMusicalCoin();
 	}
 
 	void port_ObjInteraction_InvisibilityPotion()
 	{
-		LCALL(Func_20a63);
+		port_Func_20a63();
 		if (ld_and(wInvincibleCounter))
 			return;
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F))
@@ -583,7 +672,7 @@ public:
 	void port_ObjInteraction_RollingRock()
 	{
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		if (ld_and(wIsRolling))
 			return;
 		ld(wObjDirection);
@@ -604,7 +693,7 @@ public:
 		if (invincible_or_persistent())
 			return;
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		st(wTransformation, TRANSFORMATION_VAMPIRE_WARIO);
 		FARCALL(Func_19b25);
 		ld_cp(wTransformation, TRANSFORMATION_VAMPIRE_WARIO);
@@ -618,7 +707,7 @@ public:
 		if (invincible_or_persistent())
 			return;
 		cpu_.b = OBJACTION_07;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		st(wTransformation, TRANSFORMATION_BUBBLE);
 		touch_states(TOUCH_BUMP, 0x01);
 		FARCALL(Func_2ac7d);
@@ -627,25 +716,24 @@ public:
 	void port_ObjInteraction_ZombieHead()
 	{
 		if (ld_and(wInvincibleCounter)) {
-			LJUMP(Func_20a69);
+			port_Func_20a69();
 			return;
 		}
 		ld_cp(wTransformation, TRANSFORMATION_ZOMBIE_WARIO);
 		if (ZF) {
-			LJUMP(VanishObjectAndKnockBackIfZombie);
+			port_VanishObjectAndKnockBackIfZombie();
 			return;
 		}
 		if (alu_.bit(cpu_.a, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_20a69);
+			port_Func_20a69();
 			return;
 		}
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		play_sfx(SFX_028);
 		st(wTransformation, TRANSFORMATION_ZOMBIE_WARIO);
 		touch_states(TOUCH_VANISH, 0x02);
 		FARCALL(SetState_ZombieIdling);
-		RET();
 	}
 
 	void port_Func_2028a()
@@ -670,10 +758,9 @@ public:
 			return 0;
 		alu_.cp(cpu_.a, TOUCH_VANISH);
 		if (ZF) {
-			LJUMP(Func_2092d);
+			port_Func_2092d();
 			return 2;
 		}
-		RET();
 		return 1;
 	}
 
@@ -683,7 +770,6 @@ public:
 		if (sting_touch())
 			return;
 		if (!ld_and(wWaterInteraction)) {
-			RET();
 			return;
 		}
 		// call .Bump
@@ -693,11 +779,9 @@ public:
 		gb_pop16(gb_);
 		ld_cp(wInvincibleCounter, 0x01);
 		if (ZF || ld_and(wTransformation)) {
-			RET();
 			return;
 		}
 		FARCALL(StartDive);
-		RET();
 	}
 
 	void port_Func_208f2() { func_208f2_start(); }
@@ -708,7 +792,6 @@ public:
 		if (sting_touch())
 			return;
 		if (!ld_and(wWaterInteraction)) {
-			RET();
 			return;
 		}
 		cpu_.b = rd8(wWarioScreenXPos);
@@ -717,13 +800,11 @@ public:
 		wr8(wInteractionSide, cpu_.a);
 		play_sfx(SFX_014);
 		cpu_.b = OBJACTION_WOBBLE;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		if (ld_and(wTransformation) || ld_bit(wInteractionSide, INTERACTION_UP_F)) {
-			RET();
 			return;
 		}
 		FARCALL(StartDive);
-		RET();
 	}
 
 	void port_SetState_WaterStung()
@@ -751,7 +832,7 @@ public:
 		if (ZF)
 			return;
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		play_sfx(SFX_HANG_GRAB);
 		st(wTransformation, TRANSFORMATION_RAIL);
 		st(wTouchState, TOUCH_BUMP);
@@ -779,8 +860,8 @@ public:
 		// stop_music
 		wr8(hMusicID + 0, 0xff);
 		st(hMusicID + 1, 0x00);
-		LCALL(Func_20a63);
-		LCALL(TreasureClearObjects);
+		port_Func_20a63();
+		port_TreasureClearObjects();
 		SET_HL(gb_, wLevelEndScreen);
 		cpu_.a = rd8(wLevelEndScreen);
 		alu_.cp(cpu_.a, LVLEND_NO_TREASURE);
@@ -885,32 +966,30 @@ public:
 			CALL(ReleaseOwl);
 		CALL(ClearTransformationValues);
 		CALL(UpdateLevelMusic);
-		LJUMP(SetState_Stung); // fallthrough
+		port_SetState_Stung(); // fallthrough
 	}
 
 	void port_Func_207ed()
 	{
 		if (ld_and(wInvincibleCounter) || !ld_and(wWaterInteraction)) {
-			RET();
 			return;
 		}
 		if (ld_and(wStingTouchState)) {
 			alu_.cp(cpu_.a, TOUCH_BUMP);
 			if (ZF) {
-				JUMP_TO(ADDR_Func_208f2 + 0x08); // Func_208f2.start
+				port_Func_208f2__start();
 				return;
 			}
 			alu_.cp(cpu_.a, TOUCH_VANISH);
 			if (ZF) {
-				LJUMP(Func_2092d);
+				port_Func_2092d();
 				return;
 			}
-			RET();
 			return;
 		}
 		cpu_.b = OBJACTION_06;
-		gb_call(gb_, ADDR_SetObjAction);
-		LJUMP(SetState_WaterStung); // fallthrough
+		port_SetObjAction();
+		port_SetState_WaterStung(); // fallthrough
 	}
 
 	// stop_sfx
@@ -929,7 +1008,7 @@ public:
 		stop_sfx();
 		st(wWarioState, state);
 		cpu_.b = OBJACTION_TELEPORT;
-		LJUMP(SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_ObjInteraction_WaterTeleporting() { teleport(ADDR_SetState_WaterStung, WST_WATER_TELEPORTING); }
@@ -938,16 +1017,16 @@ public:
 	void port_Func_21e8a()
 	{
 		FARCALL(SetState_BallShot);
-		LJUMP(Func_21cc9);
+		port_Func_21cc9();
 	}
 
 	void port_Func_20d81()
 	{
 		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
-			LJUMP(Func_20899);
+			port_Func_20899();
 			return;
 		}
-		LJUMP(Func_208f2);
+		port_Func_208f2();
 	}
 
 	void port_Func_2168b()
@@ -1006,16 +1085,15 @@ public:
 	void port_ObjInteraction_Snow()
 	{
 		if (ld_and(wInvincibleCounter) || ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_20a69);
+			port_Func_20a69();
 			return;
 		}
-		LCALL(Func_20a63);
+		port_Func_20a63();
 		st(wTransformation, TRANSFORMATION_SNOWMAN_WARIO);
 		xor_a();
 		wr8(wTransformationProgress, 0);
 		touch_states(TOUCH_ATTACK, 0x02);
 		FARCALL(SetState_TurningIntoSnowman);
-		RET();
 	}
 
 	void port_ObjInteraction_Ice()
@@ -1031,7 +1109,7 @@ public:
 			}
 		}
 		cpu_.b = OBJACTION_07;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		play_sfx(SFX_028);
 		st(wTransformation, TRANSFORMATION_ICE_SKATIN);
 		touch_states(TOUCH_ATTACK, 0x02);
@@ -1046,12 +1124,10 @@ public:
 			wr8(wAttackCounter, 0);
 		}
 		if (ld_and(wWaterInteraction)) {
-			RET();
 			return;
 		}
 		ld_cp(wWarioState, WST_DIVING);
 		if (ZF) {
-			RET();
 			return;
 		}
 		st(wIsOnSteppableObject, TRUE);
@@ -1063,19 +1139,18 @@ public:
 			CALL(MoveWarioUp);
 		}
 		cpu_.b = OBJACTION_STEP_ON;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		if (!ld_and(wJumpVelTable) || ld_and(wAttackCounter) || ld_and(wIsRolling)) {
-			JUMP_TO(ProcessInteractions_next_obj);
+			next_obj_ = true;
 			return;
 		}
 		CALL(TriggerFloorTransition_SkipUpdateYPos);
 		ld_cp(wInvincibleCounter, 0x01);
 		if (ZF) {
-			JUMP_TO(ProcessInteractions_next_obj);
+			next_obj_ = true;
 			return;
 		}
 		if (ld_and(wTransformation)) {
-			RET();
 			return;
 		}
 		if (ld_and(wGrabState)) {
@@ -1089,7 +1164,7 @@ public:
 			wr8(wWaterInteraction, 0);
 			FARCALL(SetState_Idling);
 		}
-		JUMP_TO(ProcessInteractions_next_obj);
+		next_obj_ = true;
 	}
 
 	void port_Func_20a6f()
@@ -1100,7 +1175,7 @@ public:
 		for (;;) {
 			if (!left) { // .asm_20a79
 				if (!ld_and(wDirection)) {
-					JUMP_TO(ProcessInteractions_next_obj);
+					next_obj_ = true;
 					return;
 				}
 				st(wInteractionSide, INTERACTION_RIGHT);
@@ -1117,7 +1192,7 @@ public:
 				break;
 			} else { // .asm_20aa5
 				if (ld_and(wDirection)) {
-					JUMP_TO(ProcessInteractions_next_obj);
+					next_obj_ = true;
 					return;
 				}
 				st(wInteractionSide, INTERACTION_LEFT);
@@ -1141,7 +1216,6 @@ public:
 			ld_cp(wTransformationProgress, 1);
 			if (ZF)
 				FARCALL(Func_28bd5);
-			RET();
 			return;
 		}
 		alu_.cp(cpu_.a, TRANSFORMATION_HOT_WARIO);
@@ -1149,7 +1223,6 @@ public:
 			ld_cp(wTransformationProgress, 1);
 			if (ZF)
 				FARCALL(Func_2afc5);
-			RET();
 			return;
 		}
 		alu_.cp(cpu_.a, TRANSFORMATION_ICE_SKATIN);
@@ -1157,17 +1230,15 @@ public:
 			ld_cp(wWarioState, WST_ICE_SKATIN_CRASH);
 			if (!ZF)
 				FARCALL(Func_1ec215);
-			RET();
 			return;
 		}
 		xor_a();
 		wr8(wWalkVelIndex, 0);
 		if (!ld_and(wIsRolling) && !ld_and(wAttackCounter)) {
-			JUMP_TO(ProcessInteractions_next_obj);
+			next_obj_ = true;
 			return;
 		}
 		FARCALL(DoJumpingBump);
-		RET();
 	}
 
 	// routine called when an object is attacked
@@ -1197,7 +1268,7 @@ public:
 		cpu_.b = PARTICLE_STARS;
 		FARCALL(CreateParticle);
 		cpu_.b = OBJACTION_ATTACK;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		cpu_.a = rd8(wTransformation);
 		alu_.cp(cpu_.a, TRANSFORMATION_FAT_WARIO);
 		if (ZF) {
@@ -1240,20 +1311,17 @@ public:
 	void port_Func_20d8c()
 	{
 		if (!ld_and(wWaterInteraction)) {
-			RET();
 			return;
 		}
 		if (ld_bit(wInteractionSide, INTERACTION_UP_F)) {
-			LJUMP(Func_207ed);
+			port_Func_207ed();
 			return;
 		}
 		if (ld_and(wTransformation)) {
-			RET();
 			return;
 		}
 		if (ld_bit(wInteractionSide, INTERACTION_DOWN_F)) {
 			FARCALL(StartDive);
-			RET();
 			return;
 		}
 		cpu_.b = ld(wWarioScreenXPos);
@@ -1263,22 +1331,21 @@ public:
 		wr8(wInteractionSide, cpu_.a);
 		st(wDirection, left ? DIRECTION_RIGHT : DIRECTION_LEFT);
 		FARCALL(SetState_SwimKnockBack);
-		RET();
 	}
 
 	// ld a, [wInteractionSide] / bit side, a / jp nz, Func_207ed / jp Func_208f2
 	void sting_or_bump(int side)
 	{
 		if (ld_bit(wInteractionSide, side))
-			LJUMP(Func_207ed);
+			port_Func_207ed();
 		else
-			LJUMP(Func_208f2);
+			port_Func_208f2();
 	}
 
 	void port_Func_20deb()
 	{
 		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
-			LJUMP(Func_20899);
+			port_Func_20899();
 			return;
 		}
 		if (!ld_and(wObjDirection))
@@ -1291,11 +1358,11 @@ public:
 	{
 		cpu_.a = rd8(wInteractionSide);
 		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
-			LJUMP(Func_20899);
+			port_Func_20899();
 			return;
 		}
 		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
-			LJUMP(Func_207ed);
+			port_Func_207ed();
 			return;
 		}
 		ld_cp(wObjDirection, DIRECTION_RIGHT);
@@ -1310,48 +1377,47 @@ public:
 		ld_cp(wObjDirection, DIRECTION_RIGHT);
 		bool swallow = ld_bit(wInteractionSide, ZF ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F);
 		if (!swallow) {
-			LJUMP(Func_207ed);
+			port_Func_207ed();
 			return;
 		}
 		cpu_.b = OBJACTION_11;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		FARCALL(SetState_Swallowed);
-		RET();
 	}
 
 	void port_ObjInteraction_Scowler()
 	{
 		cpu_.a = rd8(wInteractionSide);
 		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
-			LJUMP(Func_20899);
+			port_Func_20899();
 			return;
 		}
 		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
-			LJUMP(ObjInteraction_WaterTeleporting);
+			port_ObjInteraction_WaterTeleporting();
 			return;
 		}
-		LJUMP(Func_208f2);
+		port_Func_208f2();
 	}
 
 	// the chest interactions: open it with the matching key
 	void obj_treasure(int key, int treasure, uint8_t screen)
 	{
 		if (ld_bit(wInteractionSide, INTERACTION_UP_F)) {
-			LJUMP(Func_209ca);
+			port_Func_209ca();
 			return;
 		}
 		if (ld_and(wTransformation)) {
-			LJUMP(Func_20a6f);
+			port_Func_20a6f();
 			return;
 		}
 		SET_HL(gb_, wKeyAndTreasureFlags);
 		if (!alu_.bit(rd8(wKeyAndTreasureFlags), key)) {
-			LJUMP(Func_20a6f);
+			port_Func_20a6f();
 			return;
 		}
 		wr8(wKeyAndTreasureFlags, (uint8_t)(rd8(wKeyAndTreasureFlags) | (1 << treasure)));
 		st(wLevelEndScreen, screen);
-		LJUMP(GetTreasure);
+		port_GetTreasure();
 	}
 
 	void port_ObjInteraction_GreyTreasure() { obj_treasure(GREY_KEY_F, GREY_TREASURE_F, LVLEND_GREY_TREASURE); }
@@ -1365,15 +1431,15 @@ public:
 	{
 		cpu_.a = rd8(wInteractionSide);
 		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
-			LJUMP(Func_209ca);
+			port_Func_209ca();
 			return true;
 		}
 		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F))
 			return false;
 		if (ld_and(wAttackCounter))
-			LJUMP(Func_217a9);
+			port_Func_217a9();
 		else
-			LJUMP(Func_20a6f);
+			port_Func_20a6f();
 		return true;
 	}
 
@@ -1381,7 +1447,7 @@ public:
 	{
 		if (solid_side())
 			return;
-		LJUMP(Func_2168b);
+		port_Func_2168b();
 	}
 
 	void port_ObjInteraction_Omodon()
@@ -1389,33 +1455,30 @@ public:
 		if (solid_side())
 			return;
 		if (ld_and(wInvincibleCounter) || ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			RET();
 			return;
 		}
 		cpu_.b = OBJACTION_FLATTEN;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		FARCALL(SetState_FlatAirborne);
-		RET();
 	}
 
 	void port_Func_21abb()
 	{
 		cpu_.b = OBJACTION_ATTACK;
-		LCALL(SetObjAction);
-		LJUMP(Func_20a6f);
+		port_SetObjAction();
+		port_Func_20a6f();
 	}
 
 	void port_Func_21f01()
 	{
 		if (!ld_bit(wInteractionSide, INTERACTION_UP_F)) {
-			LJUMP(Func_20d8c);
+			port_Func_20d8c();
 			return;
 		}
 		cpu_.a = alu_.or_(rd8(wInteractionSide), INTERACTION_LEFT);
 		wr8(wInteractionSide, cpu_.a);
 		st(wDirection, DIRECTION_RIGHT);
 		FARCALL(SetState_SwimKnockBack);
-		RET();
 	}
 
 	void port_Func_20602()
@@ -1424,7 +1487,7 @@ public:
 		alu_.cp(cpu_.a, TRANSFORMATION_INVISIBLE_WARIO);
 		if (!ZF && alu_.and_(cpu_.a, cpu_.a)) {
 			// has transformation except invisible
-			LJUMP(VanishObjectAndKnockBackIfZombie);
+			port_VanishObjectAndKnockBackIfZombie();
 			return;
 		}
 		cpu_.a = alu_.and_(rd8(wGrabState), GRAB_STATE_MASK);
@@ -1446,50 +1509,50 @@ public:
 			}
 		}
 		cpu_.b = OBJACTION_VANISH_TOUCH;
-		LJUMP(SetObjAction); // fallthrough
+		port_SetObjAction(); // fallthrough
 	}
 
 	void port_Func_21aac()
 	{
 		cpu_.a = alu_.dec(rd8(wIsSmashAttacking));
 		if (!ZF) {
-			LJUMP(Func_209ca);
+			port_Func_209ca();
 			return;
 		}
 		// smash attack object
-		LCALL(Func_20602);
+		port_Func_20602();
 		cpu_.b = OBJACTION_SMASH_ATTACK_WALKABLE;
-		LJUMP(SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_ObjInteraction_Stove()
 	{
 		cpu_.a = rd8(wInteractionSide);
 		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
-			LJUMP(Func_21aac);
+			port_Func_21aac();
 			return;
 		}
 		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
-			LJUMP(Func_2168b);
+			port_Func_2168b();
 			return;
 		}
 		if (ld_and(wAttackCounter))
-			LJUMP(Func_21abb);
+			port_Func_21abb();
 		else
-			LJUMP(Func_20a6f);
+			port_Func_20a6f();
 	}
 
 	void port_ObjInteraction_WaterDrop()
 	{
 		cpu_.b = OBJACTION_06;
-		gb_call(gb_, ADDR_SetObjAction);
+		port_SetObjAction();
 		cpu_.a = rd8(wTransformation);
 		alu_.and_(cpu_.a, cpu_.a);
 		if (cpu_.f & FLAG_Z) {
-			JUMP_TO(ProcessInteractions_next_obj);
+			next_obj_ = true;
 			return;
 		}
-		JUMP(RecoverFromTransformation);
+		CALL(RecoverFromTransformation);
 	}
 
 	// ld a, [wWarioScreenXPos] / ld b, a / ld a, [wObjScreenXPos] / cp b, then
@@ -1508,30 +1571,28 @@ public:
 	void func_2023b_bump()
 	{
 		if (ld_and(wAttackCounter)) {
-			LJUMP(AttackObject);
+			port_AttackObject();
 			return;
 		}
 		cpu_.b = OBJACTION_BUMP;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		ld_cp(wInvincibleCounter, 0x01);
-		if (ZF) {
-			RET(); // is invincible
+		if (ZF) { // is invincible
 			return;
 		}
 		ld_cp(wTransformation, TRANSFORMATION_FLAT_WARIO);
 		if (ZF) {
-			LJUMP(Func_2028a);
+			port_Func_2028a();
 			return;
 		}
 		if (alu_.and_(cpu_.a, cpu_.a)) {
-			RET();
 			return;
 		}
 		cpu_.b = rd8(wWarioScreenXPos);
 		cpu_.a = rd8(wObjScreenXPos);
 		alu_.cp(cpu_.a, cpu_.b);
 		st(wDirection, CF ? DIRECTION_RIGHT : DIRECTION_LEFT);
-		LJUMP(SetState_EnemyBumping);
+		port_SetState_EnemyBumping();
 	}
 
 	void port_Func_2023b()
@@ -1548,46 +1609,45 @@ public:
 		}
 		alu_.cp(a, TOUCH_VULNERABLE);
 		if (ZF) {
-			LJUMP(Func_20939); // this causes an infinite loop!
+			port_Func_20939(); // this causes an infinite loop!
 			return;
 		}
 		alu_.cp(a, TOUCH_ATTACK);
 		if (ZF) {
-			LJUMP(AttackObject);
+			port_AttackObject();
 			return;
 		}
 		alu_.cp(a, TOUCH_VANISH);
 		if (ZF) {
-			LJUMP(VanishObjectAndKnockBackIfZombie);
+			port_VanishObjectAndKnockBackIfZombie();
 			return;
 		}
-		JUMP_TO(ProcessInteractions_next_obj);
+		next_obj_ = true;
 	}
 
 	void port_Func_2022c()
 	{
 		if (ld_and(wIsRolling)) {
-			LJUMP(AttackObject);
+			port_AttackObject();
 			return;
 		}
 		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
-			LJUMP(StepOnObject);
+			port_StepOnObject();
 			return;
 		}
-		LJUMP(Func_2023b); // fallthrough
+		port_Func_2023b(); // fallthrough
 	}
 
 	void port_Func_20939()
 	{
 		if (ld_and(wTouchState)) {
-			LJUMP(Func_2023b);
+			port_Func_2023b();
 			return;
 		}
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		ld_cp(wInvincibleCounter, 0x01);
 		if (ZF) {
-			RET();
 			return;
 		}
 		FARCALL(DoJumpingBump);
@@ -1611,16 +1671,15 @@ public:
 			set_frameset(ADDR_Frameset_14a76);
 		}
 		anim(OAM1);
-		RET();
 	}
 
 	void port_Func_20932()
 	{
 		if (ld_and(wAttackCounter)) {
-			LJUMP(AttackObject);
+			port_AttackObject();
 			return;
 		}
-		LJUMP(Func_20939); // fallthrough
+		port_Func_20939(); // fallthrough
 	}
 
 	void port_StepOnObject()
@@ -1628,7 +1687,6 @@ public:
 		// no stun if Wario is invincible
 		ld_cp(wInvincibleCounter, 0x01);
 		if (ZF) {
-			RET();
 			return;
 		}
 		cpu_.a = alu_.dec(rd8(wIsSmashAttacking));
@@ -1636,9 +1694,9 @@ public:
 			// Wario is smash attacking
 			ld_cp(wTransformation, TRANSFORMATION_FAT_WARIO);
 			if (ZF)
-				LJUMP(VanishObjectAndKnockBackIfZombie);
+				port_VanishObjectAndKnockBackIfZombie();
 			else
-				LJUMP(Func_20602);
+				port_Func_20602();
 			return;
 		}
 		if (ld_and(wTransformation)) {
@@ -1647,22 +1705,22 @@ public:
 			if (ZF) {
 				ld_cp(wTransformationProgress, 2);
 				if (!CF) {
-					LJUMP(VanishObjectAndKnockBackIfZombie);
+					port_VanishObjectAndKnockBackIfZombie();
 					return;
 				}
 			}
 			ld_cp(wTransformation, TRANSFORMATION_FAT_WARIO);
 			if (ZF) {
-				LJUMP(AttackObject);
+				port_AttackObject();
 				return;
 			}
 			side_by_x();
 			play_sfx(SFX_014);
 			cpu_.b = OBJACTION_WOBBLE;
-			LCALL(SetObjAction);
+			port_SetObjAction();
 			ld_cp(wTransformation, TRANSFORMATION_FLAT_WARIO);
 			if (ZF) {
-				LJUMP(Func_2028a);
+				port_Func_2028a();
 				return;
 			}
 			alu_.cp(cpu_.a, TRANSFORMATION_BOUNCY_WARIO);
@@ -1671,7 +1729,6 @@ public:
 				if (!ZF)
 					FARCALL(Func_2a0b2);
 			}
-			RET();
 			return;
 		}
 
@@ -1680,7 +1737,7 @@ public:
 		wr8(wAttackCounter, 0);
 		// stepping on object while rolling is attacking
 		if (ld_and(wIsRolling)) {
-			LJUMP(AttackObject);
+			port_AttackObject();
 			return;
 		}
 		side_by_x();
@@ -1705,7 +1762,7 @@ public:
 					FARCALL(StartJump_FromInput);
 				} else {
 					// .no_input
-					LCALL(Func_20939);
+					port_Func_20939();
 					goto sfx;
 				}
 			}
@@ -1722,7 +1779,6 @@ public:
 			// .asm_20506
 			ld_cp(wInvincibleCounter, 0x01);
 			if (ZF) {
-				RET();
 				return;
 			}
 			if (ld_and(wIsCrouching)) {
@@ -1747,13 +1803,13 @@ public:
 	sfx:
 		play_sfx(SFX_014);
 		cpu_.b = OBJACTION_WOBBLE;
-		LJUMP(SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_Func_20670()
 	{
 		if (ld_and(wInvincibleCounter)) {
-			LJUMP(Func_20939);
+			port_Func_20939();
 			return;
 		}
 		// if Wario is rolling, do attack
@@ -1762,7 +1818,7 @@ public:
 		if (!check_rolling)
 			check_rolling = !ld_bit(wObjInteractionType, HEAVY_OBJ_F);
 		if (check_rolling && ld_and(wIsRolling)) {
-			LJUMP(AttackObject);
+			port_AttackObject();
 			return;
 		}
 		// .asm_2068c
@@ -1772,20 +1828,20 @@ public:
 			if (!ZF) {
 				alu_.cp(a, TOUCH_BUMP);
 				if (ZF) {
-					LJUMP(Func_2023b);
+					port_Func_2023b();
 					return;
 				}
 				alu_.cp(a, TOUCH_ATTACK);
 				if (ZF) {
-					LJUMP(AttackObject);
+					port_AttackObject();
 					return;
 				}
 				alu_.cp(a, TOUCH_VANISH);
 				if (ZF) {
-					LJUMP(VanishObjectAndKnockBackIfZombie);
+					port_VanishObjectAndKnockBackIfZombie();
 					return;
 				}
-				JUMP_TO(ProcessInteractions_next_obj);
+				next_obj_ = true;
 				return;
 			}
 		}
@@ -1796,17 +1852,16 @@ public:
 		else
 			st(wDirection, DIRECTION_LEFT);
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		ld_cp(wInvincibleCounter, 0x01);
 		if (ZF) {
-			RET();
 			return;
 		}
 		ld_cp(wStingTouchState, TOUCH_VULNERABLE);
 		if (ZF)
-			LJUMP(Func_206eb);
+			port_Func_206eb();
 		else
-			LJUMP(SetState_Stung);
+			port_SetState_Stung();
 	}
 
 	// Func_20b6b.set_wario_pick_up
@@ -1834,11 +1889,9 @@ public:
 		}
 		set_frameset(fs);
 		anim(OAM1);
-		RET();
 		return;
 	grab_idling:
 		FARCALL(SetState_GrabIdling);
-		RET();
 	}
 
 	void port_Func_20b6b()
@@ -1849,17 +1902,17 @@ public:
 			uint8_t a = cpu_.a;
 			alu_.cp(a, TOUCH_ATTACK);
 			if (ZF) {
-				LJUMP(AttackObject);
+				port_AttackObject();
 				return;
 			}
 			alu_.cp(a, TOUCH_VANISH);
 			if (ZF) {
-				LJUMP(VanishObjectAndKnockBackIfZombie);
+				port_VanishObjectAndKnockBackIfZombie();
 				return;
 			}
 			alu_.cp(a, TOUCH_PASS_THROUGH);
 			if (ZF) {
-				JUMP_TO(ProcessInteractions_next_obj);
+				next_obj_ = true;
 				return;
 			}
 			goto step_on_obj;
@@ -1869,7 +1922,7 @@ public:
 		if (!CF) {
 			alu_.cp(cpu_.a, WST_TRYING_SUBMERGE + 1);
 			if (CF) {
-				LJUMP(Func_20899);
+				port_Func_20899();
 				return;
 			}
 		}
@@ -1877,7 +1930,7 @@ public:
 		cpu_.b = ld(wIsRolling);
 		cpu_.a = alu_.or_(rd8(wAttackCounter), cpu_.b);
 		if (!ZF) {
-			LJUMP(AttackObject);
+			port_AttackObject();
 			return;
 		}
 		cpu_.b = ld(wIsCrouching);
@@ -1912,7 +1965,6 @@ public:
 		// .check_invincible_counter
 		ld_cp(wInvincibleCounter, 1);
 		if (ZF) {
-			RET();
 			return;
 		}
 		{
@@ -1939,7 +1991,7 @@ public:
 		}
 		// .set_obj_pick_up
 		cpu_.b = OBJACTION_PICK_UP;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		if (!ld_and(wJumpVelTable)) {
 			set_wario_pick_up();
 			return;
@@ -1947,10 +1999,9 @@ public:
 		if (ld_bit(wObjInteractionType, HEAVY_OBJ_F))
 			goto step_on_obj;
 		FARCALL(Func_1edd3);
-		RET();
 		return;
 	step_on_obj:
-		LJUMP(StepOnObject);
+		port_StepOnObject();
 	}
 
 	void port_Func_20b41()
@@ -1963,47 +2014,46 @@ public:
 				if (!ZF) {
 					alu_.cp(a, TOUCH_ATTACK);
 					if (ZF) {
-						LJUMP(AttackObject);
+						port_AttackObject();
 						return;
 					}
 					alu_.cp(a, TOUCH_VANISH);
 					if (ZF) {
-						LJUMP(VanishObjectAndKnockBackIfZombie);
+						port_VanishObjectAndKnockBackIfZombie();
 						return;
 					}
 				}
 			}
-			LJUMP(Func_20a6f);
+			port_Func_20a6f();
 			return;
 		}
 		// .asm_20b5e
 		if (ld_and(wTouchState)) {
-			RET();
 			return;
 		}
-		LCALL(Func_20939);
+		port_Func_20939();
 		cpu_.b = OBJACTION_12;
-		LJUMP(SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_Func_20d1d()
 	{
-		LJUMP(Func_2022c);
+		port_Func_2022c();
 	}
 
 	// sting on the object's front (front = true) or back
 	void obj_sting(bool front)
 	{
 		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
-			LJUMP(StepOnObject);
+			port_StepOnObject();
 			return;
 		}
 		ld_cp(wObjDirection, DIRECTION_RIGHT);
 		int bit = (ZF != 0) == front ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F;
 		if (ld_bit(wInteractionSide, bit))
-			LJUMP(Func_20670);
+			port_Func_20670();
 		else
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 	}
 
 	void port_ObjInteraction_FrontSting() { obj_sting(true); }
@@ -2013,78 +2063,76 @@ public:
 	{
 		cpu_.a = rd8(wInteractionSide);
 		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
-			LJUMP(Func_20670);
+			port_Func_20670();
 			return;
 		}
 		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
-			LJUMP(StepOnObject);
+			port_StepOnObject();
 			return;
 		}
-		LJUMP(Func_2022c);
+		port_Func_2022c();
 	}
 
 	void port_ObjInteraction_FullSting()
 	{
-		LJUMP(Func_20670);
+		port_Func_20670();
 	}
 
 	void port_Func_20e39()
 	{
 		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
-			LJUMP(StepOnObject);
+			port_StepOnObject();
 			return;
 		}
 		ld_cp(wObjDirection, DIRECTION_RIGHT);
 		int bit = ZF ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F;
 		if (ld_bit(wInteractionSide, bit))
-			LJUMP(Func_20939);
+			port_Func_20939();
 		else
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 	}
 
 	void port_Func_20e60()
 	{
-		LJUMP(Func_20939);
+		port_Func_20939();
 	}
 
 	void port_Func_20e6a()
 	{
-		LCALL(Func_20939);
+		port_Func_20939();
 		if (ld_and(wTouchState)) {
-			RET();
 			return;
 		}
 		cpu_.b = OBJACTION_0A;
-		LJUMP(SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_Func_20e63()
 	{
 		if (ld_and(wAttackCounter)) {
-			LJUMP(AttackObject);
+			port_AttackObject();
 			return;
 		}
-		LJUMP(Func_20e6a); // fallthrough
+		port_Func_20e6a(); // fallthrough
 	}
 
 	void port_ObjInteraction_Walkable()
 	{
 		if (ld_bit(wInteractionSide, INTERACTION_UP_F))
-			LJUMP(Func_21aac);
+			port_Func_21aac();
 		else
-			LJUMP(Func_20932);
+			port_Func_20932();
 	}
 
 	void port_ObjInteraction_Fire()
 	{
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		if (ld_and(wInvincibleCounter)) {
-			RET();
 			return;
 		}
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		st(wTransformation, TRANSFORMATION_HOT_WARIO);
@@ -2093,7 +2141,7 @@ public:
 		st(wTransformationDuration + 0, (uint8_t)(HOT_WARIO_DURATION >> 8));
 		st(wTransformationDuration + 1, (uint8_t)HOT_WARIO_DURATION);
 		CALL(UpdateLevelMusic);
-		LJUMP(SetState_OnFire_ResetStateCounter); // fallthrough
+		port_SetState_OnFire_ResetStateCounter(); // fallthrough
 	}
 
 	void port_Func_2126a()
@@ -2103,19 +2151,18 @@ public:
 			FARCALL(CheckUpCollision);
 			if (b_and()) {
 				st(wCollisionBoxTop, (uint8_t)-15);
-				LJUMP(Func_2022c);
+				port_Func_2022c();
 				return;
 			}
 		}
 		// .asm_21290
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		if (ld_and(wInvincibleCounter)) {
-			RET();
 			return;
 		}
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_2023b);
+			port_Func_2023b();
 			return;
 		}
 		cpu_.b = rd8(wWarioScreenXPos);
@@ -2144,21 +2191,20 @@ public:
 		set_oam(BANK_OAM_171c0, ADDR_OAM_171c0);
 		set_frameset(ADDR_Frameset_17414);
 		anim(OAM1);
-		RET();
 	}
 
 	void port_ObjInteraction_Silky()
 	{
 		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
-			LJUMP(StepOnObject);
+			port_StepOnObject();
 			return;
 		}
 		ld_cp(wObjDirection, DIRECTION_RIGHT);
 		int bit = ZF ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F;
 		if (ld_bit(wInteractionSide, bit))
-			LJUMP(Func_2126a);
+			port_Func_2126a();
 		else
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 	}
 
 	// Whether Wario touched the object's front (front) or back:
@@ -2181,7 +2227,7 @@ public:
 	{
 		if (!ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN))
 			return false;
-		LJUMP(StepOnObject);
+		port_StepOnObject();
 		return true;
 	}
 
@@ -2207,19 +2253,18 @@ public:
 	void port_ObjInteraction_Teruteru()
 	{
 		if (!ld_bit(wInteractionSide, INTERACTION_DOWN_F)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		if (ld_and(wInvincibleCounter)) {
-			RET();
 			return;
 		}
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		st(wTransformation, TRANSFORMATION_BLIND);
 		st(wTouchState, TOUCH_BUMP);
 		st(wStingTouchState, TOUCH_VULNERABLE);
@@ -2227,90 +2272,84 @@ public:
 		FARCALL(SetState_BlindIdling);
 		zero_pals_hblank(rBGPI, BGPI_AUTOINC | (0 * PAL_SIZE), 4, rBGPD);
 		zero_pals_hblank(rOBPI, OBPI_AUTOINC | (3 * PAL_SIZE), 2, rOBPD);
-		RET();
 	}
 
 	void port_ObjInteraction_Beam()
 	{
 		if (ld_and(wInvincibleCounter)) {
-			RET();
 			return;
 		}
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		st(wTransformation, TRANSFORMATION_SPLIT);
 		touch_states(TOUCH_PASS_THROUGH, 0x02);
 		FARCALL(SetState_SplitHit);
-		RET();
 	}
 
 	void port_Func_21b3a()
 	{
-		LCALL(Func_20939);
+		port_Func_20939();
 		cpu_.b = OBJACTION_NONE;
-		LJUMP(SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_Func_21b78()
 	{
 		if (ld_bit(wInteractionSide, INTERACTION_UP_F) && ld_and(wIsSmashAttacking)) {
-			LJUMP(Func_20602);
+			port_Func_20602();
 			return;
 		}
-		LJUMP(Func_20939);
+		port_Func_20939();
 	}
 
 	void port_ObjInteraction_YellowBellyArrow()
 	{
 		if (ld_and(wInvincibleCounter)) {
-			RET();
 			return;
 		}
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		alu_.cp(cpu_.a, TRANSFORMATION_PUFFY_WARIO);
 		if (ZF) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		ld_cp(wTransformation, TRANSFORMATION_OWL_WARIO);
 		if (ZF)
 			CALL(ReleaseOwl);
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		FARCALL(SetState_PuffyInflating);
-		RET();
 	}
 
 	void port_ObjInteraction_Pneumo()
 	{
 		if (ld_bit(wInteractionSide, INTERACTION_DOWN_F))
-			LJUMP(ObjInteraction_YellowBellyArrow);
+			port_ObjInteraction_YellowBellyArrow();
 		else
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 	}
 
 	void port_Func_2160a()
 	{
 		if (ld_and(wInvincibleCounter)) {
-			RET();
 			return;
 		}
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		alu_.cp(cpu_.a, TRANSFORMATION_BOUNCY_WARIO);
 		if (ZF) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		st(wTransformation, TRANSFORMATION_BOUNCY_WARIO);
@@ -2318,7 +2357,6 @@ public:
 		st(wTransformationDuration + 0, (uint8_t)(BOUNCY_WARIO_DURATION >> 8));
 		st(wTransformationDuration + 1, (uint8_t)BOUNCY_WARIO_DURATION);
 		FARCALL(SetState_BouncyStart);
-		RET();
 	}
 
 	void port_ObjInteraction_Bouncy()
@@ -2326,9 +2364,9 @@ public:
 		if (vert_step())
 			return;
 		if (obj_side(true, true))
-			LJUMP(Func_2160a);
+			port_Func_2160a();
 		else
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 	}
 
 	void port_ObjInteraction_FireBot()
@@ -2336,17 +2374,17 @@ public:
 		if (vert_step())
 			return;
 		if (obj_side(true, true))
-			LJUMP(ObjInteraction_Fire);
+			port_ObjInteraction_Fire();
 		else
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 	}
 
 	void port_Func_21c56()
 	{
 		if (ld_bit(wInteractionSide, INTERACTION_UP_F))
-			LJUMP(Func_21aac);
+			port_Func_21aac();
 		else
-			LJUMP(Func_20b6b);
+			port_Func_20b6b();
 	}
 
 	void port_ObjInteraction_Tadpole()
@@ -2354,62 +2392,62 @@ public:
 		if (vert_step())
 			return;
 		if (obj_side(false, true))
-			LJUMP(ObjInteraction_RollingRock);
+			port_ObjInteraction_RollingRock();
 		else
-			LJUMP(Func_20e6a);
+			port_Func_20e6a();
 	}
 
 	void port_ObjInteraction_Hebarii()
 	{
 		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
-			LJUMP(Func_20e6a);
+			port_Func_20e6a();
 			return;
 		}
 		if (ld_and(wAttackCounter))
-			LJUMP(AttackObject);
+			port_AttackObject();
 		else
-			LJUMP(Func_20e6a);
+			port_Func_20e6a();
 	}
 
 	void port_ObjInteraction_PrinceFroggy()
 	{
 		cpu_.a = rd8(wInteractionSide);
 		if (alu_.bit(cpu_.a, INTERACTION_UP_F))
-			LJUMP(Func_209ca);
+			port_Func_209ca();
 		else if (alu_.bit(cpu_.a, INTERACTION_DOWN_F))
-			LJUMP(Func_2168b);
+			port_Func_2168b();
 		else
-			LJUMP(Func_20b41);
+			port_Func_20b41();
 	}
 
 	void port_Func_21d3b()
 	{
 		cpu_.a = rd8(wInteractionSide);
 		if (alu_.bit(cpu_.a, INTERACTION_UP_F) || alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
-			LJUMP(Func_20e6a);
+			port_Func_20e6a();
 			return;
 		}
 		if (obj_side(false, true))
-			LJUMP(Func_20670);
+			port_Func_20670();
 		else
-			LJUMP(Func_20e6a);
+			port_Func_20e6a();
 	}
 
 	void port_Func_21d64()
 	{
 		if (ld_bit(wInteractionSide, INTERACTION_UP_F))
-			LJUMP(Func_20670);
+			port_Func_20670();
 		else
-			LJUMP(Func_20e6a);
+			port_Func_20e6a();
 	}
 
 	// Func_21d6f.asm_21d7e
 	void func_21d7e()
 	{
 		if (ld_and(wIsSmashAttacking))
-			LJUMP(Func_20602);
+			port_Func_20602();
 		else
-			LJUMP(Func_20e6a);
+			port_Func_20e6a();
 	}
 
 	void port_Func_21d6f()
@@ -2418,9 +2456,9 @@ public:
 		if (alu_.bit(cpu_.a, INTERACTION_UP_F))
 			func_21d7e();
 		else if (alu_.bit(cpu_.a, INTERACTION_DOWN_F))
-			LJUMP(Func_20670);
+			port_Func_20670();
 		else
-			LJUMP(Func_20e6a);
+			port_Func_20e6a();
 	}
 
 	void port_Func_21f28()
@@ -2431,42 +2469,41 @@ public:
 			return;
 		}
 		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
-			LJUMP(Func_20e6a);
+			port_Func_20e6a();
 			return;
 		}
 		if (obj_side(false, true))
-			LJUMP(Func_20670);
+			port_Func_20670();
 		else
-			LJUMP(Func_20e6a);
+			port_Func_20e6a();
 	}
 
 	void port_Func_21dac()
 	{
 		if (ld_and(wInvincibleCounter)) {
-			RET();
 			return;
 		}
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		cpu_.a = rd8(wObjDirection);
 		wr8(wDirection, cpu_.a);
 		FARCALL(SetState_Launched);
 		cpu_.b = OBJACTION_06;
-		LJUMP(SetObjAction);
+		port_SetObjAction();
 	}
 
 	void port_Func_21d88()
 	{
 		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
-			LJUMP(Func_20899);
+			port_Func_20899();
 			return;
 		}
 		if (obj_side(false, true))
-			LJUMP(Func_21dac);
+			port_Func_21dac();
 		else
-			LJUMP(Func_208f2);
+			port_Func_208f2();
 	}
 
 	void port_Func_21ea6()
@@ -2477,100 +2514,98 @@ public:
 		if (ld_bit(wInteractionSide, right ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F)) {
 			cpu_.a = alu_.xor_(rd8(wObjDirection), 0x1);
 			wr8(wDirection, cpu_.a);
-			LJUMP(Func_20a6f);
+			port_Func_20a6f();
 			return;
 		}
-		LJUMP(Func_21b3a);
+		port_Func_21b3a();
 	}
 
 	void port_Func_21ecd()
 	{
 		if (!obj_side(false, true)) {
-			LJUMP(Func_20e6a);
+			port_Func_20e6a();
 			return;
 		}
 		play_sfx(SFX_FAT_WALK);
 		FARCALL(SetState_DraggedDown);
-		LJUMP(Func_21cc9);
+		port_Func_21cc9();
 	}
 
 	void port_ObjInteraction_MagicalSpiral()
 	{
 		if (ld_and(wInvincibleCounter)) {
-			RET();
 			return;
 		}
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		st(wTransformation, TRANSFORMATION_MAGIC);
 		touch_states(TOUCH_PASS_THROUGH, 0x02);
 		FARCALL(SetState_MagicRising);
-		RET();
 	}
 
 	void port_ObjInteraction_BottomSting()
 	{
 		cpu_.a = rd8(wInteractionSide);
 		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F))
-			LJUMP(Func_20670);
+			port_Func_20670();
 		else if (alu_.bit(cpu_.a, INTERACTION_UP_F))
-			LJUMP(StepOnObject);
+			port_StepOnObject();
 		else
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 	}
 
 	void port_ObjInteraction_AnonsterSilk()
 	{
 		if (ld_bit(wInteractionSide, INTERACTION_UP_F))
-			LJUMP(StepOnObject);
+			port_StepOnObject();
 		else
-			LJUMP(ObjInteraction_AnonsterWave); // fallthrough
+			port_ObjInteraction_AnonsterWave(); // fallthrough
 	}
 
 	void port_ObjInteraction_AnonsterWave()
 	{
-		LJUMP(Func_2126a);
+		port_Func_2126a();
 	}
 
 	void port_ObjInteraction_RoboMouse()
 	{
 		if (ld_bit(wInteractionSide, INTERACTION_UP_F)) {
 			if (ld_and(wIsSmashAttacking))
-				LJUMP(Func_20602);
+				port_Func_20602();
 			else
-				LJUMP(Func_20e6a);
+				port_Func_20e6a();
 			return;
 		}
 		if (obj_side(false, true))
-			LJUMP(ObjInteraction_Jamano);
+			port_ObjInteraction_Jamano();
 		else
-			LJUMP(Func_20e6a);
+			port_Func_20e6a();
 	}
 
 	void port_Func_21af1()
 	{
 		cpu_.a = rd8(wInteractionSide);
 		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
-			LJUMP(Func_209ca);
+			port_Func_209ca();
 			return;
 		}
 		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
-			LJUMP(StepOnObject);
+			port_StepOnObject();
 			return;
 		}
 		if (ld_and(wAttackCounter))
-			LJUMP(Func_217a9);
+			port_Func_217a9();
 		else
-			LJUMP(Func_20a6f);
+			port_Func_20a6f();
 	}
 
 	void port_ObjInteraction_DollBoyHammer()
 	{
-		LJUMP(Func_2160a);
+		port_Func_2160a();
 	}
 
 	void port_ObjInteraction_Wormwould()
@@ -2578,69 +2613,65 @@ public:
 		if (vert_step())
 			return;
 		if (ld_and(wAttackCounter))
-			LJUMP(AttackObject);
+			port_AttackObject();
 		else
-			LJUMP(Func_21b3a); // fallthrough
+			port_Func_21b3a(); // fallthrough
 	}
 
 	void port_ObjInteraction_Turtle()
 	{
 		if (ld_bit(wInteractionSide, INTERACTION_UP_F)) {
-			LJUMP(Func_209ca);
+			port_Func_209ca();
 			return;
 		}
 		if (ld_and(wTransformation)) {
-			RET();
 			return;
 		}
 		if (!ld_and(wWaterInteraction)) {
-			LJUMP(Func_21b3a);
+			port_Func_21b3a();
 			return;
 		}
 		FARCALL(StartDive);
-		RET();
 	}
 
 	void port_ObjInteraction_Shoot()
 	{
 		ld_cp(wTransformation, TRANSFORMATION_BALL);
 		if (ZF) {
-			LJUMP(Func_21e8a);
+			port_Func_21e8a();
 			return;
 		}
 		cpu_.a = rd8(wInteractionSide);
 		if (!alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
 			if (alu_.bit(cpu_.a, INTERACTION_UP_F))
-				LJUMP(StepOnObject);
+				port_StepOnObject();
 			else
-				LJUMP(Func_20e63);
+				port_Func_20e63();
 			return;
 		}
 		// .interaction_down
-		if (ld_and(wInvincibleCounter)) {
-			RET(); // skip if invincible
+		if (ld_and(wInvincibleCounter)) { // skip if invincible
 			return;
 		}
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		// turn Wario into ball form
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		st(wTransformation, TRANSFORMATION_BALL);
 		touch_states(TOUCH_PASS_THROUGH, 0x02);
 		FARCALL(SetState_BallStart);
-		RET();
 	}
 
 	void port_Func_21e9c()
 	{
 		ld_cp(wTransformation, TRANSFORMATION_BALL);
 		if (ZF)
-			LJUMP(Func_21e8a);
+			port_Func_21e8a();
 		else
-			LJUMP(Func_20939);
+			port_Func_20939();
 	}
 
 	void port_ObjInteraction_Richtertoffen()
@@ -2649,22 +2680,21 @@ public:
 		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
 			cpu_.a = alu_.dec(rd8(wIsSmashAttacking));
 			if (ZF)
-				LJUMP(Func_20602);
+				port_Func_20602();
 			else
-				LJUMP(StepOnObject);
+				port_StepOnObject();
 			return;
 		}
 		if (!alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
-			LJUMP(Func_20932);
+			port_Func_20932();
 			return;
 		}
 		// .try_flatten_wario
 		if (ld_and(wInvincibleCounter)) {
-			RET();
 			return;
 		}
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		st(wCollisionBoxLeft, (uint8_t)-11);
@@ -2676,33 +2706,32 @@ public:
 				FARCALL(Func_19741);
 				if (!b_and()) {
 					cpu_.b = OBJACTION_FLATTEN;
-					LCALL(SetObjAction);
+					port_SetObjAction();
 					FARCALL(SetState_FlatAirborne);
-					RET();
 					return;
 				}
 			}
 		}
 		st(wCollisionBoxLeft, (uint8_t)-9);
 		st(wCollisionBoxRight, 9);
-		LJUMP(StepOnObject);
+		port_StepOnObject();
 	}
 
 	void port_ObjInteraction_Omodonmeka()
 	{
 		if (ld_and(wJumpVelTable)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		cpu_.b = OBJACTION_0C;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		ld_cp(wTransformation, TRANSFORMATION_FLAT_WARIO);
 		if (ZF) {
-			LJUMP(SetState_FlatStretching);
+			port_SetState_FlatStretching();
 			return;
 		}
 		if (alu_.and_(cpu_.a, cpu_.a)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		// pick Wario up
@@ -2719,7 +2748,6 @@ public:
 		set_oam(BANK_OAM_15955, ADDR_OAM_15955);
 		frameset_by_dir(ADDR_Frameset_15f70, ADDR_Frameset_15f7f);
 		anim(OAM1);
-		RET();
 	}
 
 	void port_ObjInteraction_OrangeBird()
@@ -2727,47 +2755,43 @@ public:
 		if (vert_step())
 			return;
 		if (!obj_side(true, true)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		// .asm_217de
 		if (ld_and(wInvincibleCounter)) {
-			RET();
 			return;
 		}
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		alu_.cp(cpu_.a, TRANSFORMATION_CRAZY_WARIO);
 		if (ZF) {
-			LJUMP(Func_2022c);
+			port_Func_2022c();
 			return;
 		}
 		cpu_.b = OBJACTION_06;
-		LCALL(SetObjAction);
+		port_SetObjAction();
 		st(wTransformation, TRANSFORMATION_CRAZY_WARIO);
 		touch_states(TOUCH_ATTACK, 0x01);
 		FARCALL(SetState_CrazySpinning);
-		RET();
 	}
 
 	void port_ObjInteraction_Owl()
 	{
 		if (!ld_bit(wInteractionSide, INTERACTION_DOWN_F)) {
-			LJUMP(Func_20939);
+			port_Func_20939();
 			return;
 		}
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			RET();
 			return;
 		}
 		alu_.cp(cpu_.a, TRANSFORMATION_OWL_WARIO);
 		if (ZF) {
-			RET();
 			return;
 		}
-		LCALL(Func_20a63);
+		port_Func_20a63();
 		play_sfx(SFX_HANG_GRAB);
 		st(wTransformation, TRANSFORMATION_OWL_WARIO);
 		st(wTouchState, TOUCH_BUMP);
@@ -2789,7 +2813,6 @@ public:
 		wr8(wDirection, cpu_.a);
 		set_frameset(ADDR_Frameset_1fed53);
 		anim(OAM2);
-		RET();
 	}
 };
 
@@ -2799,132 +2822,130 @@ public:
 
 using wl3::level::ObjectInteractions;
 
-PORT_EX(ProcessInteractions, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ProcessInteractions(); }
-PORT_LOCAL_EX(ProcessInteractions, next_obj, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ProcessInteractions__next_obj(); }
-PORT_EX(SetObjAction, 0, 0) { ObjectInteractions(gb).port_SetObjAction(); }
-PORT_EX(Func_20a63, 0, 0) { ObjectInteractions(gb).port_Func_20a63(); }
-PORT_EX(Func_20a69, 0, 0) { ObjectInteractions(gb).port_Func_20a69(); }
-PORT_EX(Func_21cc9, 0, 0) { ObjectInteractions(gb).port_Func_21cc9(); }
-PORT_EX(CollectKey, 0, 0) { ObjectInteractions(gb).port_CollectKey(); }
+PORT_EX(ProcessInteractions, 0, 0) { ObjectInteractions(gb).port_ProcessInteractions(); }
+PORT_COVERED(SetObjAction);
+PORT_COVERED(Func_20a63);
+PORT_COVERED(Func_20a69);
+PORT_COVERED(Func_21cc9);
+PORT_COVERED(CollectKey);
 PORT_EX(SetState_OnFire, 0, 0) { ObjectInteractions(gb).port_SetState_OnFire(); }
-PORT_EX(VanishObjectAndKnockBackIfZombie, 0, 0) { ObjectInteractions(gb).port_VanishObjectAndKnockBackIfZombie(); }
-PORT_EX(SetState_OnFire_ResetStateCounter, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_SetState_OnFire_ResetStateCounter(); }
-PORT_EX(ObjInteraction_RedKey, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_RedKey(); }
-PORT_EX(ObjInteraction_GreyKey, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_GreyKey(); }
-PORT_EX(ObjInteraction_GreenKey, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_GreenKey(); }
-PORT_EX(ObjInteraction_BlueKey, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_BlueKey(); }
-PORT_EX(Func_20fe8, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20fe8(); }
-PORT_EX(ObjInteraction_None, 0, 0) { ObjectInteractions(gb).port_ObjInteraction_None(); }
-PORT_EX(ObjInteraction_Ink, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Ink(); }
-PORT_EX(Func_2092d, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_2092d(); }
-PORT_EX(ObjInteraction_Hand, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Hand(); }
-PORT_EX(ObjInteraction_UnlitTorch, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_UnlitTorch(); }
-PORT_EX(SetState_FlatStretching, 0, 0) { ObjectInteractions(gb).port_SetState_FlatStretching(); }
-PORT_EX(TreasureClearObjects, 0, 0) { ObjectInteractions(gb).port_TreasureClearObjects(); }
-PORT_EX(SetState_EnemyBumping, 0, 0) { ObjectInteractions(gb).port_SetState_EnemyBumping(); }
-PORT_EX(ObjInteraction_Food, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Food(); }
-PORT_EX(ObjInteraction_Electric, 0, 0) { ObjectInteractions(gb).port_ObjInteraction_Electric(); }
-PORT_EX(ObjInteraction_RegularCoin, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_RegularCoin(); }
-PORT_EX(CollectMusicalCoin, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_CollectMusicalCoin(); }
-PORT_EX(ObjInteraction_ColourCoin, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_ColourCoin(); }
-PORT_EX(ObjInteraction_MusicalCoin, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_MusicalCoin(); }
-PORT_EX(ObjInteraction_InvisibilityPotion, 0, 0) { ObjectInteractions(gb).port_ObjInteraction_InvisibilityPotion(); }
-PORT_EX(ObjInteraction_RollingRock, 0, 0) { ObjectInteractions(gb).port_ObjInteraction_RollingRock(); }
-PORT_EX(ObjInteraction_Vampire, 0, 0) { ObjectInteractions(gb).port_ObjInteraction_Vampire(); }
-PORT_EX(ObjInteraction_Bubble, 0, 0) { ObjectInteractions(gb).port_ObjInteraction_Bubble(); }
-PORT_EX(ObjInteraction_ZombieHead, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_ZombieHead(); }
-PORT_EX(Func_2028a, 0, 0) { ObjectInteractions(gb).port_Func_2028a(); }
-PORT_EX(Func_208f2, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_208f2(); }
-PORT_LOCAL_EX(Func_208f2, start, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_208f2__start(); }
-PORT_EX(Func_20899, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20899(); }
+PORT_COVERED(VanishObjectAndKnockBackIfZombie);
+PORT_EX(SetState_OnFire_ResetStateCounter, 0, 0) { ObjectInteractions(gb).port_SetState_OnFire_ResetStateCounter(); }
+PORT_COVERED(ObjInteraction_RedKey);
+PORT_COVERED(ObjInteraction_GreyKey);
+PORT_COVERED(ObjInteraction_GreenKey);
+PORT_COVERED(ObjInteraction_BlueKey);
+PORT_COVERED(Func_20fe8);
+PORT_COVERED(ObjInteraction_None);
+PORT_COVERED(ObjInteraction_Ink);
+PORT_COVERED(Func_2092d);
+PORT_COVERED(ObjInteraction_Hand);
+PORT_COVERED(ObjInteraction_UnlitTorch);
+PORT_COVERED(SetState_FlatStretching);
+PORT_COVERED(TreasureClearObjects);
+PORT_COVERED(SetState_EnemyBumping);
+PORT_COVERED(ObjInteraction_Food);
+PORT_COVERED(ObjInteraction_Electric);
+PORT_COVERED(ObjInteraction_RegularCoin);
+PORT_COVERED(CollectMusicalCoin);
+PORT_COVERED(ObjInteraction_ColourCoin);
+PORT_COVERED(ObjInteraction_MusicalCoin);
+PORT_COVERED(ObjInteraction_InvisibilityPotion);
+PORT_COVERED(ObjInteraction_RollingRock);
+PORT_COVERED(ObjInteraction_Vampire);
+PORT_COVERED(ObjInteraction_Bubble);
+PORT_COVERED(ObjInteraction_ZombieHead);
+PORT_COVERED(Func_2028a);
+PORT_COVERED(Func_208f2);
+PORT_COVERED(Func_20899);
 PORT_EX(SetState_WaterStung, 0, 0) { ObjectInteractions(gb).port_SetState_WaterStung(); }
-PORT_EX(ObjInteraction_Rail, 0, 0) { ObjectInteractions(gb).port_ObjInteraction_Rail(); }
-PORT_EX(GetTreasure, 0, 0) { ObjectInteractions(gb).port_GetTreasure(); }
+PORT_COVERED(ObjInteraction_Rail);
+PORT_COVERED(GetTreasure);
 PORT_EX(SetState_Stung, 0, 0) { ObjectInteractions(gb).port_SetState_Stung(); }
-PORT_EX(Func_206eb, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_206eb(); }
-PORT_EX(Func_207ed, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_207ed(); }
-PORT_EX(ObjInteraction_WaterTeleporting, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_WaterTeleporting(); }
-PORT_EX(ObjInteraction_Jamano, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Jamano(); }
-PORT_EX(Func_21e8a, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21e8a(); }
-PORT_EX(Func_20d81, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20d81(); }
-PORT_EX(Func_2168b, 0, 0) { ObjectInteractions(gb).port_Func_2168b(); }
-PORT_EX(ObjInteraction_Snow, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Snow(); }
-PORT_EX(ObjInteraction_Ice, 0, 0) { ObjectInteractions(gb).port_ObjInteraction_Ice(); }
-PORT_EX(Func_209ca, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_209ca(); }
-PORT_EX(Func_20a6f, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20a6f(); }
-PORT_EX(AttackObject, 0, 0) { ObjectInteractions(gb).port_AttackObject(); }
-PORT_EX(Func_217a9, 0, 0) { ObjectInteractions(gb).port_Func_217a9(); }
-PORT_EX(Func_20d8c, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20d8c(); }
-PORT_EX(Func_20deb, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20deb(); }
-PORT_EX(ObjInteraction_Haridama, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Haridama(); }
-PORT_EX(ObjInteraction_Pesce, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Pesce(); }
-PORT_EX(ObjInteraction_Scowler, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Scowler(); }
-PORT_EX(ObjInteraction_GreyTreasure, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_GreyTreasure(); }
-PORT_EX(ObjInteraction_RedTreasure, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_RedTreasure(); }
-PORT_EX(ObjInteraction_GreenTreasure, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_GreenTreasure(); }
-PORT_EX(ObjInteraction_BlueTreasure, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_BlueTreasure(); }
-PORT_EX(ObjInteraction_Solid, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Solid(); }
-PORT_EX(ObjInteraction_Omodon, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Omodon(); }
-PORT_EX(Func_21abb, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21abb(); }
-PORT_EX(Func_21f01, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21f01(); }
-PORT_EX(Func_20602, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20602(); }
-PORT_EX(Func_21aac, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21aac(); }
-PORT_EX(ObjInteraction_Stove, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Stove(); }
-PORT_EX(ObjInteraction_WaterDrop, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_WaterDrop(); }
-PORT_EX(Func_2023b, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_2023b(); }
-PORT_EX(Func_2022c, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_2022c(); }
-PORT_EX(Func_20939, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20939(); }
-PORT_EX(Func_20932, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20932(); }
-PORT_EX(StepOnObject, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_StepOnObject(); }
-PORT_EX(Func_20670, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20670(); }
-PORT_EX(Func_20b6b, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20b6b(); }
-PORT_EX(Func_20b41, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20b41(); }
-PORT_EX(Func_20d1d, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20d1d(); }
-PORT_EX(ObjInteraction_FrontSting, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_FrontSting(); }
-PORT_EX(ObjInteraction_BackSting, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_BackSting(); }
-PORT_EX(ObjInteraction_TopSting, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_TopSting(); }
-PORT_EX(ObjInteraction_FullSting, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_FullSting(); }
-PORT_EX(Func_20e39, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20e39(); }
-PORT_EX(Func_20e60, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20e60(); }
-PORT_EX(Func_20e6a, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20e6a(); }
-PORT_EX(Func_20e63, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_20e63(); }
-PORT_EX(ObjInteraction_Walkable, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Walkable(); }
-PORT_EX(ObjInteraction_Fire, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Fire(); }
-PORT_EX(Func_2126a, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_2126a(); }
-PORT_EX(ObjInteraction_Silky, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Silky(); }
-PORT_EX(ObjInteraction_Teruteru, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Teruteru(); }
-PORT_EX(ObjInteraction_Beam, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Beam(); }
-PORT_EX(Func_21b3a, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21b3a(); }
-PORT_EX(Func_21b78, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21b78(); }
-PORT_EX(ObjInteraction_YellowBellyArrow, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_YellowBellyArrow(); }
-PORT_EX(ObjInteraction_Pneumo, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Pneumo(); }
-PORT_EX(Func_2160a, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_2160a(); }
-PORT_EX(ObjInteraction_Bouncy, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Bouncy(); }
-PORT_EX(ObjInteraction_FireBot, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_FireBot(); }
-PORT_EX(Func_21c56, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21c56(); }
-PORT_EX(ObjInteraction_Tadpole, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Tadpole(); }
-PORT_EX(ObjInteraction_Hebarii, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Hebarii(); }
-PORT_EX(ObjInteraction_PrinceFroggy, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_PrinceFroggy(); }
-PORT_EX(Func_21d3b, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21d3b(); }
-PORT_EX(Func_21d64, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21d64(); }
-PORT_EX(Func_21d6f, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21d6f(); }
-PORT_EX(Func_21f28, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21f28(); }
-PORT_EX(Func_21dac, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21dac(); }
-PORT_EX(Func_21d88, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21d88(); }
-PORT_EX(Func_21ea6, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21ea6(); }
-PORT_EX(Func_21ecd, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21ecd(); }
-PORT_EX(ObjInteraction_MagicalSpiral, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_MagicalSpiral(); }
-PORT_EX(ObjInteraction_BottomSting, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_BottomSting(); }
-PORT_EX(ObjInteraction_AnonsterSilk, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_AnonsterSilk(); }
-PORT_EX(ObjInteraction_AnonsterWave, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_AnonsterWave(); }
-PORT_EX(ObjInteraction_RoboMouse, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_RoboMouse(); }
-PORT_EX(Func_21af1, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21af1(); }
-PORT_EX(ObjInteraction_DollBoyHammer, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_DollBoyHammer(); }
-PORT_EX(ObjInteraction_Wormwould, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Wormwould(); }
-PORT_EX(ObjInteraction_Turtle, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Turtle(); }
-PORT_EX(ObjInteraction_Shoot, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Shoot(); }
-PORT_EX(Func_21e9c, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_Func_21e9c(); }
-PORT_EX(ObjInteraction_Richtertoffen, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Richtertoffen(); }
-PORT_EX(ObjInteraction_Omodonmeka, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Omodonmeka(); }
-PORT_EX(ObjInteraction_OrangeBird, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_OrangeBird(); }
-PORT_EX(ObjInteraction_Owl, HOOK_MANUAL_RET, 0) { ObjectInteractions(gb).port_ObjInteraction_Owl(); }
+PORT_EX(Func_206eb, 0, 0) { ObjectInteractions(gb).port_Func_206eb(); }
+PORT_COVERED(Func_207ed);
+PORT_COVERED(ObjInteraction_WaterTeleporting);
+PORT_COVERED(ObjInteraction_Jamano);
+PORT_COVERED(Func_21e8a);
+PORT_COVERED(Func_20d81);
+PORT_COVERED(Func_2168b);
+PORT_COVERED(ObjInteraction_Snow);
+PORT_COVERED(ObjInteraction_Ice);
+PORT_COVERED(Func_209ca);
+PORT_COVERED(Func_20a6f);
+PORT_COVERED(AttackObject);
+PORT_COVERED(Func_217a9);
+PORT_COVERED(Func_20d8c);
+PORT_COVERED(Func_20deb);
+PORT_COVERED(ObjInteraction_Haridama);
+PORT_COVERED(ObjInteraction_Pesce);
+PORT_COVERED(ObjInteraction_Scowler);
+PORT_COVERED(ObjInteraction_GreyTreasure);
+PORT_COVERED(ObjInteraction_RedTreasure);
+PORT_COVERED(ObjInteraction_GreenTreasure);
+PORT_COVERED(ObjInteraction_BlueTreasure);
+PORT_COVERED(ObjInteraction_Solid);
+PORT_COVERED(ObjInteraction_Omodon);
+PORT_COVERED(Func_21abb);
+PORT_COVERED(Func_21f01);
+PORT_COVERED(Func_20602);
+PORT_COVERED(Func_21aac);
+PORT_COVERED(ObjInteraction_Stove);
+PORT_COVERED(ObjInteraction_WaterDrop);
+PORT_COVERED(Func_2023b);
+PORT_COVERED(Func_2022c);
+PORT_COVERED(Func_20939);
+PORT_COVERED(Func_20932);
+PORT_COVERED(StepOnObject);
+PORT_COVERED(Func_20670);
+PORT_COVERED(Func_20b6b);
+PORT_COVERED(Func_20b41);
+PORT_COVERED(Func_20d1d);
+PORT_COVERED(ObjInteraction_FrontSting);
+PORT_COVERED(ObjInteraction_BackSting);
+PORT_COVERED(ObjInteraction_TopSting);
+PORT_COVERED(ObjInteraction_FullSting);
+PORT_COVERED(Func_20e39);
+PORT_COVERED(Func_20e60);
+PORT_COVERED(Func_20e6a);
+PORT_COVERED(Func_20e63);
+PORT_COVERED(ObjInteraction_Walkable);
+PORT_COVERED(ObjInteraction_Fire);
+PORT_COVERED(Func_2126a);
+PORT_COVERED(ObjInteraction_Silky);
+PORT_COVERED(ObjInteraction_Teruteru);
+PORT_COVERED(ObjInteraction_Beam);
+PORT_COVERED(Func_21b3a);
+PORT_COVERED(Func_21b78);
+PORT_COVERED(ObjInteraction_YellowBellyArrow);
+PORT_COVERED(ObjInteraction_Pneumo);
+PORT_COVERED(Func_2160a);
+PORT_COVERED(ObjInteraction_Bouncy);
+PORT_COVERED(ObjInteraction_FireBot);
+PORT_COVERED(Func_21c56);
+PORT_COVERED(ObjInteraction_Tadpole);
+PORT_COVERED(ObjInteraction_Hebarii);
+PORT_COVERED(ObjInteraction_PrinceFroggy);
+PORT_COVERED(Func_21d3b);
+PORT_COVERED(Func_21d64);
+PORT_COVERED(Func_21d6f);
+PORT_COVERED(Func_21f28);
+PORT_COVERED(Func_21dac);
+PORT_COVERED(Func_21d88);
+PORT_COVERED(Func_21ea6);
+PORT_COVERED(Func_21ecd);
+PORT_COVERED(ObjInteraction_MagicalSpiral);
+PORT_COVERED(ObjInteraction_BottomSting);
+PORT_COVERED(ObjInteraction_AnonsterSilk);
+PORT_COVERED(ObjInteraction_AnonsterWave);
+PORT_COVERED(ObjInteraction_RoboMouse);
+PORT_COVERED(Func_21af1);
+PORT_COVERED(ObjInteraction_DollBoyHammer);
+PORT_COVERED(ObjInteraction_Wormwould);
+PORT_COVERED(ObjInteraction_Turtle);
+PORT_COVERED(ObjInteraction_Shoot);
+PORT_COVERED(Func_21e9c);
+PORT_COVERED(ObjInteraction_Richtertoffen);
+PORT_COVERED(ObjInteraction_Omodonmeka);
+PORT_COVERED(ObjInteraction_OrangeBird);
+PORT_COVERED(ObjInteraction_Owl);
