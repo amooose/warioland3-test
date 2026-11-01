@@ -185,16 +185,4 @@ void BestTimes::auto_scroll()
 
 } // namespace wl3::overworld
 
-// Only farcalled (best_times/common.asm), by the overworld's state table,
-// which returns to the main loop; hCallFunc restores a and f.
-PORT_EX(_InitBestTimeList, 0, ALL_REGISTERS)
-{
-	wl3::overworld::BestTimes(gb).init();
-}
-
-PORT_EX(_BestTimeList, 0, ALL_REGISTERS)
-{
-	wl3::overworld::BestTimes(gb).update();
-}
-
 PORT_COVERED(PrintBestTimes);

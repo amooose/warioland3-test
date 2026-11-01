@@ -35,6 +35,8 @@ private:
 	void stop_music() { stop_music2(mem_); }
 
 	void run_state(); // OverworldStateTable
+	void update_cutscene(); // UpdateCutscene
+	void leave_temple_scene(); // Func_80e33
 	void select_level(); // SelectLevel
 
 	// init.asm: the map

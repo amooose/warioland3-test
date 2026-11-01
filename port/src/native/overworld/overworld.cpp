@@ -1,6 +1,8 @@
 // The overworld, part 1; see overworld.hpp.
 #include "overworld.hpp"
 
+#include "../cutscenes/cutscenes.hpp"
+
 #include <initializer_list>
 
 namespace wl3::overworld {
@@ -82,10 +84,10 @@ void Overworld::run_state()
 {
 	// the states still register-level, by address (0: a C++ one, below)
 	static constexpr uint16_t STATES[40] = {
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ADDR_InitTreasureCollection, 0,
-		ADDR_TreasureCollection, 0, ADDR_InitCutscene, 0, ADDR_UpdateCutscene, 0, ADDR_Func_80db1,
-		0, ADDR_InitBestTimeList, 0, ADDR_BestTimeList, 0, ADDR_InitTempleScene, 0, ADDR_UpdateTempleScene,
-		ADDR_Func_80e33, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, ADDR_InitCutscene, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	};
 	uint8_t state = wram_.sub_state();
 	switch (state) {
@@ -110,6 +112,15 @@ void Overworld::run_state()
 	case 11: update_map_side(); return;
 	case 13: TreasureCollection(gb_).init_far(); return;
 	case 15: TreasureCollection(gb_).update_far(); return;
+	case 19: update_cutscene(); return;
+	case 21: after_cutscene(); return; // Func_80db1
+	// InitBestTimeList, BestTimeList, InitTempleScene, UpdateTempleScene
+	// (farcalls of their modules), Func_80e33
+	case 23: routines_.in_bank(BANK__InitBestTimeList, ADDR__InitBestTimeList, [&] { BestTimes(gb_).init(); }); return;
+	case 25: routines_.in_bank(BANK__BestTimeList, ADDR__BestTimeList, [&] { BestTimes(gb_).update(); }); return;
+	case 27: routines_.in_bank(BANK__InitTempleScene, ADDR__InitTempleScene, [&] { TempleScene(gb_).init(); }); return;
+	case 29: routines_.in_bank(BANK__UpdateTempleScene, ADDR__UpdateTempleScene, [&] { TempleScene(gb_).update(); }); return;
+	case 30: leave_temple_scene(); return;
 	// the golf building's and the epilogue's (GolfBuilding, Func_80e55,
 	// InitEpilogue, Func_80e75, Func_80e85)
 	case 32: routines_.farcall(BANK__GolfBuilding, ADDR__GolfBuilding); return;
@@ -123,6 +134,28 @@ void Overworld::run_state()
 		return;
 	}
 	routines_.call(STATES[state]);
+}
+
+// UpdateCutscene: a cutscene the top bar started is skipped with B, once
+// it's past its first step
+void Overworld::update_cutscene()
+{
+	if (mem_[wOWBarsState] && mem_[w2d013] >= 0x01 && (mem_[wJoypadPressed] & (1 << B_PAD_B))) {
+		++wram_.sub_state();
+		stop_sfx(mem_);
+		return;
+	}
+	routines_.in_bank(BANK_DoCutsceneFunc, ADDR_DoCutsceneFunc, [&] { cutscenes::Cutscenes(gb_).update(); });
+	routines_.clear_unused_virtual_oam();
+}
+
+// Func_80e33: B back to the map, or on (the temple scene's end)
+void Overworld::leave_temple_scene()
+{
+	if (mem_[wJoypadDown] & (1 << B_PAD_B))
+		wram_.sub_state() = SST_OVERWORLD_08;
+	else
+		++wram_.sub_state();
 }
 
 // SetCompassSprite: the compass, top left, pointing at the side
@@ -782,3 +815,17 @@ PORT_COVERED(Func_80e75);
 PORT_COVERED(Func_80e85);
 PORT_COVERED(_LoadMapSidePals);
 PORT_COVERED(_LoadPalsForOWScene);
+
+// The overworld states the state table runs (by HandleOverworld), and
+// what they farcall.
+PORT_COVERED(InitBestTimeList);
+PORT_COVERED(BestTimeList);
+PORT_COVERED(_InitBestTimeList);
+PORT_COVERED(_BestTimeList);
+PORT_COVERED(InitTempleScene);
+PORT_COVERED(UpdateTempleScene);
+PORT_COVERED(_InitTempleScene);
+PORT_COVERED(_UpdateTempleScene);
+PORT_COVERED(Func_80e33);
+PORT_COVERED(UpdateCutscene);
+PORT_COVERED(Func_80db1);

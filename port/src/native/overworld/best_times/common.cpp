@@ -25,18 +25,6 @@ public:
 		cpu_.a = SST_OVERWORLD_BEST_TIMES;
 		wr8(wSubState, cpu_.a);
 	}
-
-	// state table entries (the main loop reloads every register after them)
-	// over C++ routines that leave registers as ALL_REGISTERS
-	void port_InitBestTimeList()
-	{
-		FARCALL(_InitBestTimeList);
-	}
-
-	void port_BestTimeList()
-	{
-		FARCALL(_BestTimeList);
-	}
 };
 
 } // namespace
@@ -46,5 +34,3 @@ public:
 using wl3::overworld::OverworldBestTimesCommon;
 
 PORT_EX(Func_80de0, 0, 0) { OverworldBestTimesCommon(gb).port_Func_80de0(); }
-PORT_EX(InitBestTimeList, 0, ALL_REGISTERS) { OverworldBestTimesCommon(gb).port_InitBestTimeList(); }
-PORT_EX(BestTimeList, 0, ALL_REGISTERS) { OverworldBestTimesCommon(gb).port_BestTimeList(); }

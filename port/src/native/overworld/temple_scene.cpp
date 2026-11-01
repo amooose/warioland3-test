@@ -945,8 +945,6 @@ void TempleScene::right_hand()
 } // namespace wl3::overworld
 
 // Farcalled by the map's sub-state table.
-PORT_EX(_InitTempleScene, 0, ALL_REGISTERS) { wl3::overworld::TempleScene(gb).init(); }
-PORT_EX(_UpdateTempleScene, 0, ALL_REGISTERS) { wl3::overworld::TempleScene(gb).update(); }
 PORT_EX(HandleEnterTempleWithAllMusicBoxesScene, 0, ALL_REGISTERS) { wl3::overworld::TempleScene(gb).enter_with_music_boxes(); }
 PORT_EX(Func_ad445, 0, ALL_REGISTERS) { wl3::overworld::TempleScene(gb).show_music_boxes(); }
 PORT_EX(HandleHiddenFigureReveal, 0, ALL_REGISTERS) { wl3::overworld::TempleScene(gb).figure_appears(); }
