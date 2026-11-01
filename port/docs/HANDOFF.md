@@ -465,6 +465,16 @@ primitives, home/wario.cpp, and the golf objects' animation):
   primitives; check the new internals with temporary ALL_REGISTERS hooks
   and many variants, as for the save data, then remove the hooks; run the
   full fuzz tier for each batch.
+- Done (2026-11-01): the four Wario state groups dispatch natively
+  (wario_states_1-4.cpp): calls between a group's labels are member
+  calls, only labels called from elsewhere keep hooks (69 of 516). The
+  conversion is scripted (direct_calls.py in the session scratchpad:
+  LCALL/CALL/JUMP to own labels -> member calls, tail jumps out -> calls,
+  RET() dropped, the dispatcher a switch); watch for "else RET();" before
+  a shared return and for computed jumps (JUMP_TO(target)), which become
+  member function pointers. Group 1's dispatcher switches on a (the asm
+  doesn't reload wWarioState). Next the same for update_objects and
+  object_interactions, then the handler bodies' registers -> locals.
 - Home's level-tied files (load_room, load_level, decompress_level_data,
   door/floor/room transitions, wario_mechanics1, object_mechanics,
   object_pos, IsOnSlipperyGround) go with the level code that calls
