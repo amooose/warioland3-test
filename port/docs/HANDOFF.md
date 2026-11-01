@@ -109,10 +109,10 @@ Each step that worked in the cloud session:
    - Grouping by asm file keeps shared helpers in one `.c` file.
 2. **Read the asm.** Write the C in `src/ported/<same path as the asm>.c`,
    matching that file's helpers and conventions.
-   - `engine/level/wario_states.h` has the small helpers the Wario state
-     ports share, such as `st`, `ld_and`, `clear`, `load_gfx`, `set_oam`,
-     `frameset_by_dir` and `anim`. Include it for anything that sets
-     Wario's state (`object_interactions.c` does).
+   - The Wario state helpers (`st`, `ld_and`, `clear`, `load_gfx`,
+     `set_oam`, `frameset_by_dir`, `anim`...) are now members of
+     `AsmModule` (src/native/level/asm_module.hpp), with the level engine
+     (all C++).
    - `home/fade.c` has `fade_begin`, `fade_end` and `unpack_rgb` /
      `pack_cur_rgb`.
 3. **Build.**

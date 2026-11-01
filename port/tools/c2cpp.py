@@ -40,7 +40,9 @@ def port(m):
 	return 'void port_' + name + '()'
 c = re.sub(r'^(PORT_LOCAL_JUMP|PORT_LOCAL_EX|PORT_LOCAL|PORT_JUMP|PORT_EX|PORT)\(([^)]*)\)', port, c, flags=re.M)
 
-# static functions -> members; forward declarations go
+# static functions -> members; forward declarations go (members needn't
+# be declared before use), including those over more than a line
+c = re.sub(r'^static (inline )?[^=;{}\n]*?\b\w+\([^;{}]*\);\n', '', c, flags=re.M)
 c = re.sub(r'^static (inline )?([\w\s\*]+?\b\w+)\(GB \*gb\);\n', '', c, flags=re.M)
 c = re.sub(r'^static (inline )?([^=;\n]*?\b\w+\()GB \*gb, ', r'\2', c, flags=re.M)
 c = re.sub(r'^static (inline )?([^=;\n]*?\b\w+\()GB \*gb\)', r'\2)', c, flags=re.M)
