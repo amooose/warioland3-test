@@ -355,14 +355,14 @@ void ActionHelp::load_sprite(MenuObject obj)
 
 } // namespace wl3::action_help
 
-// Called from ActionHelpStateTable, whose callers use no register after it
-// (see src/ported/engine/action_help/common.c).
-PORT_EX(_ActionHelpStateTable, 0, ALL_REGISTERS)
+// MainStateTable calls it (push_wram BANK("GFX RAM") around the table)
+PORT_EX(ActionHelpStateTable, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
-	wl3::action_help::ActionHelp(gb).run_state();
+	wl3::run_state_table(gb, 0x03, BANK__ActionHelpStateTable, ADDR__ActionHelpStateTable, [&] { wl3::action_help::ActionHelp(gb).run_state(); });
 }
 
 // The routines implemented inside this module (they have no hooks).
+PORT_COVERED(_ActionHelpStateTable);
 PORT_COVERED(InitActionHelp);
 PORT_COVERED(UpdateActionHelp);
 PORT_COVERED(ExecuteMainPowerUpActionHelp);

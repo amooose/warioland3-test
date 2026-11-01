@@ -689,13 +689,14 @@ void ClearScreen::set_musical_coin_flag()
 
 } // namespace wl3::clear
 
-// Called from ClearScreenStateTable (see src/ported/engine/clear/common.c).
-PORT_EX(_ClearScreenStateTable, 0, ALL_REGISTERS)
+// MainStateTable calls it (push_wram BANK("GFX RAM") around the table)
+PORT_EX(ClearScreenStateTable, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
-	wl3::clear::ClearScreen(gb).run_state();
+	wl3::run_state_table(gb, 0x03, BANK__ClearScreenStateTable, ADDR__ClearScreenStateTable, [&] { wl3::clear::ClearScreen(gb).run_state(); });
 }
 
 // The routines implemented inside this module (they have no hooks).
+PORT_COVERED(_ClearScreenStateTable);
 PORT_COVERED(InitClearScreen);
 PORT_COVERED(UpdateClearScreen);
 PORT_COVERED(OpenMusicalCoinsScreen);

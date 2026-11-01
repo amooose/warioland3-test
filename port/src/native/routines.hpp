@@ -154,6 +154,24 @@ private:
 	GB *gb_;
 };
 
+// A state table's home wrapper (GolfStateTable, PauseMenuStateTable...):
+// push_wram wram_bank, farcall the module's table (fn, as the original at
+// bank:addr), pop_wram. MainStateTable's caller reloads b to l; a and f
+// are left as pop_wram leaves them (the WRAM bank it read, the entry's
+// flags).
+template <class F>
+void run_state_table(GB *gb, uint8_t wram_bank, uint8_t bank, uint16_t addr, F fn)
+{
+	uint8_t flags = gb->cpu.f;
+	Memory mem(gb);
+	uint8_t saved = mem[rWBK];
+	mem[rWBK] = wram_bank;
+	home::farcall(gb, bank, addr, fn);
+	mem[rWBK] = saved;
+	gb->cpu.a = saved;
+	gb->cpu.f = flags;
+}
+
 // The play_sfx, stop_sfx and play_music2 / stop_music2 macros
 inline void play_sfx(Memory mem, uint16_t sfx)
 {

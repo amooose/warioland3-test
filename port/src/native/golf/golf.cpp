@@ -728,17 +728,16 @@ void Golf::update_building_animations()
 
 using wl3::golf::Golf;
 
-// The state tables, reached by farcall from GolfStateTable and
-// GolfBuildingStateTable. hCallFunc restores af after them and the main loop
-// follows, so their callers use no register they leave.
-PORT_EX(_GolfStateTable, 0, ALL_REGISTERS)
+// MainStateTable calls it (push_wram BANK("Level Objects WRAM") around the table)
+PORT_EX(GolfStateTable, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
-	Golf(gb).run_golf_state();
+	wl3::run_state_table(gb, 0x01, BANK__GolfStateTable, ADDR__GolfStateTable, [&] { Golf(gb).run_golf_state(); });
 }
 
-PORT_EX(_GolfBuildingStateTable, 0, ALL_REGISTERS)
+// MainStateTable calls it (push_wram BANK("Level Objects WRAM") around the table)
+PORT_EX(GolfBuildingStateTable, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
-	Golf(gb).run_building_state();
+	wl3::run_state_table(gb, 0x01, BANK__GolfBuildingStateTable, ADDR__GolfBuildingStateTable, [&] { Golf(gb).run_building_state(); });
 }
 
 // VBlank_1c84e0.Func, run from wVBlankFunc (see ram_code.c): sets the golf
@@ -755,6 +754,8 @@ PORT_LOCAL_EX(VBlank_1c84e0, Func, HOOK_MANUAL_RET, 0)
 }
 
 // The routines implemented inside this module (they have no hooks).
+PORT_COVERED(_GolfBuildingStateTable);
+PORT_COVERED(_GolfStateTable);
 PORT_COVERED(InitGolfLobby);
 PORT_COVERED(HandleGolfLobby);
 PORT_COVERED(HandleGolfLobbyStates);

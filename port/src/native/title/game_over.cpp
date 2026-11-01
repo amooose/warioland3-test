@@ -175,11 +175,10 @@ void GameOver::load_hidden_figure_gfx()
 
 using wl3::title::GameOver;
 
-// Called from GameOverStateTable, whose callers use no register after it
-// (see src/ported/engine/game_over/common.c).
-PORT_EX(_GameOverStateTable, 0, ALL_REGISTERS)
+// MainStateTable calls it (push_wram BANK("GFX RAM") around the table)
+PORT_EX(GameOverStateTable, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
-	GameOver(gb).run_state();
+	wl3::run_state_table(gb, 0x03, BANK__GameOverStateTable, ADDR__GameOverStateTable, [&] { GameOver(gb).run_state(); });
 }
 
 // Farcalled from InitLevel only: there, hCallFunc's pop af gives back f,
@@ -190,6 +189,7 @@ PORT_EX(LoadHiddenFigureGfx, 0, ALL_REGISTERS)
 }
 
 // The routines implemented inside this module (they have no hooks).
+PORT_COVERED(_GameOverStateTable);
 PORT_COVERED(InitGameOverScreen);
 PORT_COVERED(UpdateGameOverScreen);
 PORT_COVERED(Func_db3e4);

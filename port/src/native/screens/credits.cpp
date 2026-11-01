@@ -302,13 +302,14 @@ void Credits::last_state()
 
 } // namespace wl3::screens
 
-// Called from CreditsStateTable (see src/ported/engine/credits/common.c).
-PORT_EX(_CreditsStateTable, 0, ALL_REGISTERS)
+// MainStateTable calls it (push_wram BANK("GFX RAM") around the table)
+PORT_EX(CreditsStateTable, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
-	wl3::screens::Credits(gb).run_state();
+	wl3::run_state_table(gb, 0x03, BANK__CreditsStateTable, ADDR__CreditsStateTable, [&] { wl3::screens::Credits(gb).run_state(); });
 }
 
 // The routines implemented inside this module (they have no hooks).
+PORT_COVERED(_CreditsStateTable);
 PORT_COVERED(InitCredits);
 PORT_COVERED(ShowCredits);
 PORT_COVERED(Func_160190);

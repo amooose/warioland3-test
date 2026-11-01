@@ -249,13 +249,14 @@ PORT_EX(LanguageSelectionStateTable, 0, ALL_REGISTERS)
 	mem[rWBK] = wram_bank;
 }
 
-// Called from PerfectStateTable (see src/ported/engine/perfect/common.c).
-PORT_EX(_PerfectStateTable, 0, ALL_REGISTERS)
+// MainStateTable calls it (push_wram BANK("GFX RAM") around the table)
+PORT_EX(PerfectStateTable, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
-	wl3::screens::Perfect(gb).run_state();
+	wl3::run_state_table(gb, 0x03, BANK__PerfectStateTable, ADDR__PerfectStateTable, [&] { wl3::screens::Perfect(gb).run_state(); });
 }
 
 // The routines implemented inside this module (they have no hooks).
+PORT_COVERED(_PerfectStateTable);
 PORT_COVERED(GBIncompatible);
 PORT_COVERED(ExitGBIncompatible);
 PORT_COVERED(InitLanguageSelection);
