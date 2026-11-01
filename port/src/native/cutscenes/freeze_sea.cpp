@@ -1,6 +1,7 @@
 // Cutscene0eFunc and Cutscene11Func, one script: an item rises, the sky
 // changes, and a cloud (the freeze) or the lightning comes. And
 // Cutscene18Func, drawn the same way. See cutscenes.hpp.
+#include "../home/ow.hpp"
 #include "loaders.hpp"
 #include "cutscenes.hpp"
 
@@ -28,11 +29,7 @@ void Cutscenes::freeze_sea()
 {
 	// .asm_9d3aa: the sky's palettes, from pals
 	auto change_sky = [&](uint16_t pals) {
-		SET_HL(gb_, pals);
-		SET_DE(gb_, wTempPals1);
-		gb_->cpu.c = 8 * PAL_SIZE;
-		gb_->cpu.b = BANK_Pals_b8040;
-		routines_.call(ADDR_CopyFarBytes);
+		home::copy_far_bytes(gb_, BANK_Pals_b8040, pals, wTempPals1, 8 * PAL_SIZE);
 		mem_[wSceneObj1YCoord] = 0;
 		mem_[wSceneObj2State] = 0;
 		wram_.collection_row() = 0x08;

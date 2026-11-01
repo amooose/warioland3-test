@@ -53,9 +53,7 @@ void GolfBuilding::init()
 	gb_->cpu.b = BANK_Pals_84900;
 	gb_->cpu.c = 8 * PAL_SIZE;
 	routines_.call(ADDR_CopyFarBytes);
-	SET_HL(gb_, ADDR_PrologueBackgroundGfx);
-	gb_->cpu.b = BANK_PrologueBackgroundGfx;
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_PrologueBackgroundGfx, ADDR_PrologueBackgroundGfx);
 	decompress(BANK_GolfBuildingAttrmap, ADDR_GolfBuildingAttrmap, v1BGMap0, true);
 	decompress(BANK_GolfBuildingTilemap, ADDR_GolfBuildingTilemap, v0BGMap0, false);
 	place_wario();

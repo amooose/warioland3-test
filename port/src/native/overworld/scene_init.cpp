@@ -201,11 +201,7 @@ void SceneInit::bottom_bar()
 	mem_[rWY] = SCREEN_HEIGHT_PX;
 	wram_.bottom_bar_action() = BOTBAR_CLOSED;
 	// the empty treasure's tiles
-	SET_HL(gb_, ADDR_TreasureGfx);
-	SET_DE(gb_, v0Tiles1 + 0x10 * TILE_SIZE);
-	gb_->cpu.c = 4 * TILE_SIZE;
-	gb_->cpu.b = BANK_TreasureGfx;
-	routines_.call(ADDR_CopyFarBytes);
+	home::copy_far_bytes(gb_, BANK_TreasureGfx, ADDR_TreasureGfx, v0Tiles1 + 0x10 * TILE_SIZE, 4 * TILE_SIZE);
 }
 
 // Func_b4247: the top bar's day and night button, below the screen
@@ -220,11 +216,7 @@ void SceneInit::top_bar()
 	mem_[rVBK] = 1;
 	routines_.copy(v0BGMap0 + 30 * TILEMAP_WIDTH, wAttrmap + 19 * TILEMAP_WIDTH, 2 * TILEMAP_WIDTH);
 	mem_[rVBK] = 0;
-	SET_HL(gb_, ADDR_Pals_84a20);
-	SET_DE(gb_, wTempPals2 + 4 * PAL_SIZE);
-	gb_->cpu.c = 4 * PAL_SIZE;
-	gb_->cpu.b = BANK_Pals_84a20;
-	routines_.call(ADDR_CopyFarBytes);
+	home::copy_far_bytes(gb_, BANK_Pals_84a20, ADDR_Pals_84a20, wTempPals2 + 4 * PAL_SIZE, 4 * PAL_SIZE);
 	place(wSceneObj5, {0x00, 0x60, 0x00});
 	routines_.farcall(BANK_VBlank_Overworld, ADDR_VBlank_Overworld);
 	routines_.farcall(BANK_DrawCoinCount, ADDR_DrawCoinCount);
@@ -471,11 +463,7 @@ void SceneInit::east(uint8_t param, uint8_t c)
 			gb_->cpu.c = 0x91;
 			gb_->cpu.b = BANK_OWSceneFreezeSeaTilemap;
 			routines_.call(ADDR_CopyFarBytes);
-			SET_HL(gb_, ADDR_OWSceneFreezeSeaAttrmap + 15);
-			SET_DE(gb_, wAttrmap + 10 * TILEMAP_WIDTH + 15);
-			gb_->cpu.c = 0x91;
-			gb_->cpu.b = BANK_OWSceneFreezeSeaAttrmap;
-			routines_.call(ADDR_CopyFarBytes);
+			home::copy_far_bytes(gb_, BANK_OWSceneFreezeSeaAttrmap, ADDR_OWSceneFreezeSeaAttrmap + 15, wAttrmap + 10 * TILEMAP_WIDTH + 15, 0x91);
 		}
 		return;
 	case EOWFUNC_EARTHQUAKE: // Func_b46d9

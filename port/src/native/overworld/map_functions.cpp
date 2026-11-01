@@ -153,9 +153,7 @@ bool MapFunctions::move(uint16_t obj, uint16_t data)
 
 void MapFunctions::set_state(uint16_t state, uint8_t value)
 {
-	gb_->cpu.a = value;
-	SET_HL(gb_, state);
-	routines_.call(ADDR_SetSceneObjState);
+	home::set_scene_obj_state(gb_, state, value);
 }
 
 // ---------------------------------------------------------------------------
@@ -435,11 +433,7 @@ void MapFunctions::crayon()
 		return;
 	case 10: // .LoadNewOWPal
 		routines_.copy(wTempPals1, wTempBGPals, 8 * PAL_SIZE);
-		SET_HL(gb_, ADDR_Pals_84500);
-		SET_DE(gb_, wTempPals1);
-		gb_->cpu.c = 8 * PAL_SIZE;
-		gb_->cpu.b = BANK_Pals_84500;
-		routines_.call(ADDR_CopyFarBytes);
+		home::copy_far_bytes(gb_, BANK_Pals_84500, ADDR_Pals_84500, wTempPals1, 8 * PAL_SIZE);
 		wram_.pal_config1_total_steps() = 0;
 		next_step();
 		return;
@@ -889,11 +883,7 @@ void MapFunctions::rain_pals()
 		return;
 	}
 	// .apply_pals: the first BG palette to load
-	SET_HL(gb_, pals);
-	SET_DE(gb_, wTempPals1);
-	gb_->cpu.b = BANK_Pals_84140;
-	gb_->cpu.c = 8 * PAL_SIZE;
-	routines_.call(ADDR_CopyFarBytes);
+	home::copy_far_bytes(gb_, BANK_Pals_84140, pals, wTempPals1, 8 * PAL_SIZE);
 	pal_config(wPalConfig1, static_cast<uint8_t>(rBGPI), wTempPals1);
 }
 
@@ -979,11 +969,7 @@ void MapFunctions::pal_config(uint16_t config, uint8_t reg, uint16_t src)
 void MapFunctions::load_one_pal(uint8_t bank, uint16_t pals, uint8_t pal)
 {
 	uint16_t dest = static_cast<uint16_t>(wTempPals1 + pal * PAL_SIZE);
-	SET_HL(gb_, static_cast<uint16_t>(pals + pal * PAL_SIZE));
-	SET_DE(gb_, dest);
-	gb_->cpu.b = bank;
-	gb_->cpu.c = PAL_SIZE;
-	routines_.call(ADDR_CopyFarBytes);
+	home::copy_far_bytes(gb_, bank, static_cast<uint16_t>(pals + pal * PAL_SIZE), dest, PAL_SIZE);
 	mem_[wPalConfig1] = static_cast<uint8_t>(rBGPI);
 	mem_[wPalConfig1Index] = BGPI_AUTOINC | (pal * PAL_SIZE);
 	mem_[wPalConfig1Number] = 1;
@@ -1341,11 +1327,7 @@ void MapFunctions::yellow_music_box()
 // CopyFarBytes: 8 palettes from bank:src to dest
 void MapFunctions::load_pals(uint8_t bank, uint16_t src, uint16_t dest)
 {
-	SET_HL(gb_, src);
-	SET_DE(gb_, dest);
-	gb_->cpu.b = bank;
-	gb_->cpu.c = 8 * PAL_SIZE;
-	routines_.call(ADDR_CopyFarBytes);
+	home::copy_far_bytes(gb_, bank, src, dest, 8 * PAL_SIZE);
 }
 
 // SOWFunc_CanyonThunder: lightning strikes the canyon, flashing, then a
@@ -2264,11 +2246,7 @@ void MapFunctions::castle_pals()
 		mem_[wPalConfig2Number] = 6;
 		mem_[wPalConfig2SourceHi] = static_cast<uint8_t>(wTempPals1 >> 8);
 		mem_[wPalConfig2SourceLo] = static_cast<uint8_t>(wTempPals1);
-		SET_HL(gb_, ADDR_Pals_84840);
-		SET_DE(gb_, wTempBGPals);
-		gb_->cpu.c = 6 * PAL_SIZE;
-		gb_->cpu.b = BANK_Pals_84840;
-		routines_.call(ADDR_CopyFarBytes);
+		home::copy_far_bytes(gb_, BANK_Pals_84840, ADDR_Pals_84840, wTempBGPals, 6 * PAL_SIZE);
 		frames = 0; // .asm_b750a
 		++phase;
 		return;

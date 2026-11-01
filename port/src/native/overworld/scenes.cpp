@@ -83,11 +83,7 @@ uint16_t Scenes::coord_in_tilemap(uint16_t coords)
 
 void Scenes::copy_far_bytes(uint8_t bank, uint16_t src, uint16_t dest, uint8_t count)
 {
-	SET_HL(gb_, src);
-	SET_DE(gb_, dest);
-	gb_->cpu.c = count;
-	gb_->cpu.b = bank;
-	routines_.call(ADDR_CopyFarBytes);
+	home::copy_far_bytes(gb_, bank, src, dest, count);
 }
 
 // ---------------------------------------------------------------------------
@@ -680,9 +676,7 @@ void Scenes::highlight_level()
 		gb_->cpu.c = wram_.level2();
 		SET_DE(gb_, wCurSceneObj);
 		routines_.call(ADDR_SetObjPositionToLevelCoords);
-		SET_HL(gb_, wCurSceneObjState);
-		gb_->cpu.a = 0x02;
-		routines_.call(ADDR_SetSceneObjState);
+		home::set_scene_obj_state(gb_, wCurSceneObjState, 0x02);
 		play_sfx(mem_, SFX_104);
 		next_step();
 		return;
@@ -727,18 +721,12 @@ void Scenes::draw_highlight_marker()
 
 void Scenes::update_marker_animation(uint8_t bank, uint16_t frameset)
 {
-	SET_HL(gb_, wCurSceneObjDuration);
-	SET_DE(gb_, frameset);
-	gb_->cpu.b = bank;
-	routines_.call(ADDR_UpdateOWAnimation);
+	home::update_ow_animation(gb_, bank, wCurSceneObjDuration, frameset);
 }
 
 void Scenes::draw_marker()
 {
-	SET_HL(gb_, wCurSceneObj);
-	SET_DE(gb_, ADDR_OAM_aa445);
-	gb_->cpu.b = BANK_OAM_aa445;
-	routines_.call(ADDR_LoadOWSpriteWithScroll);
+	home::load_ow_sprite_with_scroll(gb_, BANK_OAM_aa445, ADDR_OAM_aa445, wCurSceneObj);
 }
 
 } // namespace wl3::overworld

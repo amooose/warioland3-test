@@ -52,9 +52,7 @@ void TreasureCollection::update_far()
 
 void TreasureCollection::set_scene_obj_state(uint16_t state, uint8_t value)
 {
-	SET_HL(gb_, state);
-	gb_->cpu.a = value;
-	routines_.call(ADDR_SetSceneObjState);
+	home::set_scene_obj_state(gb_, state, value);
 }
 
 void TreasureCollection::decompress(uint8_t bank, uint16_t src, uint16_t dest)

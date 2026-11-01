@@ -1,4 +1,5 @@
 // Cutscenes $51 to $58. See cutscenes.hpp.
+#include "../home/ow.hpp"
 #include "loaders.hpp"
 #include "cutscenes.hpp"
 
@@ -99,9 +100,7 @@ void Cutscenes::draw_func_9f8da()
 void Cutscenes::init_cut_balloon()
 {
 	cutscenes::load_cutscenes9_gfx_vram1(gb_);
-	gb_->cpu.b = BANK_LevelMainTiles24;
-	SET_HL(gb_, ADDR_LevelMainTiles24);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_LevelMainTiles24, ADDR_LevelMainTiles24);
 	cutscenes::load_cutscene_bg_maps(gb_, 36);
 	cutscenes::clear_temp_pals(gb_);
 	place(wSceneObj2, 0x58, 0x50, 0x01);
@@ -171,9 +170,7 @@ void Cutscenes::cut_balloon()
 void Cutscenes::init_reveal_dark_room()
 {
 	cutscenes::clear_temp_pals(gb_);
-	gb_->cpu.b = BANK_LevelMainTiles11;
-	SET_HL(gb_, ADDR_LevelMainTiles11);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_LevelMainTiles11, ADDR_LevelMainTiles11);
 	cutscenes::load_cutscenes8_10_gfx_vram1(gb_);
 	cutscenes::load_cutscene_bg_maps(gb_, 24);
 	cutscenes::load_cutscene_bg_maps(gb_, 25);

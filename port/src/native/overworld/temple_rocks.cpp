@@ -251,9 +251,7 @@ void TempleRocks::set_size(uint16_t rock, uint16_t obj, uint8_t seed, bool can_b
 			extra = 2;
 		state = static_cast<uint8_t>(size + extra);
 	}
-	gb_->cpu.a = state;
-	SET_HL(gb_, static_cast<uint16_t>(obj + SCENE_OBJ_STATE));
-	routines_.call(ADDR_SetSceneObjState);
+	home::set_scene_obj_state(gb_, static_cast<uint16_t>(obj + SCENE_OBJ_STATE), state);
 }
 
 // .Next: the next action, from frame 0

@@ -275,10 +275,7 @@ void BottomBar::draw_8_coin()
 {
 	if (!wram_.bottom_bar_flags().bit(FLAG_8_COIN))
 		return;
-	SET_HL(gb_, wCompassObjState);
-	SET_DE(gb_, ADDR_Frameset_aa2fb);
-	gb_->cpu.b = BANK_Frameset_aa2fb;
-	routines_.call(ADDR_UpdateOWAnimation);
+	home::update_ow_animation(gb_, BANK_Frameset_aa2fb, wCompassObjState, ADDR_Frameset_aa2fb);
 	load_sprite(LOW_ROW, 0x90, wram_.compass_obj_duration(), 0x00);
 }
 
@@ -294,9 +291,7 @@ void BottomBar::load_sprite(uint8_t y, uint8_t x, uint8_t frame, uint8_t attribu
 
 void BottomBar::load_sprite_got_params(uint8_t bank, uint16_t oam)
 {
-	SET_HL(gb_, oam);
-	gb_->cpu.b = bank;
-	routines_.call(ADDR_LoadOWSpriteWithScroll_GotParams);
+	home::load_ow_sprite_got_params(gb_, bank, oam);
 }
 
 void BottomBar::idle(int cycles)

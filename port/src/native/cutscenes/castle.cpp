@@ -1,5 +1,6 @@
 // Cutscene19Func, the castle appears, and Cutscene1bFunc, the sun is
 // summoned (with the owl). See cutscenes.hpp.
+#include "../home/ow.hpp"
 #include "loaders.hpp"
 #include "cutscenes.hpp"
 
@@ -94,9 +95,7 @@ void Cutscenes::init_summon_sun()
 	cutscenes::load_cutscenes4_gfx(gb_);
 	decompress(BANK_OwlGfx, ADDR_OwlGfx, v1Tiles0, true);
 	mem_[rVBK] = 1;
-	gb_->cpu.b = BANK_LevelMainTiles28;
-	SET_HL(gb_, ADDR_LevelMainTiles28);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_LevelMainTiles28, ADDR_LevelMainTiles28);
 	mem_[rVBK] = 0;
 	cutscenes::load_cutscene_bg_maps(gb_, 3);
 	decompress(BANK_Cutscene33Attrmap, ADDR_Cutscene33Attrmap, v1BGMap1, true);

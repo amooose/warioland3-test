@@ -77,9 +77,7 @@ void TempleNotes::unrealistic()
 
 void TempleNotes::set_scene_obj_state(uint16_t state, uint8_t value)
 {
-	SET_HL(gb_, state);
-	gb_->cpu.a = value;
-	routines_.call(ADDR_SetSceneObjState);
+	home::set_scene_obj_state(gb_, state, value);
 }
 
 // ---------------------------------------------------------------------------

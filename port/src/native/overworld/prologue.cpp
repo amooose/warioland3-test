@@ -17,18 +17,12 @@ void Prologue::wario_state(uint8_t state)
 
 void Prologue::set_state(uint16_t state, uint8_t value)
 {
-	gb_->cpu.a = value;
-	SET_HL(gb_, state);
-	routines_.call(ADDR_SetSceneObjState);
+	home::set_scene_obj_state(gb_, state, value);
 }
 
 void Prologue::far_copy(uint8_t bank, uint16_t src, uint16_t dest, uint8_t count)
 {
-	SET_HL(gb_, src);
-	SET_DE(gb_, dest);
-	gb_->cpu.c = count;
-	gb_->cpu.b = bank;
-	routines_.call(ADDR_CopyFarBytes);
+	home::copy_far_bytes(gb_, bank, src, dest, count);
 }
 
 // Prologue_Next

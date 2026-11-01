@@ -99,7 +99,7 @@ void MapWalk::arrive()
 void MapWalk::start_music()
 {
 	if (!wram_.day_night().bit(7)) {
-		routines_.call(ADDR_PlayOverworldMusic);
+		home::play_overworld_music(gb_);
 		update_objects();
 		next_state();
 		return;
@@ -376,9 +376,7 @@ void MapWalk::temple_step()
 
 void MapWalk::set_scene_obj_state(uint16_t state, uint8_t value)
 {
-	SET_HL(gb_, state);
-	gb_->cpu.a = value;
-	routines_.call(ADDR_SetSceneObjState);
+	home::set_scene_obj_state(gb_, state, value);
 }
 
 // ---------------------------------------------------------------------------
@@ -719,10 +717,7 @@ void MapWalk::draw_wario()
 	SET_HL(gb_, w2d104);
 	gb_->cpu.b = OW_ANIMATION_BANK;
 	routines_.call(ADDR_UpdateOWAnimation);
-	SET_DE(gb_, mem_.word(w2d107));
-	SET_HL(gb_, w2d100);
-	gb_->cpu.b = OW_ANIMATION_BANK;
-	routines_.call(ADDR_LoadOWSpriteWithScroll);
+	home::load_ow_sprite_with_scroll(gb_, OW_ANIMATION_BANK, mem_.word(w2d107), w2d100);
 }
 
 } // namespace wl3::overworld

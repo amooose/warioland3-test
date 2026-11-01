@@ -25,9 +25,7 @@ void SceneCommon::fill(uint16_t addr, uint16_t size, uint8_t value)
 
 void SceneCommon::set_state(uint16_t state, uint8_t value)
 {
-	gb_->cpu.a = value;
-	SET_HL(gb_, state);
-	routines_.call(ADDR_SetSceneObjState);
+	home::set_scene_obj_state(gb_, state, value);
 }
 
 // Func_aca6d

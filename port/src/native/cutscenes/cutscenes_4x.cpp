@@ -1,4 +1,5 @@
 // Cutscenes $43 to $4f. See cutscenes.hpp.
+#include "../home/ow.hpp"
 #include "loaders.hpp"
 #include "cutscenes.hpp"
 
@@ -9,9 +10,7 @@ void Cutscenes::init_place_propeller()
 {
 	load_pals1(BANK_Pals_b8440, ADDR_Pals_b8440);
 	load_pals2(BANK_Pals_b8440, ADDR_Pals_b8440);
-	gb_->cpu.b = BANK_LevelMainTiles36;
-	SET_HL(gb_, ADDR_LevelMainTiles36);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_LevelMainTiles36, ADDR_LevelMainTiles36);
 	cutscenes::load_cutscene_bg_maps(gb_, 20);
 }
 
@@ -381,9 +380,7 @@ void Cutscenes::init_place_brick()
 {
 	cutscenes::clear_temp_pals(gb_);
 	cutscenes::load_cutscenes1_gfx_vram1(gb_);
-	gb_->cpu.b = BANK_LevelMainTiles27;
-	SET_HL(gb_, ADDR_LevelMainTiles27);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_LevelMainTiles27, ADDR_LevelMainTiles27);
 	cutscenes::load_cutscene_bg_maps(gb_, 30);
 }
 
@@ -434,9 +431,7 @@ void Cutscenes::init_spray_iron_wall()
 {
 	load_pals1(BANK_Pals_b8480, ADDR_Pals_b8480);
 	load_pals2(BANK_Pals_b8480, ADDR_Pals_b8480);
-	gb_->cpu.b = BANK_LevelMainTiles23;
-	SET_HL(gb_, ADDR_LevelMainTiles23);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_LevelMainTiles23, ADDR_LevelMainTiles23);
 	cutscenes::load_cutscene_bg_maps(gb_, 22);
 	place(wSceneObj2, 0x20, 0x4c, 0x01);
 	place(wSceneObj3, 0x50, 0x60, 0x04);

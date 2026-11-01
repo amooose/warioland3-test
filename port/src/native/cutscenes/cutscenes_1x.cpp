@@ -1,4 +1,5 @@
 // Cutscenes $1e to $27. See cutscenes.hpp.
+#include "../home/ow.hpp"
 #include "loaders.hpp"
 #include "cutscenes.hpp"
 
@@ -235,9 +236,7 @@ void Cutscenes::init_open_tree_mouth()
 	cutscenes::load_cutscenes8_gfx_vram0(gb_);
 	cutscenes::load_cutscene_bg_maps(gb_, 28);
 	mem_[rVBK] = 1;
-	gb_->cpu.b = BANK_SpecialTiles0;
-	SET_HL(gb_, ADDR_SpecialTiles0);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_SpecialTiles0, ADDR_SpecialTiles0);
 	mem_[rVBK] = 0;
 	place(wSceneObj2, 104, 80, 0x01);
 	draw_func_9f3ee();
@@ -325,9 +324,7 @@ void Cutscenes::init_cart_wheels()
 	SET_HL(gb_, ADDR_LevelMainTiles14);
 	routines_.call(ADDR_LoadFarTiles);
 	mem_[rVBK] = 1;
-	gb_->cpu.b = BANK_SpecialTiles1;
-	SET_HL(gb_, ADDR_SpecialTiles1);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_SpecialTiles1, ADDR_SpecialTiles1);
 	mem_[rVBK] = 0;
 	decompress(BANK_Cutscene11Attrmap, ADDR_Cutscene11Attrmap, v1BGMap0, true);
 	decompress(BANK_Cutscene11Tilemap, ADDR_Cutscene11Tilemap, v0BGMap0);
@@ -390,9 +387,7 @@ void Cutscenes::init_make_wire()
 	load_pals1(BANK_Pals_b8300, ADDR_Pals_b8300);
 	load_pals2(BANK_Pals_b8300, ADDR_Pals_b8300);
 	cutscenes::load_cutscenes8_5_gfx_vram1(gb_);
-	gb_->cpu.b = BANK_LevelMainTiles22;
-	SET_HL(gb_, ADDR_LevelMainTiles22);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_LevelMainTiles22, ADDR_LevelMainTiles22);
 	cutscenes::load_cutscene_bg_maps(gb_, 31);
 }
 

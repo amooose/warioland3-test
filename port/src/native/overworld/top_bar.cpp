@@ -430,10 +430,7 @@ void TopBar::draw()
 void TopBar::draw_obj(uint8_t state, uint16_t duration, uint16_t obj)
 {
 	animate(state, duration);
-	gb_->cpu.b = BANK_OAM_a9fe2;
-	SET_DE(gb_, ADDR_OAM_a9fe2);
-	SET_HL(gb_, obj);
-	routines_.call(ADDR_LoadOWSpriteWithScroll);
+	home::load_ow_sprite_with_scroll(gb_, BANK_OAM_a9fe2, ADDR_OAM_a9fe2, obj);
 }
 
 // Func_82521: the object's animation in its state. States 6 and 8 end in
@@ -449,10 +446,7 @@ void TopBar::animate(uint8_t state, uint16_t duration)
 		}
 		if (!state)
 			return;
-		SET_DE(gb_, FRAMESETS[state]);
-		SET_HL(gb_, hl);
-		gb_->cpu.b = OW_ANIMATION_BANK;
-		routines_.call(ADDR_UpdateOWAnimation);
+		home::update_ow_animation(gb_, OW_ANIMATION_BANK, hl, FRAMESETS[state]);
 		uint8_t next = state == 6 ? 0x07 : state == 8 ? 0x05 : 0;
 		if (!next || wram_.ow_animation_finished() != 0xff)
 			return;
@@ -472,11 +466,7 @@ void TopBar::animate(uint8_t state, uint16_t duration)
 // CopyFarBytes: count bytes from bank:src to dest
 void TopBar::copy_far_bytes(uint8_t bank, uint16_t src, uint16_t dest, uint8_t count)
 {
-	SET_HL(gb_, src);
-	SET_DE(gb_, dest);
-	gb_->cpu.c = count;
-	gb_->cpu.b = bank;
-	routines_.call(ADDR_CopyFarBytes);
+	home::copy_far_bytes(gb_, bank, src, dest, count);
 }
 
 // The four object palettes from wTempPals2 palette 4, for the V-Blank.

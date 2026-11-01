@@ -1,5 +1,6 @@
 // The cutscenes' dispatch and shared helpers (bank27.asm). See
 // cutscenes.hpp.
+#include "../home/ow.hpp"
 #include "loaders.hpp"
 #include "cutscenes.hpp"
 #include "../home/system.hpp"
@@ -252,9 +253,7 @@ void Cutscenes::place(uint16_t obj, uint8_t y, uint8_t x, uint8_t state)
 
 void Cutscenes::set_state(uint16_t obj, uint8_t state)
 {
-	gb_->cpu.a = state;
-	SET_HL(gb_, static_cast<uint16_t>(obj + 6));
-	routines_.call(ADDR_SetSceneObjState);
+	home::set_scene_obj_state(gb_, static_cast<uint16_t>(obj + 6), state);
 }
 
 // Func_9cd40
@@ -279,11 +278,7 @@ void Cutscenes::set_ob_pals_to_load()
 
 void Cutscenes::copy_far(uint8_t bank, uint16_t src, uint16_t dest, uint8_t count)
 {
-	gb_->cpu.b = bank;
-	gb_->cpu.c = count;
-	SET_HL(gb_, src);
-	SET_DE(gb_, dest);
-	routines_.call(ADDR_CopyFarBytes);
+	home::copy_far_bytes(gb_, bank, src, dest, count);
 }
 
 // Func_9cdcd: every 6 frames, wSCY by the next of 7 steps, then back by a
@@ -338,16 +333,12 @@ void Cutscenes::decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vram1
 
 void Cutscenes::load_pals1(uint8_t bank, uint16_t pals)
 {
-	gb_->cpu.b = bank;
-	SET_HL(gb_, pals);
-	routines_.call(ADDR_LoadFarPalsToTempPals1);
+	home::load_far_pals_to_temp_pals1(gb_, bank, pals);
 }
 
 void Cutscenes::load_pals2(uint8_t bank, uint16_t pals)
 {
-	gb_->cpu.b = bank;
-	SET_HL(gb_, pals);
-	routines_.call(ADDR_LoadFarPalsToTempPals2);
+	home::load_far_pals_to_temp_pals2(gb_, bank, pals);
 }
 
 void Cutscenes::rise(uint16_t obj, uint8_t sound_at, uint8_t stop_at, uint8_t dx)
@@ -377,10 +368,7 @@ uint16_t Cutscenes::animate(uint16_t state, uint16_t frameset, uint8_t bank)
 {
 	// dec c / dec c: the duration, two bytes before the state
 	uint16_t duration = static_cast<uint16_t>((state & 0xff00) | static_cast<uint8_t>(state - 2));
-	SET_DE(gb_, frameset);
-	SET_HL(gb_, duration);
-	gb_->cpu.b = bank;
-	routines_.call(ADDR_UpdateOWAnimation);
+	home::update_ow_animation(gb_, bank, duration, frameset);
 	return static_cast<uint16_t>((duration & 0xff00) | (duration & 0xf8));
 }
 
@@ -400,10 +388,7 @@ bool Cutscenes::next_state_when_done(uint16_t obj, uint8_t next)
 // Func_9f0bc and the like (LoadOWSprite)
 void Cutscenes::draw(uint16_t obj, uint16_t oam, uint8_t bank)
 {
-	SET_HL(gb_, obj);
-	SET_DE(gb_, oam);
-	gb_->cpu.b = bank;
-	routines_.call(ADDR_LoadOWSprite);
+	home::load_ow_sprite(gb_, bank, oam, obj);
 }
 
 // Func_9fb53: while wSceneObj1YCoord is y_check, a sprite of frame at the

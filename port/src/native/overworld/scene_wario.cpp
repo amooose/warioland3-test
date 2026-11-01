@@ -177,10 +177,7 @@ void SceneWario::animate()
 		return;
 	const Animation &anim = ANIMATIONS[state];
 	// .UpdateAnimation
-	gb_->cpu.b = mem_[wSceneWarioOAMBank];
-	SET_HL(gb_, wSceneWarioDuration);
-	SET_DE(gb_, anim.frameset);
-	routines_.call(ADDR_UpdateOWAnimation);
+	home::update_ow_animation(gb_, mem_[wSceneWarioOAMBank], wSceneWarioDuration, anim.frameset);
 	bool finished = mem_[wOWAnimationFinished] == 0xff;
 
 	switch (anim.extra) {

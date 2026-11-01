@@ -280,10 +280,7 @@ void SceneObjects::run_state(uint8_t side, uint16_t state, uint8_t s)
 		if (!anim.frameset) // Func_b4000
 			return;
 		// UpdateCurOWObjAnimation
-		SET_DE(gb_, anim.frameset);
-		SET_HL(gb_, static_cast<uint16_t>(obj | 1 << 2));
-		gb_->cpu.b = OW_OBJ_BANK;
-		routines_.call(ADDR_UpdateOWAnimation);
+		home::update_ow_animation(gb_, OW_OBJ_BANK, static_cast<uint16_t>(obj | 1 << 2), anim.frameset);
 		bool finished = wram_.ow_animation_finished() == 0xff;
 		if (anim.special == Special::Palette) {
 			// pop hl / set 0, l / res 2, l: from the state to the attributes

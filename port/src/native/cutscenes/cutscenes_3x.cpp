@@ -1,4 +1,5 @@
 // Cutscenes $30 to $3d. See cutscenes.hpp.
+#include "../home/ow.hpp"
 #include "loaders.hpp"
 #include "cutscenes.hpp"
 
@@ -7,9 +8,7 @@ namespace wl3::cutscenes {
 // InitCutscene30, Func_9ded4
 void Cutscenes::init_raise_ice_blocks()
 {
-	gb_->cpu.b = BANK_LevelMainTiles7;
-	SET_HL(gb_, ADDR_LevelMainTiles7);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_LevelMainTiles7, ADDR_LevelMainTiles7);
 	cutscenes::load_cutscenes8_5_gfx_vram1(gb_);
 	cutscenes::load_cutscene_bg_maps(gb_, 26);
 	cutscenes::clear_temp_pals(gb_);
@@ -307,9 +306,7 @@ void Cutscenes::init_remove_warps()
 {
 	cutscenes::clear_temp_pals(gb_);
 	cutscenes::load_cutscenes9_gfx_vram1(gb_);
-	gb_->cpu.b = BANK_LevelMainTiles30;
-	SET_HL(gb_, ADDR_LevelMainTiles30);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_LevelMainTiles30, ADDR_LevelMainTiles30);
 	cutscenes::load_cutscene_bg_maps(gb_, 37);
 	cutscenes::load_cutscene_bg_maps(gb_, 38);
 	place(wSceneObj2, 0x54, 0x46, 0x01); // Func_9ccf9
@@ -438,9 +435,7 @@ void Cutscenes::init_demons_blood()
 	load_pals1(BANK_Pals_b84c0, ADDR_Pals_b84c0);
 	load_pals2(BANK_Pals_b84c0, ADDR_Pals_b84c0);
 	cutscenes::load_cutscenes8_5_gfx_vram1(gb_);
-	gb_->cpu.b = BANK_LevelMainTiles31;
-	SET_HL(gb_, ADDR_LevelMainTiles31);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_LevelMainTiles31, ADDR_LevelMainTiles31);
 	cutscenes::load_cutscene_bg_maps(gb_, 23);
 	cutscenes::set_bg_priority_on_top_rows_vram1(gb_);
 }
@@ -555,9 +550,7 @@ void Cutscenes::init_paragoom_cage()
 	cutscenes::load_cutscenes9_gfx_vram0(gb_);
 	decompress(BANK_ParaGoomGfx, ADDR_ParaGoomGfx, v1Tiles0 + 0x40 * TILE_SIZE, true);
 	mem_[rVBK] = 1;
-	gb_->cpu.b = BANK_LevelMainTiles30;
-	SET_HL(gb_, ADDR_LevelMainTiles30);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_LevelMainTiles30, ADDR_LevelMainTiles30);
 	mem_[rVBK] = 0;
 	cutscenes::load_cutscene_bg_maps(gb_, 34);
 	cutscenes::load_cutscene_bg_maps(gb_, 35);

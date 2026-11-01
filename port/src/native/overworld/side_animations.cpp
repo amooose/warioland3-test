@@ -12,9 +12,7 @@ void SideAnimations::unrealistic()
 
 void SideAnimations::set_state(uint16_t state, uint8_t value)
 {
-	gb_->cpu.a = value;
-	SET_HL(gb_, state);
-	routines_.call(ADDR_SetSceneObjState);
+	home::set_scene_obj_state(gb_, state, value);
 }
 
 // UpdateMapSideOWAnimations: each of the side's objects, by its state

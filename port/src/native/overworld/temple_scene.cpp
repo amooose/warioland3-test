@@ -18,9 +18,7 @@ void TempleScene::wario_state(uint8_t state)
 
 void TempleScene::set_state(uint16_t state, uint8_t value)
 {
-	gb_->cpu.a = value;
-	SET_HL(gb_, state);
-	routines_.call(ADDR_SetSceneObjState);
+	home::set_scene_obj_state(gb_, state, value);
 }
 
 // The decompress_* macros

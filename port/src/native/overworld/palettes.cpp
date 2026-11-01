@@ -495,7 +495,7 @@ void Palettes::switch_day_night()
 	mem_[w2d011] = night;
 	Byte day_night = mem_[wDayNight];
 	day_night = static_cast<uint8_t>(((day_night >> 1) << 1 | (night & 1)) & 0x7f);
-	routines_.call(ADDR_PlayOverworldMusic);
+	home::play_overworld_music(gb_);
 	mem_[w2d0e3] = 0;
 	mem_[wOWPalTransitionState] = 0;
 	mem_[wOWPalTransitionCounter] = 0;
@@ -570,9 +570,7 @@ void Palettes::to_daytime()
 		load_base_and_target(1);
 		next_transition();
 		mem_[w2d809] = 0x02;
-		gb_->cpu.a = 0x13;
-		SET_HL(gb_, wSceneObj7State);
-		routines_.call(ADDR_SetSceneObjState);
+		home::set_scene_obj_state(gb_, wSceneObj7State, 0x13);
 		return;
 	case 5: // .Func_84be7
 		fade_colours();
@@ -724,11 +722,7 @@ void Palettes::prologue_fade()
 		gb_->cpu.c = 8 * PAL_SIZE;
 		gb_->cpu.b = BANK_Pals_db000;
 		routines_.call(ADDR_CopyFarBytes);
-		SET_HL(gb_, ADDR_Pals_db040);
-		SET_DE(gb_, wTempPals2 + 3 * PAL_SIZE);
-		gb_->cpu.c = 5 * PAL_SIZE;
-		gb_->cpu.b = BANK_Pals_db040;
-		routines_.call(ADDR_CopyFarBytes);
+		home::copy_far_bytes(gb_, BANK_Pals_db040, ADDR_Pals_db040, wTempPals2 + 3 * PAL_SIZE, 5 * PAL_SIZE);
 		break;
 	case 5: // .five
 		from_current();

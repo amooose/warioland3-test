@@ -80,23 +80,28 @@ void Overworld::handle()
 
 void Overworld::run_state()
 {
-	// the states still in C, by address (0: a C++ one, below)
+	// the states still register-level, by address (0: a C++ one, below)
 	static constexpr uint16_t STATES[40] = {
-		ADDR_FastFadeToWhite, 0, ADDR_SlowFadeFromWhite, 0, ADDR_FastFadeToWhite,
-		0, ADDR_SlowFadeFromWhite, 0,
-		ADDR_FadeBGToWhite_Normal, 0, ADDR_DarkenBGToPal_Normal, 0,
-		ADDR_FadeBGToWhite_Normal, ADDR_InitTreasureCollection, ADDR_DarkenBGToPal_Normal,
-		ADDR_TreasureCollection, ADDR_FadeBGToWhite_Normal,
-		ADDR_InitCutscene, ADDR_DarkenBGToPal_Normal, ADDR_UpdateCutscene, ADDR_FadeBGToWhite_Normal,
-		ADDR_Func_80db1,
-		ADDR_FadeBGToWhite_Normal, ADDR_InitBestTimeList, ADDR_DarkenBGToPal_Normal, ADDR_BestTimeList,
-		ADDR_FadeBGToWhite_Normal, ADDR_InitTempleScene, ADDR_DarkenBGToPal_Normal, ADDR_UpdateTempleScene,
-		ADDR_Func_80e33,
-		ADDR_FadeBGToWhite_Normal, 0, ADDR_DarkenBGToPal_Normal, 0,
-		ADDR_FastFadeToWhite, 0, ADDR_SlowFadeFromWhite, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ADDR_InitTreasureCollection, 0,
+		ADDR_TreasureCollection, 0, ADDR_InitCutscene, 0, ADDR_UpdateCutscene, 0, ADDR_Func_80db1,
+		0, ADDR_InitBestTimeList, 0, ADDR_BestTimeList, 0, ADDR_InitTempleScene, 0, ADDR_UpdateTempleScene,
+		ADDR_Func_80e33, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	};
 	uint8_t state = wram_.sub_state();
 	switch (state) {
+	// the fades in and out of each part of the map
+	case 0: case 4: case 35:
+		home::fade_bg_to_white(gb_, FADE_SPEED_SLOW); // FastFadeToWhite
+		return;
+	case 2: case 6: case 37:
+		home::darken_bg_to_pal(gb_, FADE_SPEED_SLOW); // SlowFadeFromWhite
+		return;
+	case 8: case 12: case 16: case 20: case 22: case 26: case 31:
+		home::fade_bg_to_white(gb_, FADE_SPEED_NORMAL); // FadeBGToWhite_Normal
+		return;
+	case 10: case 14: case 18: case 24: case 28: case 33:
+		home::darken_bg_to_pal(gb_, FADE_SPEED_NORMAL); // DarkenBGToPal_Normal
+		return;
 	case 1: init(); return;
 	case 3: wait_for_a(); return;
 	case SST_OVERWORLD_OW_SCENE: init_scene(); return;
@@ -131,10 +136,7 @@ void Overworld::set_compass()
 // LoadCompassSprite
 void Overworld::load_compass()
 {
-	SET_HL(gb_, wCompassObj);
-	SET_DE(gb_, ADDR_OAM_aa580);
-	gb_->cpu.b = BANK_OAM_aa580;
-	routines_.call(ADDR_LoadOWSpriteWithScroll);
+	home::load_ow_sprite_with_scroll(gb_, BANK_OAM_aa580, ADDR_OAM_aa580, wCompassObj);
 }
 
 // The level for wOWLevel: its variant (by the treasures that change it)
@@ -441,7 +443,7 @@ void Overworld::show_top_bar()
 	routines_.copy(ATTRS, WINDOW_ROWS, 2 * TILEMAP_WIDTH);
 	set_vram1(false);
 	wram_.transition_param() = wram_.unk_2d02c();
-	routines_.call(ADDR_PlayOverworldMusic);
+	home::play_overworld_music(gb_);
 }
 
 // ---------------------------------------------------------------------------
