@@ -35,6 +35,7 @@ void draw_coin_count(GB *gb); // DrawCoinCount
 uint8_t level_with_treasure(GB *gb, uint8_t treasure); // GetLevelThatContainsTreasure
 void check_if_event_has_cutscene(GB *gb); // CheckIfEventHasCutscene
 void init_cutscene(GB *gb); // _InitCutscene
+void set_obj_position_to_level_coords(GB *gb, uint16_t obj, uint8_t level); // SetObjPositionToLevelCoords
 
 class Overworld {
 public:

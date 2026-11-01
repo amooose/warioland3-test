@@ -40,15 +40,6 @@ public:
 	}
 
 	// a = map side level index
-	void port_GetMapLevelCoords()
-	{
-		cpu_.a = alu_.add(cpu_.a, cpu_.a); // *2
-		cpu_.c = cpu_.a;
-		cpu_.a = rd8(wCurMapSide);
-		SET_HL(gb_, ADDR_MapLevelCoords);
-		CALL(GetCthWordFromAthTable);
-	}
-
 	// a = value to compare with wOWFuncCounter
 	// returns c = a value for wNextMapSide
 	void port_Func_812b0()
@@ -152,7 +143,6 @@ public:
 
 using wl3::overworld::OverworldBank20;
 
-PORT_EX(GetMapLevelCoords, 0, 0) { OverworldBank20(gb).port_GetMapLevelCoords(); }
 PORT_EX(Func_812b0, 0, 0) { OverworldBank20(gb).port_Func_812b0(); }
 PORT_EX(UnreferencedLCD_82729, 0, 0) { OverworldBank20(gb).port_UnreferencedLCD_82729(); }
 PORT_EX(UnreferencedLCD_82754, 0, 0) { OverworldBank20(gb).port_UnreferencedLCD_82754(); }

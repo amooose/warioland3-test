@@ -131,6 +131,16 @@ void init_cutscene(GB *gb)
 	++mem[wSubState];
 }
 
+// SetObjPositionToLevelCoords (treasure_collection/common.asm): a scene
+// object's y and x at a level of the current map side (inc e between them)
+void set_obj_position_to_level_coords(GB *gb, uint16_t obj, uint8_t level)
+{
+	Memory mem(gb);
+	uint16_t coords = map_level_coords(gb, level);
+	mem[obj] = mem[coords];
+	mem[static_cast<uint16_t>((obj & 0xff00) | static_cast<uint8_t>(obj + 1))] = mem[static_cast<uint16_t>(coords + 1)];
+}
+
 } // namespace wl3::overworld
 
 // Only the overworld modules (C++) call these.
@@ -145,3 +155,5 @@ PORT_COVERED(GetLevelThatContainsTreasure);
 PORT_COVERED(CheckIfEventHasCutscene);
 PORT_COVERED(InitCutscene);
 PORT_COVERED(_InitCutscene);
+PORT_COVERED(SetObjPositionToLevelCoords);
+PORT_COVERED(GetMapLevelCoords);

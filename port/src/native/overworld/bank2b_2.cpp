@@ -125,11 +125,6 @@ public:
 		func_ae1c9();
 	}
 
-	void port_Func_ae1ce()
-	{
-		advance_w2d890();
-	}
-
 	void func_ae1d5()
 	{
 		cpu_.a = 0;
@@ -352,7 +347,6 @@ PORT_EX(Prologue_Next, 0, 0) { OverworldBank2b2(gb).port_Prologue_Next(); }
 PORT_EX(Prologue_Finish, 0, 0) { OverworldBank2b2(gb).port_Prologue_Finish(); }
 PORT_EX(Func_ae1c2, 0, 0) { OverworldBank2b2(gb).port_Func_ae1c2(); }
 PORT_EX(Func_ae1c9, 0, 0) { OverworldBank2b2(gb).port_Func_ae1c9(); }
-PORT_EX(Func_ae1ce, 0, 0) { OverworldBank2b2(gb).port_Func_ae1ce(); }
 PORT_EX(Func_ae1d5, 0, 0) { OverworldBank2b2(gb).port_Func_ae1d5(); }
 PORT_EX(Func_af130, 0, 0) { OverworldBank2b2(gb).port_Func_af130(); }
 PORT_EX(Func_af135, 0, 0) { OverworldBank2b2(gb).port_Func_af135(); }

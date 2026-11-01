@@ -671,9 +671,7 @@ void Scenes::highlight_level()
 		wait(12);
 		return;
 	case 7: // .Func_82c93: the star on the level
-		gb_->cpu.c = wram_.level2();
-		SET_DE(gb_, wCurSceneObj);
-		routines_.call(ADDR_SetObjPositionToLevelCoords);
+		set_obj_position_to_level_coords(gb_, wCurSceneObj, wram_.level2());
 		home::set_scene_obj_state(gb_, wCurSceneObjState, 0x02);
 		play_sfx(mem_, SFX_104);
 		next_step();

@@ -538,7 +538,8 @@ void Epilogue::leave_on_gift()
 		y -= 3;
 		if (y < 0x18) {
 			mem_[wCurSceneObjState] = 0;
-			routines_.call(ADDR_Func_ae1ce);
+			mem_[w2d891] = 0; // Func_ae1ce: the next step
+			++mem_[w2d890];
 			return;
 		}
 		if (y >= 0x40 || mem_[wCurSceneObjState] == 0x12)
@@ -759,3 +760,5 @@ void Epilogue::bounce_treasure()
 // Farcalled by the map's sub-state table (C++).
 PORT_EX(_InitEpilogue, 0, ALL_REGISTERS) { wl3::overworld::Epilogue(gb).init(); }
 PORT_EX(Func_af13c, 0, ALL_REGISTERS) { wl3::overworld::Epilogue(gb).update(); }
+
+PORT_COVERED(Func_ae1ce); // done inline
