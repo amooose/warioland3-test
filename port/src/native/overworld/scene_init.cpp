@@ -191,7 +191,7 @@ void SceneInit::bottom_bar()
 	for (uint16_t attributes : {wSceneObj5Attributes, wSceneObj8Attributes,
 		wSceneObj9Attributes, wSceneObj10Attributes})
 		mem_[attributes] |= 1 << 2;
-	routines_.farcall(BANK_Func_80bd9, ADDR_Func_80bd9);
+	routines_.in_bank(BANK_Func_80bd9, ADDR_Func_80bd9, [&] { clear_bottom_left_bg_priority(gb_); });
 	routines_.in_bank(BANK_VBlank_Overworld, ADDR_VBlank_Overworld, [&] { set_vblank_overworld(gb_); });
 	decompress(BANK_OverworldBottomBarTreasuresTilemap, ADDR_OverworldBottomBarTreasuresTilemap, v0BGMap1, false);
 	decompress(BANK_OverworldBottomBarTreasuresAttrmap, ADDR_OverworldBottomBarTreasuresAttrmap, v1BGMap1, true);

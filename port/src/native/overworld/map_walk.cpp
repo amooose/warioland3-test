@@ -184,11 +184,9 @@ void MapWalk::on_level()
 		update_objects();
 		return;
 	}
-	routines_.call(ADDR_Func_80de0);
-	if (gb_->cpu.f & FLAG_C) {
-		update_objects();
-		return;
-	}
+	// bug: the asm's jr c after Func_80de0 never jumps (its xor a clears
+	// carry), so the walk goes on the frame the best times open
+	check_best_times(gb_);
 	uint8_t direction = dpad(wram_.joypad_pressed()) & wram_.ow_allowed_d_pad_input();
 	if (!direction) {
 		update_objects();

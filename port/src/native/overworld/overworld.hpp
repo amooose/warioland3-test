@@ -25,6 +25,13 @@ void set_vblank_ow_scene(GB *gb);
 // x), from MapLevelCoords
 uint16_t map_level_coords(GB *gb, uint8_t level);
 
+void switch_day_night(GB *gb); // SwitchDayNight: wDayNight's bit 4
+void do_day_night_spell(GB *gb); // DoDayNightSpell
+void get_crayon_flags(GB *gb); // GetCrayonFlags: to wCrayonFlags
+void clear_bottom_left_bg_priority(GB *gb); // Func_80bd9
+void save_after_level(GB *gb); // Func_803e6
+void check_best_times(GB *gb); // Func_80de0
+
 class Overworld {
 public:
 	explicit Overworld(GB *gb) : gb_(gb), mem_(gb), wram_(gb), hram_(gb), routines_(gb) {}

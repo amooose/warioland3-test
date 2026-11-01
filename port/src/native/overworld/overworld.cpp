@@ -127,7 +127,7 @@ void Overworld::run_state()
 	case 34: routines_.farcall(BANK_Func_adbfe, ADDR_Func_adbfe); return;
 	case 36: routines_.farcall(BANK__InitEpilogue, ADDR__InitEpilogue); return;
 	case 38: routines_.farcall(BANK_Func_af13c, ADDR_Func_af13c); return;
-	case 39: routines_.call(ADDR_Func_803e6); return;
+	case 39: save_after_level(gb_); return;
 	}
 	if (state >= 40) {
 		unrealistic();
@@ -214,7 +214,7 @@ void Overworld::init()
 	// a new game has the 0th treasure
 	if (transition == TRANSITION_NEW_GAME)
 		wram_.treasures_collected().set_bit(0);
-	routines_.call(ADDR_GetCrayonFlags);
+	get_crayon_flags(gb_);
 
 	if (wram_.ow_bars_state() != OWBARS_INPUT_TOP) {
 		uint8_t ow_level = wram_.ow_level();
@@ -222,7 +222,7 @@ void Overworld::init()
 			wram_.next_map_side() = 0;
 			wram_.map_side_level_id() = 0;
 			wram_.sub_state() = SST_OVERWORLD_GOLF_BUILDING;
-			routines_.call(ADDR_Func_803e6);
+			save_after_level(gb_);
 			return;
 		}
 		Events::SideLevel at = Events(gb_).map_level_id(ow_level);
@@ -244,7 +244,7 @@ void Overworld::init()
 		after_cutscene();
 		return;
 	case TRANSITION_GAME_OVER:
-		routines_.call(ADDR_Func_803e6);
+		save_after_level(gb_);
 		return;
 	case TRANSITION_NEW_GAME:
 		wram_.cur_event() = EVENT_PROLOGUE;
@@ -285,7 +285,7 @@ void Overworld::load_map_without_scene()
 {
 	wram_.cur_event() = EVENT_00;
 	wram_.sub_state() = SST_OVERWORLD_09;
-	routines_.call(ADDR_Func_803e6);
+	save_after_level(gb_);
 }
 
 void Overworld::wait_for_a()
@@ -331,7 +331,7 @@ void Overworld::init_map_side()
 		time = (day_night >> 4) & 0x0f;
 		wram_.day_night() = static_cast<uint8_t>((wram_.day_night() & 0xfe) | (time & 0x01));
 	} else {
-		routines_.call(ADDR_SwitchDayNight);
+		switch_day_night(gb_);
 		time = day_night & ~((1 << 7) | (1 << 4));
 		if (!wram_.transition_param()) {
 			time ^= 0x01;
@@ -409,7 +409,7 @@ void Overworld::finish_map_side()
 	wram_.virtual_oam_byte_size() = 0;
 	Scenes(gb_).init();
 	Events(gb_).show_missing_treasure_indicators();
-	routines_.call(ADDR_Func_80bd9);
+	clear_bottom_left_bg_priority(gb_);
 	write_bg_map_from_wram();
 	MapWalk(gb_).place_on_level();
 	uint8_t level = wram_.map_side_level_id();

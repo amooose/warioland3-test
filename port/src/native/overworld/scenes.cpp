@@ -415,7 +415,7 @@ void Scenes::end()
 		return;
 	}
 	++wram_.sub_state();
-	routines_.call(ADDR_Func_803e6);
+	save_after_level(gb_);
 }
 
 void Scenes::stop_sfx()

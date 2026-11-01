@@ -32,3 +32,4 @@ whether a player can ever see it.
 | `Func_811cf` (overworld) | `ld [hl], a` writes 0 through hl, which still holds the jumptable's target: it writes the MBC's RAM-bank register. | confirmed, harmless | no |
 | `LoadTreasureTiles` (src/engine/overworld/bank26.asm) | Falls through into `.CopyGfx` after the fourth treasure, copying a fifth time. | confirmed (marked in the disassembly) | unknown |
 | `CalculateChecksumLong` (src/engine/pause/save/checksum.asm) | Its loop jumps to `CalculateChecksum` instead of `.start`. | confirmed (marked in the disassembly) | unknown; changing it changes save checksums |
+| `Func_80de0` / `Func_80e89` (overworld map walk) | `call Func_80de0 / jr c` never jumps: Func_80de0 starts with `xor a`, which clears carry, and nothing sets it. On the frame start opens the best time list (time attack), the map walk still takes the d-pad. | confirmed | probably not (the state changes next frame) |

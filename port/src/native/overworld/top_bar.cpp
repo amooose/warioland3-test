@@ -216,7 +216,7 @@ void TopBar::day_night()
 	uint8_t frame = wram_.owui_obj1_frame();
 	if (frame != 4 && frame != 6)
 		return;
-	routines_.call(ADDR_DoDayNightSpell);
+	do_day_night_spell(gb_);
 	load_button_attributes();
 	apply_button_attributes();
 	++wram_.ow_bars_state();
