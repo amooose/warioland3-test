@@ -654,6 +654,12 @@ Modules so far:
   too (collisions.cpp, block_functions.cpp): they keep ProcessBlock's
   unwinding and bank checks (a block function can pop past its caller or
   come back in another bank) and every jump between block functions.
+  The object engine (update_objects.cpp, object_interactions.cpp) was
+  converted with tools/c2cpp.py: it turns a register-level C file into a
+  class over `AsmModule` (src/native/level/asm_module.hpp, the C helpers
+  as members on the real CPU state, `Alu` in src/native/alu.hpp for the
+  flags), with the same logic, then gets reviewed and fuzzed like any
+  port. Never wrap PORT_EX in a macro; the tool writes each hook out.
 
 `src/native/routines.hpp` wraps the register-level C routines a module calls
 (DisableLCD, FarDecompress, the golf sprite helpers...): each sets the
