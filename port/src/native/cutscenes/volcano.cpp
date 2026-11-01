@@ -1,4 +1,5 @@
 // Cutscene14Func: the volcano erupts. See cutscenes.hpp.
+#include "loaders.hpp"
 #include "cutscenes.hpp"
 
 namespace wl3::cutscenes {
@@ -21,9 +22,9 @@ void Cutscenes::init_volcano()
 	load_pals1(BANK_Pals_b8200, ADDR_Pals_b8200);
 	load_pals2(BANK_Pals_b8a40, ADDR_Pals_b8a40);
 	wram_.lcdc_flags_to_flip() = LCDC_BG_MAP;
-	routines_.call(ADDR_LoadCutscenes2Gfx);
-	routines_.call(ADDR_LoadCutsceneBGMaps01);
-	routines_.call(ADDR_LoadCutsceneBGMaps05);
+	cutscenes::load_cutscenes2_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 1);
+	cutscenes::load_cutscene_bg_maps(gb_, 5);
 }
 
 // Cutscene14Func: the item rises with three rocks bobbing around it, and

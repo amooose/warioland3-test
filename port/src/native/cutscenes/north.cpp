@@ -1,4 +1,5 @@
 // The north side's cutscenes. See cutscenes.hpp.
+#include "loaders.hpp"
 #include "cutscenes.hpp"
 
 #include <initializer_list>
@@ -13,13 +14,13 @@ constexpr uint16_t FUNC_9F0E0_FRAMESETS = ADDR_Func_9f0e0 + 0x30; // Func_9f0e0.
 } // namespace
 
 // InitCutscene02, InitCutscene04
-void Cutscenes::init_north(uint16_t pals2, uint8_t pals2_bank, uint16_t gfx, uint16_t bg_maps1, uint16_t bg_maps2)
+void Cutscenes::init_north(uint16_t pals2, uint8_t pals2_bank, void (*load_gfx)(GB *gb))
 {
 	load_pals1(BANK_Pals_b8200, ADDR_Pals_b8200);
 	load_pals2(pals2_bank, pals2);
-	routines_.call(gfx);
-	routines_.call(bg_maps1);
-	routines_.call(bg_maps2);
+	load_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 1);
+	cutscenes::load_cutscene_bg_maps(gb_, 2);
 }
 
 // Cutscene02Func: an axe swings in, speed lines, and the tree is cut
@@ -275,7 +276,7 @@ namespace wl3::cutscenes {
 // InitCutscene06
 void Cutscenes::init_rainstorm()
 {
-	routines_.call(ADDR_LoadCutscenes3Gfx);
+	cutscenes::load_cutscenes3_gfx(gb_);
 	decompress(BANK_Cutscene08Attrmap, ADDR_Cutscene08Attrmap, v1BGMap0, true);
 	decompress(BANK_Cutscene08Tilemap, ADDR_Cutscene08Tilemap, v0BGMap0);
 	load_pals1(BANK_Pals_b8080, ADDR_Pals_b8080);
@@ -387,7 +388,7 @@ namespace wl3::cutscenes {
 // InitCutscene07, Func_9d158
 void Cutscenes::init_fix_elevator()
 {
-	routines_.call(ADDR_LoadCutscenes1Gfx_Vram0);
+	cutscenes::load_cutscenes1_gfx_vram0(gb_);
 	decompress(BANK_Cutscene06Attrmap, ADDR_Cutscene06Attrmap, v1BGMap0, true);
 	decompress(BANK_Cutscene06Tilemap, ADDR_Cutscene06Tilemap, v0BGMap0);
 	load_pals1(BANK_Pals_b8000, ADDR_Pals_b8000);
@@ -522,8 +523,8 @@ void Cutscenes::init_raise_tower()
 {
 	load_pals1(BANK_Pals_b8040, ADDR_Pals_b8040);
 	load_pals2(BANK_Pals_b8a00, ADDR_Pals_b8a00);
-	routines_.call(ADDR_LoadCutscenes1Gfx_Vram0);
-	routines_.call(ADDR_LoadCutsceneBGMaps03);
+	cutscenes::load_cutscenes1_gfx_vram0(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 3);
 	mem_[wSceneObj1YCoord] = 3; // the shadows (draw_shadow)
 	place(wSceneObj2, 130, 113, 0x01);
 	place(wSceneObj3, 130, 47, 0x02);
@@ -600,8 +601,8 @@ void Cutscenes::init_blow_mist()
 {
 	load_pals1(BANK_Pals_b8040, ADDR_Pals_b8040);
 	load_pals2(BANK_Pals_b8d40, ADDR_Pals_b8d40);
-	routines_.call(ADDR_LoadCutscenes4Gfx);
-	routines_.call(ADDR_LoadCutsceneBGMaps03);
+	cutscenes::load_cutscenes4_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 3);
 }
 
 // Cutscene0cFunc: the bellows rise
@@ -644,9 +645,9 @@ void Cutscenes::init_summon_snakes()
 {
 	load_pals1(BANK_Pals_b8040, ADDR_Pals_b8040);
 	load_pals2(BANK_Pals_b8dc0, ADDR_Pals_b8dc0);
-	routines_.call(ADDR_LoadCutscenes4Gfx);
-	routines_.call(ADDR_LoadCutsceneBGMaps01);
-	routines_.call(ADDR_LoadCutsceneBGMaps02);
+	cutscenes::load_cutscenes4_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 1);
+	cutscenes::load_cutscene_bg_maps(gb_, 2);
 }
 
 // Cutscene0dFunc: the flute rises and plays; the snakes come and go

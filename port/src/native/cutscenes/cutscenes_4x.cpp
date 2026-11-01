@@ -1,4 +1,5 @@
 // Cutscenes $43 to $4f. See cutscenes.hpp.
+#include "loaders.hpp"
 #include "cutscenes.hpp"
 
 namespace wl3::cutscenes {
@@ -11,7 +12,7 @@ void Cutscenes::init_place_propeller()
 	gb_->cpu.b = BANK_LevelMainTiles36;
 	SET_HL(gb_, ADDR_LevelMainTiles36);
 	routines_.call(ADDR_LoadFarTiles);
-	routines_.call(ADDR_LoadCutsceneBGMaps20);
+	cutscenes::load_cutscene_bg_maps(gb_, 20);
 }
 
 // Cutscene43Func: the propeller drops in and spins
@@ -70,13 +71,13 @@ void Cutscenes::init_feed_octohon()
 	wram_.lcdc_flags_to_flip() = LCDC_BG_MAP;
 	load_pals1(BANK_Pals_b8200, ADDR_Pals_b8200);
 	load_pals2(BANK_Pals_b90c0, ADDR_Pals_b90c0);
-	routines_.call(ADDR_Func_9c931);
+	cutscenes::load_cutscenes7_5_gfx(gb_);
 	decompress(BANK_OctohonGfx, ADDR_OctohonGfx, v1Tiles1 + 0x40 * TILE_SIZE, true);
-	routines_.call(ADDR_LoadCutsceneBGMaps01);
-	routines_.call(ADDR_LoadCutsceneBGMaps04);
-	routines_.call(ADDR_SetBGPriorityOnTopRows_BGMap1);
-	routines_.call(ADDR_SetBGPriorityOnTopRows_Vram0);
-	routines_.call(ADDR_Func_9cc4f);
+	cutscenes::load_cutscene_bg_maps(gb_, 1);
+	cutscenes::load_cutscene_bg_maps(gb_, 4);
+	cutscenes::set_bg_priority_on_top_rows_bg_map1(gb_);
+	cutscenes::set_bg_priority_on_top_rows_vram0(gb_);
+	cutscenes::set_bg_priority_on_block(gb_);
 }
 
 // Cutscene44Func: the food drops in; the Octohon swims up to it, eats,
@@ -229,8 +230,8 @@ void Cutscenes::init_sky_door()
 {
 	load_pals1(BANK_Pals_b83c0, ADDR_Pals_b83c0);
 	load_pals2(BANK_Pals_b9040, ADDR_Pals_b9040);
-	routines_.call(ADDR_Func_9c937);
-	routines_.call(ADDR_LoadCutsceneBGMaps17);
+	cutscenes::load_cutscenes7_10_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 17);
 	place(wSceneObj2, 0x40, 0xb0, 0x02);
 	place(wSceneObj3, 0x44, 0x50, 0x01);
 	animate_all({wSceneObj2State, wSceneObj3State}, ADDR_Func_9f7bb + 0x1b, ADDR_OAM_bee6e);
@@ -283,11 +284,11 @@ void Cutscenes::sky_door()
 // InitCutscene4c, Func_9e4ae
 void Cutscenes::init_extinguish_fire()
 {
-	routines_.call(ADDR_ClearTempPals_Bank27);
-	routines_.call(ADDR_LoadCutscenes8Gfx_Vram0);
+	cutscenes::clear_temp_pals(gb_);
+	cutscenes::load_cutscenes8_gfx_vram0(gb_);
 	decompress(BANK_FireGfx, ADDR_FireGfx, v1Tiles1, true);
-	routines_.call(ADDR_LoadLevelMainTiles29_Vram1);
-	routines_.call(ADDR_LoadCutsceneBGMaps32);
+	cutscenes::load_level_main_tiles29_vram1(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 32);
 	place(wSceneObj2, 0x80, 0x40, 0x01);
 	place(wSceneObj3, 0x50, 0x5c, 0x01);
 	mem_[wSceneObj3Attributes] |= 1 << 1;
@@ -303,7 +304,7 @@ void Cutscenes::extinguish_fire()
 		wait(30);
 		break;
 	case 1: // .Func_9e4f0
-		routines_.call(ADDR_Func_9cc87);
+		cutscenes::clear_temp_bg_ob_pals(gb_);
 		load_pals1(BANK_Pals_b86c0, ADDR_Pals_b86c0);
 		load_pals2(BANK_Pals_b86c0, ADDR_Pals_b86c0);
 		advance();
@@ -378,12 +379,12 @@ void Cutscenes::draw_extinguish_fire()
 // InitCutscene4e
 void Cutscenes::init_place_brick()
 {
-	routines_.call(ADDR_ClearTempPals_Bank27);
-	routines_.call(ADDR_LoadCutscenes1Gfx_Vram1);
+	cutscenes::clear_temp_pals(gb_);
+	cutscenes::load_cutscenes1_gfx_vram1(gb_);
 	gb_->cpu.b = BANK_LevelMainTiles27;
 	SET_HL(gb_, ADDR_LevelMainTiles27);
 	routines_.call(ADDR_LoadFarTiles);
-	routines_.call(ADDR_LoadCutsceneBGMaps30);
+	cutscenes::load_cutscene_bg_maps(gb_, 30);
 }
 
 // Cutscene4eFunc: fade in; the brick rises into place
@@ -394,7 +395,7 @@ void Cutscenes::place_brick()
 		wait(30);
 		break;
 	case 1: // .Func_9e562
-		routines_.call(ADDR_Func_9cc87);
+		cutscenes::clear_temp_bg_ob_pals(gb_);
 		load_pals1(BANK_Pals_b8640, ADDR_Pals_b8640);
 		load_pals2(BANK_Pals_b8640, ADDR_Pals_b8640);
 		advance();
@@ -436,7 +437,7 @@ void Cutscenes::init_spray_iron_wall()
 	gb_->cpu.b = BANK_LevelMainTiles23;
 	SET_HL(gb_, ADDR_LevelMainTiles23);
 	routines_.call(ADDR_LoadFarTiles);
-	routines_.call(ADDR_LoadCutsceneBGMaps22);
+	cutscenes::load_cutscene_bg_maps(gb_, 22);
 	place(wSceneObj2, 0x20, 0x4c, 0x01);
 	place(wSceneObj3, 0x50, 0x60, 0x04);
 	draw_func_9f86a();

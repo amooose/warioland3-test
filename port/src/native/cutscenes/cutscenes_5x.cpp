@@ -1,4 +1,5 @@
 // Cutscenes $51 to $58. See cutscenes.hpp.
+#include "loaders.hpp"
 #include "cutscenes.hpp"
 
 namespace wl3::cutscenes {
@@ -8,10 +9,10 @@ void Cutscenes::init_mix_chemicals()
 {
 	load_pals1(BANK_Pals_b8400, ADDR_Pals_b8400);
 	load_pals2(BANK_Pals_b8400, ADDR_Pals_b8400);
-	routines_.call(ADDR_Func_9c931);
-	routines_.call(ADDR_LoadCutsceneBGMaps18);
-	routines_.call(ADDR_LoadCutsceneBGMaps19);
-	routines_.call(ADDR_SetBGPriorityOnTopRows_Vram0);
+	cutscenes::load_cutscenes7_5_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 18);
+	cutscenes::load_cutscene_bg_maps(gb_, 19);
+	cutscenes::set_bg_priority_on_top_rows_vram0(gb_);
 	place(wSceneObj2, 0x40, 0x58, 0x02);
 	place(wSceneObj3, 0x58, 0x58, 0x01);
 	draw_func_9f8da();
@@ -97,12 +98,12 @@ void Cutscenes::draw_func_9f8da()
 // InitCutscene54, Func_9e2b8
 void Cutscenes::init_cut_balloon()
 {
-	routines_.call(ADDR_LoadCutscenes9Gfx_Vram1);
+	cutscenes::load_cutscenes9_gfx_vram1(gb_);
 	gb_->cpu.b = BANK_LevelMainTiles24;
 	SET_HL(gb_, ADDR_LevelMainTiles24);
 	routines_.call(ADDR_LoadFarTiles);
-	routines_.call(ADDR_LoadCutsceneBGMaps36);
-	routines_.call(ADDR_ClearTempPals_Bank27);
+	cutscenes::load_cutscene_bg_maps(gb_, 36);
+	cutscenes::clear_temp_pals(gb_);
 	place(wSceneObj2, 0x58, 0x50, 0x01);
 	place(wSceneObj3, 0x70, 0x50, 0x02);
 	animate_all({wSceneObj2State, wSceneObj3State}, ADDR_Func_9f73b + 0x1b, ADDR_OAM_becdc);
@@ -116,7 +117,7 @@ void Cutscenes::cut_balloon()
 		wait(30);
 		break;
 	case 1: // .Func_9e2ed
-		routines_.call(ADDR_Func_9cc87);
+		cutscenes::clear_temp_bg_ob_pals(gb_);
 		load_pals1(BANK_Pals_b8740, ADDR_Pals_b8740);
 		load_pals2(BANK_Pals_b8740, ADDR_Pals_b8740);
 		advance();
@@ -169,13 +170,13 @@ void Cutscenes::cut_balloon()
 // InitCutscene56, Func_9e6ef
 void Cutscenes::init_reveal_dark_room()
 {
-	routines_.call(ADDR_ClearTempPals_Bank27);
+	cutscenes::clear_temp_pals(gb_);
 	gb_->cpu.b = BANK_LevelMainTiles11;
 	SET_HL(gb_, ADDR_LevelMainTiles11);
 	routines_.call(ADDR_LoadFarTiles);
-	routines_.call(ADDR_Func_9c97d);
-	routines_.call(ADDR_LoadCutsceneBGMaps24);
-	routines_.call(ADDR_LoadCutsceneBGMaps25);
+	cutscenes::load_cutscenes8_10_gfx_vram1(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 24);
+	cutscenes::load_cutscene_bg_maps(gb_, 25);
 	place(wSceneObj2, 0x56, 0x50, 0x01);
 	draw_func_9f91f();
 }
@@ -189,7 +190,7 @@ void Cutscenes::reveal_dark_room()
 		wait(30);
 		break;
 	case 1: // .Func_9e71f
-		routines_.call(ADDR_Func_9cc87);
+		cutscenes::clear_temp_bg_ob_pals(gb_);
 		load_pals1(BANK_Pals_b9080, ADDR_Pals_b9080);
 		load_pals2(BANK_Pals_b9080, ADDR_Pals_b9080);
 		advance();
@@ -277,10 +278,10 @@ void Cutscenes::draw_func_9f91f()
 // InitCutscene57, Func_9e79a
 void Cutscenes::init_summon_moon()
 {
-	routines_.call(ADDR_ClearTempPals_Bank27);
-	routines_.call(ADDR_Func_9c937);
-	routines_.call(ADDR_LoadCutsceneBGMaps29);
-	routines_.call(ADDR_SetBGPriorityOnTopRows_Vram0);
+	cutscenes::clear_temp_pals(gb_);
+	cutscenes::load_cutscenes7_10_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 29);
+	cutscenes::set_bg_priority_on_top_rows_vram0(gb_);
 	place(wSceneObj3, 0x4e, 0x54, 0x01);
 	place(wSceneObj2, 0x10, 0x48, 0x03);
 	animate_all({wSceneObj2State, wSceneObj3State}, ADDR_Func_9f991 + 0x28, ADDR_OAM_bf611, {{0x04, 0x03}});
@@ -299,7 +300,7 @@ void Cutscenes::summon_moon()
 		wait(30);
 		break;
 	case 1: // .Func_9e7d9
-		routines_.call(ADDR_Func_9cc87);
+		cutscenes::clear_temp_bg_ob_pals(gb_);
 		load_pals1(BANK_Pals_b8540, ADDR_Pals_b8540);
 		load_pals2(BANK_Pals_b8540, ADDR_Pals_b8540);
 		advance();
@@ -405,12 +406,12 @@ void Cutscenes::draw_func_9f9f5()
 // InitCutscene58, Func_9e855
 void Cutscenes::init_crater_hole()
 {
-	routines_.call(ADDR_ClearTempPals_Bank27);
-	routines_.call(ADDR_LoadCutscenes9Gfx_Vram0);
+	cutscenes::clear_temp_pals(gb_);
+	cutscenes::load_cutscenes9_gfx_vram0(gb_);
 	decompress(BANK_WallCrackGfx, ADDR_WallCrackGfx, v1Tiles1, true);
-	routines_.call(ADDR_LoadLevelMainTiles29_Vram1);
-	routines_.call(ADDR_LoadCutsceneBGMaps39);
-	routines_.call(ADDR_LoadCutsceneBGMaps040);
+	cutscenes::load_level_main_tiles29_vram1(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 39);
+	cutscenes::load_cutscene_bg_maps(gb_, 40);
 	place(wSceneObj2, SCREEN_HEIGHT_PX, 0x48, 0x01);
 	place(wSceneObj3, 0x48, 0x58, 0x01);
 	animate_all({wSceneObj11State, wSceneObj10State, wSceneObj2State}, ADDR_Func_9f9c1 + 0x2e, ADDR_OAM_bf66d,
@@ -437,7 +438,7 @@ void Cutscenes::crater_hole()
 		wait(30);
 		break;
 	case 1: // .Func_9e89c
-		routines_.call(ADDR_Func_9cc87);
+		cutscenes::clear_temp_bg_ob_pals(gb_);
 		load_pals1(BANK_Pals_b87c0, ADDR_Pals_b87c0);
 		load_pals2(BANK_Pals_b87c0, ADDR_Pals_b87c0);
 		advance();
@@ -486,10 +487,10 @@ void Cutscenes::crater_hole()
 // InitCutscene55, Func_9e91a: three blocks, each with its drill hole
 void Cutscenes::init_drill_holes()
 {
-	routines_.call(ADDR_ClearTempPals_Bank27);
-	routines_.call(ADDR_LoadLevelMainTiles29_Vram0);
-	routines_.call(ADDR_LoadCutscenes7Gfx_Vram1);
-	routines_.call(ADDR_LoadCutsceneBGMaps27);
+	cutscenes::clear_temp_pals(gb_);
+	cutscenes::load_level_main_tiles29_vram0(gb_);
+	cutscenes::load_cutscenes7_gfx_vram1(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 27);
 	place(wSceneObj3, 0x58, 0x40, 0x01);
 	place(wSceneObj4, 0x58, 0x50, 0x01);
 	place(wSceneObj5, 0x58, 0x60, 0x01);
@@ -531,7 +532,7 @@ void Cutscenes::drill_holes()
 		wait(30);
 		break;
 	case 1: // .Func_9e9a3
-		routines_.call(ADDR_Func_9cc87);
+		cutscenes::clear_temp_bg_ob_pals(gb_);
 		load_pals1(BANK_Pals_b8680, ADDR_Pals_b8680);
 		load_pals2(BANK_Pals_b8680, ADDR_Pals_b8680);
 		advance();

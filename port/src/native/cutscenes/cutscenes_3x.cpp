@@ -1,4 +1,5 @@
 // Cutscenes $30 to $3d. See cutscenes.hpp.
+#include "loaders.hpp"
 #include "cutscenes.hpp"
 
 namespace wl3::cutscenes {
@@ -9,9 +10,9 @@ void Cutscenes::init_raise_ice_blocks()
 	gb_->cpu.b = BANK_LevelMainTiles7;
 	SET_HL(gb_, ADDR_LevelMainTiles7);
 	routines_.call(ADDR_LoadFarTiles);
-	routines_.call(ADDR_Func_9c977);
-	routines_.call(ADDR_LoadCutsceneBGMaps26);
-	routines_.call(ADDR_ClearTempPals_Bank27);
+	cutscenes::load_cutscenes8_5_gfx_vram1(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 26);
+	cutscenes::clear_temp_pals(gb_);
 	place(wSceneObj2, 88, 98, 0x03);
 	place(wSceneObj3, 88, 70, 0x01);
 	mem_[wSceneObj4YCoord] = 72;
@@ -41,7 +42,7 @@ void Cutscenes::raise_ice_blocks()
 		wait(30);
 		break;
 	case 1: // .Func_9df3c
-		routines_.call(ADDR_Func_9cc87);
+		cutscenes::clear_temp_bg_ob_pals(gb_);
 		load_pals1(BANK_Pals_b8500, ADDR_Pals_b8500);
 		load_pals2(BANK_Pals_b8500, ADDR_Pals_b8500);
 		advance();
@@ -127,8 +128,8 @@ void Cutscenes::init_torch_forest()
 {
 	load_pals1(BANK_Pals_b8240, ADDR_Pals_b8240);
 	load_pals2(BANK_Pals_b8f40, ADDR_Pals_b8f40);
-	routines_.call(ADDR_LoadCutscenes4Gfx);
-	routines_.call(ADDR_LoadCutsceneBGMaps12);
+	cutscenes::load_cutscenes4_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 12);
 }
 
 // Cutscene37Func: the torch rises, burning
@@ -172,8 +173,8 @@ void Cutscenes::init_reveal_warped_void()
 {
 	load_pals1(BANK_Pals_b8200, ADDR_Pals_b8200);
 	load_pals2(BANK_Pals_b8f80, ADDR_Pals_b8f80);
-	routines_.call(ADDR_Func_9c931);
-	routines_.call(ADDR_LoadCutsceneBGMaps03);
+	cutscenes::load_cutscenes7_5_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 3);
 }
 
 // Cutscene38Func: the switch rises and is pressed
@@ -255,7 +256,7 @@ void Cutscenes::init_raise_pipe()
 {
 	load_pals1(BANK_Pals_b8380, ADDR_Pals_b8380);
 	load_pals2(BANK_Pals_b8fc0, ADDR_Pals_b8fc0);
-	routines_.call(ADDR_LoadCutsceneBGMaps15);
+	cutscenes::load_cutscene_bg_maps(gb_, 15);
 }
 
 // Cutscene39Func: the lever drops in and is pulled
@@ -304,13 +305,13 @@ void Cutscenes::raise_pipe()
 // InitCutscene3a, Func_9e018
 void Cutscenes::init_remove_warps()
 {
-	routines_.call(ADDR_ClearTempPals_Bank27);
-	routines_.call(ADDR_LoadCutscenes9Gfx_Vram1);
+	cutscenes::clear_temp_pals(gb_);
+	cutscenes::load_cutscenes9_gfx_vram1(gb_);
 	gb_->cpu.b = BANK_LevelMainTiles30;
 	SET_HL(gb_, ADDR_LevelMainTiles30);
 	routines_.call(ADDR_LoadFarTiles);
-	routines_.call(ADDR_LoadCutsceneBGMaps37);
-	routines_.call(ADDR_LoadCutsceneBGMaps38);
+	cutscenes::load_cutscene_bg_maps(gb_, 37);
+	cutscenes::load_cutscene_bg_maps(gb_, 38);
 	place(wSceneObj2, 0x54, 0x46, 0x01); // Func_9ccf9
 	static constexpr uint16_t WARPS[4] = {wSceneObj4, wSceneObj5, wSceneObj6, wSceneObj7};
 	for (int i = 0; i < 4; i++) {
@@ -354,7 +355,7 @@ void Cutscenes::remove_warps()
 		wait(30);
 		break;
 	case 1: // .Func_9e07d
-		routines_.call(ADDR_Func_9cc87);
+		cutscenes::clear_temp_bg_ob_pals(gb_);
 		load_pals1(BANK_Pals_b8780, ADDR_Pals_b8780);
 		load_pals2(BANK_Pals_b8780, ADDR_Pals_b8780);
 		advance();
@@ -436,12 +437,12 @@ void Cutscenes::init_demons_blood()
 {
 	load_pals1(BANK_Pals_b84c0, ADDR_Pals_b84c0);
 	load_pals2(BANK_Pals_b84c0, ADDR_Pals_b84c0);
-	routines_.call(ADDR_Func_9c977);
+	cutscenes::load_cutscenes8_5_gfx_vram1(gb_);
 	gb_->cpu.b = BANK_LevelMainTiles31;
 	SET_HL(gb_, ADDR_LevelMainTiles31);
 	routines_.call(ADDR_LoadFarTiles);
-	routines_.call(ADDR_LoadCutsceneBGMaps23);
-	routines_.call(ADDR_SetBGPriorityOnTopRows_Vram1);
+	cutscenes::load_cutscene_bg_maps(gb_, 23);
+	cutscenes::set_bg_priority_on_top_rows_vram1(gb_);
 }
 
 // Cutscene3cFunc: the bottle comes down, tips, a drop falls and splashes,
@@ -551,15 +552,15 @@ void Cutscenes::init_paragoom_cage()
 {
 	load_pals1(BANK_Pals_b8700, ADDR_Pals_b8700);
 	load_pals2(BANK_Pals_b9000, ADDR_Pals_b9000);
-	routines_.call(ADDR_LoadCutscenes9Gfx_Vram0);
+	cutscenes::load_cutscenes9_gfx_vram0(gb_);
 	decompress(BANK_ParaGoomGfx, ADDR_ParaGoomGfx, v1Tiles0 + 0x40 * TILE_SIZE, true);
 	mem_[rVBK] = 1;
 	gb_->cpu.b = BANK_LevelMainTiles30;
 	SET_HL(gb_, ADDR_LevelMainTiles30);
 	routines_.call(ADDR_LoadFarTiles);
 	mem_[rVBK] = 0;
-	routines_.call(ADDR_LoadCutsceneBGMaps34);
-	routines_.call(ADDR_LoadCutsceneBGMaps35);
+	cutscenes::load_cutscene_bg_maps(gb_, 34);
+	cutscenes::load_cutscene_bg_maps(gb_, 35);
 }
 
 // Cutscene3dFunc: the key goes in twice, the cage opens, the Paragoom

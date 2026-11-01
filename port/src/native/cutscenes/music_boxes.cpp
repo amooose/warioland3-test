@@ -1,5 +1,6 @@
 // The music boxes' cutscenes (Cutscene08Func, 10, 17, 1d and 25): the box
 // rises, opens and plays its tune. See cutscenes.hpp.
+#include "loaders.hpp"
 #include "cutscenes.hpp"
 
 namespace wl3::cutscenes {
@@ -18,9 +19,9 @@ void Cutscenes::init_music_box(uint16_t pals)
 	load_pals2(BANK_Pals_b8ac0, pals);
 	load_pals1(BANK_Pals_b8200, ADDR_Pals_b8200);
 	wram_.lcdc_flags_to_flip() = LCDC_BG_MAP;
-	routines_.call(ADDR_LoadCutscenes2Gfx);
-	routines_.call(ADDR_LoadCutsceneBGMaps01);
-	routines_.call(ADDR_LoadCutsceneBGMaps04);
+	cutscenes::load_cutscenes2_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 1);
+	cutscenes::load_cutscene_bg_maps(gb_, 4);
 }
 
 // Func_9d6f0: box is the box's first state (1, 3, 5, 7, 9)
@@ -84,8 +85,8 @@ void Cutscenes::init_plant_seeds()
 {
 	load_pals1(BANK_Pals_b8200, ADDR_Pals_b8200);
 	load_pals2(BANK_Pals_b8a80, ADDR_Pals_b8a80);
-	routines_.call(ADDR_LoadCutscenes2Gfx);
-	routines_.call(ADDR_LoadCutsceneBGMaps03);
+	cutscenes::load_cutscenes2_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 3);
 }
 
 // Cutscene09Func: the seeds' pot rises

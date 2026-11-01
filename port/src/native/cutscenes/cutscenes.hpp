@@ -74,7 +74,7 @@ private:
 
 	// the cutscenes
 	// InitCutscene02, 03, 04: palettes, graphics and BG maps
-	void init_north(uint16_t pals2, uint8_t pals2_bank, uint16_t gfx, uint16_t bg_maps1, uint16_t bg_maps2);
+	void init_north(uint16_t pals2, uint8_t pals2_bank, void (*load_gfx)(GB *gb));
 	void cut_tree(); // Cutscene02Func: EVENT_CUT_TREE
 	void draw_cut_tree(); // OWCutTree
 	void open_north_gate(); // Cutscene03Func: EVENT_OPEN_NORTH_GATE

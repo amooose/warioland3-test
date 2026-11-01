@@ -1,5 +1,6 @@
 // The cutscenes' dispatch and shared helpers (bank27.asm). See
 // cutscenes.hpp.
+#include "loaders.hpp"
 #include "cutscenes.hpp"
 #include "../home/system.hpp"
 
@@ -70,18 +71,16 @@ bool Cutscenes::init(uint8_t event)
 {
 	switch (event) {
 	case EVENT_CUT_TREE:
-		init_north(ADDR_Pals_b8c00, BANK_Pals_b8c00, ADDR_LoadCutscenes1Gfx_Vram0, ADDR_LoadCutsceneBGMaps01,
-			ADDR_LoadCutsceneBGMaps02);
+		init_north(ADDR_Pals_b8c00, BANK_Pals_b8c00, cutscenes::load_cutscenes1_gfx_vram0);
 		return true;
 	case EVENT_OPEN_NORTH_GATE: // InitCutscene03: Pals_b8240, one BG map
 		load_pals1(BANK_Pals_b8240, ADDR_Pals_b8240);
 		load_pals2(BANK_Pals_b88c0, ADDR_Pals_b88c0);
-		routines_.call(ADDR_LoadCutscenes3Gfx);
-		routines_.call(ADDR_LoadCutsceneBGMaps07);
+		cutscenes::load_cutscenes3_gfx(gb_);
+		cutscenes::load_cutscene_bg_maps(gb_, 7);
 		return true;
 	case EVENT_EXPEL_TORNADO:
-		init_north(ADDR_Pals_b8ec0, BANK_Pals_b8ec0, ADDR_LoadCutscenes8Gfx_Vram0, ADDR_LoadCutsceneBGMaps01,
-			ADDR_LoadCutsceneBGMaps02);
+		init_north(ADDR_Pals_b8ec0, BANK_Pals_b8ec0, cutscenes::load_cutscenes8_gfx_vram0);
 		return true;
 	case EVENT_RAINSTORM: init_rainstorm(); return true;
 	case EVENT_FIX_ELEVATOR: init_fix_elevator(); return true;
@@ -313,7 +312,7 @@ void Cutscenes::shake_screen()
 // .asm_9e77c and the like
 void Cutscenes::next_fade(uint8_t bank, uint16_t pals)
 {
-	routines_.call(ADDR_Func_9cd74);
+	cutscenes::copy_temp_pals_to_bg_ob_pals(gb_);
 	load_pals1(bank, pals);
 	advance();
 }

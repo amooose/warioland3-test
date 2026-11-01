@@ -1,5 +1,6 @@
 // Cutscene13Func, the foot stone, and Cutscene15Func / Cutscene49Func, the
 // snake doors. See cutscenes.hpp.
+#include "loaders.hpp"
 #include "cutscenes.hpp"
 
 namespace wl3::cutscenes {
@@ -10,8 +11,8 @@ void Cutscenes::init_foot_stone()
 	load_pals1(BANK_Pals_b8040, ADDR_Pals_b8040);
 	load_pals2(BANK_Pals_b8e00, ADDR_Pals_b8e00);
 	wram_.lcdc_flags_to_flip() = LCDC_BG_MAP;
-	routines_.call(ADDR_LoadCutscenes4Gfx);
-	routines_.call(ADDR_LoadCutsceneBGMaps05);
+	cutscenes::load_cutscenes4_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 5);
 }
 
 // Cutscene13Func: the stone rises and falls, its shadow down, and the screen
@@ -96,9 +97,9 @@ void Cutscenes::init_snake_door(uint16_t pals1, uint16_t pals2)
 	wram_.cutscene_wy() = 0x28;
 	mem_[rWX] = 80 + WX_OFS;
 	wram_.cutscene_wx() = 80 + WX_OFS;
-	routines_.call(ADDR_LoadCutscenes2Gfx);
-	routines_.call(ADDR_LoadCutsceneBGMaps14);
-	routines_.call(ADDR_LoadCutsceneBGMaps13);
+	cutscenes::load_cutscenes2_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 14);
+	cutscenes::load_cutscene_bg_maps(gb_, 13);
 	// Func_9da0e
 	set_state(wSceneObj4, 0x05);
 	mem_[wSceneObj4] = 96;

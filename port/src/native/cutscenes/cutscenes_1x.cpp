@@ -1,4 +1,5 @@
 // Cutscenes $1e to $27. See cutscenes.hpp.
+#include "loaders.hpp"
 #include "cutscenes.hpp"
 
 namespace wl3::cutscenes {
@@ -8,7 +9,7 @@ void Cutscenes::init_explode_bombs()
 {
 	load_pals1(BANK_Pals_b80c0, ADDR_Pals_b80c0);
 	load_pals2(BANK_Pals_b8cc0, ADDR_Pals_b8cc0);
-	routines_.call(ADDR_LoadCutscenes3Gfx);
+	cutscenes::load_cutscenes3_gfx(gb_);
 	decompress(BANK_Cutscene09Attrmap, ADDR_Cutscene09Attrmap, v1BGMap0, true);
 	decompress(BANK_Cutscene09Tilemap, ADDR_Cutscene09Tilemap, v0BGMap0);
 	place(wSceneObj2, 83, 80, 0x04);
@@ -74,10 +75,10 @@ void Cutscenes::init_leaves_fall()
 {
 	load_pals1(BANK_Pals_b8280, ADDR_Pals_b8280);
 	load_pals2(BANK_Pals_b8f00, ADDR_Pals_b8f00);
-	routines_.call(ADDR_Func_9c931);
-	routines_.call(ADDR_LoadCutsceneBGMaps16);
-	routines_.call(ADDR_SetBGPriorityOnTopRows_Vram0);
-	routines_.call(ADDR_Func_9cc4f);
+	cutscenes::load_cutscenes7_5_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 16);
+	cutscenes::set_bg_priority_on_top_rows_vram0(gb_);
+	cutscenes::set_bg_priority_on_block(gb_);
 	place(wSceneObj3, 96, 112, 0x04);
 	draw_func_9f423();
 }
@@ -175,10 +176,10 @@ void Cutscenes::draw_func_9f423()
 // InitCutscene22
 void Cutscenes::init_treasure_map()
 {
-	routines_.call(ADDR_LoadCutscenes3Gfx);
+	cutscenes::load_cutscenes3_gfx(gb_);
 	decompress(BANK_Cutscene10Attrmap, ADDR_Cutscene10Attrmap, v1BGMap0, true);
 	decompress(BANK_Cutscene10Tilemap, ADDR_Cutscene10Tilemap, v0BGMap0);
-	routines_.call(ADDR_ClearTempPals_Bank27);
+	cutscenes::clear_temp_pals(gb_);
 }
 
 // Cutscene22Func: fade in from black, and the map is opened
@@ -191,7 +192,7 @@ void Cutscenes::treasure_map()
 	case 1: // .Func_9d5f1: the palettes to fade to, from black
 		copy_far(BANK_Pals_b8100, ADDR_Pals_b8100, wTempPals1, 8 * PAL_SIZE);
 		copy_far(BANK_Pals_b8d00, ADDR_Pals_b8d00, wTempPals2, 8 * PAL_SIZE);
-		routines_.call(ADDR_Func_9cc87);
+		cutscenes::clear_temp_bg_ob_pals(gb_);
 		advance();
 		break;
 	case 2: // Func_9cdbd
@@ -231,8 +232,8 @@ void Cutscenes::init_open_tree_mouth()
 {
 	load_pals1(BANK_Pals_b82c0, ADDR_Pals_b82c0);
 	load_pals2(BANK_Pals_b82c0, ADDR_Pals_b82c0);
-	routines_.call(ADDR_LoadCutscenes8Gfx_Vram0);
-	routines_.call(ADDR_LoadCutsceneBGMaps28);
+	cutscenes::load_cutscenes8_gfx_vram0(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 28);
 	mem_[rVBK] = 1;
 	gb_->cpu.b = BANK_SpecialTiles0;
 	SET_HL(gb_, ADDR_SpecialTiles0);
@@ -388,11 +389,11 @@ void Cutscenes::init_make_wire()
 {
 	load_pals1(BANK_Pals_b8300, ADDR_Pals_b8300);
 	load_pals2(BANK_Pals_b8300, ADDR_Pals_b8300);
-	routines_.call(ADDR_Func_9c977);
+	cutscenes::load_cutscenes8_5_gfx_vram1(gb_);
 	gb_->cpu.b = BANK_LevelMainTiles22;
 	SET_HL(gb_, ADDR_LevelMainTiles22);
 	routines_.call(ADDR_LoadFarTiles);
-	routines_.call(ADDR_LoadCutsceneBGMaps31);
+	cutscenes::load_cutscene_bg_maps(gb_, 31);
 }
 
 // Cutscene21Func: the tool goes up, along the three spools right and back

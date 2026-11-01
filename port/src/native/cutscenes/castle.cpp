@@ -1,5 +1,6 @@
 // Cutscene19Func, the castle appears, and Cutscene1bFunc, the sun is
 // summoned (with the owl). See cutscenes.hpp.
+#include "loaders.hpp"
 #include "cutscenes.hpp"
 
 namespace wl3::cutscenes {
@@ -9,8 +10,8 @@ void Cutscenes::init_reveal_castle()
 {
 	load_pals1(BANK_Pals_b8140, ADDR_Pals_b8140);
 	load_pals2(BANK_Pals_b8940, ADDR_Pals_b8940);
-	routines_.call(ADDR_LoadCutscenes4Gfx);
-	routines_.call(ADDR_LoadCutsceneBGMaps12);
+	cutscenes::load_cutscenes4_gfx(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 12);
 }
 
 // Cutscene19Func: the item rises and is used; BG palette 2 lightens in
@@ -90,19 +91,19 @@ void Cutscenes::reveal_castle()
 // InitCutscene1b
 void Cutscenes::init_summon_sun()
 {
-	routines_.call(ADDR_LoadCutscenes4Gfx);
+	cutscenes::load_cutscenes4_gfx(gb_);
 	decompress(BANK_OwlGfx, ADDR_OwlGfx, v1Tiles0, true);
 	mem_[rVBK] = 1;
 	gb_->cpu.b = BANK_LevelMainTiles28;
 	SET_HL(gb_, ADDR_LevelMainTiles28);
 	routines_.call(ADDR_LoadFarTiles);
 	mem_[rVBK] = 0;
-	routines_.call(ADDR_LoadCutsceneBGMaps03);
+	cutscenes::load_cutscene_bg_maps(gb_, 3);
 	decompress(BANK_Cutscene33Attrmap, ADDR_Cutscene33Attrmap, v1BGMap1, true);
 	decompress(BANK_Cutscene33Tilemap, ADDR_Cutscene33Tilemap, v0BGMap1);
 	load_pals1(BANK_Pals_b8040, ADDR_Pals_b8040);
 	load_pals2(BANK_Pals_b8c80, ADDR_Pals_b8c80);
-	routines_.call(ADDR_SetBGPriorityOnTopRows_BGMap1);
+	cutscenes::set_bg_priority_on_top_rows_bg_map1(gb_);
 }
 
 // Cutscene1bFunc: two halves close in, the palettes fade and change, and

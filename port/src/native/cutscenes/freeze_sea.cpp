@@ -1,6 +1,7 @@
 // Cutscene0eFunc and Cutscene11Func, one script: an item rises, the sky
 // changes, and a cloud (the freeze) or the lightning comes. And
 // Cutscene18Func, drawn the same way. See cutscenes.hpp.
+#include "loaders.hpp"
 #include "cutscenes.hpp"
 
 namespace wl3::cutscenes {
@@ -18,9 +19,9 @@ void Cutscenes::init_freeze_sea(uint16_t pals1, uint16_t pals2)
 	static_assert(BANK_Pals_b8200 == BANK_Pals_b8040 && BANK_Pals_b8980 == BANK_Pals_b8c40);
 	load_pals1(BANK_Pals_b8200, pals1);
 	load_pals2(BANK_Pals_b8980, pals2);
-	routines_.call(ADDR_LoadCutscenes1Gfx_Vram0);
-	routines_.call(ADDR_LoadCutsceneBGMaps03);
-	routines_.call(ADDR_LoadCutsceneBGMaps21);
+	cutscenes::load_cutscenes1_gfx_vram0(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 3);
+	cutscenes::load_cutscene_bg_maps(gb_, 21);
 }
 
 void Cutscenes::freeze_sea()
@@ -129,9 +130,9 @@ void Cutscenes::init_purify_water()
 {
 	load_pals1(BANK_Pals_b8200, ADDR_Pals_b8200);
 	load_pals2(BANK_Pals_b8d80, ADDR_Pals_b8d80);
-	routines_.call(ADDR_LoadCutscenes1Gfx_Vram0);
-	routines_.call(ADDR_LoadCutsceneBGMaps01);
-	routines_.call(ADDR_LoadCutsceneBGMaps02);
+	cutscenes::load_cutscenes1_gfx_vram0(gb_);
+	cutscenes::load_cutscene_bg_maps(gb_, 1);
+	cutscenes::load_cutscene_bg_maps(gb_, 2);
 }
 
 // Cutscene18Func: the item rises
