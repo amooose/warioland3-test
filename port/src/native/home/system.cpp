@@ -1,6 +1,7 @@
 // Home's input and system routines; see system.hpp.
 #include "system.hpp"
 
+#include "../flags.hpp"
 #include "memory.hpp"
 
 #include <initializer_list>
@@ -11,6 +12,11 @@ namespace {
 
 constexpr uint16_t HCALL_FUNC = ADDR_InitHRAMCallFunc + 0x0c; // .Func
 constexpr uint8_t HCALL_FUNC_SIZE = 0x17; // .end - .Func
+constexpr uint16_t VBLANK_RET_FUNC = ADDR_VBlank_Ret + 0x0c;
+constexpr uint8_t VBLANK_RET_SIZE = 0x01;
+constexpr uint16_t VBLANK_TA_FUNC = ADDR_VBlank_TimeAttackDescription + 0x0c;
+constexpr uint8_t VBLANK_TA_SIZE = 0x10;
+constexpr uint16_t BOSS_MUSIC_IDS = ADDR_UpdateLevelMusic + 0x70; // .BossMusicIDs
 
 } // namespace
 
@@ -81,9 +87,164 @@ void clear_save_data(GB *gb)
 	Memory(gb).byte(hUnused_fffd) = 0;
 }
 
+void wait_next_hblank(GB *gb)
+{
+	Memory mem(gb);
+	while (!(mem[rSTAT] & STAT_MODE))
+		idle(gb, 32);
+	while (mem[rSTAT] & STAT_MODE)
+		idle(gb, 32);
+}
+
+void init_lcd(GB *gb)
+{
+	Memory mem(gb);
+	mem[wLCDFunc] = 0xd9; // reti
+	mem[rIF] = 0;
+	mem[rIE] = static_cast<uint8_t>(mem[rIE] & ~(1 << B_IE_STAT));
+	mem[rSTAT] = static_cast<uint8_t>(mem[rSTAT] & ~(1 << B_STAT_LYC));
+}
+
+void vblank_ret(GB *gb)
+{
+	copy(gb, VBLANK_RET_FUNC, wVBlankFunc, VBLANK_RET_SIZE);
+}
+
+void vblank_time_attack_description(GB *gb)
+{
+	copy(gb, VBLANK_TA_FUNC, wVBlankFunc, VBLANK_TA_SIZE);
+}
+
+namespace {
+
+// The music UpdateLevelMusic picks: its ID, little-endian at id, and how
+// it got there (for the hook's registers).
+struct LevelMusic {
+	uint16_t id;
+	bool banked;            // read with the ROM bank pushed and switched
+	bool by_transformation; // pushed for the transformation's look-up
+	uint8_t index;          // e: the table offset
+	bool carry;             // d: its carry
+};
+
+LevelMusic level_music(GB *gb)
+{
+	Memory mem(gb);
+	if (uint8_t boss = mem[wBossState]) {
+		uint8_t index = static_cast<uint8_t>((boss - 1) * 2);
+		return {static_cast<uint16_t>(BOSS_MUSIC_IDS + index), false, false, index, false};
+	}
+	bool transformed = mem[wTransformation] != 0;
+	if (transformed) {
+		uint8_t index = static_cast<uint8_t>((mem[wTransformation] & 0x1f) * 2);
+		uint16_t id = static_cast<uint16_t>(ADDR_TransformationMusicIDs + index);
+		uint8_t bank = mem[wROMBank];
+		bankswitch(gb, BANK_TransformationMusicIDs, ADDR_UpdateLevelMusic);
+		bool has_music = mem[id] != 0xff;
+		bankswitch(gb, bank, ADDR_UpdateLevelMusic);
+		if (has_music)
+			return {id, true, true, index, false};
+	}
+	unsigned twice = mem[wLevel] * 2u;
+	return {static_cast<uint16_t>(ADDR_LevelMusic + twice), true, transformed, static_cast<uint8_t>(twice),
+		twice > 0xff};
+}
+
+} // namespace
+
+// LevelMusic is read in TransformationMusicIDs' bank after a
+// transformation without music (the asm doesn't switch again).
+void update_level_music(GB *gb)
+{
+	Memory mem(gb);
+	LevelMusic music = level_music(gb);
+	uint8_t bank = mem[wROMBank];
+	if (music.banked)
+		bankswitch(gb, music.by_transformation ? BANK_TransformationMusicIDs : BANK_LevelMusic,
+			ADDR_UpdateLevelMusic);
+	mem[hMusicID + 1] = mem[music.id];
+	mem[hMusicID + 0] = mem[static_cast<uint16_t>(music.id + 1)];
+	if (music.banked)
+		bankswitch(gb, bank, ADDR_UpdateLevelMusic);
+}
+
+void init_game_state(GB *gb)
+{
+	Memory mem(gb);
+	mem[wState] = ST_TITLE;
+	mem[wSubState] = 0;
+}
+
+void set_perfect_state(GB *gb)
+{
+	Memory mem(gb);
+	mem[wState] = ST_PERFECT;
+	mem[wSubState] = 0;
+}
+
+namespace {
+
+// Why SaveGameOrEnterPerfectScreen goes to the save (the check that said
+// so, for its flags), or PERFECT
+enum class SaveReason { PERFECT, TIME_ATTACK, TRANSITION, NOT_CLEARED, TREASURES };
+
+SaveReason save_reason(Memory mem)
+{
+	if (mem[wGameModeFlags] & (1 << MODE_TIME_ATTACK_F))
+		return SaveReason::TIME_ATTACK;
+	uint8_t transition = mem[wTransitionParam];
+	if (transition == TRANSITION_EPILOGUE_NOT_PERFECT || transition == TRANSITION_EPILOGUE_PERFECT
+		|| transition == TRANSITION_GAME_OVER)
+		return SaveReason::TRANSITION;
+	if (!(mem[wGameModeFlags] & MODE_GAME_CLEARED))
+		return SaveReason::NOT_CLEARED;
+	return mem[wNumCollectedTreasures] == 1 ? SaveReason::PERFECT : SaveReason::TREASURES;
+}
+
+} // namespace
+
+void save_game_or_enter_perfect_screen(GB *gb)
+{
+	Memory mem(gb);
+	if (save_reason(mem) == SaveReason::PERFECT) {
+		set_perfect_state(gb);
+		return;
+	}
+	mem[wPendingSubState] = mem[wSubState];
+	mem[wState] = ST_PAUSE_MENU;
+	mem[wSubState] = SST_PAUSE_18;
+}
+
+namespace {
+
+// Where CheckHasAllMusicalCoinFlags stops: the first flag clear, in byte
+// `byte` at bit `bit` (byte 3, bit 0, the last), or none
+struct CoinFlagCheck {
+	bool all;
+	int byte, bit;
+};
+
+CoinFlagCheck check_musical_coin_flags(GB *gb)
+{
+	Memory mem(gb);
+	for (int byte = 0; byte < 3; byte++)
+		for (int bit = 0; bit < 8; bit++)
+			if (!(mem[static_cast<uint16_t>(wMusicalCoinFlags + byte)] >> bit & 1))
+				return {false, byte, bit};
+	return {(mem[wMusicalCoinFlags + 3] & 1) != 0, 3, 0};
+}
+
+} // namespace
+
+bool has_all_musical_coin_flags(GB *gb)
+{
+	return check_musical_coin_flags(gb).all;
+}
+
 } // namespace wl3::home
 
 using namespace wl3::home;
+namespace flags = wl3::flags;
 
 PORT_EX(UpdateJoypad, 0, 0)
 {
@@ -138,4 +299,133 @@ PORT_EX(ClearSaveData, HOOK_MANUAL_RET, 0)
 	gb->cpu.b = 0;
 	gb->cpu.f = FLAG_Z | FLAG_N; // the last fill's dec b, after xor a
 	gb->cpu.pc = ADDR_Init;
+}
+
+// returns nz if every level's Musical Coin flag is set; b and c are the
+// loops' counts where it stopped
+PORT_EX(CheckHasAllMusicalCoinFlags, 0, 0)
+{
+	CoinFlagCheck check = check_musical_coin_flags(gb);
+	if (check.byte < 3) {
+		gb->cpu.b = static_cast<uint8_t>(8 - check.bit);
+		gb->cpu.c = static_cast<uint8_t>(3 - check.byte);
+		SET_HL(gb, static_cast<uint16_t>(wMusicalCoinFlags + check.byte + 1));
+	} else {
+		gb->cpu.b = 0;
+		gb->cpu.c = 0;
+		SET_HL(gb, wMusicalCoinFlags + 3);
+	}
+	gb->cpu.a = check.all ? TRUE : FALSE;
+	gb->cpu.f = check.all ? FLAG_C : FLAG_Z; // the last rrca's carry, or xor a
+}
+
+PORT_EX(WaitNextHBlank, 0, 0)
+{
+	wait_next_hblank(gb);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z | FLAG_H; // and STAT_MODE
+}
+
+PORT_EX(InitLCD, 0, 0)
+{
+	init_lcd(gb);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, rSTAT);
+}
+
+// the CopyHLToDE's registers
+static void vblank_func_regs(GB *gb, uint16_t func, uint8_t size)
+{
+	SET_HL(gb, static_cast<uint16_t>(func + size));
+	SET_DE(gb, static_cast<uint16_t>(wVBlankFunc + size));
+	gb->cpu.a = wl3::Memory(gb)[static_cast<uint16_t>(func + size - 1)];
+	gb->cpu.b = 0;
+	gb->cpu.f = static_cast<uint8_t>((gb->cpu.f & FLAG_C) | FLAG_Z | FLAG_N);
+}
+
+PORT_EX(VBlank_Ret, 0, 0)
+{
+	vblank_ret(gb);
+	vblank_func_regs(gb, VBLANK_RET_FUNC, VBLANK_RET_SIZE);
+}
+
+PORT_EX(VBlank_TimeAttackDescription, 0, 0)
+{
+	vblank_time_attack_description(gb);
+	vblank_func_regs(gb, VBLANK_TA_FUNC, VBLANK_TA_SIZE);
+}
+
+// hl is left on the ID's high byte, de the table offset. After a bank
+// push, a and f are popped: the bank it came from, and the flags of the
+// transformation's index (z) or of the and a that found none (z, h).
+PORT_EX(UpdateLevelMusic, 0, 0)
+{
+	wl3::Memory mem(gb);
+	uint8_t bank = mem[wROMBank];
+	LevelMusic music = level_music(gb);
+	update_level_music(gb);
+	SET_HL(gb, static_cast<uint16_t>(music.id + 1));
+	gb->cpu.d = music.carry;
+	gb->cpu.e = music.index;
+	if (!music.banked) {
+		gb->cpu.a = mem[static_cast<uint16_t>(music.id + 1)];
+		// add hl, de: z kept from add a, h and c from the 16-bit add
+		uint8_t f = static_cast<uint8_t>(music.index ? 0 : FLAG_Z);
+		if ((BOSS_MUSIC_IDS & 0x0fff) + music.index > 0x0fff)
+			f |= FLAG_H;
+		if (BOSS_MUSIC_IDS + music.index > 0xffff)
+			f |= FLAG_C;
+		gb->cpu.f = f;
+		return;
+	}
+	gb->cpu.a = bank;
+	gb->cpu.f = music.by_transformation ? FLAG_Z : FLAG_Z | FLAG_H;
+}
+
+PORT_EX(InitGameState, 0, 0)
+{
+	init_game_state(gb);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+}
+
+PORT_EX(SetPerfectState, 0, 0)
+{
+	set_perfect_state(gb);
+	SET_HL(gb, wState);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z; // xor a
+}
+
+// a and f from the last check (or SetPerfectState's)
+PORT_EX(SaveGameOrEnterPerfectScreen, 0, 0)
+{
+	wl3::Memory mem(gb);
+	SaveReason reason = save_reason(mem);
+	uint8_t carry = gb->cpu.f & FLAG_C;
+	uint8_t transition = mem[wTransitionParam];
+	uint8_t treasures = mem[wNumCollectedTreasures];
+	save_game_or_enter_perfect_screen(gb);
+	if (reason == SaveReason::PERFECT) {
+		SET_HL(gb, wState);
+		gb->cpu.a = 0;
+		gb->cpu.f = FLAG_Z; // xor a
+		return;
+	}
+	gb->cpu.a = SST_PAUSE_18;
+	switch (reason) {
+	case SaveReason::TIME_ATTACK:
+		gb->cpu.f = static_cast<uint8_t>(carry | FLAG_H); // bit, set
+		break;
+	case SaveReason::TRANSITION: // the cp that matched
+		gb->cpu.f = flags::cp(transition, transition);
+		break;
+	case SaveReason::NOT_CLEARED:
+		gb->cpu.f = FLAG_Z | FLAG_H; // and
+		break;
+	default: // dec, not to 0 (the and before it cleared carry)
+		gb->cpu.f = flags::dec(0, treasures);
+		break;
+	}
 }

@@ -40,6 +40,15 @@ AnimStep update_wario_animation(GB *gb);
 // BG map update; returns the queue entry's offset (wc19e before)
 uint8_t queue_block_update(GB *gb, uint16_t block);
 
+// LoadGameOverSprite / LoadCreditsMusicBoxSprite: a sprite from its 4
+// bytes at obj (y, x, frame, attributes; the position on screen), from
+// the game over screen's OAM data or the music box's (wCreditsMusicBox*)
+SpriteEnd load_game_over_sprite(GB *gb, uint16_t obj);
+SpriteEnd load_credits_music_box_sprite(GB *gb, uint16_t obj);
+// LoadWarioGfx: queues the DMA of Wario's graphics (wDMASource*) to
+// v0Tiles0
+void load_wario_gfx(GB *gb);
+
 void save_backup_vram(GB *gb); // SaveBackupVRAM: scroll, palettes and VRAM to WRAM 3-7
 void load_backup_vram(GB *gb); // LoadBackupVRAM: and back
 

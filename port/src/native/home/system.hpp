@@ -22,4 +22,21 @@ void init_hram_call_func(GB *gb); // InitHRAMCallFunc: hCallFunc's code to HRAM
 // asm then jumps to Init)
 void clear_save_data(GB *gb);
 
+void wait_next_hblank(GB *gb); // WaitNextHBlank
+void init_lcd(GB *gb); // InitLCD: no LCD interrupt, wLCDFunc a reti
+void vblank_ret(GB *gb); // VBlank_Ret: wVBlankFunc a ret
+void vblank_time_attack_description(GB *gb); // VBlank_TimeAttackDescription: its .Func to wVBlankFunc
+
+// UpdateLevelMusic: hMusicID by the boss fight, the transformation (if it
+// has music) or the level
+void update_level_music(GB *gb);
+void init_game_state(GB *gb); // InitGameState: the title
+void set_perfect_state(GB *gb); // SetPerfectState
+// SaveGameOrEnterPerfectScreen: the perfect screen after the last treasure
+// of a cleared game, else the pause menu's save
+void save_game_or_enter_perfect_screen(GB *gb);
+
+// CheckHasAllMusicalCoinFlags: every level's flag (25 bits)
+bool has_all_musical_coin_flags(GB *gb);
+
 } // namespace wl3::home

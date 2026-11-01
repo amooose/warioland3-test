@@ -133,6 +133,56 @@ uint8_t queue_block_update(GB *gb, uint16_t block)
 
 namespace {
 
+// wCurSprite* from a sprite's 4 bytes, its position on screen made OAM's
+void set_cur_sprite(Memory mem, uint16_t obj)
+{
+	mem[wCurSpriteYCoord] = static_cast<uint8_t>(mem[obj] + OAM_Y_OFS);
+	mem[wCurSpriteXCoord] = static_cast<uint8_t>(mem[static_cast<uint16_t>(obj + 1)] + OAM_X_OFS);
+	mem[wCurSpriteFrame] = mem[static_cast<uint16_t>(obj + 2)];
+	mem[wCurSpriteAttributes] = mem[static_cast<uint16_t>(obj + 3)];
+}
+
+SpriteEnd load_sprite_in(GB *gb, uint8_t bank, uint16_t table, uint16_t routine)
+{
+	uint8_t saved = Memory(gb)[wROMBank];
+	bankswitch(gb, bank, routine);
+	SpriteEnd end = load_sprite(gb, table);
+	bankswitch(gb, saved, routine);
+	return end;
+}
+
+} // namespace
+
+SpriteEnd load_game_over_sprite(GB *gb, uint16_t obj)
+{
+	set_cur_sprite(Memory(gb), obj);
+	return load_sprite_in(gb, BANK_OAM_aab5c, ADDR_OAM_aab5c, ADDR_LoadGameOverSprite);
+}
+
+SpriteEnd load_credits_music_box_sprite(GB *gb, uint16_t obj)
+{
+	Memory mem(gb);
+	set_cur_sprite(mem, obj);
+	mem[wTempBank] = mem[wCreditsMusicBoxOAMBank];
+	uint16_t table = static_cast<uint16_t>(mem[wCreditsMusicBoxOAMPtr + 0] << 8 | mem[wCreditsMusicBoxOAMPtr + 1]);
+	return load_sprite_in(gb, mem[wTempBank], table, ADDR_LoadCreditsMusicBoxSprite);
+}
+
+void load_wario_gfx(GB *gb)
+{
+	Memory mem(gb);
+	mem[wPendingDMASourceBank] = mem[wDMASourceBank];
+	mem[wPendingDMASourcePtr + 0] = mem[wDMASourcePtr + 0];
+	mem[wPendingDMASourcePtr + 1] = mem[wDMASourcePtr + 1];
+	mem[wPendingDMADestinationPtr + 0] = static_cast<uint8_t>(v0Tiles0 >> 8);
+	mem[wPendingDMADestinationPtr + 1] = static_cast<uint8_t>(v0Tiles0);
+	mem[wPendingDMADestinationBank] = BANK_v0Tiles0;
+	mem[wPendingDMALength] = 127;
+	mem[wIsDMATransferPending] = TRUE;
+}
+
+namespace {
+
 // the scroll and palettes to WRAM 3 (or back), then VRAM's four $1000
 // quarters to WRAM 4 to 7
 void backup_vram(GB *gb, bool save)
@@ -322,4 +372,41 @@ PORT_EX(LoadBackupVRAM, 0, 0)
 	SET_BC(gb, 0);
 	gb->cpu.a = 0;
 	gb->cpu.f = FLAG_Z; // xor a
+}
+
+// a is popped from the push before the bankswitch (the bank it came from),
+// f from the last add before it (x + OAM_X_OFS, read before the sprite,
+// which can overwrite it, is drawn)
+static uint8_t x_add_flags(GB *gb, uint16_t obj)
+{
+	return flags::add(wl3::Memory(gb)[static_cast<uint16_t>(obj + 1)], OAM_X_OFS);
+}
+
+static void loaded_sprite_regs(GB *gb, uint8_t bank, uint8_t f, const SpriteEnd &end)
+{
+	sprite_regs(gb, end);
+	gb->cpu.a = bank;
+	gb->cpu.f = f;
+}
+
+PORT_EX(LoadGameOverSprite, 0, 0)
+{
+	uint16_t obj = REG_HL(gb);
+	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t f = x_add_flags(gb, obj);
+	loaded_sprite_regs(gb, bank, f, load_game_over_sprite(gb, obj));
+}
+
+PORT_EX(LoadCreditsMusicBoxSprite, 0, 0)
+{
+	uint16_t obj = REG_HL(gb);
+	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t f = x_add_flags(gb, obj);
+	loaded_sprite_regs(gb, bank, f, load_credits_music_box_sprite(gb, obj));
+}
+
+PORT_EX(LoadWarioGfx, 0, 0)
+{
+	load_wario_gfx(gb);
+	gb->cpu.a = TRUE;
 }

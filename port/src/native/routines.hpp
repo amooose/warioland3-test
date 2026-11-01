@@ -8,6 +8,7 @@
 #include "home/memory.hpp"
 #include "home/pals.hpp"
 #include "home/sprites.hpp"
+#include "home/system.hpp"
 #include "native.hpp"
 #include "ram.hpp"
 
@@ -128,8 +129,7 @@ public:
 
 	bool check_has_all_musical_coin_flags()
 	{
-		call(ADDR_CheckHasAllMusicalCoinFlags);
-		return gb_->cpu.a;
+		return home::has_all_musical_coin_flags(gb_);
 	}
 
 	// Golf objects (src/home/load_golf_sprite.asm). True when the
