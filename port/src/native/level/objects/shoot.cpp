@@ -297,7 +297,7 @@ void Shoot::interacted_with_ball_wario()
 	mem_[wWarioXPos + 1] = mem_[wCurObjXPos + 0];
 	play_sfx(SFX_FAT_WALK);
 	substate() |= OBJSUBFLAG_HDIR;
-	// bug: meant to compare the x position with 123, it compares a, the
+	// bug (docs/ASM_BUGS.md): meant to compare the x position with 123, it compares a, the
 	// low byte of SFX_FAT_WALK, so it always sets the direction right
 	if ((SFX_FAT_WALK & 0xff) < 123)
 		substate() |= OBJSUBFLAG_VDIR;

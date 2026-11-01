@@ -469,6 +469,8 @@ void HiddenFigure::set_pals()
 // --- the face ---
 
 // laughs (Wario grabbed); the update function goes to h's page
+// bug: from the face, h is still w1d14e's page, so the laugh state never
+// takes (docs/ASM_BUGS.md)
 void HiddenFigure::face_laugh_start(uint16_t page)
 {
 	state_duration() = 0x3c;
@@ -628,6 +630,8 @@ void HiddenFigure::hand_rest(bool right)
 	set_update(update);
 	var2() = 0;
 	var3() = 0;
+	// bug? (docs/ASM_BUGS.md): the right hand clears the substate where
+	// the left clears the state (an ld [hl] for ld [hli])
 	if (right)
 		substate() = 0;
 	else

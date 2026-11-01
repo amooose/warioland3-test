@@ -294,6 +294,9 @@ build/wl3 --headless --input tests/inputs/X.input --trace-check X.trace
     - the reads listed in `sites[]` in trace.c. Add a site there when a
       trace shows a read like `UpdateRoomAnimatedTiles`'s LY check.
   - A difference in the screen alone is counted but doesn't fail.
+- **The original game's bugs are ported as they are**, and listed in
+  docs/ASM_BUGS.md to fix at the end (behind an option, so parity can
+  still be tested). Add each one found there, with a `// bug:` comment.
 - **Stack reads are the original game's bugs.**
   `QueueBlockTilesAlongRow_*` writes one byte past the tile queue, into
   the first attribute queue entry, and reads that byte from the stack:

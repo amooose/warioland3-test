@@ -112,7 +112,7 @@ void Nobiiru::step(const Step &s, uint8_t index)
 	else if (index == OUT)
 		set_interaction(OBJ_INTERACTION_0B);
 	if (s.box) {
-		// the asm's sting step leaves the new interaction type in a, which
+		// bug? (docs/ASM_BUGS.md): the asm's sting step leaves the new interaction type in a, which
 		// .SetCollisionAndFrameset then stores as the box's left
 		mem_[wCurObjCollBoxLeft] = index == STING ? interaction() : (right ? s.right_box_left : s.left_box_left);
 		mem_[wCurObjCollBoxRight] = right ? s.right_box_right : s.left_box_right;
