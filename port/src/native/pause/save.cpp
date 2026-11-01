@@ -14,6 +14,12 @@ constexpr uint16_t LEVEL_OBJECTS_WRAM_SIZE = 0x14a;
 constexpr uint8_t LEVEL_OBJECTS_WRAM_BANK = 0x01;
 constexpr uint8_t TREASURES_SIZE = static_cast<uint8_t>((wOWLevel - wTreasuresCollected) + 2);
 
+// the V-Blank functions' .Func and their sizes
+constexpr uint16_t VBLANK_SAVING = ADDR_VBlank_Saving + 0x0c;
+constexpr uint8_t VBLANK_SAVING_SIZE = 0x06; // OAM only, while writing to SRAM
+constexpr uint16_t VBLANK_SAVE_SCREEN = ADDR_VBlank_SaveScreen + 0x0c;
+constexpr uint8_t VBLANK_SAVE_SCREEN_SIZE = 0x23; // with the progress bar's tile
+
 } // namespace
 
 void SaveScreen::handle_complete_box()
@@ -81,10 +87,11 @@ void SaveScreen::init(bool backup)
 		routines_.call(ADDR_ClearBGMap1);
 	}
 	routines_.clear_virtual_oam();
-	routines_.farcall(BANK_LoadSaveScreenPals, ADDR_LoadSaveScreenPals);
-	routines_.farcall(BANK_LoadSaveScreenGfx, ADDR_LoadSaveScreenGfx);
-	routines_.farcall(BANK_DrawSaveInProgressBox, ADDR_DrawSaveInProgressBox);
-	routines_.call(ADDR_VBlank_SaveScreen);
+	routines_.in_bank(BANK_LoadSaveScreenPals, ADDR_LoadSaveScreenPals, [&] { load_pals(); });
+	routines_.in_bank(BANK_LoadSaveScreenGfx, ADDR_LoadSaveScreenGfx, [&] { load_gfx(); });
+	routines_.in_bank(BANK_DrawSaveInProgressBox, ADDR_DrawSaveInProgressBox,
+		[&] { draw_box(ADDR_SaveInProgressBoxAttrmap, ADDR_SaveInProgressBoxTilemap); });
+	set_vblank_func(VBLANK_SAVE_SCREEN, VBLANK_SAVE_SCREEN_SIZE);
 	wram_.scy() = 0;
 	mem_[rSCY] = 0;
 	wram_.scx() = 0;
@@ -190,9 +197,45 @@ void SaveScreen::switch_sram(uint8_t bank)
 // the "save complete" box, LCD on
 void SaveScreen::show_complete_box()
 {
-	routines_.call(ADDR_VBlank_Saving);
-	routines_.farcall(BANK_LoadSaveScreenPals, ADDR_LoadSaveScreenPals);
-	routines_.farcall(BANK_DrawSaveCompleteBox, ADDR_DrawSaveCompleteBox);
+	set_vblank_func(VBLANK_SAVING, VBLANK_SAVING_SIZE);
+	routines_.in_bank(BANK_LoadSaveScreenPals, ADDR_LoadSaveScreenPals, [&] { load_pals(); });
+	routines_.in_bank(BANK_DrawSaveCompleteBox, ADDR_DrawSaveCompleteBox,
+		[&] { draw_box(ADDR_SaveCompleteBoxAttrmap, ADDR_SaveCompleteBoxTilemap); });
+}
+
+// ---- bank7d.asm: the save screen's graphics ----
+
+void SaveScreen::load_pals() // LoadSaveScreenPals
+{
+	routines_.load_pals_to_temp_pals1(ADDR_Pals_1f628c);
+	routines_.load_pals_to_temp_pals2(ADDR_Pals_1f628c);
+}
+
+void SaveScreen::load_gfx() // LoadSaveScreenGfx
+{
+	mem_[rVBK] = 0;
+	// an hcall, though SaveBoxGfx is in this bank
+	routines_.in_bank(BANK_SaveBoxGfx, ADDR_Decompress, [&] { routines_.decompress(ADDR_SaveBoxGfx, v0Tiles0); });
+	mem_[wTempBank] = BANK_WarioSleepGfx;
+	routines_.far_copy(ADDR_WarioSleepGfx, v0Tiles0, 0x800); // FarCopyHLToDE_BC
+}
+
+// DrawSaveInProgressBox, DrawSaveCompleteBox
+void SaveScreen::draw_box(uint16_t attrmap, uint16_t tilemap)
+{
+	mem_[rVBK] = BANK_v1Tiles0; // BANK("VRAM1")
+	routines_.decompress(attrmap, v0BGMap0);
+	mem_[rVBK] = 0;
+	routines_.decompress(tilemap, v0BGMap0);
+}
+
+// ---- vblank.asm ----
+
+// VBlank_Saving, VBlank_SaveScreen: their .Func (save/vblank.cpp) to
+// wVBlankFunc
+void SaveScreen::set_vblank_func(uint16_t func, uint8_t size)
+{
+	routines_.copy(func, wVBlankFunc, size);
 }
 
 // The game's progress, in SRAM and its backup, each with its checksum.
@@ -282,3 +325,9 @@ PORT_COVERED(Save);
 PORT_COVERED(SaveLevel);
 PORT_COVERED(ResetAfterPauseMenuSave);
 PORT_COVERED(ResetAfterSave);
+PORT_COVERED(LoadSaveScreenPals);
+PORT_COVERED(LoadSaveScreenGfx);
+PORT_COVERED(DrawSaveInProgressBox);
+PORT_COVERED(DrawSaveCompleteBox);
+PORT_COVERED(VBlank_Saving);
+PORT_COVERED(VBlank_SaveScreen);

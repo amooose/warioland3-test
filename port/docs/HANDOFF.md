@@ -596,10 +596,13 @@ Modules so far:
   object), all clobbering every register. `SaveData` (save_data.cpp) is
   the checksums and the boot-time save validation, plain C++ called
   directly by `SaveScreen`; its one entry is `ValidateSaveData`
-  (ALL_REGISTERS: Start reads none after it). Still register-level: the
-  save screen's loaders (bank7d.cpp), its V-Blank functions
-  (save/vblank.cpp) and DrawLevelObjectsAfterLevelReturn (home code calls
-  it).
+  (ALL_REGISTERS: Start reads none after it). The save screen's loaders
+  (bank7d.asm) and V-Blank setters are `SaveScreen` methods, and
+  `PauseMenuStateTable` (a and f as pop_wram leaves them) calls
+  `PauseMenu` directly. Still register-level: the V-Blank functions'
+  bodies, run from wVBlankFunc (save/vblank.cpp), and
+  DrawLevelObjectsAfterLevelReturn (home code calls it; it farcalls
+  level-engine hooks).
 - **clear** (src/native/clear): the level clear screens (`ClearScreen`):
   treasure and music boxes, the time attack result, the musical coins tally
   with the pencil. The bank-$78 loaders run through `in_bank`. Still C: the

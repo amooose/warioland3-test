@@ -373,10 +373,19 @@ void PauseMenu::draw_time(uint16_t coord, uint16_t time)
 
 using wl3::pause::PauseMenu;
 
-// Called from PauseMenuStateTable (see src/ported/engine/pause/common.c).
-PORT_EX(_PauseMenuStateTable, 0, ALL_REGISTERS)
+// MainStateTable calls it and returns to the main loop, which reloads b to
+// l; a and f are left as pop_wram leaves them (the WRAM bank it read, the
+// entry's flags).
+PORT_EX(PauseMenuStateTable, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 {
-	PauseMenu(gb).run_state();
+	uint8_t flags = gb->cpu.f;
+	wl3::Memory mem(gb);
+	uint8_t wram_bank = mem[rWBK];
+	mem[rWBK] = 0x03; // BANK("GFX RAM")
+	wl3::Routines(gb).in_bank(BANK__PauseMenuStateTable, ADDR__PauseMenuStateTable, [&] { PauseMenu(gb).run_state(); });
+	mem[rWBK] = wram_bank;
+	gb->cpu.a = wram_bank;
+	gb->cpu.f = flags;
 }
 
 // Called from ReturnToPauseMenuFromActionHelp, whose caller (Action Help's
@@ -394,6 +403,7 @@ PORT_EX(LoadPauseMenuSprite, 0, ALL_REGISTERS)
 }
 
 // The routines implemented inside this module (they have no hooks).
+PORT_COVERED(_PauseMenuStateTable);
 PORT_COVERED(InitPauseMenu);
 PORT_COVERED(InitPauseMenu_SkipBackupVRAM);
 PORT_COVERED(UpdatePauseMenu);

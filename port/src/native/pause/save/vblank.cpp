@@ -12,29 +12,6 @@ class PauseSaveVblank : public AsmModule {
 public:
 	using AsmModule::AsmModule;
 
-	// ld hl, .Func / ld de, wVBlankFunc / ld b, .end - .Func / call CopyHLToDE
-	void set_vblank_func(uint16_t func, uint8_t size)
-	{
-		SET_HL(gb_, func);
-		SET_DE(gb_, wVBlankFunc);
-		cpu_.b = size;
-		CALL(CopyHLToDE);
-	}
-
-	// used for when game is actually writing data to SRAM
-	// only handles OAM and nothing else
-	void port_VBlank_Saving()
-	{
-		set_vblank_func(ADDR_VBlank_Saving + 0x0c, 0x06);
-	}
-
-	// used for when game is showing the save progress bar
-	// updates the bar progress by overwriting tile and attribute
-	void port_VBlank_SaveScreen()
-	{
-		set_vblank_func(ADDR_VBlank_SaveScreen + 0x0c, 0x23);
-	}
-
 	// VBlank_Saving.Func, as copied to wVBlankFunc (see ram_code.c). Its calls
 	// return to cpu_.pc + n, the block's start wherever it runs from.
 	void port_VBlank_Saving__Func()
@@ -77,7 +54,5 @@ public:
 
 using wl3::pause::PauseSaveVblank;
 
-PORT_EX(VBlank_Saving, 0, 0) { PauseSaveVblank(gb).port_VBlank_Saving(); }
-PORT_EX(VBlank_SaveScreen, 0, 0) { PauseSaveVblank(gb).port_VBlank_SaveScreen(); }
 PORT_LOCAL_EX(VBlank_Saving, Func, HOOK_MANUAL_RET, 0) { PauseSaveVblank(gb).port_VBlank_Saving__Func(); }
 PORT_LOCAL_EX(VBlank_SaveScreen, Func, HOOK_MANUAL_RET, 0) { PauseSaveVblank(gb).port_VBlank_SaveScreen__Func(); }

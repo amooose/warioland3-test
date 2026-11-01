@@ -3,9 +3,9 @@
 // treasures, and its state table.
 //
 // The save screens and saving (save.asm) are `SaveScreen`, the checksums
-// and save validation `SaveData`. Still register-level: the save screen's
-// graphics loaders (bank7d.cpp), its V-Blank functions (save/vblank.cpp),
-// and DrawLevelObjectsAfterLevelReturn, which home code calls.
+// and save validation `SaveData`. Still register-level: the V-Blank
+// functions' bodies run from wVBlankFunc (save/vblank.cpp), and
+// DrawLevelObjectsAfterLevelReturn, which home code calls.
 #pragma once
 
 #include "../menu_object.hpp"
@@ -84,6 +84,10 @@ private:
 	void write_echoes(uint8_t step, uint16_t echo1, uint16_t echo2, uint16_t sum);
 	void switch_sram(uint8_t bank); // sramswitch
 	void show_complete_box();
+	void load_pals(); // LoadSaveScreenPals
+	void load_gfx(); // LoadSaveScreenGfx
+	void draw_box(uint16_t attrmap, uint16_t tilemap); // DrawSaveInProgressBox, DrawSaveCompleteBox
+	void set_vblank_func(uint16_t func, uint8_t size); // VBlank_Saving, VBlank_SaveScreen
 
 	GB *gb_;
 	Memory mem_;
