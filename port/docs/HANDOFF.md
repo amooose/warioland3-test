@@ -620,7 +620,13 @@ Modules so far:
   (Pesce's, Yellow Belly's) take h's page as a parameter; their internal
   callers pass `wCurObjState & 0xff00`, never the address itself, and a
   `ld [hld]` pair is a 16-bit step (Jamano's Func_554bc with e = 0 writes
-  into the page before). Quirks kept: Nobiiru's sting
+  into the page before). Reading h after a home routine is only safe when
+  hl was set as the asm sets it before the call: routines that leave hl
+  alone (MoveWarioUp, HandleUpwardsFloorTransition without a transition,
+  MoveObject*_Slow returning early) pass whatever the hook got through
+  (Omodonmeka's .Func_426ee). Every object is C++ now (Anonster,
+  Omodonmeka, Shoot and Hidden Figure last): the old
+  src/ported/engine/level/objects is gone. Quirks kept: Nobiiru's sting
   step stores its new interaction type as the collision box's left (the
   asm reuses a). The jumptable objects (the rock, Nobiiru, the hand) use
   tables of handlers; the rock's is checked against the asm's dw list.
