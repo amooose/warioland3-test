@@ -446,7 +446,7 @@ void Overworld::finish_map_side()
 	if (at_exit)
 		clear_pal7_colours();
 	wram_.unk_2d0e0() = at_exit ? 0 : 1;
-	routines_.farcall(BANK_DrawCoinCount, ADDR_DrawCoinCount);
+	routines_.in_bank(BANK_DrawCoinCount, ADDR_DrawCoinCount, [&] { draw_coin_count(gb_); });
 	set_compass();
 	if (!wram_.ow_bars_state())
 		routines_.call(ADDR_DrawBottomBar);

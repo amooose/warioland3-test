@@ -14,35 +14,6 @@ public:
 
 	// and the levels call (the collection screen is C++, src/native/overworld)
 
-	// a = digit (low nibble): copies its 2 tiles from NumbersGfx to de
-	void draw_number()
-	{
-		cpu_.a = alu_.and_(cpu_.a, 0x0f);
-		cpu_.a = alu_.inc(cpu_.a);
-		uint16_t hl = ADDR_NumbersGfx;
-		SET_BC(gb_, 0x20);
-		for (;;) {
-			cpu_.a = alu_.dec(cpu_.a);
-			if (!cpu_.a)
-				break;
-			hl = alu_.add16(hl, 0x20);
-		}
-		SET_HL(gb_, hl);
-		cpu_.b = 0x20;
-		CALL(CopyHLToDE);
-	}
-
-	void port_DrawCoinCount()
-	{
-		SET_DE(gb_, v0Tiles1 + 0xa * TILE_SIZE);
-		cpu_.a = rd8(wNumCoins + 0);
-		draw_number();
-		cpu_.a = alu_.swap(rd8(wNumCoins + 1));
-		draw_number();
-		cpu_.a = rd8(wNumCoins + 1);
-		draw_number();
-	}
-
 	void port_ClearTreasureData()
 	{
 		cpu_.a = 0;
@@ -133,22 +104,6 @@ public:
 		SET_HL(gb_, wLevelTreasureIDs);
 		cpu_.b = NUM_LEVEL_TREASURES;
 		CALL(CopyHLToDE);
-	}
-
-	// c = treasure ID
-	// returns b = level
-	void port_GetLevelThatContainsTreasure()
-	{
-		cpu_.b = 0xff;
-		uint16_t hl = ADDR_LevelTreasureIDs;
-		do {
-			cpu_.b = alu_.inc(cpu_.b);
-			cpu_.a = rd8(hl++);
-			alu_.cp(cpu_.a, cpu_.c);
-		} while (!(cpu_.f & FLAG_Z));
-		SET_HL(gb_, hl);
-		cpu_.b = alu_.srl(cpu_.b);
-		cpu_.b = alu_.srl(cpu_.b);
 	}
 
 	void port_Func_9aaf4()
@@ -302,13 +257,11 @@ public:
 
 using wl3::overworld::OverworldBank26;
 
-PORT_EX(DrawCoinCount, 0, 0) { OverworldBank26(gb).port_DrawCoinCount(); }
 PORT_EX(ClearTreasureData, 0, 0) { OverworldBank26(gb).port_ClearTreasureData(); }
 PORT_EX(LoadLevelTreasures, 0, 0) { OverworldBank26(gb).port_LoadLevelTreasures(); }
 PORT_EX(LoadTreasurePals, 0, 0) { OverworldBank26(gb).port_LoadTreasurePals(); }
 PORT_EX(LoadTreasureTiles, 0, 0) { OverworldBank26(gb).port_LoadTreasureTiles(); }
 PORT_EX(FillBottomBarTreasureIDs, 0, 0) { OverworldBank26(gb).port_FillBottomBarTreasureIDs(); }
-PORT_EX(GetLevelThatContainsTreasure, 0, 0) { OverworldBank26(gb).port_GetLevelThatContainsTreasure(); }
 PORT_EX(Func_9aaf4, 0, 0) { OverworldBank26(gb).port_Func_9aaf4(); }
 PORT_EX(WriteUncollectedBottomBarTreasureIDs, 0, 0) { OverworldBank26(gb).port_WriteUncollectedBottomBarTreasureIDs(); }
 PORT_EX(LoadLevelTreasureData, 0, 0) { OverworldBank26(gb).port_LoadLevelTreasureData(); }

@@ -2,6 +2,7 @@
 // best_times/common.asm) the overworld modules call; see overworld.hpp.
 #include "overworld.hpp"
 
+#include "../home/memory.hpp"
 #include "../home/system.hpp"
 
 namespace wl3::overworld {
@@ -62,6 +63,33 @@ void check_best_times(GB *gb)
 		mem[wSubState] = SST_OVERWORLD_BEST_TIMES;
 }
 
+// DrawCoinCount (bank26.asm): wNumCoins's three BCD digits as tiles, from
+// NumbersGfx (two tiles a digit) to v0Tiles1 tile $0a on
+void draw_coin_count(GB *gb)
+{
+	Memory mem(gb);
+	uint8_t digits[3] = {static_cast<uint8_t>(mem[wNumCoins + 0] & 0x0f),
+		static_cast<uint8_t>(mem[wNumCoins + 1] >> 4), static_cast<uint8_t>(mem[wNumCoins + 1] & 0x0f)};
+	uint16_t dest = v0Tiles1 + 0xa * TILE_SIZE;
+	for (uint8_t digit : digits) {
+		home::copy(gb, static_cast<uint16_t>(ADDR_NumbersGfx + digit * 0x20), dest, 0x20);
+		dest += 0x20;
+	}
+}
+
+// GetLevelThatContainsTreasure (bank26.asm): LevelTreasureIDs has 4 a
+// level; searched until found
+uint8_t level_with_treasure(GB *gb, uint8_t treasure)
+{
+	Memory mem(gb);
+	uint16_t at = ADDR_LevelTreasureIDs;
+	uint8_t index = 0xff;
+	do
+		index++;
+	while (mem[at++] != treasure);
+	return index >> 2;
+}
+
 } // namespace wl3::overworld
 
 // Only the overworld modules (C++) call these.
@@ -71,3 +99,5 @@ PORT_COVERED(GetCrayonFlags);
 PORT_COVERED(Func_80bd9);
 PORT_COVERED(Func_803e6);
 PORT_COVERED(Func_80de0);
+PORT_COVERED(DrawCoinCount);
+PORT_COVERED(GetLevelThatContainsTreasure);

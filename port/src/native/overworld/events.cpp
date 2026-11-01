@@ -148,9 +148,10 @@ Events::SideLevel Events::next_treasure_side_level()
 	if (next != TREASURES_END) {
 		uint8_t event = event_with_treasure(next).event;
 		if (event <= EVENT_GOLD_MUSIC_BOX || (wram_.game_mode_flags() & (1 << MODE_GAME_CLEARED_F))) {
-			gb_->cpu.c = wram_.next_treasure();
-			routines_.farcall(BANK_GetLevelThatContainsTreasure, ADDR_GetLevelThatContainsTreasure);
-			return map_level_id(gb_->cpu.b);
+			uint8_t level = 0;
+			routines_.in_bank(BANK_GetLevelThatContainsTreasure, ADDR_GetLevelThatContainsTreasure,
+				[&] { level = level_with_treasure(gb_, wram_.next_treasure()); });
+			return map_level_id(level);
 		}
 	}
 	return {NORTH, OWNORTH_THE_TEMPLE};

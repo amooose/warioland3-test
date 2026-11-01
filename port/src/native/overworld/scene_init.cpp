@@ -219,7 +219,7 @@ void SceneInit::top_bar()
 	home::copy_far_bytes(gb_, BANK_Pals_84a20, ADDR_Pals_84a20, wTempPals2 + 4 * PAL_SIZE, 4 * PAL_SIZE);
 	place(wSceneObj5, {0x00, 0x60, 0x00});
 	routines_.in_bank(BANK_VBlank_Overworld, ADDR_VBlank_Overworld, [&] { set_vblank_overworld(gb_); });
-	routines_.farcall(BANK_DrawCoinCount, ADDR_DrawCoinCount);
+	routines_.in_bank(BANK_DrawCoinCount, ADDR_DrawCoinCount, [&] { draw_coin_count(gb_); });
 	mem_[wSceneObj6State] = 0;
 	mem_[wSceneObj7State] = 0;
 	mem_[wSceneObj2State] = 0;

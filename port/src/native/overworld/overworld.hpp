@@ -31,6 +31,8 @@ void get_crayon_flags(GB *gb); // GetCrayonFlags: to wCrayonFlags
 void clear_bottom_left_bg_priority(GB *gb); // Func_80bd9
 void save_after_level(GB *gb); // Func_803e6
 void check_best_times(GB *gb); // Func_80de0
+void draw_coin_count(GB *gb); // DrawCoinCount
+uint8_t level_with_treasure(GB *gb, uint8_t treasure); // GetLevelThatContainsTreasure
 
 class Overworld {
 public:
