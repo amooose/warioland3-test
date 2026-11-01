@@ -7,6 +7,7 @@
 #include "ram.hpp"
 
 extern "C" void port_farcall(GB *gb, int bank, uint16_t addr);
+extern "C" void port_farcall_ret(GB *gb, int bank, uint16_t addr, uint16_t ret);
 
 namespace wl3 {
 
@@ -20,6 +21,12 @@ public:
 	// the farcall macro: any routine, with the given ROM bank mapped
 	// (through hCallFunc)
 	void farcall(uint8_t bank, uint16_t addr) { port_farcall(gb_, bank, addr); }
+
+	// call and farcall pushing the original's return address (ret: the
+	// address after its call) rather than a sentinel, for code that reads
+	// the stack (the room drawing's queues, block functions)
+	void call_ret(uint16_t addr, uint16_t ret) { gb_call_ret(gb_, addr, ret); }
+	void farcall_ret(uint8_t bank, uint16_t addr, uint16_t ret) { port_farcall_ret(gb_, bank, addr, ret); }
 
 	// The farcall macro, for a routine of a C++ module: fn runs with bank
 	// mapped, leaving hCallFunc's bank and pointer (addr, the original
