@@ -17,6 +17,9 @@ struct SpriteEnd {
 	bool full;     // stopped by virtual OAM filling up
 };
 SpriteEnd load_sprite(GB *gb, uint16_t table);
+// for the hooks: the registers LoadSprite leaves (b and c the position,
+// de the data, hl virtual OAM, a and f from its last check)
+void set_sprite_regs(GB *gb, const SpriteEnd &end);
 
 // DrawWario: Wario's sprite from wWarioOAMBank/Ptr, unless he's invisible
 // (or blinking); whether he was drawn, and where the sprite ended

@@ -12,145 +12,6 @@ class HomeOverworld : public AsmModule {
 public:
 	using AsmModule::AsmModule;
 
-	// ld a, [wROMBank] / push af / ld a, b / bankswitch
-	void push_bank_switch_to_b()
-	{
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = cpu_.b;
-		bankswitch(cpu_.a);
-	}
-
-	// pop af / bankswitch
-	void pop_bank()
-	{
-		pop_af();
-		bankswitch(cpu_.a);
-	}
-
-	// input:
-	// - hl = wSceneObjXDuration
-	// - de = frameset pointer
-	// - b  = bank
-	// output:
-	// - bc = wSceneObjXState
-	// - hl = wSceneObjYCoord
-	void port_UpdateOWAnimation()
-	{
-		wr8(wOWAnimationFinished, 0);
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a, pushed with the bank below
-		push_bank_switch_to_b();
-
-		uint16_t hl = REG_HL(gb_);
-		uint8_t duration = rd8(hl);
-		wr8(hl++, (uint8_t)(duration - 1));
-		if (duration == 0) {
-			// next frame: frameset entries are (frame, duration) pairs
-			uint8_t offset = rd8(hl);
-			uint16_t de = REG_DE(gb_);
-			uint16_t entry = (uint16_t)(de + offset);
-			uint8_t frame = rd8(entry);
-			if (frame == 0xff) {
-				// frameset end: restart from its beginning
-				wr8(wOWAnimationFinished, frame);
-				entry = de;
-				frame = rd8(de);
-				offset = 0;
-			}
-			cpu_.d = frame;
-			wr8(hl--, (uint8_t)(offset + 2)); // frameset offset
-			entry++;
-			wr8(hl--, (uint8_t)(rd8(entry) - 1)); // duration
-			hl = (uint16_t)((hl & 0xff00) | ((hl - 1) & 0xff)); // dec l
-			wr8(hl, frame);
-		}
-
-		// point to the start of the scene object, and its state
-		uint8_t l = hl & 0xf8;
-		cpu_.h = (uint8_t)(hl >> 8);
-		cpu_.l = l;
-		cpu_.b = cpu_.h;
-		cpu_.c = (uint8_t)(l + 6);
-		pop_bank();
-	}
-
-	// copies c bytes from b:hl to de
-	void port_CopyFarBytes()
-	{
-		push_bank_switch_to_b();
-		cpu_.b = cpu_.c;
-		CALL(CopyHLToDE);
-		pop_bank();
-	}
-
-	// copies c * $100 bytes from bank b
-	// at address hl to de
-	void port_CopyFarBytes_Long()
-	{
-		push_bank_switch_to_b();
-		cpu_.b = cpu_.c;
-		cpu_.c = 0;
-		CALL(CopyHLToDE_BC);
-		pop_bank();
-	}
-
-	void port_LoadFarTiles()
-	{
-		push_bank_switch_to_b();
-		SET_BC(gb_, 0x80 * TILE_SIZE);
-		SET_DE(gb_, v0Tiles2);
-		CALL(CopyHLToDE_BC);
-		pop_bank();
-	}
-
-	// sets scene obj's state and
-	// resets its animation data
-	// a = state
-	void port_SetSceneObjState()
-	{
-		uint16_t hl = REG_HL(gb_);
-		wr8(hl--, cpu_.a);
-		wr8(hl--, 0);
-		wr8(hl, 0);
-		SET_HL(gb_, hl);
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-	}
-
-	void port_LoadFarPalsToTempPals1()
-	{
-		push_bank_switch_to_b();
-		CALL(LoadPalsToTempPals1);
-		pop_bank();
-	}
-
-	void port_LoadFarPalsToTempPals2()
-	{
-		push_bank_switch_to_b();
-		CALL(LoadPalsToTempPals2);
-		pop_bank();
-	}
-
-	// hl = OAM data
-	// b = sprite bank
-	// de = pointer to sprite
-	void port_LoadOWSprite()
-	{
-		uint16_t hl = REG_HL(gb_);
-		cpu_.c = 0x10;
-		wr8(wCurSpriteYCoord, alu_.add(rd8(hl++), cpu_.c));
-		cpu_.c = 0x08;
-		wr8(wCurSpriteXCoord, alu_.add(rd8(hl++), cpu_.c));
-		wr8(wCurSpriteFrame, rd8(hl++));
-		wr8(wCurSpriteAttributes, rd8(hl));
-
-		SET_HL(gb_, REG_DE(gb_));
-		push_bank_switch_to_b();
-		CALL(LoadSprite);
-		pop_bank();
-	}
-
 	// returns TRUE in a and carry set if treasure
 	// in input a has already been collected
 	// if not collected returns z set
@@ -198,18 +59,6 @@ public:
 		SET_HL(gb_, alu_.add16(REG_HL(gb_), REG_DE(gb_)));
 	}
 
-	// b = OAM bank, hl = OAM
-	void port_LoadOWSpriteWithScroll_GotParams()
-	{
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = cpu_.b;
-		bankswitch(cpu_.a);
-		CALL(LoadSprite);
-		pop_af();
-		bankswitch(cpu_.a);
-	}
-
 	// ld a, [hli] / ld h, [hl] / ld l, a, with the second register pair
 	// written to hi:lo
 	void load_pointer(uint8_t *hi, uint8_t *lo)
@@ -253,30 +102,6 @@ public:
 	{
 		load_pointer(&cpu_.h, &cpu_.l);
 		cpu_.a = rd8(REG_HL(gb_));
-	}
-
-	// b = sprite bank
-	// de = pointer to sprite
-	// hl = y, x, frame and attributes (relative to the BG)
-	void port_LoadOWSpriteWithScroll()
-	{
-		uint16_t hl = REG_HL(gb_);
-		cpu_.c = rd8(wSCY);
-		cpu_.a = alu_.sub(rd8(hl++), cpu_.c);
-		cpu_.c = 0x10;
-		cpu_.a = alu_.add(cpu_.a, cpu_.c);
-		wr8(wCurSpriteYCoord, cpu_.a);
-		cpu_.c = rd8(wSCX);
-		cpu_.a = alu_.sub(rd8(hl++), cpu_.c);
-		cpu_.c = 0x08;
-		cpu_.a = alu_.add(cpu_.a, cpu_.c);
-		wr8(wCurSpriteXCoord, cpu_.a);
-		wr8(wCurSpriteFrame, rd8(hl++));
-		cpu_.a = rd8(hl);
-		wr8(wCurSpriteAttributes, cpu_.a);
-		cpu_.h = cpu_.d;
-		cpu_.l = cpu_.e;
-		JUMP(LoadOWSpriteWithScroll_GotParams); // fallthrough
 	}
 
 	// hl = y, x in pixels
@@ -324,24 +149,6 @@ public:
 		cpu_.f = FLAG_Z; // xor a
 		cpu_.a = 32 - 1; // 32 dma_tiles
 		wr8(w2d0b5Mode, cpu_.a);
-	}
-
-	// play_music2: sets hMusicIDBackup and hMusicID
-	void play_music2(uint16_t music)
-	{
-		cpu_.a = (uint8_t)(music >> 8);
-		wr8(hMusicIDBackup + 0, cpu_.a);
-		wr8(hMusicID + 0, cpu_.a);
-		cpu_.a = (uint8_t)music;
-		wr8(hMusicIDBackup + 1, cpu_.a);
-		wr8(hMusicID + 1, cpu_.a);
-	}
-
-	void port_PlayOverworldMusic()
-	{
-		cpu_.a = rd8(w2d011);
-		bool night = alu_.and_(cpu_.a, cpu_.a) != 0;
-		play_music2(night ? MUSIC_OVERWORLD_NIGHT : MUSIC_OVERWORLD_DAY);
 	}
 
 	// a = value to write to [bc]
@@ -484,25 +291,14 @@ public:
 
 using wl3::home::HomeOverworld;
 
-PORT_EX(UpdateOWAnimation, 0, 0) { HomeOverworld(gb).port_UpdateOWAnimation(); }
-PORT_EX(CopyFarBytes, 0, 0) { HomeOverworld(gb).port_CopyFarBytes(); }
-PORT_EX(CopyFarBytes_Long, 0, 0) { HomeOverworld(gb).port_CopyFarBytes_Long(); }
-PORT_EX(LoadFarTiles, 0, 0) { HomeOverworld(gb).port_LoadFarTiles(); }
-PORT_EX(SetSceneObjState, 0, 0) { HomeOverworld(gb).port_SetSceneObjState(); }
-PORT_EX(LoadFarPalsToTempPals1, 0, 0) { HomeOverworld(gb).port_LoadFarPalsToTempPals1(); }
-PORT_EX(LoadFarPalsToTempPals2, 0, 0) { HomeOverworld(gb).port_LoadFarPalsToTempPals2(); }
-PORT_EX(LoadOWSprite, 0, 0) { HomeOverworld(gb).port_LoadOWSprite(); }
 PORT_EX(IsTreasureCollected, 0, 0) { HomeOverworld(gb).port_IsTreasureCollected(); }
 PORT_EX(AddOffsetInPointerTable, 0, 0) { HomeOverworld(gb).port_AddOffsetInPointerTable(); }
-PORT_EX(LoadOWSpriteWithScroll_GotParams, 0, 0) { HomeOverworld(gb).port_LoadOWSpriteWithScroll_GotParams(); }
 PORT_EX(GetPointerFromTableHL, 0, 0) { HomeOverworld(gb).port_GetPointerFromTableHL(); }
 PORT_EX(GetPointerFromTableDE, 0, 0) { HomeOverworld(gb).port_GetPointerFromTableDE(); }
 PORT_EX(GetCthWordFromAthTable, 0, 0) { HomeOverworld(gb).port_GetCthWordFromAthTable(); }
 PORT_EX(GetByteFromPointerInHL, 0, 0) { HomeOverworld(gb).port_GetByteFromPointerInHL(); }
-PORT_EX(LoadOWSpriteWithScroll, HOOK_MANUAL_RET, 0) { HomeOverworld(gb).port_LoadOWSpriteWithScroll(); }
 PORT_EX(GetOWCoordInTilemap, 0, 0) { HomeOverworld(gb).port_GetOWCoordInTilemap(); }
 PORT_EX(LoadLevelName, 0, 0) { HomeOverworld(gb).port_LoadLevelName(); }
-PORT_EX(PlayOverworldMusic, 0, 0) { HomeOverworld(gb).port_PlayOverworldMusic(); }
 PORT_EX(Func_3c29, 0, 0) { HomeOverworld(gb).port_Func_3c29(); }
 PORT_EX(Func_3c35, 0, 0) { HomeOverworld(gb).port_Func_3c35(); }
 PORT_EX(Func_3c03, 0, 0) { HomeOverworld(gb).port_Func_3c03(); }

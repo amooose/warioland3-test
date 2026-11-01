@@ -224,6 +224,17 @@ void backup_vram(GB *gb, bool save)
 
 } // namespace
 
+void set_sprite_regs(GB *gb, const SpriteEnd &end)
+{
+	Memory mem(gb);
+	gb->cpu.b = mem[wCurSpriteYCoord];
+	gb->cpu.c = mem[wCurSpriteXCoord];
+	SET_DE(gb, end.data);
+	SET_HL(gb, static_cast<uint16_t>((wVirtualOAM & 0xff00) | end.oam));
+	gb->cpu.a = end.full ? end.oam : 0x80;
+	gb->cpu.f = end.full ? flags::cp(end.oam, OAM_SIZE) : flags::cp(0x80, 0x80);
+}
+
 void save_backup_vram(GB *gb)
 {
 	backup_vram(gb, true);
@@ -241,17 +252,6 @@ namespace flags = wl3::flags;
 
 namespace {
 
-// LoadSprite's b, c, de, hl, and a and f from its last check
-void sprite_regs(GB *gb, const SpriteEnd &end)
-{
-	wl3::Memory mem(gb);
-	gb->cpu.b = mem[wCurSpriteYCoord];
-	gb->cpu.c = mem[wCurSpriteXCoord];
-	SET_DE(gb, end.data);
-	SET_HL(gb, static_cast<uint16_t>((wVirtualOAM & 0xff00) | end.oam));
-	gb->cpu.a = end.full ? end.oam : 0x80;
-	gb->cpu.f = end.full ? flags::cp(end.oam, OAM_SIZE) : flags::cp(0x80, 0x80);
-}
 
 // An animation step's registers: hl where it last wrote (the offset, the
 // duration on a reset, the duration again on a new frame), bc the entry,
@@ -280,7 +280,7 @@ void anim_regs(GB *gb, const AnimStep &s, uint16_t offset, uint16_t duration, ui
 
 PORT_EX(LoadSprite, 0, 0)
 {
-	sprite_regs(gb, load_sprite(gb, REG_HL(gb)));
+	set_sprite_regs(gb, load_sprite(gb, REG_HL(gb)));
 }
 
 // a and f are popped from the push before the bankswitch (the bank it came
@@ -292,7 +292,7 @@ PORT_EX(DrawWario, 0, 0)
 	uint8_t bank = mem[wROMBank];
 	SpriteEnd end;
 	if (draw_wario(gb, &end)) {
-		sprite_regs(gb, end);
+		set_sprite_regs(gb, end);
 		gb->cpu.a = bank;
 		gb->cpu.f = invisible ? flags::cp(0xf0, 0xf0) : flags::and_(0);
 		return;
@@ -384,7 +384,7 @@ static uint8_t x_add_flags(GB *gb, uint16_t obj)
 
 static void loaded_sprite_regs(GB *gb, uint8_t bank, uint8_t f, const SpriteEnd &end)
 {
-	sprite_regs(gb, end);
+	set_sprite_regs(gb, end);
 	gb->cpu.a = bank;
 	gb->cpu.f = f;
 }

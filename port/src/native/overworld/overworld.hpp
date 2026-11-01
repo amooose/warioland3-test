@@ -11,6 +11,7 @@
 #pragma once
 
 #include "../menu_object.hpp"
+#include "../home/ow.hpp"
 #include "../routines.hpp"
 #include <initializer_list>
 
@@ -28,7 +29,7 @@ private:
 	// a routine still in C taking a, and its result: a, or the Z flag
 	uint8_t call_a(uint16_t addr, uint8_t a);
 	bool call_z(uint16_t addr, uint8_t a);
-	bool treasure_collected(uint8_t treasure) { return call_a(ADDR_IsTreasureCollected, treasure); }
+	bool treasure_collected(uint8_t treasure) { return home::is_treasure_collected(gb_, treasure); }
 	void set_compass(); // SetCompassSprite
 	void load_compass(); // LoadCompassSprite
 	void stop_music() { stop_music2(mem_); }
