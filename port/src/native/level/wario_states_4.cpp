@@ -546,7 +546,7 @@ public:
 		CALL(SetWarioPal);
 		load_gfx(BANK_WarioSnowballGfx, ADDR_WarioSnowballGfx);
 		set_oam(BANK_OAM_1ffa12, ADDR_OAM_1ffa12);
-		st(wDirection, rd8(wObjDirection));
+		wr8(wDirection, rd8(wObjDirection));
 		frameset_by_dir(ADDR_Frameset_1ffd16, ADDR_Frameset_1ffd10);
 		anim(OAM2);
 	}
@@ -999,11 +999,10 @@ public:
 			return;
 		}
 		wr8(wWarioState, WST_BALL_START);
-		xor_a();
 		wr8(wSFXLoopCounter, 0);
 		wr8(wWarioStateCounter, 0);
 		wr8(wWarioStateCycles, 0);
-		st(wJumpVelIndex, 0x18);
+		wr8(wJumpVelIndex, 0x18);
 		reset_anim();
 		set_frameset(ADDR_Frameset_1dd313);
 		anim(OAM3);
@@ -2025,14 +2024,20 @@ PORT_COVERED(Func_1edaca);
 PORT_COVERED(Func_1edaf8);
 PORT_COVERED(SetState_SnowmanAirborne_Fall);
 PORT_COVERED(SetState_SnowmanAirborne_Jump);
-PORT_EX(SetState_Swallowed, 0, 0) { WarioStates4(gb).port_SetState_Swallowed(); }
+// its callers (all in the Wario states and interactions) read no a, f or b after it
+PORT_EX(SetState_Swallowed, 0, R_A | R_F | R_B) { WarioStates4(gb).port_SetState_Swallowed(); }
 PORT_EX(SetState_FanStart, 0, 0) { WarioStates4(gb).port_SetState_FanStart(); }
-PORT_EX(SetState_IceSkatinStart, 0, 0) { WarioStates4(gb).port_SetState_IceSkatinStart(); }
+// its callers (all in the Wario states and interactions) read no a, f or b after it
+PORT_EX(SetState_IceSkatinStart, 0, R_A | R_F | R_B) { WarioStates4(gb).port_SetState_IceSkatinStart(); }
 PORT_COVERED(HandleWarioOwlInput);
-PORT_EX(SetState_SplitHit, 0, 0) { WarioStates4(gb).port_SetState_SplitHit(); }
-PORT_EX(SetState_TurningIntoSnowman, 0, 0) { WarioStates4(gb).port_SetState_TurningIntoSnowman(); }
-PORT_EX(SetState_Launched, 0, 0) { WarioStates4(gb).port_SetState_Launched(); }
-PORT_EX(SetState_MagicRising, 0, 0) { WarioStates4(gb).port_SetState_MagicRising(); }
+// its callers (all in the Wario states and interactions) read no a, f or b after it
+PORT_EX(SetState_SplitHit, 0, R_A | R_F | R_B) { WarioStates4(gb).port_SetState_SplitHit(); }
+// its callers (all in the Wario states and interactions) read no a, f or b after it
+PORT_EX(SetState_TurningIntoSnowman, 0, R_A | R_F | R_B) { WarioStates4(gb).port_SetState_TurningIntoSnowman(); }
+// its callers (all in the Wario states and interactions) read no a, f or b after it
+PORT_EX(SetState_Launched, 0, R_A | R_F | R_B) { WarioStates4(gb).port_SetState_Launched(); }
+// its callers (all in the Wario states and interactions) read no a, f or b after it
+PORT_EX(SetState_MagicRising, 0, R_A | R_F | R_B) { WarioStates4(gb).port_SetState_MagicRising(); }
 PORT_COVERED(UpdateState_BallShot);
 PORT_COVERED(TurnIntoSmallSnowball);
 PORT_EX(Func_1ec215, 0, 0) { WarioStates4(gb).port_Func_1ec215(); }
@@ -2050,7 +2055,8 @@ PORT_COVERED(UpdateState_BallSentUpwards);
 PORT_COVERED(UpdateState_MagicRising);
 PORT_COVERED(UpdateState_Launched);
 PORT_COVERED(UpdateState_BallThrown);
-PORT_EX(SetState_BallStart, 0, 0) { WarioStates4(gb).port_SetState_BallStart(); }
+// its callers (all in the Wario states and interactions) read no a, f or b after it
+PORT_EX(SetState_BallStart, 0, R_A | R_F | R_B) { WarioStates4(gb).port_SetState_BallStart(); }
 PORT_COVERED(Func_1ee00f);
 PORT_COVERED(Func_1ee02e);
 PORT_COVERED(UpdateState_IceSkatin);

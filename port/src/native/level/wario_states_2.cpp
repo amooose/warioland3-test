@@ -967,7 +967,6 @@ public:
 	void port_SetState_GetTreasureLookFront()
 	{
 		wr8(wWarioState, WST_GET_TREASURE_LOOK_FRONT);
-		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		wr8(wWarioStateCounter, 0);
@@ -1016,7 +1015,6 @@ public:
 		wr8(wWarioStateCycles, 0);
 		load_gfx(BANK_WarioIdleGfx, ADDR_WarioIdleGfx);
 		set_oam(BANK_OAM_14000, ADDR_OAM_14000);
-		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		frameset_by_dir(ADDR_Frameset_1421c, ADDR_Frameset_14225);
@@ -1540,7 +1538,8 @@ PORT_COVERED(UpdateState_GetTreasureTurnWalk);
 PORT_COVERED(SetState_GetTreasureLookFront);
 PORT_COVERED(UpdateState_GetTreasureLookFront);
 PORT_COVERED(UpdateState_GetTreasureClear);
-PORT_EX(SetState_Sleeping, 0, 0) { WarioStates2(gb).port_SetState_Sleeping(); }
+// its callers (all in the Wario states and interactions) read no a, f or b after it
+PORT_EX(SetState_Sleeping, 0, R_A | R_F | R_B) { WarioStates2(gb).port_SetState_Sleeping(); }
 PORT_COVERED(UpdateState_Sleeping);
 PORT_COVERED(SetState_LadderScratching);
 PORT_COVERED(UpdateState_LadderScratching);

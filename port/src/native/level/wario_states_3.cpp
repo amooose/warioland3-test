@@ -3614,7 +3614,8 @@ PORT_COVERED(SetState_FatLanding);
 PORT_COVERED(SetState_FatRecovering);
 PORT_COVERED(SetState_BallOString);
 PORT_COVERED(SetState_BallOStringKnockBack);
-PORT_EX(SetState_ZombieIdling, 0, 0) { WarioStates3(gb).port_SetState_ZombieIdling(); }
+// its callers (all in the Wario states and interactions) read no a, f or b after it
+PORT_EX(SetState_ZombieIdling, 0, R_A | R_F | R_B) { WarioStates3(gb).port_SetState_ZombieIdling(); }
 PORT_COVERED(SetState_ZombieWalking);
 PORT_COVERED(SetState_ZombieTurning);
 PORT_COVERED(SetState_ZombieAirborne);
@@ -3656,7 +3657,8 @@ PORT_COVERED(UpdateState_FatTurning);
 PORT_COVERED(UpdateState_BouncyCeiling);
 PORT_EX(SetState_FlatSquishedLifting, 0, 0) { WarioStates3(gb).port_SetState_FlatSquishedLifting(); }
 PORT_COVERED(UpdateState_GettingUnwrappedInString);
-PORT_EX(Func_2ac7d, 0, 0) { WarioStates3(gb).port_Func_2ac7d(); }
+// its callers (all in the Wario states and interactions) read no a, f or b after it
+PORT_EX(Func_2ac7d, 0, R_A | R_F | R_B) { WarioStates3(gb).port_Func_2ac7d(); }
 PORT_EX(SetState_VampireTransforming, 0, 0) { WarioStates3(gb).port_SetState_VampireTransforming(); }
 PORT_COVERED(SetState_VampireIdling);
 PORT_EX(SetState_FlatIdling, 0, 0) { WarioStates3(gb).port_SetState_FlatIdling(); }
@@ -3673,7 +3675,8 @@ PORT_COVERED(UpdateState_FatLanding);
 PORT_COVERED(SetState_FlatWalking);
 PORT_EX(SetState_FlatFalling, 0, 0) { WarioStates3(gb).port_SetState_FlatFalling(); }
 PORT_COVERED(Func_29317);
-PORT_EX(SetState_TurningInvisible, 0, 0) { WarioStates3(gb).port_SetState_TurningInvisible(); }
+// its callers (all in the Wario states and interactions) read no a, f or b after it
+PORT_EX(SetState_TurningInvisible, 0, R_A | R_F | R_B) { WarioStates3(gb).port_SetState_TurningInvisible(); }
 PORT_COVERED(SetState_CrazyTurning);
 PORT_COVERED(SetState_VampireTurning);
 PORT_COVERED(SetState_CrazyAirborne);
@@ -3700,8 +3703,10 @@ PORT_COVERED(UpdateState_FatEating);
 PORT_COVERED(UpdateState_FlatSinking);
 PORT_EX(Func_2ad6a, 0, 0) { WarioStates3(gb).port_Func_2ad6a(); }
 PORT_COVERED(SetState_Crazy);
-PORT_EX(SetState_CrazySpinning, 0, 0) { WarioStates3(gb).port_SetState_CrazySpinning(); }
-PORT_EX(SetState_PuffyInflating, 0, 0) { WarioStates3(gb).port_SetState_PuffyInflating(); }
+// its callers (all in the Wario states and interactions) read no a, f or b after it
+PORT_EX(SetState_CrazySpinning, 0, R_A | R_F | R_B) { WarioStates3(gb).port_SetState_CrazySpinning(); }
+// its callers (all in the Wario states and interactions) read no a, f or b after it
+PORT_EX(SetState_PuffyInflating, 0, R_A | R_F | R_B) { WarioStates3(gb).port_SetState_PuffyInflating(); }
 PORT_COVERED(UpdateState_GettingFlatAirborne);
 PORT_EX(SetState_FlatAirborne, 0, 0) { WarioStates3(gb).port_SetState_FlatAirborne(); }
 PORT_COVERED(UpdateState_FatBumping);

@@ -555,7 +555,7 @@ public:
 			wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 		play_sfx(SFX_03A);
 		CALL(UpdateLevelMusic);
-		st(wWarioState, WST_FAT_EATING);
+		wr8(wWarioState, WST_FAT_EATING);
 		collision_box(-1, -27, -9, 9);
 		reset_anim();
 		load_gfx(BANK_WarioFatGfx, ADDR_WarioFatGfx);
@@ -573,7 +573,7 @@ public:
 		cpu_.b = OBJACTION_06;
 		port_SetObjAction();
 
-		if (ld_and(wInvincibleCounter))
+		if (rd8(wInvincibleCounter))
 			return;
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F))
 			return;
@@ -659,7 +659,7 @@ public:
 	void port_ObjInteraction_InvisibilityPotion()
 	{
 		port_Func_20a63();
-		if (ld_and(wInvincibleCounter))
+		if (rd8(wInvincibleCounter))
 			return;
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F))
 			return;
@@ -673,7 +673,7 @@ public:
 	{
 		cpu_.b = OBJACTION_06;
 		port_SetObjAction();
-		if (ld_and(wIsRolling))
+		if (rd8(wIsRolling))
 			return;
 		ld(wObjDirection);
 		wr8(wDirection, cpu_.a);
@@ -696,8 +696,7 @@ public:
 		port_SetObjAction();
 		wr8(wTransformation, TRANSFORMATION_VAMPIRE_WARIO);
 		FARCALL(Func_19b25);
-		ld_cp(wTransformation, TRANSFORMATION_VAMPIRE_WARIO);
-		if (!ZF)
+		if (rd8(wTransformation) != TRANSFORMATION_VAMPIRE_WARIO)
 			return;
 		FARCALL(SetState_VampireTransforming);
 	}
@@ -850,7 +849,7 @@ public:
 		reset_anim();
 		load_gfx(BANK_WarioHangGfx, ADDR_WarioHangGfx);
 		set_oam(BANK_OAM_1fee05, ADDR_OAM_1fee05);
-		st(wDirection, rd8(wObjDirection));
+		wr8(wDirection, rd8(wObjDirection));
 		set_frameset(ADDR_Frameset_1feec4);
 		anim(OAM2);
 	}
@@ -1089,7 +1088,6 @@ public:
 		}
 		port_Func_20a63();
 		wr8(wTransformation, TRANSFORMATION_SNOWMAN_WARIO);
-		xor_a();
 		wr8(wTransformationProgress, 0);
 		touch_states(TOUCH_ATTACK, 0x02);
 		FARCALL(SetState_TurningIntoSnowman);
@@ -1346,7 +1344,7 @@ public:
 			port_Func_20899();
 			return;
 		}
-		if (!ld_and(wObjDirection))
+		if (!rd8(wObjDirection))
 			sting_or_bump(INTERACTION_RIGHT_F);
 		else
 			sting_or_bump(INTERACTION_LEFT_F);
@@ -1363,8 +1361,7 @@ public:
 			port_Func_207ed();
 			return;
 		}
-		ld_cp(wObjDirection, DIRECTION_RIGHT);
-		if (ZF)
+		if (rd8(wObjDirection) == DIRECTION_RIGHT)
 			sting_or_bump(INTERACTION_LEFT_F);
 		else
 			sting_or_bump(INTERACTION_RIGHT_F);
@@ -2232,7 +2229,6 @@ public:
 				idle(32);
 			while ((cpu_.a = alu_.and_(rd8(rSTAT), STAT_MODE)))
 				idle(32);
-			xor_a();
 			for (int i = 0; i < 2 * PAL_SIZE; i++)
 				wr8((uint16_t)(0xff00 + cpu_.c), 0);
 			cpu_.b = alu_.dec(cpu_.b);
@@ -2732,7 +2728,7 @@ public:
 		clear(zero);
 		cpu_.a = alu_.inc(cpu_.a);
 		wr8(wJumpVelTable, cpu_.a);
-		st(wPickedUpWiggleCounter, NUM_WIGGLES_TO_ESCAPE);
+		wr8(wPickedUpWiggleCounter, NUM_WIGGLES_TO_ESCAPE);
 		load_gfx(BANK_WarioAirborneGfx, ADDR_WarioAirborneGfx);
 		set_oam(BANK_OAM_15955, ADDR_OAM_15955);
 		frameset_by_dir(ADDR_Frameset_15f70, ADDR_Frameset_15f7f);
@@ -2793,7 +2789,6 @@ public:
 			wJumpVelIndex, 0};
 		clear(zero);
 		CALL(UpdateLevelMusic);
-		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		load_gfx(BANK_WarioHangGfx, ADDR_WarioHangGfx);
