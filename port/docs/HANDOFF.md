@@ -507,7 +507,19 @@ primitives, home/wario.cpp, and the golf objects' animation):
   files. The scripted passes have reached their limit here: what's left
   is rewriting routines by hand to take arguments and return values
   (the collision checks returning their result first, since most of the
-  remaining b and flag traffic comes from them).
+  remaining b and flag traffic comes from them). Done at the call sites
+  (06c5289: centre_collision() etc., the farcall plus ld a, b / and a).
+- collisions.cpp itself: no recording ever unwinds. With a print in
+  call_ret's may_unwind path (outside tests), all 14 recordings ran with
+  none: the block functions' push/pop pairs balance, and only a fuzzed
+  block function table makes ProcessBlock pop past its caller or come
+  back in another bank. So a plain rewrite can flag those cases
+  unrealistic under test (inconclusive, as for other unreachable fuzzed
+  states) instead of emulating them: each check computes its points from
+  Wario's position and box, calls GetBlockPtr and ProcessBlock (the
+  block functions stay register-level for now) and returns the result
+  ProcessBlock leaves in a. Keep the hooks as wrappers with the asm's
+  registers for the register-level callers (objects, block functions).
 - Home's level-tied files (load_room, load_level, decompress_level_data,
   door/floor/room transitions, wario_mechanics1, object_mechanics,
   object_pos, IsOnSlipperyGround) go with the level code that calls
