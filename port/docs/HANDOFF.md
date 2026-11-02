@@ -484,8 +484,17 @@ primitives, home/wario.cpp, and the golf objects' animation):
   through the object action tables (targets in other files), so each
   jump needs deciding whether its target keeps a hook. Take it with the
   objects' own cleanup.
-- Next: the handler bodies' registers -> locals (Wario states,
-  interactions), a handler at a time.
+- Registers -> plain memory, first pass done (7ad245e, 544 sites): a
+  script (locals.py in the session scratchpad) rewrites st / xor_a /
+  ld_and / ld_bit / ld_mask / ld_cp + flag test where the a and flags
+  they set are dead on every path: both sides of a condition, else
+  branches, block ends, labels and returns (a function's end counts as a
+  read unless the dispatcher's caller reloads everything), and calls that
+  pass a (CALL, LCALL, member calls; FARCALL sets a itself). An
+  assignment whose right side reads a is a read. What's left of the
+  register helpers is where a value really flows (cpu_.b into
+  MoveWario*, b_and() after collision checks...): the next pass turns
+  those into arguments and return values, routine by routine.
 - Home's level-tied files (load_room, load_level, decompress_level_data,
   door/floor/room transitions, wario_mechanics1, object_mechanics,
   object_pos, IsOnSlipperyGround) go with the level code that calls
