@@ -89,7 +89,6 @@ public:
 		cpu_.a = alu_.bit(cpu_.a, OBJSUBFLAG_HDIR_F) ? DIRECTION_RIGHT : DIRECTION_LEFT;
 		wr8(wObjDirection, cpu_.a);
 
-		xor_a();
 		wr8(wInteractionSide, 0);
 		cpu_.a = 0xff;
 		wr8(wc1c2, 0xff);
@@ -370,7 +369,7 @@ public:
 
 	void port_SetState_OnFire()
 	{
-		st(wWarioState, WST_ON_FIRE);
+		wr8(wWarioState, WST_ON_FIRE);
 		static const uint16_t zero[] = {wInvisibleFrame, wSFXLoopCounter, wWarioStateCycles,
 			wGrabState, wAttackCounter, wJumpVelIndex, wJumpVelTable, wIsCrouching, wIsRolling,
 			wIsSmashAttacking, 0};
@@ -463,8 +462,8 @@ public:
 
 	void port_SetState_FlatStretching()
 	{
-		st(wAutoMoveState, 0x01);
-		st(wWarioState, WST_FLAT_STRETCHING);
+		wr8(wAutoMoveState, 0x01);
+		wr8(wWarioState, WST_FLAT_STRETCHING);
 		collision_box(-1, -8, -11, 11);
 		st(wPickedUpWiggleCounter, NUM_WIGGLES_TO_ESCAPE);
 		static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wFrameDuration,
@@ -509,12 +508,12 @@ public:
 	void port_SetState_EnemyBumping()
 	{
 		play_sfx(SFX_BUMP);
-		st(wJumpVelIndex, 0x0e);
-		st(wJumpVelTable, 0x01);
+		wr8(wJumpVelIndex, 0x0e);
+		wr8(wJumpVelTable, 0x01);
 		static const uint16_t zero[] = {wFrameDuration, wAnimationFrame, wWarioStateCounter,
 			wWarioStateCycles, wIsSmashAttacking, wGrabState, 0};
 		clear(zero);
-		st(wWarioState, WST_ENEMY_BUMPING);
+		wr8(wWarioState, WST_ENEMY_BUMPING);
 		load_gfx(BANK_WarioWalkGfx, ADDR_WarioWalkGfx);
 		set_oam(BANK_OAM_1426c, ADDR_OAM_1426c);
 		if (ld_and(wIsCrouching))
@@ -543,16 +542,16 @@ public:
 			return;
 		}
 		port_Func_20a63();
-		st(wTransformation, TRANSFORMATION_FAT_WARIO);
+		wr8(wTransformation, TRANSFORMATION_FAT_WARIO);
 		touch_states(TOUCH_BUMP, 0x02);
-		st(wTransformationDuration + 0, (uint8_t)(FAT_WARIO_DURATION >> 8));
-		st(wTransformationDuration + 1, (uint8_t)FAT_WARIO_DURATION);
+		wr8(wTransformationDuration + 0, (uint8_t)(FAT_WARIO_DURATION >> 8));
+		wr8(wTransformationDuration + 1, (uint8_t)FAT_WARIO_DURATION);
 		static const uint16_t zero[] = {wInvisibleFrame, wSFXLoopCounter, wWarioStateCounter,
 			wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching, wIsRolling,
 			wIsSmashAttacking, 0};
 		clear(zero);
 		if (ld_and(wJumpVelTable))
-			st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+			wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 		play_sfx(SFX_03A);
 		CALL(UpdateLevelMusic);
 		st(wWarioState, WST_FAT_EATING);
@@ -583,13 +582,13 @@ public:
 		if (ld_bit(wInteractionSide, INTERACTION_RIGHT_F))
 			st(wDirection, DIRECTION_LEFT);
 		else
-			st(wDirection, DIRECTION_RIGHT);
+			wr8(wDirection, DIRECTION_RIGHT);
 		play_sfx(SFX_040);
 		static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
 			wAttackCounter, wJumpVelIndex, wJumpVelTable, wIsCrouching, wIsRolling,
 			wIsSmashAttacking, wInvisibleFrame, 0};
 		clear(zero);
-		st(wWarioState, WST_ELECTRIC_START);
+		wr8(wWarioState, WST_ELECTRIC_START);
 		collision_box(-1, -27, -9, 9);
 		st(wTransformation, TRANSFORMATION_ELECTRIC);
 		touch_states(TOUCH_VANISH, 0x01);
@@ -694,7 +693,7 @@ public:
 			return;
 		cpu_.b = OBJACTION_06;
 		port_SetObjAction();
-		st(wTransformation, TRANSFORMATION_VAMPIRE_WARIO);
+		wr8(wTransformation, TRANSFORMATION_VAMPIRE_WARIO);
 		FARCALL(Func_19b25);
 		ld_cp(wTransformation, TRANSFORMATION_VAMPIRE_WARIO);
 		if (!ZF)
@@ -708,7 +707,7 @@ public:
 			return;
 		cpu_.b = OBJACTION_07;
 		port_SetObjAction();
-		st(wTransformation, TRANSFORMATION_BUBBLE);
+		wr8(wTransformation, TRANSFORMATION_BUBBLE);
 		touch_states(TOUCH_BUMP, 0x01);
 		FARCALL(Func_2ac7d);
 	}
@@ -731,7 +730,7 @@ public:
 		cpu_.b = OBJACTION_06;
 		port_SetObjAction();
 		play_sfx(SFX_028);
-		st(wTransformation, TRANSFORMATION_ZOMBIE_WARIO);
+		wr8(wTransformation, TRANSFORMATION_ZOMBIE_WARIO);
 		touch_states(TOUCH_VANISH, 0x02);
 		FARCALL(SetState_ZombieIdling);
 	}
@@ -742,7 +741,7 @@ public:
 			return;
 		cpu_.b = rd8(wWarioScreenXPos);
 		ld_cp(wObjScreenXPos, cpu_.b);
-		st(wDirection, CF ? DIRECTION_RIGHT : DIRECTION_LEFT);
+		wr8(wDirection, CF ? DIRECTION_RIGHT : DIRECTION_LEFT);
 		FARCALL(SetState_FlatFalling);
 	}
 
@@ -810,8 +809,8 @@ public:
 	void port_SetState_WaterStung()
 	{
 		play_sfx(SFX_STING);
-		st(wInvincibleCounter, 0x01);
-		st(wWarioState, WST_WATER_STUNG);
+		wr8(wInvincibleCounter, 0x01);
+		wr8(wWarioState, WST_WATER_STUNG);
 		static const uint16_t zero[] = {wSwimVelIndex, wJumpVelTable, wWarioStateCounter,
 			wWarioStateCycles, 0};
 		clear(zero);
@@ -834,10 +833,10 @@ public:
 		cpu_.b = OBJACTION_06;
 		port_SetObjAction();
 		play_sfx(SFX_HANG_GRAB);
-		st(wTransformation, TRANSFORMATION_RAIL);
-		st(wTouchState, TOUCH_BUMP);
-		st(wStingTouchState, TOUCH_VULNERABLE);
-		st(wca94, 0x01);
+		wr8(wTransformation, TRANSFORMATION_RAIL);
+		wr8(wTouchState, TOUCH_BUMP);
+		wr8(wStingTouchState, TOUCH_VULNERABLE);
+		wr8(wca94, 0x01);
 		st(wWarioState, WST_HANGING_RAIL);
 		collision_box(-1, -27, -9, 9);
 		static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
@@ -868,8 +867,7 @@ public:
 		if (ZF)
 			return;
 		wr8(wLevelEndScreen, rd8(wLevelEndScreen) | 0x80);
-		st(wResetDisabled, TRUE);
-		xor_a();
+		wr8(wResetDisabled, TRUE);
 		wr8(wWalkVelIndex, 0);
 		st(wWarioState, WST_GET_TREASURE_START);
 		static const uint16_t zero[] = {wFrameDuration, wAnimationFrame, wJumpVelIndex,
@@ -913,19 +911,19 @@ public:
 
 	void port_SetState_Stung()
 	{
-		st(wInvincibleCounter, 0x01);
+		wr8(wInvincibleCounter, 0x01);
 		play_sfx(SFX_STING);
-		st(wWarioState, WST_STUNG);
+		wr8(wWarioState, WST_STUNG);
 		static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
 			wAttackCounter, wIsRolling, wIsSmashAttacking, 0};
 		clear(zero);
-		st(wJumpVelIndex, 0x6);
-		st(wCollisionBoxBottom, (uint8_t)-1);
-		st(wCollisionBoxLeft, (uint8_t)-9);
-		st(wCollisionBoxRight, 9);
+		wr8(wJumpVelIndex, 0x6);
+		wr8(wCollisionBoxBottom, (uint8_t)-1);
+		wr8(wCollisionBoxLeft, (uint8_t)-9);
+		wr8(wCollisionBoxRight, 9);
 		bool low_ceiling = false;
-		if (ld_and(wIsCrouching)) {
-			st(wCollisionBoxTop, (uint8_t)-27);
+		if (rd8(wIsCrouching)) {
+			wr8(wCollisionBoxTop, (uint8_t)-27);
 			cpu_.a = rd8(hYPosHi);
 			wr8(hYPosHiBackup, cpu_.a);
 			cpu_.a = rd8(hYPosLo);
@@ -944,12 +942,12 @@ public:
 			}
 		}
 		if (low_ceiling) {
-			st(wCollisionBoxTop, (uint8_t)-15);
+			wr8(wCollisionBoxTop, (uint8_t)-15);
 			xor_a();
 			wr8(wJumpVelTable, 0);
 			restore_pos_backup();
 		} else {
-			st(wCollisionBoxTop, (uint8_t)-27);
+			wr8(wCollisionBoxTop, (uint8_t)-27);
 			st(wJumpVelTable, JUMP_VEL_KNOCK_BACK);
 		}
 		load_gfx(BANK_WarioAirborneGfx, ADDR_WarioAirborneGfx);
@@ -1031,8 +1029,7 @@ public:
 
 	void port_Func_2168b()
 	{
-		ld_cp(wWarioState, WST_FLAT_SQUISHED);
-		if (ZF) {
+		if (rd8(wWarioState) == WST_FLAT_SQUISHED) {
 			FARCALL(SetState_FlatSquishedLifting);
 			return;
 		}
@@ -1042,7 +1039,7 @@ public:
 		cpu_.b = cpu_.a;
 		CALL(MoveWarioDown);
 		FARCALL(Func_19b25);
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			FARCALL(DiveFromSurface_SkipSplash);
 			return;
 		}
@@ -1068,16 +1065,14 @@ public:
 		if (alu_.and_(cpu_.a, cpu_.a))
 			return;
 		if (ground) {
-			xor_a();
 			wr8(wGrabState, 0);
 			FARCALL(SetState_Idling);
 			return;
 		}
-		if (ld_and(wIsCrouching)) {
+		if (rd8(wIsCrouching)) {
 			FARCALL(StartCrouchFall);
 			return;
 		}
-		xor_a();
 		wr8(wGrabState, 0);
 		FARCALL(StartFall);
 	}
@@ -1089,8 +1084,7 @@ public:
 			return;
 		}
 		port_Func_20a63();
-		st(wTransformation, TRANSFORMATION_SNOWMAN_WARIO);
-		xor_a();
+		wr8(wTransformation, TRANSFORMATION_SNOWMAN_WARIO);
 		wr8(wTransformationProgress, 0);
 		touch_states(TOUCH_ATTACK, 0x02);
 		FARCALL(SetState_TurningIntoSnowman);
@@ -1101,7 +1095,7 @@ public:
 		if (ld_and(wInvincibleCounter) || ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F))
 			return;
 		if (ld_and(wIsCrouching)) {
-			st(wCollisionBoxTop, (uint8_t)-27);
+			wr8(wCollisionBoxTop, (uint8_t)-27);
 			FARCALL(CheckUpCollision);
 			if (b_and()) {
 				st(wCollisionBoxTop, (uint8_t)-15);
@@ -1111,15 +1105,14 @@ public:
 		cpu_.b = OBJACTION_07;
 		port_SetObjAction();
 		play_sfx(SFX_028);
-		st(wTransformation, TRANSFORMATION_ICE_SKATIN);
+		wr8(wTransformation, TRANSFORMATION_ICE_SKATIN);
 		touch_states(TOUCH_ATTACK, 0x02);
 		FARCALL(SetState_IceSkatinStart);
 	}
 
 	void port_Func_209ca()
 	{
-		ld_cp(wWarioState, WST_ATTACKING_AIRBORNE);
-		if (ZF) {
+		if (rd8(wWarioState) == WST_ATTACKING_AIRBORNE) {
 			xor_a();
 			wr8(wAttackCounter, 0);
 		}
@@ -1130,7 +1123,7 @@ public:
 		if (ZF) {
 			return;
 		}
-		st(wIsOnSteppableObject, TRUE);
+		wr8(wIsOnSteppableObject, TRUE);
 		if (ld_and(wc1c1)) {
 			alu_.cp(cpu_.a, 0x03);
 			if (!CF)
@@ -1156,11 +1149,9 @@ public:
 		if (ld_and(wGrabState)) {
 			FARCALL(SetState_GrabIdling);
 		} else if (ld_and(wIsCrouching)) {
-			xor_a();
 			wr8(wWaterInteraction, 0);
 			FARCALL(CrouchOrSlide);
 		} else {
-			xor_a();
 			wr8(wWaterInteraction, 0);
 			FARCALL(SetState_Idling);
 		}
@@ -1178,7 +1169,7 @@ public:
 					next_obj_ = true;
 					return;
 				}
-				st(wInteractionSide, INTERACTION_RIGHT);
+				wr8(wInteractionSide, INTERACTION_RIGHT);
 				FARCALL(Func_197b1);
 				if (b_and())
 					break;
@@ -1195,7 +1186,7 @@ public:
 					next_obj_ = true;
 					return;
 				}
-				st(wInteractionSide, INTERACTION_LEFT);
+				wr8(wInteractionSide, INTERACTION_LEFT);
 				FARCALL(Func_19741);
 				if (b_and())
 					break;
@@ -1232,7 +1223,6 @@ public:
 				FARCALL(Func_1ec215);
 			return;
 		}
-		xor_a();
 		wr8(wWalkVelIndex, 0);
 		if (!ld_and(wIsRolling) && !ld_and(wAttackCounter)) {
 			next_obj_ = true;
@@ -1249,7 +1239,7 @@ public:
 		cpu_.b = ld(wWarioScreenXPos);
 		alu_.cp(ld(wObjScreenXPos), cpu_.b);
 		bool left = CF;
-		st(wInteractionSide, left ? INTERACTION_LEFT : INTERACTION_RIGHT);
+		wr8(wInteractionSide, left ? INTERACTION_LEFT : INTERACTION_RIGHT);
 		// x = Wario's x +/- 8, y = Wario's y - 8
 		cpu_.a = rd8(wWarioXPos + 1);
 		cpu_.a = left ? alu_.sub(cpu_.a, 0x08) : alu_.add(cpu_.a, 0x08);
@@ -1283,7 +1273,7 @@ public:
 		}
 		if (alu_.and_(cpu_.a, cpu_.a))
 			return;
-		if (ld_and(wIsRolling)) {
+		if (rd8(wIsRolling)) {
 			if (!ld_bit(wObjInteractionType, HEAVY_OBJ_F))
 				return;
 			ld_cp(wPowerUpLevel, GARLIC);
@@ -1293,7 +1283,7 @@ public:
 			return;
 		}
 		// .not_rolling
-		if (ld_bit(wObjInteractionType, HEAVY_OBJ_F)) {
+		if ((rd8(wObjInteractionType) >> HEAVY_OBJ_F & 1)) {
 			FARCALL(DoJumpingBump_NoSFX);
 			return;
 		}
@@ -1320,7 +1310,7 @@ public:
 		if (ld_and(wTransformation)) {
 			return;
 		}
-		if (ld_bit(wInteractionSide, INTERACTION_DOWN_F)) {
+		if ((rd8(wInteractionSide) >> INTERACTION_DOWN_F & 1)) {
 			FARCALL(StartDive);
 			return;
 		}
@@ -1329,7 +1319,7 @@ public:
 		bool left = CF;
 		cpu_.a = alu_.or_(rd8(wInteractionSide), left ? INTERACTION_LEFT : INTERACTION_RIGHT);
 		wr8(wInteractionSide, cpu_.a);
-		st(wDirection, left ? DIRECTION_RIGHT : DIRECTION_LEFT);
+		wr8(wDirection, left ? DIRECTION_RIGHT : DIRECTION_LEFT);
 		FARCALL(SetState_SwimKnockBack);
 	}
 
@@ -1477,7 +1467,7 @@ public:
 		}
 		cpu_.a = alu_.or_(rd8(wInteractionSide), INTERACTION_LEFT);
 		wr8(wInteractionSide, cpu_.a);
-		st(wDirection, DIRECTION_RIGHT);
+		wr8(wDirection, DIRECTION_RIGHT);
 		FARCALL(SetState_SwimKnockBack);
 	}
 
@@ -1495,12 +1485,11 @@ public:
 		if (ZF) {
 			FARCALL(Func_1ede9);
 		} else {
-			xor_a();
 			wr8(wGrabState, 0);
 			FARCALL(StartJump_FromInput);
 		}
-		st(wDoFullJump, TRUE);
-		st(wJumpVelIndex, 0x0a);
+		wr8(wDoFullJump, TRUE);
+		wr8(wJumpVelIndex, 0x0a);
 		if (ld_bit(wJoypadDown, B_PAD_A)) {
 			ld_cp(wPowerUpLevel, HIGH_JUMP_BOOTS);
 			if (!CF) {
@@ -1652,21 +1641,19 @@ public:
 		}
 		FARCALL(DoJumpingBump);
 		load_gfx(BANK_WarioWalkGfx, ADDR_WarioWalkGfx);
-		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		set_oam(BANK_OAM_1426c, ADDR_OAM_1426c);
-		xor_a();
 		wr8(wGrabState, 0);
 		cpu_.b = rd8(wWarioScreenXPos);
 		cpu_.a = rd8(wObjScreenXPos);
 		alu_.cp(cpu_.a, cpu_.b);
 		if (!CF) {
-			st(wInteractionSide, INTERACTION_RIGHT);
+			wr8(wInteractionSide, INTERACTION_RIGHT);
 			st(wDirection, DIRECTION_LEFT);
 			set_frameset(ADDR_Frameset_14a79);
 		} else {
-			st(wInteractionSide, INTERACTION_LEFT);
+			wr8(wInteractionSide, INTERACTION_LEFT);
 			st(wDirection, DIRECTION_RIGHT);
 			set_frameset(ADDR_Frameset_14a76);
 		}
@@ -1699,10 +1686,9 @@ public:
 				port_Func_20602();
 			return;
 		}
-		if (ld_and(wTransformation)) {
+		if (rd8(wTransformation)) {
 			// .Transformed
-			ld_cp(wTransformation, TRANSFORMATION_HOT_WARIO);
-			if (ZF) {
+			if (rd8(wTransformation) == TRANSFORMATION_HOT_WARIO) {
 				ld_cp(wTransformationProgress, 2);
 				if (!CF) {
 					port_VanishObjectAndKnockBackIfZombie();
@@ -1733,7 +1719,6 @@ public:
 		}
 
 		// not transformed
-		xor_a();
 		wr8(wAttackCounter, 0);
 		// stepping on object while rolling is attacking
 		if (ld_and(wIsRolling)) {
@@ -1754,7 +1739,6 @@ public:
 			if (ZF) {
 				FARCALL(Func_1ede9); // .grabbing
 			} else {
-				xor_a();
 				wr8(wGrabState, 0);
 				if (ld_and(wIsCrouching)) {
 					FARCALL(StartCrouchJump);
@@ -1766,8 +1750,8 @@ public:
 					goto sfx;
 				}
 			}
-			st(wDoFullJump, TRUE);
-			st(wJumpVelIndex, 0x0a);
+			wr8(wDoFullJump, TRUE);
+			wr8(wJumpVelIndex, 0x0a);
 			if (ld_bit(wJoypadDown, B_PAD_A)) {
 				ld_cp(wPowerUpLevel, HIGH_JUMP_BOOTS);
 				if (!CF) {
@@ -1791,7 +1775,6 @@ public:
 					if (ld_and(wJumpVelTable))
 						FARCALL(Func_1edd3);
 				} else {
-					xor_a();
 					wr8(wGrabState, 0);
 					if (ld_and(wJumpVelTable))
 						FARCALL(StartFall);
@@ -1868,22 +1851,21 @@ public:
 	void set_wario_pick_up()
 	{
 		play_sfx(SFX_GRAB);
-		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		wr8(wWarioStateCounter, 0);
 		wr8(wWarioStateCycles, 0);
-		st(wWarioState, WST_PICKING_UP);
+		wr8(wWarioState, WST_PICKING_UP);
 		collision_box(-1, -27, -9, 9);
 		load_gfx(BANK_WarioThrowGfx, ADDR_WarioThrowGfx);
 		set_oam(BANK_OAM_1606a, ADDR_OAM_1606a);
 		uint16_t fs;
 		if (!ld_and(wDirection)) {
-			if (ld_bit(wWarioSlopeInteraction, LEFT_SLOPE_F))
+			if ((rd8(wWarioSlopeInteraction) >> LEFT_SLOPE_F & 1))
 				goto grab_idling;
 			fs = ld_mask(wGrabState, 1 << GRAB_HEAVY_F) ? ADDR_Frameset_163f5 : ADDR_Frameset_163ec;
 		} else {
-			if (ld_bit(wWarioSlopeInteraction, RIGHT_SLOPE_F))
+			if ((rd8(wWarioSlopeInteraction) >> RIGHT_SLOPE_F & 1))
 				goto grab_idling;
 			fs = ld_mask(wGrabState, 1 << GRAB_HEAVY_F) ? ADDR_Frameset_16415 : ADDR_Frameset_1640c;
 		}
@@ -1896,7 +1878,7 @@ public:
 
 	void port_Func_20b6b()
 	{
-		if (ld_bit(wInteractionSide, INTERACTION_UP_F))
+		if ((rd8(wInteractionSide) >> INTERACTION_UP_F & 1))
 			goto step_on_obj;
 		if (ld_and(wTouchState)) {
 			uint8_t a = cpu_.a;
@@ -1937,8 +1919,7 @@ public:
 		cpu_.a = alu_.or_(rd8(wGrabState), cpu_.b);
 		if (!ZF)
 			goto step_on_obj;
-		ld_cp(wPowerUpLevel, GRAB_GLOVE);
-		if (CF)
+		if (rd8(wPowerUpLevel) < GRAB_GLOVE)
 			goto step_on_obj;
 		ld_cp(wWarioState, WST_LADDER_SCRATCHING);
 		if (ZF)
@@ -1954,11 +1935,11 @@ public:
 		cpu_.a = rd8(wObjScreenXPos);
 		alu_.cp(cpu_.a, cpu_.b);
 		if (!CF) {
-			st(wInteractionSide, INTERACTION_RIGHT);
+			wr8(wInteractionSide, INTERACTION_RIGHT);
 			if (!ld_and(wDirection))
 				goto step_on_obj;
 		} else {
-			st(wInteractionSide, INTERACTION_LEFT);
+			wr8(wInteractionSide, INTERACTION_LEFT);
 			if (ld_and(wDirection))
 				goto step_on_obj;
 		}
@@ -1996,7 +1977,7 @@ public:
 			set_wario_pick_up();
 			return;
 		}
-		if (ld_bit(wObjInteractionType, HEAVY_OBJ_F))
+		if ((rd8(wObjInteractionType) >> HEAVY_OBJ_F & 1))
 			goto step_on_obj;
 		FARCALL(Func_1edd3);
 		return;
@@ -2135,10 +2116,10 @@ public:
 			port_Func_2022c();
 			return;
 		}
-		st(wTransformation, TRANSFORMATION_HOT_WARIO);
-		st(wTransformationProgress, 1);
+		wr8(wTransformation, TRANSFORMATION_HOT_WARIO);
+		wr8(wTransformationProgress, 1);
 		touch_states(TOUCH_BUMP, 0x02);
-		st(wTransformationDuration + 0, (uint8_t)(HOT_WARIO_DURATION >> 8));
+		wr8(wTransformationDuration + 0, (uint8_t)(HOT_WARIO_DURATION >> 8));
 		st(wTransformationDuration + 1, (uint8_t)HOT_WARIO_DURATION);
 		CALL(UpdateLevelMusic);
 		port_SetState_OnFire_ResetStateCounter(); // fallthrough
@@ -2147,7 +2128,7 @@ public:
 	void port_Func_2126a()
 	{
 		if (ld_and(wIsCrouching)) {
-			st(wCollisionBoxTop, (uint8_t)-27);
+			wr8(wCollisionBoxTop, (uint8_t)-27);
 			FARCALL(CheckUpCollision);
 			if (b_and()) {
 				st(wCollisionBoxTop, (uint8_t)-15);
@@ -2168,15 +2149,15 @@ public:
 		cpu_.b = rd8(wWarioScreenXPos);
 		cpu_.a = rd8(wObjScreenXPos);
 		alu_.cp(cpu_.a, cpu_.b);
-		st(wDirection, CF ? DIRECTION_RIGHT : DIRECTION_LEFT);
+		wr8(wDirection, CF ? DIRECTION_RIGHT : DIRECTION_LEFT);
 		// .set_ball_o_string
 		play_sfx(SFX_039);
-		st(wTransformation, TRANSFORMATION_BALL_O_STRING_WARIO);
+		wr8(wTransformation, TRANSFORMATION_BALL_O_STRING_WARIO);
 		xor_a();
 		wr8(wTransformationProgress, 0);
 		touch_states(TOUCH_ATTACK, 0x01);
 		CALL(UpdateLevelMusic);
-		st(wWarioState, WST_GETTING_WRAPPED_IN_STRING);
+		wr8(wWarioState, WST_GETTING_WRAPPED_IN_STRING);
 		static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
 			wAttackCounter, wJumpVelIndex, wJumpVelTable, wIsCrouching, wIsRolling,
 			wIsSmashAttacking, 0};
@@ -2265,10 +2246,10 @@ public:
 		}
 		cpu_.b = OBJACTION_06;
 		port_SetObjAction();
-		st(wTransformation, TRANSFORMATION_BLIND);
-		st(wTouchState, TOUCH_BUMP);
-		st(wStingTouchState, TOUCH_VULNERABLE);
-		st(wca94, 0x01);
+		wr8(wTransformation, TRANSFORMATION_BLIND);
+		wr8(wTouchState, TOUCH_BUMP);
+		wr8(wStingTouchState, TOUCH_VULNERABLE);
+		wr8(wca94, 0x01);
 		FARCALL(SetState_BlindIdling);
 		zero_pals_hblank(rBGPI, BGPI_AUTOINC | (0 * PAL_SIZE), 4, rBGPD);
 		zero_pals_hblank(rOBPI, OBPI_AUTOINC | (3 * PAL_SIZE), 2, rOBPD);
@@ -2285,7 +2266,7 @@ public:
 		}
 		cpu_.b = OBJACTION_06;
 		port_SetObjAction();
-		st(wTransformation, TRANSFORMATION_SPLIT);
+		wr8(wTransformation, TRANSFORMATION_SPLIT);
 		touch_states(TOUCH_PASS_THROUGH, 0x02);
 		FARCALL(SetState_SplitHit);
 	}
@@ -2352,10 +2333,10 @@ public:
 			port_Func_2022c();
 			return;
 		}
-		st(wTransformation, TRANSFORMATION_BOUNCY_WARIO);
+		wr8(wTransformation, TRANSFORMATION_BOUNCY_WARIO);
 		touch_states(TOUCH_BUMP, 0x01);
-		st(wTransformationDuration + 0, (uint8_t)(BOUNCY_WARIO_DURATION >> 8));
-		st(wTransformationDuration + 1, (uint8_t)BOUNCY_WARIO_DURATION);
+		wr8(wTransformationDuration + 0, (uint8_t)(BOUNCY_WARIO_DURATION >> 8));
+		wr8(wTransformationDuration + 1, (uint8_t)BOUNCY_WARIO_DURATION);
 		FARCALL(SetState_BouncyStart);
 	}
 
@@ -2542,7 +2523,7 @@ public:
 		}
 		cpu_.b = OBJACTION_06;
 		port_SetObjAction();
-		st(wTransformation, TRANSFORMATION_MAGIC);
+		wr8(wTransformation, TRANSFORMATION_MAGIC);
 		touch_states(TOUCH_PASS_THROUGH, 0x02);
 		FARCALL(SetState_MagicRising);
 	}
@@ -2660,7 +2641,7 @@ public:
 		// turn Wario into ball form
 		cpu_.b = OBJACTION_06;
 		port_SetObjAction();
-		st(wTransformation, TRANSFORMATION_BALL);
+		wr8(wTransformation, TRANSFORMATION_BALL);
 		touch_states(TOUCH_PASS_THROUGH, 0x02);
 		FARCALL(SetState_BallStart);
 	}
@@ -2697,8 +2678,8 @@ public:
 			port_Func_2022c();
 			return;
 		}
-		st(wCollisionBoxLeft, (uint8_t)-11);
-		st(wCollisionBoxRight, 11);
+		wr8(wCollisionBoxLeft, (uint8_t)-11);
+		wr8(wCollisionBoxRight, 11);
 		ld_cp(wLadderInteraction, LADDER_UNDERNEATH);
 		if (!ZF) {
 			FARCALL(Func_197b1);
@@ -2712,7 +2693,7 @@ public:
 				}
 			}
 		}
-		st(wCollisionBoxLeft, (uint8_t)-9);
+		wr8(wCollisionBoxLeft, (uint8_t)-9);
 		st(wCollisionBoxRight, 9);
 		port_StepOnObject();
 	}
@@ -2735,7 +2716,7 @@ public:
 			return;
 		}
 		// pick Wario up
-		st(wAutoMoveState, 0x01);
+		wr8(wAutoMoveState, 0x01);
 		st(wWarioState, WST_PICKED_UP);
 		collision_box(-1, -27, -9, 9);
 		static const uint16_t zero[] = {wIsSmashAttacking, wAttackCounter, wIsCrouching,
@@ -2773,7 +2754,7 @@ public:
 		}
 		cpu_.b = OBJACTION_06;
 		port_SetObjAction();
-		st(wTransformation, TRANSFORMATION_CRAZY_WARIO);
+		wr8(wTransformation, TRANSFORMATION_CRAZY_WARIO);
 		touch_states(TOUCH_ATTACK, 0x01);
 		FARCALL(SetState_CrazySpinning);
 	}
@@ -2793,10 +2774,10 @@ public:
 		}
 		port_Func_20a63();
 		play_sfx(SFX_HANG_GRAB);
-		st(wTransformation, TRANSFORMATION_OWL_WARIO);
-		st(wTouchState, TOUCH_BUMP);
-		st(wStingTouchState, TOUCH_VULNERABLE);
-		st(wca94, 0x01);
+		wr8(wTransformation, TRANSFORMATION_OWL_WARIO);
+		wr8(wTouchState, TOUCH_BUMP);
+		wr8(wStingTouchState, TOUCH_VULNERABLE);
+		wr8(wca94, 0x01);
 		st(wWarioState, WST_GRABBING_OWL);
 		collision_box(-1, -27, -9, 9);
 		static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
@@ -2822,7 +2803,9 @@ public:
 
 using wl3::level::ObjectInteractions;
 
-PORT_EX(ProcessInteractions, 0, 0) { ObjectInteractions(gb).port_ProcessInteractions(); }
+// farcalled by update_level: hCallFunc pops af, and what follows (xor a,
+// DrawObjects_NoPriority) sets every register it uses
+PORT_EX(ProcessInteractions, 0, ALL_REGISTERS) { ObjectInteractions(gb).port_ProcessInteractions(); }
 PORT_COVERED(SetObjAction);
 PORT_COVERED(Func_20a63);
 PORT_COVERED(Func_20a69);

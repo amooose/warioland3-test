@@ -107,14 +107,12 @@ public:
 
 	void port_SetState_Slipping()
 	{
-		st(wWarioState, WST_SLIPPING);
-		xor_a();
+		wr8(wWarioState, WST_SLIPPING);
 		wr8(wSFXLoopCounter, 0);
 		wr8(wWarioStateCounter, 0);
 		wr8(wAttackCounter, 0);
 		load_gfx(BANK_WarioIdleGfx, ADDR_WarioIdleGfx);
 		set_oam(BANK_OAM_14000, ADDR_OAM_14000);
-		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		ld(wDirection);
@@ -171,7 +169,7 @@ public:
 
 	anim_and_input:
 		anim(OAM1);
-		if (ld_bit(wJoypadPressed, B_PAD_A)) {
+		if ((rd8(wJoypadPressed) >> B_PAD_A & 1)) {
 			FARCALL(StartJump_FromInput);
 			return;
 		}
@@ -222,7 +220,7 @@ public:
 
 	void port_Func_19e89()
 	{
-		st(wWarioState, WST_CROUCH_SLIPPING);
+		wr8(wWarioState, WST_CROUCH_SLIPPING);
 		xor_a();
 		wr8(wSFXLoopCounter, 0);
 		wr8(wAttackCounter, 0);
@@ -231,7 +229,6 @@ public:
 		wr8(wIsCrouching, cpu_.a);
 		load_gfx(BANK_WarioWalkGfx, ADDR_WarioWalkGfx);
 		set_oam(BANK_OAM_1426c, ADDR_OAM_1426c);
-		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		ld_cp(wWarioStateCycles, 0x01);
@@ -246,7 +243,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_bit(wJoypadPressed, B_PAD_A)) {
+		if ((rd8(wJoypadPressed) >> B_PAD_A & 1)) {
 			FARCALL(StartCrouchJump);
 			return;
 		}
@@ -284,7 +281,7 @@ public:
 
 	void port_SetState_DraggedDown()
 	{
-		st(wWarioState, WST_DRAGGED_DOWN);
+		wr8(wWarioState, WST_DRAGGED_DOWN);
 		xor_a();
 		wr8(wSFXLoopCounter, 0);
 		wr8(wWarioStateCounter, 0);
@@ -311,7 +308,7 @@ public:
 	void port_UpdateState_DraggedDown()
 	{
 		anim(OAM1);
-		if (ld_and(wAutoMoveState))
+		if (rd8(wAutoMoveState))
 			return;
 		ld_cp(wLevel, THE_TEMPLE);
 		if (ZF) {
@@ -323,7 +320,7 @@ public:
 
 	void teleporting(uint8_t sfx_frame, uint8_t next_state)
 	{
-		st(wIsIntangible, TRUE);
+		wr8(wIsIntangible, TRUE);
 		anim(OAM1);
 		uint8_t v = inc_counter();
 		alu_.cp(v, sfx_frame);
@@ -337,7 +334,7 @@ public:
 			return;
 		}
 		wr8(wWarioStateCounter, 0x00);
-		st(wWarioState, next_state);
+		wr8(wWarioState, next_state);
 		st(wInvincibleCounter, 0x01);
 		SET_HL(gb_, wRoomTransitionParam);
 		wr8(wRoomTransitionParam,
@@ -362,24 +359,23 @@ public:
 
 	void port_SetState_SandFalling()
 	{
-		xor_a();
-		st(wGrabState, 0);
-		st(wWarioState, WST_SAND_FALLING);
-		st(wCollisionBoxBottom, (uint8_t)-1);
-		st(wCollisionBoxTop, (uint8_t)-27);
-		st(wCollisionBoxLeft, (uint8_t)-9);
-		st(wCollisionBoxRight, 9);
+		wr8(wGrabState, 0);
+		wr8(wWarioState, WST_SAND_FALLING);
+		wr8(wCollisionBoxBottom, (uint8_t)-1);
+		wr8(wCollisionBoxTop, (uint8_t)-27);
+		wr8(wCollisionBoxLeft, (uint8_t)-9);
+		wr8(wCollisionBoxRight, 9);
 
 		xor_a();
-		st(wJumpVelIndex, 0);
-		st(wJumpVelTable, 0);
-		st(wWarioStateCounter, 0);
-		st(wWarioStateCycles, 0);
-		st(wIsSmashAttacking, 0);
-		st(wAttackCounter, 0);
-		st(wIsRolling, 0);
-		st(wSwimVelIndex, 0);
-		st(wIsCrouching, 0);
+		wr8(wJumpVelIndex, 0);
+		wr8(wJumpVelTable, 0);
+		wr8(wWarioStateCounter, 0);
+		wr8(wWarioStateCycles, 0);
+		wr8(wIsSmashAttacking, 0);
+		wr8(wAttackCounter, 0);
+		wr8(wIsRolling, 0);
+		wr8(wSwimVelIndex, 0);
+		wr8(wIsCrouching, 0);
 		st(wc0e0, 0);
 		SET_HL(gb_, ADDR_WarioDefaultPal);
 		LCALL(SetWarioPal); // waits for HBlank
@@ -420,7 +416,7 @@ public:
 	void port_SetState_SandJumping()
 	{
 		play_sfx(SFX_JUMP);
-		st(wWarioState, WST_SAND_JUMPING);
+		wr8(wWarioState, WST_SAND_JUMPING);
 		xor_a();
 		wr8(wJumpVelIndex, 0);
 		wr8(wWarioStateCounter, 0);
@@ -469,8 +465,7 @@ public:
 
 	void port_SetState_SandIdling()
 	{
-		st(wWarioState, WST_SAND_IDLING);
-		xor_a();
+		wr8(wWarioState, WST_SAND_IDLING);
 		wr8(wJumpVelIndex, 0);
 		wr8(wJumpVelTable, 0);
 		load_gfx(BANK_WarioIdleGfx, ADDR_WarioIdleGfx);
@@ -489,14 +484,12 @@ public:
 
 	void port_SetState_SandWalking()
 	{
-		xor_a();
 		wr8(wWalkVelIndex, 0);
-		st(wWarioState, WST_SAND_WALKING);
+		wr8(wWarioState, WST_SAND_WALKING);
 		if (ld_bit(wJoypadDown, B_PAD_RIGHT))
 			st(wDirection, DIRECTION_RIGHT);
 		else if (alu_.bit(cpu_.a, B_PAD_LEFT))
-			st(wDirection, DIRECTION_LEFT);
-		xor_a();
+			wr8(wDirection, DIRECTION_LEFT);
 		wr8(wSFXLoopCounter, 0);
 		wr8(wJumpVelIndex, 0);
 		wr8(wJumpVelTable, 0);
@@ -526,8 +519,7 @@ public:
 
 	void port_SetState_SandTurning()
 	{
-		st(wWarioState, WST_SAND_TURNING);
-		xor_a();
+		wr8(wWarioState, WST_SAND_TURNING);
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		wr8(wWarioStateCounter, 0);
@@ -558,9 +550,8 @@ public:
 
 	void port_SetState_LadderClimbing()
 	{
-		st(wWarioState, WST_LADDER_CLIMBING);
+		wr8(wWarioState, WST_LADDER_CLIMBING);
 		center_on_ladder();
-		xor_a();
 		wr8(wSFXLoopCounter, 0);
 		wr8(wWarioStateCounter, 0);
 		wr8(wWarioStateCycles, 0);
@@ -597,7 +588,7 @@ public:
 
 	void port_SetState_LadderIdling()
 	{
-		st(wWarioState, WST_LADDER_IDLING);
+		wr8(wWarioState, WST_LADDER_IDLING);
 		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
@@ -662,7 +653,7 @@ public:
 
 	void port_SetState_GettingOffLadder()
 	{
-		st(wWarioState, WST_GETTING_OFF_LADDER);
+		wr8(wWarioState, WST_GETTING_OFF_LADDER);
 		xor_a();
 		wr8(wSFXLoopCounter, 0);
 		wr8(wWarioStateCounter, 0);
@@ -686,9 +677,8 @@ public:
 		else
 			CALL(MoveWarioLeft);
 		FARCALL(Func_19b25);
-		if (ld_and(wLadderInteraction))
+		if (rd8(wLadderInteraction))
 			return;
-		xor_a();
 		wr8(wIsGettingOffLadder, 0);
 		wr8(wIsIntangible, 0);
 		FARCALL(StartFall);
@@ -696,7 +686,7 @@ public:
 
 	void set_state_sliding(uint8_t state)
 	{
-		st(wWarioState, state);
+		wr8(wWarioState, state);
 		play_sfx(SFX_SLIDE);
 		xor_a();
 		wr8(wSFXLoopCounter, 0);
@@ -705,9 +695,8 @@ public:
 		wr8(wIsGettingOffLadder, 0);
 		cpu_.a = alu_.inc(cpu_.a);
 		wr8(wJumpVelTable, cpu_.a);
-		ld_cp(wPowerUpLevel, LEAD_OVERALLS);
-		if (!CF)
-			st(wIsSmashAttacking, TRUE);
+		if (rd8(wPowerUpLevel) >= LEAD_OVERALLS)
+			wr8(wIsSmashAttacking, TRUE);
 		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
@@ -728,8 +717,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (!ld_and(fence ? wIsNearFence : wLadderInteraction)) {
-			xor_a();
+		if (!rd8(fence ? wIsNearFence : wLadderInteraction)) {
 			wr8(wIsSmashAttacking, FALSE);
 			FARCALL(StartFall);
 			return;
@@ -751,7 +739,7 @@ public:
 			return;
 		}
 		update_pos_y();
-		if (!ld_and(wIsSmashAttacking)) {
+		if (!rd8(wIsSmashAttacking)) {
 			FARCALL(SetState_Idling);
 			return;
 		}
@@ -769,8 +757,7 @@ public:
 
 	void port_SetState_GrabSlipping()
 	{
-		st(wWarioState, WST_GRAB_SLIPPING);
-		xor_a();
+		wr8(wWarioState, WST_GRAB_SLIPPING);
 		wr8(wSFXLoopCounter, 0);
 		wr8(wWarioStateCounter, 0);
 		wr8(wAttackCounter, 0);
@@ -790,11 +777,11 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (!ld_and(wGrabState)) {
+		if (!rd8(wGrabState)) {
 			FARCALL(SetState_Idling);
 			return;
 		}
-		if (ld_bit(wJoypadPressed, B_PAD_A)) {
+		if ((rd8(wJoypadPressed) >> B_PAD_A & 1)) {
 			FARCALL(Func_1ede9);
 			return;
 		}
@@ -856,7 +843,6 @@ public:
 	{
 		SET_HL(gb_, wWarioState);
 		wr8(wWarioState, alu_.inc(rd8(wWarioState)));
-		xor_a();
 		wr8(wWarioStateCycles, 0);
 		FARCALL(Func_1e6ea);
 	}
@@ -878,7 +864,6 @@ public:
 			return;
 		SET_HL(gb_, wWarioState);
 		wr8(wWarioState, alu_.inc(rd8(wWarioState))); // WST_GET_TREASURE_TURN_FRONT_1
-		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		wr8(wWarioStateCycles, 0);
@@ -899,8 +884,7 @@ public:
 			port_SetState_GetTreasureLookFront();
 			return;
 		}
-		st(wWarioState, WST_GET_TREASURE_LAUGH);
-		xor_a();
+		wr8(wWarioState, WST_GET_TREASURE_LAUGH);
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		wr8(wWarioStateCounter, 0);
@@ -916,8 +900,7 @@ public:
 		anim(OAM2);
 		if (!anim_ended())
 			return;
-		st(wWarioState, WST_GET_TREASURE_TURN_BACK);
-		xor_a();
+		wr8(wWarioState, WST_GET_TREASURE_TURN_BACK);
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		wr8(wWarioStateCounter, 0);
@@ -933,15 +916,13 @@ public:
 		anim(OAM2);
 		if (!anim_ended())
 			return;
-		st(wWarioState, WST_GET_TREASURE_OPEN);
+		wr8(wWarioState, WST_GET_TREASURE_OPEN);
 		play_sfx(SFX_03E);
-		xor_a();
 		wr8(wSFXLoopCounter, 0);
 		wr8(wWarioStateCounter, 0);
 		wr8(wWarioStateCycles, 0);
 		load_gfx(BANK_WarioClearGfx, ADDR_WarioClearGfx);
 		set_oam(BANK_OAM_1fc000, ADDR_OAM_1fc000);
-		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		set_frameset(ADDR_Frameset_1fc2c4);
@@ -955,7 +936,6 @@ public:
 			return;
 		st(wWarioState, WST_GET_TREASURE_TURN_WALK);
 		CALL(LoadCollectedTreasurePal_Level);
-		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		wr8(wWarioStateCounter, 0);
@@ -974,7 +954,7 @@ public:
 		if (!anim_ended()) {
 			return;
 		}
-		st(wWarioStateCounter, 32);
+		wr8(wWarioStateCounter, 32);
 		xor_a();
 		wr8(wAutoMoveState, 0);
 		port_SetNextGetTreasureState();
@@ -982,7 +962,7 @@ public:
 
 	void port_SetState_GetTreasureLookFront()
 	{
-		st(wWarioState, WST_GET_TREASURE_LOOK_FRONT);
+		wr8(wWarioState, WST_GET_TREASURE_LOOK_FRONT);
 		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
@@ -999,11 +979,10 @@ public:
 		anim(OAM2);
 		if (!anim_ended())
 			return;
-		st(wWarioState, WST_GET_TREASURE_CLEAR);
+		wr8(wWarioState, WST_GET_TREASURE_CLEAR);
 		get_pos();
 		cpu_.b = PARTICLE_TREASURE_GLOW;
 		FARCALL(CreateParticle);
-		xor_a();
 		wr8(wWarioStateCounter, 0);
 		wr8(wWarioStateCycles, 0);
 	}
@@ -1011,14 +990,14 @@ public:
 	void port_UpdateState_GetTreasureClear()
 	{
 		SET_HL(gb_, wWarioStateCounter);
-		if (!ld_bit(wJoypadDown, B_PAD_A)) {
+		if (!(rd8(wJoypadDown) >> B_PAD_A & 1)) {
 			cpu_.a = alu_.inc(rd8(wWarioStateCounter));
 			wr8(wWarioStateCounter, cpu_.a);
 			alu_.cp(cpu_.a, 180);
 			if (CF)
 				return;
 		}
-		if (!ld_and(wCurParticleAnimEnded))
+		if (!rd8(wCurParticleAnimEnded))
 			return;
 		wr8(wWarioStateCounter, 0);
 		SET_HL(gb_, wLevelEndScreen);
@@ -1027,8 +1006,7 @@ public:
 
 	void port_SetState_Sleeping()
 	{
-		st(wWarioState, WST_SLEEPING);
-		xor_a();
+		wr8(wWarioState, WST_SLEEPING);
 		wr8(wSFXLoopCounter, 0);
 		wr8(wWarioStateCounter, 0);
 		wr8(wWarioStateCycles, 0);
@@ -1049,7 +1027,7 @@ public:
 			// .asm_1acd0
 			if (anim_ended())
 				play_sfx(SFX_SLEEP);
-			if (!ld_and(wJoypadDown))
+			if (!rd8(wJoypadDown))
 				return;
 			xor_a();
 			wr8(wFrameDuration, 0);
@@ -1070,7 +1048,6 @@ public:
 		if (!anim_ended())
 			return;
 		play_sfx(SFX_SLEEP);
-		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		inc_counter();
@@ -1080,7 +1057,7 @@ public:
 
 	void port_SetState_LadderScratching()
 	{
-		st(wWarioState, WST_LADDER_SCRATCHING);
+		wr8(wWarioState, WST_LADDER_SCRATCHING);
 		coll_box_btlr();
 		xor_a();
 		wr8(wJumpVelIndex, 0);
@@ -1107,7 +1084,7 @@ public:
 
 	void port_SetState_FenceShakeSliding()
 	{
-		st(wWarioState, WST_FENCE_SHAKE_SLIDING);
+		wr8(wWarioState, WST_FENCE_SHAKE_SLIDING);
 		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
@@ -1137,15 +1114,13 @@ public:
 		if (!b_and())
 			return;
 		update_pos_y();
-		xor_a();
 		wr8(wJumpVelTable, 0);
 		wr8(wJumpVelIndex, 0);
 	}
 
 	void port_SetState_FenceMovingVertical()
 	{
-		st(wWarioState, WST_FENCE_MOVING_VERTICAL);
-		xor_a();
+		wr8(wWarioState, WST_FENCE_MOVING_VERTICAL);
 		wr8(wSFXLoopCounter, 0);
 		wr8(wWarioStateCounter, 0);
 		wr8(wWarioStateCycles, 0);
@@ -1174,7 +1149,7 @@ public:
 
 	void port_SetState_FenceIdling()
 	{
-		st(wWarioState, WST_FENCE_IDLING);
+		wr8(wWarioState, WST_FENCE_IDLING);
 		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
@@ -1196,14 +1171,12 @@ public:
 
 	void port_SetState_FenceMovingHorizontal()
 	{
-		st(wWarioState, WST_FENCE_MOVING_HORIZONTAL);
-		xor_a();
+		wr8(wWarioState, WST_FENCE_MOVING_HORIZONTAL);
 		wr8(wSFXLoopCounter, 0);
 		wr8(wWarioStateCounter, 0);
 		wr8(wWarioStateCycles, 0);
 		wr8(wIsSmashAttacking, 0);
 		coll_box_blrt();
-		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		bool right;
@@ -1327,7 +1300,7 @@ public:
 				port_SetState_FenceIdling();
 			return;
 		}
-		st(wDirection, right ? DIRECTION_RIGHT : DIRECTION_LEFT);
+		wr8(wDirection, right ? DIRECTION_RIGHT : DIRECTION_LEFT);
 		FARCALL(CheckFrontCollision);
 		if (b_and()) {
 			return;
@@ -1400,7 +1373,7 @@ public:
 			port_SetState_SandTurning();
 			return;
 		}
-		st(wDirection, right ? DIRECTION_RIGHT : DIRECTION_LEFT);
+		wr8(wDirection, right ? DIRECTION_RIGHT : DIRECTION_LEFT);
 		FARCALL(CheckFrontCollision);
 		if (b_and()) {
 			return;
@@ -1457,7 +1430,7 @@ public:
 				return;
 			}
 			FARCALL(Func_19b12);
-			if (ld_and(wLadderInteraction)) {
+			if (rd8(wLadderInteraction)) {
 				FARCALL(CheckCentreCollision);
 				if (b_and())
 					center_on_ladder();
@@ -1483,11 +1456,11 @@ public:
 			// .asm_1b4a7
 			bool ok;
 			if (ld_bit(wJoypadDown, B_PAD_RIGHT)) {
-				st(wCollisionBoxRight, 16);
+				wr8(wCollisionBoxRight, 16);
 				FARCALL(Func_19741);
 				ok = !b_and();
 			} else {
-				st(wCollisionBoxLeft, (uint8_t)-16);
+				wr8(wCollisionBoxLeft, (uint8_t)-16);
 				FARCALL(Func_197b1);
 				ok = !b_and();
 			}
