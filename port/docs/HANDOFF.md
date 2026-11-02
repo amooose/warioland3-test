@@ -493,8 +493,17 @@ primitives, home/wario.cpp, and the golf objects' animation):
   pass a (CALL, LCALL, member calls; FARCALL sets a itself). An
   assignment whose right side reads a is a read. What's left of the
   register helpers is where a value really flows (cpu_.b into
-  MoveWario*, b_and() after collision checks...): the next pass turns
-  those into arguments and return values, routine by routine.
+  MoveWario*, b_and() after collision checks...).
+- Second pass (b151b7e, 599 sites, redone from the code before the first
+  pass): FARCALL keeps the flags (hCallFunc pops af); a table of the
+  common callees' register use from their asm; an internal member's exit
+  registers are dead when all its calls leave them dead (fixed point);
+  "b = n / call MoveWario*" -> home::move_wario_x / _y (20 sites).
+  What's still register-level is mostly pinned by the 69 Wario state
+  routines and 6 interactions called from other files with exact
+  contracts. Next: check those callers (other groups, the objects,
+  update_level) to relax each contract that nothing reads, then rerun
+  the rewriter.
 - Home's level-tied files (load_room, load_level, decompress_level_data,
   door/floor/room transitions, wario_mechanics1, object_mechanics,
   object_pos, IsOnSlipperyGround) go with the level code that calls
