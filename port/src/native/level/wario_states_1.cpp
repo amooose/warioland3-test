@@ -526,8 +526,7 @@ public:
 
 	void port_Func_1f3a7()
 	{
-		FARCALL(CheckCentreCollision);
-		if (b_and()) {
+		if (centre_collision()) {
 			update_pos_y();
 			st(wc0e1, PAD_DOWN);
 			return;
@@ -993,8 +992,7 @@ public:
 	void port_Func_1ec4b()
 	{
 		wr8(wCollisionBoxTop, (uint8_t)-27);
-		FARCALL(CheckUpCollision);
-		if (!b_and()) {
+		if (!up_collision()) {
 			port_SetState_Attacking();
 			return;
 		}
@@ -1153,8 +1151,7 @@ public:
 		}
 		anim(OAM1);
 		wr8(wCollisionBoxTop, (uint8_t)-27);
-		FARCALL(CheckUpCollision);
-		if (b_and())
+		if (up_collision())
 			st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 	}
 
@@ -1283,8 +1280,7 @@ public:
 			return;
 		}
 		wr8(wCollisionBoxTop, (uint8_t)-27);
-		FARCALL(CheckUpCollision);
-		if (b_and()) {
+		if (up_collision()) {
 			port_CrouchOrSlide();
 			return;
 		}
@@ -1409,8 +1405,7 @@ public:
 				cpu_.b = 1;
 			}
 			CALL(MoveWarioDown);
-			FARCALL(CheckCentreCollision);
-			if (!b_and()) {
+			if (!centre_collision()) {
 				return;
 			}
 		}
@@ -1590,8 +1585,7 @@ public:
 			return;
 		}
 		wr8(wDirection, right ? DIRECTION_RIGHT : DIRECTION_LEFT);
-		FARCALL(CheckFrontCollision);
-		if (b_and()) {
+		if (front_collision()) {
 			return;
 		}
 		if (right) {
@@ -1728,8 +1722,7 @@ public:
 		if (!ZF) {
 			return;
 		}
-		FARCALL(CheckCentreCollision);
-		if (!b_and()) {
+		if (!centre_collision()) {
 			port_StartCrouchFall();
 			return;
 		}
@@ -1784,8 +1777,7 @@ public:
 				st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 			return;
 		}
-		FARCALL(CheckAirborneCollision);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			CALL(TriggerDownwardsFloorTransition);
 			return;
 		}
@@ -1804,8 +1796,7 @@ public:
 			return;
 		port_Func_1f6c2();
 		anim(OAM1);
-		FARCALL(CheckFrontCollision);
-		if (!b_and()) {
+		if (!front_collision()) {
 			bool right = facing_right();
 			cpu_.b = 1;
 			if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX)
@@ -1854,14 +1845,12 @@ public:
 				cpu_.a = alu_.inc(alu_.cpl(v));
 				home::move_wario_y(gb_, -static_cast<int>(cpu_.a));
 				inc_jump_vel_index();
-				FARCALL(CheckUpCollision);
-				if (!b_and()) {
+				if (!up_collision()) {
 					return;
 				}
 				st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 			}
-			FARCALL(CheckAirborneCollision);
-			if (!b_and()) {
+			if (!airborne_collision()) {
 				CALL(TriggerDownwardsFloorTransition);
 				return;
 			}
@@ -1901,13 +1890,11 @@ public:
 			return;
 		}
 		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
-			FARCALL(CheckUpCollision);
-			if (b_and())
+			if (up_collision())
 				st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 			return;
 		}
-		FARCALL(CheckAirborneCollision);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			CALL(TriggerDownwardsFloorTransition);
 			return;
 		}
@@ -2101,8 +2088,7 @@ public:
 
 	void port_UpdateState_SwimKnockBack()
 	{
-		FARCALL(CheckFrontCollision);
-		if (!b_and()) {
+		if (!front_collision()) {
 			cpu_.a = inc_counter();
 			alu_.cp(cpu_.a, 0x04);
 			bool move = true;
@@ -2138,8 +2124,7 @@ public:
 		anim(OAM1);
 		SET_HL(gb_, wWarioStateCounter);
 		wr8(wWarioStateCounter, alu_.inc(rd8(wWarioStateCounter)));
-		FARCALL(CheckUpCollision);
-		if (b_and()) {
+		if (up_collision()) {
 			ld_cp(wWarioStateCounter, 0x78);
 			if (CF) {
 				return;
@@ -2182,8 +2167,7 @@ public:
 
 	void port_Func_1f310()
 	{
-		FARCALL(CheckFrontCollision);
-		if (b_and()) {
+		if (front_collision()) {
 			st(wc0e1, facing_right() ? PAD_RIGHT : PAD_LEFT);
 			return;
 		}
@@ -2199,8 +2183,7 @@ public:
 
 	void port_Func_1f3d9()
 	{
-		FARCALL(CheckUpCollision);
-		if (b_and()) {
+		if (up_collision()) {
 			return;
 		}
 		FARCALL(Func_19acd);
@@ -2473,8 +2456,7 @@ public:
 		if (!still_in(WST_CROUCH_WALKING)) {
 			return;
 		}
-		FARCALL(CheckCentreCollision);
-		if (!b_and()) {
+		if (!centre_collision()) {
 			port_StartCrouchFall();
 			return;
 		}
@@ -2530,8 +2512,7 @@ public:
 			return;
 		}
 		// .falling
-		FARCALL(CheckAirborneCollision);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			if (!still_in(WST_CROUCH_AIRBORNE)) {
 				return;
 			}
@@ -2630,8 +2611,7 @@ public:
 			port_DoBumpWithBigBackOffset();
 			return;
 		}
-		FARCALL(CheckCentreCollision);
-		if (!b_and()) {
+		if (!centre_collision()) {
 			port_Func_1e174();
 			return;
 		}
@@ -2684,13 +2664,11 @@ public:
 				wr8(wJumpVelIndex, MAX_JUMP_VEL_INDEX);
 		}
 		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
-			FARCALL(CheckUpCollision);
-			if (b_and())
+			if (up_collision())
 				st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 			return;
 		}
-		FARCALL(CheckAirborneCollision);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			CALL(TriggerDownwardsFloorTransition);
 			return;
 		}
@@ -2820,13 +2798,11 @@ public:
 		if (!rd8(wGroundShakeCounter)) {
 			// .no_more_ground_shake
 			wr8(wCollisionBoxTop, (uint8_t)-27);
-			FARCALL(CheckUpCollision);
-			if (b_and()) {
+			if (up_collision()) {
 				port_CrouchOrSlide();
 				return;
 			}
-			FARCALL(CheckCentreCollision);
-			if (!b_and()) {
+			if (!centre_collision()) {
 				port_StartFall();
 				return;
 			}
@@ -2840,13 +2816,11 @@ public:
 		FARCALL(HandleWalk);
 		CALL(Func_1762);
 		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
-			FARCALL(CheckUpCollision);
-			if (b_and())
+			if (up_collision())
 				st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 			return;
 		}
-		FARCALL(CheckCentreCollision);
-		if (!b_and()) {
+		if (!centre_collision()) {
 			CALL(TriggerDownwardsFloorTransition);
 			return;
 		}
@@ -2990,8 +2964,7 @@ public:
 		}
 		ld_cp(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 		if (CF) {
-			FARCALL(CheckUpCollision);
-			if (b_and())
+			if (up_collision())
 				st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 			return;
 		}
@@ -3042,8 +3015,7 @@ public:
 
 	void port_Func_1f357()
 	{
-		FARCALL(CheckCentreCollision);
-		if (b_and())
+		if (centre_collision())
 			update_pos_y();
 		if (still_in(WST_WATER_STUNG)) {
 			return;
@@ -3083,8 +3055,7 @@ public:
 	// HandleUnderwaterThrustingInput.up
 	void thrust_up()
 	{
-		FARCALL(CheckUpCollision);
-		if (b_and()) {
+		if (up_collision()) {
 			set_c0e1(B_PAD_UP);
 			port_StartDive();
 			return;
@@ -3101,8 +3072,7 @@ public:
 	// HandleUnderwaterThrustingInput.down
 	void thrust_down()
 	{
-		FARCALL(CheckCentreCollision);
-		if (b_and()) {
+		if (centre_collision()) {
 			update_pos_y();
 			set_c0e1(B_PAD_DOWN);
 			return;
@@ -3114,8 +3084,7 @@ public:
 	// HandleUnderwaterThrustingInput.right / .left
 	void thrust_horizontal(bool right)
 	{
-		FARCALL(CheckCentreCollision);
-		if (b_and())
+		if (centre_collision())
 			update_pos_y();
 		if (still_in(WST_WATER_STUNG)) {
 			return;
@@ -3148,8 +3117,7 @@ public:
 		}
 		if (alu_.bit(cpu_.a, B_PAD_DOWN)) {
 			// .diagonal_down
-			FARCALL(CheckCentreCollision);
-			if (!b_and()) {
+			if (!centre_collision()) {
 				cpu_.b = 1;
 				CALL(MoveWarioDown);
 				return;
@@ -3159,8 +3127,7 @@ public:
 			return;
 		}
 		// diagonal up
-		FARCALL(CheckUpCollision);
-		if (b_and()) {
+		if (up_collision()) {
 			set_c0e1(B_PAD_UP);
 			return;
 		}
@@ -3253,8 +3220,7 @@ public:
 				st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 			return;
 		}
-		FARCALL(CheckAirborneCollision);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			CALL(TriggerDownwardsFloorTransition);
 			return;
 		}
@@ -3311,8 +3277,7 @@ public:
 			anim(OAM1);
 			return;
 		}
-		FARCALL(CheckFrontCollision);
-		if (b_and())
+		if (front_collision())
 			return;
 		// current overrides player input
 		if (water_current_mask(CURRENT_RIGHT | CURRENT_LEFT))
@@ -3409,8 +3374,7 @@ public:
 			return;
 		}
 		// .asm_1f2c0
-		FARCALL(CheckCentreCollision);
-		if (b_and())
+		if (centre_collision())
 			update_pos_y();
 		if (still_in(WST_WATER_STUNG)) {
 			return;
@@ -3503,8 +3467,7 @@ public:
 		// .asm_1f1f5
 		anim(OAM1);
 		wr8(wWarioStateCycles, 0x01);
-		FARCALL(CheckUpCollision);
-		if (b_and()) {
+		if (up_collision()) {
 			st(wc0e1, PAD_UP);
 			return;
 		}
@@ -3709,8 +3672,7 @@ public:
 		if (!still_in(WST_GRAB_WALKING)) {
 			return;
 		}
-		FARCALL(CheckCentreCollision);
-		if (!b_and()) {
+		if (!centre_collision()) {
 			port_Func_1edd3();
 			return;
 		}
@@ -3739,8 +3701,7 @@ public:
 			port_DoBumpWithSmallBackOffset();
 			return;
 		}
-		FARCALL(CheckCentreCollision);
-		if (!b_and()) {
+		if (!centre_collision()) {
 			port_StartFallingAirborneAttack();
 			return;
 		}

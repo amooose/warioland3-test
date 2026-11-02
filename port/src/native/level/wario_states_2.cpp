@@ -406,8 +406,7 @@ public:
 		if (!ZF) {
 			return;
 		}
-		FARCALL(CheckCentreCollision);
-		if (!b_and()) {
+		if (!centre_collision()) {
 			return;
 		}
 		update_pos_y();
@@ -457,8 +456,7 @@ public:
 			port_SetState_SandFalling();
 			return;
 		}
-		FARCALL(CheckUpCollision);
-		if (!b_and()) {
+		if (!up_collision()) {
 			return;
 		}
 		port_SetState_SandFalling();
@@ -513,8 +511,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		FARCALL(CheckCentreCollision);
-		if (!b_and()) {
+		if (!centre_collision()) {
 			port_SetState_SandFalling();
 			return;
 		}
@@ -639,8 +636,7 @@ public:
 		CALL(MoveWarioDown);
 		if (down_floor_check())
 			CALL(StartDownwardsFloorTransition);
-		FARCALL(CheckAirborneCollision);
-		if (b_and()) {
+		if (airborne_collision()) {
 			update_pos_y();
 			FARCALL(SetState_Idling);
 			return;
@@ -738,8 +734,7 @@ public:
 		CALL(MoveWarioDown);
 		if (down_floor_check())
 			CALL(StartDownwardsFloorTransition);
-		FARCALL(CheckAirborneCollision);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			return;
 		}
 		update_pos_y();
@@ -821,8 +816,7 @@ public:
 		anim(OAM1);
 		if (ld_and(wJumpVelTable)) {
 			CALL(ApplyJumpVelocity);
-			FARCALL(CheckAirborneCollision);
-			if (!b_and()) {
+			if (!airborne_collision()) {
 				return;
 			}
 			wr8(wWarioPos + 0, rd8(hYPosHi));
@@ -1111,8 +1105,7 @@ public:
 		if (!ld_and(wJumpVelTable))
 			return;
 		CALL(ApplyJumpVelocity);
-		FARCALL(CheckAirborneCollision);
-		if (!b_and())
+		if (!airborne_collision())
 			return;
 		update_pos_y();
 		wr8(wJumpVelTable, 0);
@@ -1249,8 +1242,7 @@ public:
 		}
 		if (alu_.bit(cpu_.a, B_PAD_DOWN)) {
 			home::move_wario_y(gb_, 0x01);
-			FARCALL(CheckCentreCollision);
-			if (b_and()) {
+			if (centre_collision()) {
 				update_pos_y();
 				FARCALL(SetState_Idling);
 				return;
@@ -1301,8 +1293,7 @@ public:
 			return;
 		}
 		wr8(wDirection, right ? DIRECTION_RIGHT : DIRECTION_LEFT);
-		FARCALL(CheckFrontCollision);
-		if (b_and()) {
+		if (front_collision()) {
 			return;
 		}
 		cpu_.b = 0x01;
@@ -1319,8 +1310,7 @@ public:
 			return;
 		}
 		port_Func_1b302();
-		FARCALL(CheckFrontCollision);
-		if (b_and()) {
+		if (front_collision()) {
 			return;
 		}
 		FARCALL(Func_2b17a);
@@ -1331,8 +1321,7 @@ public:
 
 	void port_Func_1b302()
 	{
-		FARCALL(CheckCentreCollision);
-		if (b_and())
+		if (centre_collision())
 			return;
 		cpu_.b = 0x01;
 		if ((rd8(wJoypadDown) >> B_PAD_DOWN & 1))
@@ -1374,8 +1363,7 @@ public:
 			return;
 		}
 		wr8(wDirection, right ? DIRECTION_RIGHT : DIRECTION_LEFT);
-		FARCALL(CheckFrontCollision);
-		if (b_and()) {
+		if (front_collision()) {
 			return;
 		}
 		if (right) {
@@ -1431,14 +1419,12 @@ public:
 			}
 			FARCALL(Func_19b12);
 			if (rd8(wLadderInteraction)) {
-				FARCALL(CheckCentreCollision);
-				if (b_and())
+				if (centre_collision())
 					center_on_ladder();
 				return;
 			}
 			// .no_more_ladder_interaction
-			FARCALL(CheckCentreCollision);
-			if (b_and())
+			if (centre_collision())
 				goto idle;
 			FARCALL(StartFall);
 			return;

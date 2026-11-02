@@ -85,6 +85,17 @@ protected:
 		cpu_.a = cpu_.b;
 		return alu_.and_(cpu_.a, cpu_.a) != 0;
 	}
+	// Wario's collision checks (farcalled), true if they found one, with
+	// the ld a, b / and a that tests their result in b
+	bool centre_collision() { return collision_check(BANK_CheckCentreCollision, ADDR_CheckCentreCollision); }
+	bool front_collision() { return collision_check(BANK_CheckFrontCollision, ADDR_CheckFrontCollision); }
+	bool up_collision() { return collision_check(BANK_CheckUpCollision, ADDR_CheckUpCollision); }
+	bool airborne_collision() { return collision_check(BANK_CheckAirborneCollision, ADDR_CheckAirborneCollision); }
+	bool collision_check(uint8_t bank, uint16_t addr)
+	{
+		port_farcall(gb_, bank, addr);
+		return b_and();
+	}
 	// ld a, [addr] / bit n, a
 	bool ld_bit(uint16_t addr, int n) { return alu_.bit(ld(addr), n); }
 	// ld a, [addr] / and mask: true if nz

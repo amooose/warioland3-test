@@ -932,8 +932,7 @@ public:
 			wr8(hXPosHiBackup, cpu_.a);
 			cpu_.a = rd8(hXPosLo);
 			wr8(hXPosLoBackup, cpu_.a);
-			FARCALL(CheckUpCollision);
-			if (b_and()) {
+			if (up_collision()) {
 				low_ceiling = true;
 			} else {
 				xor_a();
@@ -1099,8 +1098,7 @@ public:
 			return;
 		if (ld_and(wIsCrouching)) {
 			wr8(wCollisionBoxTop, (uint8_t)-27);
-			FARCALL(CheckUpCollision);
-			if (b_and()) {
+			if (up_collision()) {
 				st(wCollisionBoxTop, (uint8_t)-15);
 				return;
 			}
@@ -2135,8 +2133,7 @@ public:
 	{
 		if (ld_and(wIsCrouching)) {
 			wr8(wCollisionBoxTop, (uint8_t)-27);
-			FARCALL(CheckUpCollision);
-			if (b_and()) {
+			if (up_collision()) {
 				st(wCollisionBoxTop, (uint8_t)-15);
 				port_Func_2022c();
 				return;

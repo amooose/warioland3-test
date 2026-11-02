@@ -823,8 +823,7 @@ public:
 	void port_UpdateState_BallStart()
 	{
 		CALL(ApplyJumpVelocity);
-		FARCALL(CheckAirborneCollision);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			return;
 		}
 		update_pos_y();
@@ -866,8 +865,7 @@ public:
 		ld_cp(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 		if (CF) {
 			home::move_wario_y(gb_, -static_cast<int>(3));
-			FARCALL(CheckUpCollision);
-			if (!b_and()) {
+			if (!up_collision()) {
 				CALL(HandleUpwardsFloorTransition);
 				return;
 			}
@@ -876,8 +874,7 @@ public:
 			return;
 		}
 		CALL(ApplyJumpVelocity);
-		FARCALL(CheckAirborneCollision);
-		if (b_and()) {
+		if (airborne_collision()) {
 			update_pos_y();
 			wr8(wIsIntangible, 0);
 			wr8(wJumpVelIndex, 0);
@@ -889,8 +886,7 @@ public:
 	void port_UpdateState_MagicRising()
 	{
 		FARCALL(Func_19b25);
-		FARCALL(CheckUpCollision);
-		if (b_and()) {
+		if (up_collision()) {
 			get_pos();
 			cpu_.b = PARTICLE_MAGIC_STOP;
 			FARCALL(CreateParticle);
@@ -925,8 +921,7 @@ public:
 		}
 		sfx_loop(0x86, SFX_04C);
 		anim(OAM3);
-		FARCALL(CheckFrontCollision);
-		if (!b_and()) {
+		if (!front_collision()) {
 			cpu_.b = 2;
 			move_by_dir();
 			return;
@@ -948,8 +943,7 @@ public:
 			return;
 		}
 		home::move_wario_x(gb_, -static_cast<int>(2));
-		FARCALL(CheckAirborneCollision);
-		if (!b_and())
+		if (!airborne_collision())
 			return;
 		update_pos_y();
 		wr8(wIsIntangible, 0);
@@ -1057,16 +1051,14 @@ public:
 	{
 		if (room_transition_check())
 			return;
-		FARCALL(CheckFrontCollision);
-		if (b_and()) {
+		if (front_collision()) {
 			port_Func_1ec215();
 			return;
 		}
 		sfx_loop(0x0c, SFX_ZIP_LINE_SLIDE);
 		anim(OAM2);
 		walk_move(0x14, 0x10);
-		FARCALL(CheckCentreCollision);
-		if (b_and()) {
+		if (centre_collision()) {
 			update_pos_y();
 			return;
 		}
@@ -1083,8 +1075,7 @@ public:
 			port_SetState_IceSkatinCrash();
 			return;
 		}
-		FARCALL(CheckFrontCollision);
-		if (b_and()) {
+		if (front_collision()) {
 			port_Func_1ec215();
 			return;
 		}
@@ -1097,8 +1088,7 @@ public:
 		if (!still_in(WST_ICE_SKATIN_AIRBORNE)) {
 			return;
 		}
-		FARCALL(CheckAirborneCollision);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			if (!still_in(WST_ICE_SKATIN_AIRBORNE)) {
 				return;
 			}
@@ -1249,8 +1239,7 @@ public:
 		if (!still_in(WST_SNOWMAN_WALKING)) {
 			return;
 		}
-		FARCALL(CheckCentreCollision);
-		if (!b_and()) {
+		if (!centre_collision()) {
 			port_SetState_SnowmanAirborne_Fall();
 			return;
 		}
@@ -1318,8 +1307,7 @@ public:
 			port_SetState_SnowballCrash();
 			return;
 		}
-		FARCALL(CheckCentreCollision);
-		if (b_and()) {
+		if (centre_collision()) {
 			update_pos_y();
 			return;
 		}
@@ -1376,8 +1364,7 @@ public:
 		if (CF) {
 			return;
 		}
-		FARCALL(CheckAirborneCollision);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			return;
 		}
 		update_pos_y();
@@ -1428,8 +1415,7 @@ public:
 			return;
 		}
 		CALL(ApplyJumpVelocity);
-		FARCALL(CheckAirborneCollision);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			FARCALL(HandleWalk);
 			CALL(Func_1762);
 			CALL(TriggerDownwardsFloorTransition);
@@ -1462,8 +1448,7 @@ public:
 		if (!ZF) {
 			return;
 		}
-		FARCALL(CheckCentreCollision);
-		if (!b_and()) {
+		if (!centre_collision()) {
 			port_SetState_SnowmanAirborne_Fall();
 			return;
 		}
@@ -1516,8 +1501,7 @@ public:
 		}
 		if (ld_and(wJumpVelTable)) {
 			CALL(ApplyJumpVelocity);
-			FARCALL(CheckAirborneCollision);
-			if (!b_and()) {
+			if (!airborne_collision()) {
 				CALL(TriggerDownwardsFloorTransition);
 				return;
 			}
@@ -1548,8 +1532,7 @@ public:
 		FARCALL(Func_2b17a);
 		if (rd8(wWalkVelIndex) >= 0x08)
 			wr8(wWalkVelIndex, 0x04);
-		FARCALL(CheckAirborneCollision);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			return;
 		}
 		update_pos_y();
@@ -1603,8 +1586,7 @@ public:
 		FARCALL(HandleWalk);
 		if (rd8(wWalkVelIndex) >= 0x18)
 			wr8(wWalkVelIndex, 0x14);
-		FARCALL(CheckAirborneCollision);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			CALL(TriggerDownwardsFloorTransition);
 			return;
 		}
@@ -1640,8 +1622,7 @@ public:
 			return;
 		}
 		if (rd8(wJumpVelIndex) < 0x18) {
-			FARCALL(CheckUpCollision);
-			if (!b_and()) {
+			if (!up_collision()) {
 				return;
 			}
 			ld_cp(wWarioState, WST_SNOWMAN_AIRBORNE);
@@ -1651,8 +1632,7 @@ public:
 			port_SetState_SnowmanAirborne_Fall();
 			return;
 		}
-		FARCALL(CheckAirborneCollision);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			CALL(TriggerDownwardsFloorTransition);
 			return;
 		}
@@ -1686,8 +1666,7 @@ public:
 			port_Func_1ed09b();
 			return;
 		}
-		FARCALL(CheckCentreCollision);
-		if (b_and()) {
+		if (centre_collision()) {
 			return;
 		}
 		wr8(wWarioState, WST_SPLITTING_AIRBORNE);
@@ -1709,8 +1688,7 @@ public:
 			return;
 		}
 		CALL(ApplyJumpVelocity);
-		FARCALL(CheckAirborneCollision);
-		if (b_and()) {
+		if (airborne_collision()) {
 			port_SetState_Splitting();
 			return;
 		}
