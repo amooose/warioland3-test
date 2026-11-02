@@ -5,6 +5,7 @@
 // original's registers, flags and return addresses (see asm_module.hpp).
 // Converted with tools/c2cpp.py, then fuzzed hook by hook.
 #include "../asm_module.hpp"
+#include "../home/wario.hpp"
 
 namespace wl3::level {
 
@@ -119,7 +120,7 @@ public:
 		wr8(wWarioState, WST_DIVING);
 		wr8(wCollisionBoxBottom, (uint8_t)-1);
 		wr8(wCollisionBoxLeft, (uint8_t)-9);
-		st(wCollisionBoxRight, 9);
+		wr8(wCollisionBoxRight, 9);
 		static const uint16_t zero[] = {wJumpVelIndex, wJumpVelTable, wWarioStateCounter,
 			wWarioStateCycles, wIsSmashAttacking, wAttackCounter, wIsRolling, wSwimVelIndex,
 			wIsCrouching, wc0e0, 0};
@@ -215,6 +216,7 @@ public:
 
 	void port_SetState_RollingAirborne()
 	{
+		xor_a();
 		wr8(wWarioSlopeInteraction, 0);
 		wr8(wGrabState, 0);
 		wr8(wJumpVelTable, JUMP_VEL_KNOCK_BACK);
@@ -417,6 +419,7 @@ public:
 
 	void port_StartJump_FromSand()
 	{
+		xor_a();
 		wr8(wJumpVelIndex, 0);
 		wr8(wJumpingUpwards, TRUE);
 		wr8(wDoFullJump, TRUE);
@@ -433,6 +436,7 @@ public:
 
 	void port_DiveFromSurface()
 	{
+		xor_a();
 		wr8(wGrabState, 0);
 		get_pos();
 		cpu_.a = alu_.and_(rd8(hYPosLo), 0xf0);
@@ -591,7 +595,7 @@ public:
 			return;
 		}
 
-		if ((rd8(wJoypadDown) >> B_PAD_DOWN & 1)) {
+		if (ld_bit(wJoypadDown, B_PAD_DOWN)) {
 			FARCALL(Func_19b12);
 			if (!still_idling()) {
 				return;
@@ -664,7 +668,7 @@ public:
 		clear(zero);
 		wr8(wWarioState, WST_ROLLING);
 		collision_box(-1, -14, -9, 9);
-		st(wIsRolling, 0x02);
+		wr8(wIsRolling, 0x02);
 		reset_anim();
 		frameset_by_dir(ADDR_Frameset_166e6, ADDR_Frameset_166f7);
 		anim(OAM1);
@@ -700,6 +704,7 @@ public:
 
 	void port_SetState_CrouchSliding()
 	{
+		xor_a();
 		wr8(wSFXLoopCounter, 0);
 		wr8(wAttackCounter, 0);
 		play_sfx(SFX_SLIDE);
@@ -917,6 +922,7 @@ public:
 
 	void port_SetState_Idling()
 	{
+		xor_a();
 		wr8(wWalkVelIndex, 0);
 		wr8(wWarioState, WST_IDLING);
 		static const uint16_t zero[] = {wFrameDuration, wAnimationFrame, wJumpVelIndex,
@@ -1047,17 +1053,18 @@ public:
 
 	void port_HandleBumpMovement()
 	{
-		if (rd8(wJumpVelIndex) >= 28) {
+		ld_cp(wJumpVelIndex, 28);
+		if (!CF) {
 			cpu_.a = alu_.and_(rd8(wJoypadDown), PAD_RIGHT | PAD_LEFT);
 			if (cpu_.a) {
 				if (alu_.bit(cpu_.a, B_PAD_RIGHT)) {
-					st(wDirection, DIRECTION_RIGHT);
+					wr8(wDirection, DIRECTION_RIGHT);
 					if (!farcall_b(BANK_Func_197b1, ADDR_Func_197b1)) {
 						cpu_.b = 1;
 						CALL(MoveWarioLeft);
 					}
 				} else {
-					st(wDirection, DIRECTION_LEFT);
+					wr8(wDirection, DIRECTION_LEFT);
 					if (!farcall_b(BANK_Func_19741, ADDR_Func_19741)) {
 						cpu_.b = 1;
 						CALL(MoveWarioRight);
@@ -1072,15 +1079,13 @@ public:
 		// .no_control
 		ld_cp(wDirection, DIRECTION_RIGHT);
 		if (ZF) {
-			cpu_.b = 1;
-			CALL(MoveWarioRight);
+			home::move_wario_x(gb_, 1);
 			if (farcall_b(BANK_Func_19741, ADDR_Func_19741)) {
 				cpu_.b = 1;
 				CALL(MoveWarioLeft);
 			}
 		} else {
-			cpu_.b = 1;
-			CALL(MoveWarioLeft);
+			home::move_wario_x(gb_, -static_cast<int>(1));
 			if (farcall_b(BANK_Func_197b1, ADDR_Func_197b1)) {
 				cpu_.b = 1;
 				CALL(MoveWarioRight);
@@ -1167,9 +1172,8 @@ public:
 		else
 			return;
 		uint8_t dir = right ? DIRECTION_RIGHT : DIRECTION_LEFT;
-		ld_cp(wDirection, dir);
-		if (!ZF)
-			st(wDirection, dir);
+		if (rd8(wDirection) != dir)
+			wr8(wDirection, dir);
 		if (farcall_b(BANK_CheckFrontCollision, ADDR_CheckFrontCollision))
 			return;
 		cpu_.b = 1;
@@ -1449,7 +1453,7 @@ public:
 			return;
 		}
 		flip_dir();
-		st(wInvincibleCounter, 0x10);
+		wr8(wInvincibleCounter, 0x10);
 		SET_HL(gb_, ADDR_WarioDefaultPal);
 		CALL(SetWarioPal);
 		wr8(wCollisionBoxTop, (uint8_t)-27);
@@ -1501,19 +1505,17 @@ public:
 
 	void port_UpdateState_PipeGoingDown()
 	{
-		st(wIsIntangible, TRUE);
+		wr8(wIsIntangible, TRUE);
 		anim(OAM1);
-		cpu_.b = 1;
-		CALL(MoveWarioDown);
+		home::move_wario_y(gb_, 1);
 		pipe_counter(false);
 	}
 
 	void port_UpdateState_PipeGoingUp()
 	{
-		st(wIsIntangible, TRUE);
+		wr8(wIsIntangible, TRUE);
 		anim(OAM1);
-		cpu_.b = 1;
-		CALL(MoveWarioUp);
+		home::move_wario_y(gb_, -static_cast<int>(1));
 		pipe_counter(true);
 	}
 
@@ -1806,8 +1808,7 @@ public:
 		if (!b_and()) {
 			bool right = facing_right();
 			cpu_.b = 1;
-			ld_cp(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
-			if (CF)
+			if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX)
 				cpu_.b = alu_.inc(cpu_.b);
 			if (right)
 				CALL(MoveWarioRight);
@@ -1851,8 +1852,7 @@ public:
 					break;
 				}
 				cpu_.a = alu_.inc(alu_.cpl(v));
-				cpu_.b = cpu_.a;
-				CALL(MoveWarioUp);
+				home::move_wario_y(gb_, -static_cast<int>(cpu_.a));
 				inc_jump_vel_index();
 				FARCALL(CheckUpCollision);
 				if (!b_and()) {
@@ -2043,7 +2043,6 @@ public:
 			CALL(MoveWarioUp);
 			inc_jump_vel_index();
 		} else {
-			xor_a();
 			wr8(wDoFullJump, 0);
 			cpu_.b = rd8(hl);
 			CALL(MoveWarioDown);
@@ -2151,23 +2150,20 @@ public:
 		}
 		FARCALL(Func_19acd);
 		if (!rd8(wWaterInteraction)) {
-			ld_cp(wWarioStateCounter, 0x78);
-			if (CF) {
+			if (rd8(wWarioStateCounter) < 0x78) {
 				return;
 			}
 			water_stung_end(&WarioStates1::port_SurfaceFromUnderwater);
 			return;
 		}
-		ld_cp(wWarioStateCounter, 0x78);
-		if (!CF) {
+		if (rd8(wWarioStateCounter) >= 0x78) {
 			water_stung_end(&WarioStates1::port_SetState_Submerged);
 			return;
 		}
-		if (ld_mask(wGlobalCounter, 1)) {
+		if ((rd8(wGlobalCounter) & (1))) {
 			return;
 		}
-		cpu_.b = 0x01;
-		CALL(MoveWarioUp);
+		home::move_wario_y(gb_, -static_cast<int>(0x01));
 		if (!rd8(wWaterCurrent)) {
 			return;
 		}
@@ -2395,7 +2391,7 @@ public:
 				port_DiveFromSurface();
 				return;
 			}
-			if (rd8(wIsInSand)) {
+			if (ld_and(wIsInSand)) {
 				FARCALL(SetState_SandFalling);
 				return;
 			}
@@ -2424,7 +2420,8 @@ public:
 		static const AirborneFramesets f = {ADDR_Frameset_15f94, ADDR_Frameset_15f97, ADDR_Frameset_15f8e,
 			ADDR_Frameset_15f91, ADDR_Frameset_1604e, ADDR_Frameset_16055};
 		airborne_smash_attack(&f);
-		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
+		ld_cp(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+		if (CF) {
 			FARCALL(CheckUpCollision);
 			if (!b_and() || !still_in(WST_AIRBORNE)) {
 				return;
@@ -2616,7 +2613,7 @@ public:
 			return;
 		sfx_loop(12, SFX_ROLL);
 		anim(OAM1);
-		if ((rd8(wJoypadPressed) >> B_PAD_A & 1)) {
+		if (ld_bit(wJoypadPressed, B_PAD_A)) {
 			// .asm_1e145
 			FARCALL(CheckCentreCollision);
 			update_pos_y();
@@ -2653,7 +2650,7 @@ public:
 			port_DiveFromSurface();
 			return;
 		}
-		if (rd8(wIsInSand)) {
+		if (ld_and(wIsInSand)) {
 			FARCALL(SetState_SandFalling);
 			return;
 		}
@@ -2884,7 +2881,7 @@ public:
 		if (!still_in(WST_CROUCH_SLIDING)) {
 			return;
 		}
-		if ((rd8(wJoypadPressed) >> B_PAD_A & 1)) {
+		if (ld_bit(wJoypadPressed, B_PAD_A)) {
 			// .try_jump
 			wr8(wCollisionBoxTop, (uint8_t)-27);
 			FARCALL(CheckUpCollision);
@@ -2970,7 +2967,7 @@ public:
 			port_StartFall();
 			return;
 		}
-		if (rd8(wIsInSand)) {
+		if (ld_and(wIsInSand)) {
 			FARCALL(SetState_SandFalling);
 			return;
 		}
@@ -2991,7 +2988,8 @@ public:
 			if (!CF)
 				st(wWalkVelIndex, 0x04);
 		}
-		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
+		ld_cp(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+		if (CF) {
 			FARCALL(CheckUpCollision);
 			if (b_and())
 				st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
@@ -3269,6 +3267,7 @@ public:
 
 	void port_UpdateState_WaterSurfaceIdling()
 	{
+		xor_a();
 		wr8(wc0e1, 0);
 		FARCALL(Func_19b25);
 		if (!still_in(WST_WATER_SURFACE_IDLING)) {
@@ -3428,6 +3427,7 @@ public:
 
 	void port_SetState_AttackingAirborne()
 	{
+		xor_a();
 		wr8(wWarioSlopeInteraction, 0);
 		wr8(wWarioState, WST_ATTACKING_AIRBORNE);
 		reset_anim();
@@ -3517,8 +3517,7 @@ public:
 		if (!ZF || water_current_mask(CURRENT_UP | CURRENT_DOWN)) {
 			return;
 		}
-		cpu_.b = 0x01;
-		CALL(MoveWarioUp);
+		home::move_wario_y(gb_, -static_cast<int>(0x01));
 	}
 
 	void port_StartFallingAirborneAttack()

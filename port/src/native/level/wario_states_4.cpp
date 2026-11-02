@@ -5,6 +5,7 @@
 // original's registers, flags and return addresses (see asm_module.hpp).
 // Converted with tools/c2cpp.py, then fuzzed hook by hook.
 #include "../asm_module.hpp"
+#include "../home/wario.hpp"
 
 namespace wl3::level {
 
@@ -43,7 +44,6 @@ public:
 			wIsSmashAttacking, wJumpVelTable, wJumpVelIndex, wInvisibleFrame, 0};
 		clear(zero);
 		collision_box(-1, -27, -9, 9);
-		xor_a();
 		CALL(UpdateLevelMusic);
 		xor_a();
 		wr8(wFrameDuration, 0);
@@ -58,6 +58,7 @@ public:
 
 	void port_SetState_BlindWalking()
 	{
+		xor_a();
 		wr8(wWalkVelIndex, 0);
 		wr8(wWarioState, WST_BLIND_WALKING);
 		wr8(wSFXLoopCounter, 0);
@@ -168,7 +169,7 @@ public:
 
 	void port_SetState_IceSkatin()
 	{
-		st(wWarioState, WST_ICE_SKATIN);
+		wr8(wWarioState, WST_ICE_SKATIN);
 		static const uint16_t zero[] = {wSFXLoopCounter, wFrameDuration, wAnimationFrame, 0};
 		clear(zero);
 		frameset_by_dir(ADDR_Frameset_1fdd97, ADDR_Frameset_1fdd94);
@@ -179,7 +180,7 @@ public:
 	{
 		play_sfx(SFX_066);
 		wr8(wJumpVelTable, JUMP_VEL_KNOCK_BACK);
-		st(wWarioState, WST_BALL_AIRBORNE);
+		wr8(wWarioState, WST_BALL_AIRBORNE);
 		reset_anim();
 		frameset_by_dir(ADDR_Frameset_1dd2f3, ADDR_Frameset_1dd2f6);
 		anim(OAM3);
@@ -189,7 +190,7 @@ public:
 	{
 		xor_a();
 		wr8(wWalkVelIndex, 0);
-		st(wWarioState, WST_FAN_LIFTING);
+		wr8(wWarioState, WST_FAN_LIFTING);
 		static const uint16_t zero[] = {wSFXLoopCounter, wFrameDuration, wAnimationFrame, 0};
 		clear(zero);
 		frameset_by_dir(ADDR_Frameset_1dc374, ADDR_Frameset_1dc3b8);
@@ -252,7 +253,7 @@ public:
 	{
 		xor_a();
 		wr8(wTransformationProgress, 0);
-		st(wWarioState, WST_SNOWBALL_CRASH);
+		wr8(wWarioState, WST_SNOWBALL_CRASH);
 		bool right = flip_dir_and();
 		cpu_.b = 2;
 		if (right)
@@ -270,6 +271,7 @@ public:
 
 	void port_SetState_SnowmanWalking()
 	{
+		xor_a();
 		wr8(wWalkVelIndex, 0);
 		wr8(wWarioState, WST_SNOWMAN_WALKING);
 		wr8(wSFXLoopCounter, 0);
@@ -483,7 +485,7 @@ public:
 
 	void port_SetState_IceSkatinStart()
 	{
-		st(wWarioState, WST_ICE_SKATIN_START);
+		wr8(wWarioState, WST_ICE_SKATIN_START);
 		collision_box(-1, -27, -9, 9);
 		static const uint16_t zero[] = {wInvisibleFrame, wWarioStateCounter, wWarioStateCycles,
 			wGrabState, wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking,
@@ -537,7 +539,7 @@ public:
 			wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking, 0};
 		clear(zero);
 		wr8(wJumpVelTable, 0x01);
-		st(wJumpVelIndex, 0x0e);
+		wr8(wJumpVelIndex, 0x0e);
 		CALL(UpdateLevelMusic);
 		reset_anim();
 		SET_HL(gb_, ADDR_WarioSplitPal);
@@ -557,8 +559,8 @@ public:
 		static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
 			wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking, wJumpVelIndex, 0};
 		clear(zero);
-		if (ld_and(wJumpVelTable))
-			st(wJumpVelIndex, 0x18);
+		if (rd8(wJumpVelTable))
+			wr8(wJumpVelIndex, 0x18);
 		CALL(UpdateLevelMusic);
 		reset_anim();
 		SET_HL(gb_, ADDR_WarioSnowmanPal);
@@ -577,7 +579,7 @@ public:
 		wr8(wTouchState, TOUCH_VANISH);
 		wr8(wStingTouchState, TOUCH_VANISH);
 		wr8(wca94, 0x02);
-		st(wWarioState, WST_LAUNCHED);
+		wr8(wWarioState, WST_LAUNCHED);
 		static const uint16_t zero[] = {wSFXLoopCounter, wWalkVelIndex, wWarioStateCounter,
 			wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching, wIsRolling,
 			wIsSmashAttacking, wJumpVelTable, wJumpVelIndex, 0};
@@ -863,8 +865,7 @@ public:
 		anim(OAM3);
 		ld_cp(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 		if (CF) {
-			cpu_.b = 3;
-			CALL(MoveWarioUp);
+			home::move_wario_y(gb_, -static_cast<int>(3));
 			FARCALL(CheckUpCollision);
 			if (!b_and()) {
 				CALL(HandleUpwardsFloorTransition);
@@ -941,14 +942,12 @@ public:
 	{
 		anim(OAM3);
 		CALL(ApplyJumpVelocity);
-		ld_cp(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
-		if (CF) {
+		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
 			cpu_.b = 3;
 			CALL(MoveWarioLeft);
 			return;
 		}
-		cpu_.b = 2;
-		CALL(MoveWarioLeft);
+		home::move_wario_x(gb_, -static_cast<int>(2));
 		FARCALL(CheckAirborneCollision);
 		if (!b_and())
 			return;
@@ -1051,9 +1050,8 @@ public:
 			CALL(ApplyWalkVelocity_Left);
 			CALL(MoveWarioLeft);
 		}
-		ld_cp(wWalkVelIndex, max);
-		if (!CF)
-			st(wWalkVelIndex, v);
+		if (rd8(wWalkVelIndex) >= max)
+			wr8(wWalkVelIndex, v);
 	}
 
 	void port_UpdateState_IceSkatin()
@@ -1198,8 +1196,7 @@ public:
 				port_UpdateWarioOwlDirection();
 				return;
 			}
-			cpu_.b = 1;
-			CALL(MoveWarioLeft);
+			home::move_wario_x(gb_, -static_cast<int>(1));
 		}
 	}
 
@@ -1480,7 +1477,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}
@@ -1514,7 +1511,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}
@@ -1592,7 +1589,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}
@@ -1623,7 +1620,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}
@@ -1801,6 +1798,7 @@ public:
 
 	void port_SetState_BlindAirborne()
 	{
+		xor_a();
 		wr8(wWarioSlopeInteraction, 0);
 		wr8(wWarioState, WST_BLIND_AIRBORNE);
 		static const uint16_t zero[] = {wFrameDuration, wAnimationFrame, wWarioStateCounter,
@@ -1842,7 +1840,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}

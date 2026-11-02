@@ -5,6 +5,7 @@
 // original's registers, flags and return addresses (see asm_module.hpp).
 // Converted with tools/c2cpp.py, then fuzzed hook by hook.
 #include "../asm_module.hpp"
+#include "../home/wario.hpp"
 
 namespace wl3::level {
 
@@ -169,7 +170,7 @@ public:
 
 	anim_and_input:
 		anim(OAM1);
-		if ((rd8(wJoypadPressed) >> B_PAD_A & 1)) {
+		if (ld_bit(wJoypadPressed, B_PAD_A)) {
 			FARCALL(StartJump_FromInput);
 			return;
 		}
@@ -243,7 +244,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if ((rd8(wJoypadPressed) >> B_PAD_A & 1)) {
+		if (ld_bit(wJoypadPressed, B_PAD_A)) {
 			FARCALL(StartCrouchJump);
 			return;
 		}
@@ -310,8 +311,7 @@ public:
 		anim(OAM1);
 		if (rd8(wAutoMoveState))
 			return;
-		ld_cp(wLevel, THE_TEMPLE);
-		if (ZF) {
+		if (rd8(wLevel) == THE_TEMPLE) {
 			st(wLevelEndScreen, LVLEND_GAME_OVER);
 			return;
 		}
@@ -335,7 +335,7 @@ public:
 		}
 		wr8(wWarioStateCounter, 0x00);
 		wr8(wWarioState, next_state);
-		st(wInvincibleCounter, 0x01);
+		wr8(wInvincibleCounter, 0x01);
 		SET_HL(gb_, wRoomTransitionParam);
 		wr8(wRoomTransitionParam,
 			rd8(wRoomTransitionParam) & (uint8_t)~(1 << ROOMTRANSITIONF_DELAY_F));
@@ -359,6 +359,7 @@ public:
 
 	void port_SetState_SandFalling()
 	{
+		xor_a();
 		wr8(wGrabState, 0);
 		wr8(wWarioState, WST_SAND_FALLING);
 		wr8(wCollisionBoxBottom, (uint8_t)-1);
@@ -484,12 +485,14 @@ public:
 
 	void port_SetState_SandWalking()
 	{
+		xor_a();
 		wr8(wWalkVelIndex, 0);
 		wr8(wWarioState, WST_SAND_WALKING);
 		if (ld_bit(wJoypadDown, B_PAD_RIGHT))
 			st(wDirection, DIRECTION_RIGHT);
 		else if (alu_.bit(cpu_.a, B_PAD_LEFT))
 			wr8(wDirection, DIRECTION_LEFT);
+		xor_a();
 		wr8(wSFXLoopCounter, 0);
 		wr8(wJumpVelIndex, 0);
 		wr8(wJumpVelTable, 0);
@@ -718,6 +721,7 @@ public:
 			return;
 		}
 		if (!rd8(fence ? wIsNearFence : wLadderInteraction)) {
+			xor_a();
 			wr8(wIsSmashAttacking, FALSE);
 			FARCALL(StartFall);
 			return;
@@ -739,7 +743,7 @@ public:
 			return;
 		}
 		update_pos_y();
-		if (!rd8(wIsSmashAttacking)) {
+		if (!ld_and(wIsSmashAttacking)) {
 			FARCALL(SetState_Idling);
 			return;
 		}
@@ -777,11 +781,11 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (!rd8(wGrabState)) {
+		if (!ld_and(wGrabState)) {
 			FARCALL(SetState_Idling);
 			return;
 		}
-		if ((rd8(wJoypadPressed) >> B_PAD_A & 1)) {
+		if (ld_bit(wJoypadPressed, B_PAD_A)) {
 			FARCALL(Func_1ede9);
 			return;
 		}
@@ -1059,7 +1063,6 @@ public:
 	{
 		wr8(wWarioState, WST_LADDER_SCRATCHING);
 		coll_box_btlr();
-		xor_a();
 		wr8(wJumpVelIndex, 0);
 		wr8(wJumpVelTable, 0);
 		wr8(wWarioStateCounter, 0);
@@ -1247,8 +1250,7 @@ public:
 			return;
 		}
 		if (alu_.bit(cpu_.a, B_PAD_DOWN)) {
-			cpu_.b = 0x01;
-			CALL(MoveWarioDown);
+			home::move_wario_y(gb_, 0x01);
 			FARCALL(CheckCentreCollision);
 			if (b_and()) {
 				update_pos_y();
@@ -1335,7 +1337,7 @@ public:
 		if (b_and())
 			return;
 		cpu_.b = 0x01;
-		if (ld_bit(wJoypadDown, B_PAD_DOWN))
+		if ((rd8(wJoypadDown) >> B_PAD_DOWN & 1))
 			cpu_.b = alu_.inc(cpu_.b);
 		CALL(MoveWarioDown);
 	}

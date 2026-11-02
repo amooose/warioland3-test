@@ -5,6 +5,7 @@
 // original's registers, flags and return addresses (see asm_module.hpp).
 // Converted with tools/c2cpp.py, then fuzzed hook by hook.
 #include "../asm_module.hpp"
+#include "../home/wario.hpp"
 
 namespace wl3::level {
 
@@ -59,7 +60,6 @@ public:
 		wr8(wTouchState, TOUCH_ATTACK);
 		wr8(wStingTouchState, TOUCH_ATTACK);
 		wr8(wca94, 0x01);
-		xor_a();
 		wr8(wJumpVelIndex, 0);
 		wr8(wJumpVelTable, 0);
 		reset_anim();
@@ -69,6 +69,7 @@ public:
 
 	void port_SetState_FatWalking()
 	{
+		xor_a();
 		wr8(wWalkVelIndex, 0);
 		wr8(wWarioState, WST_FAT_WALKING);
 		xor_a();
@@ -108,7 +109,7 @@ public:
 
 	void port_SetState_FatLanding()
 	{
-		st(wWarioState, WST_FAT_LANDING);
+		wr8(wWarioState, WST_FAT_LANDING);
 		static const uint16_t zero[] = {wJumpVelTable, wJumpVelIndex, wIsSmashAttacking,
 			wWarioStateCounter, wFrameDuration, wAnimationFrame, 0};
 		clear(zero);
@@ -130,7 +131,7 @@ public:
 	void port_SetState_BallOString()
 	{
 		wr8(wWarioState, WST_BALL_O_STRING);
-		st(wTransformationProgress, 1);
+		wr8(wTransformationProgress, 1);
 		static const uint16_t zero[] = {wSFXLoopCounter, wWalkVelIndex, wWarioStateCycles,
 			wJumpVelTable, wJumpVelIndex, 0};
 		clear(zero);
@@ -142,6 +143,7 @@ public:
 
 	void port_SetState_BallOStringKnockBack()
 	{
+		xor_a();
 		wr8(wTransformationProgress, 0);
 		play_sfx(SFX_BUMP);
 		wr8(wWarioState, WST_BALL_O_STRING_KNOCK_BACK);
@@ -158,7 +160,7 @@ public:
 
 	void port_SetState_ZombieIdling()
 	{
-		st(wWarioState, WST_ZOMBIE_IDLING);
+		wr8(wWarioState, WST_ZOMBIE_IDLING);
 		collision_box(-1, -27, -9, 9);
 		touch_states(TOUCH_VANISH, 0x02);
 		static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wInvisibleFrame,
@@ -260,7 +262,7 @@ public:
 		static const uint16_t zero[] = {wJumpVelIndex, wJumpVelTable, wWarioStateCounter,
 			wWalkVelIndex, 0};
 		clear(zero);
-		st(wWarioState, WST_BOUNCY_FLOOR);
+		wr8(wWarioState, WST_BOUNCY_FLOOR);
 		reset_anim();
 		set_frameset(ADDR_Frameset_1fcc5f);
 		anim(OAM2);
@@ -478,8 +480,7 @@ public:
 		cpu_.a = alu_.and_(rd8(wGlobalCounter), 1);
 		if (!ZF)
 			return;
-		cpu_.b = 0x01;
-		CALL(MoveWarioUp);
+		home::move_wario_y(gb_, -static_cast<int>(0x01));
 	}
 
 	void port_Func_28f6d()
@@ -553,7 +554,7 @@ public:
 	void port_Func_2ade4()
 	{
 		CALL(ClearTransformationValues);
-		st(wInvincibleCounter, 0x10);
+		wr8(wInvincibleCounter, 0x10);
 		CALL(UpdateLevelMusic);
 		get_pos();
 		cpu_.a = alu_.and_(rd8(hYPosLo), 0xf0);
@@ -640,7 +641,7 @@ public:
 
 	void port_Func_2ac7d()
 	{
-		st(wWarioState, WST_IN_BUBBLE);
+		wr8(wWarioState, WST_IN_BUBBLE);
 		collision_box(-1, -27, -9, 9);
 		static const uint16_t zero[] = {wSFXLoopCounter, wWarioStateCycles, wGrabState,
 			wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking, wJumpVelTable,
@@ -662,7 +663,7 @@ public:
 	void port_SetState_VampireTransforming()
 	{
 		play_sfx(SFX_045);
-		st(wWarioState, WST_VAMPIRE_TRANSFORMING);
+		wr8(wWarioState, WST_VAMPIRE_TRANSFORMING);
 		touch_states(TOUCH_VANISH, 0x02);
 		collision_box(-1, -27, -9, 9);
 		static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
@@ -742,7 +743,7 @@ public:
 		pos_offset(false, 0x04, 0x08);
 		cpu_.b = PARTICLE_BUBBLES;
 		FARCALL(CreateParticle);
-		st(wWarioState, WST_FLAT_STRETCHING_UNDERWATER);
+		wr8(wWarioState, WST_FLAT_STRETCHING_UNDERWATER);
 		static const uint16_t zero[] = {wWalkVelIndex, wWarioStateCounter, wWarioStateCycles,
 			wJumpVelIndex, wJumpVelTable, 0};
 		clear(zero);
@@ -761,7 +762,7 @@ public:
 
 	void port_SetState_ZombieWrithing()
 	{
-		st(wWarioState, WST_ZOMBIE_WRITHING);
+		wr8(wWarioState, WST_ZOMBIE_WRITHING);
 		reset_anim();
 		frameset_by_dir(ADDR_Frameset_1fc882, ADDR_Frameset_1fc88b);
 		anim(OAM2);
@@ -875,10 +876,10 @@ public:
 		clear(zero);
 		set_frameset(ADDR_Frameset_17175);
 		anim(OAM1);
-		if (ld_bit(wJoypadDown, B_PAD_RIGHT))
-			st(wDirection, DIRECTION_RIGHT);
+		if ((rd8(wJoypadDown) >> B_PAD_RIGHT & 1))
+			wr8(wDirection, DIRECTION_RIGHT);
 		else
-			st(wDirection, DIRECTION_LEFT);
+			wr8(wDirection, DIRECTION_LEFT);
 	}
 
 	void port_SetState_FlatFalling()
@@ -913,7 +914,7 @@ public:
 		clear(zero);
 		cpu_.a = alu_.inc(cpu_.a);
 		wr8(wIsIntangible, cpu_.a);
-		st(wWarioState, WST_TURNING_INVISIBLE);
+		wr8(wWarioState, WST_TURNING_INVISIBLE);
 		collision_box(-1, -27, -9, 9);
 		static const uint16_t zero2[] = {wTouchState, wStingTouchState, wca94, 0};
 		clear(zero2);
@@ -963,7 +964,7 @@ public:
 
 	void port_SetState_BatIdling()
 	{
-		st(wWarioState, WST_BAT_IDLING);
+		wr8(wWarioState, WST_BAT_IDLING);
 		static const uint16_t zero[] = {wSFXLoopCounter, wJumpVelIndex, wJumpVelTable, 0};
 		clear(zero);
 		reset_anim();
@@ -1239,8 +1240,7 @@ public:
 		if (!ZF) {
 			return;
 		}
-		cpu_.b = 0x01;
-		CALL(MoveWarioDown);
+		home::move_wario_y(gb_, 0x01);
 		FARCALL(CheckCentreCollision);
 		if (!b_and()) {
 			return;
@@ -1251,7 +1251,7 @@ public:
 	void port_Func_2ad6a()
 	{
 		CALL(ClearTransformationValues);
-		st(wInvincibleCounter, 0x10);
+		wr8(wInvincibleCounter, 0x10);
 		CALL(UpdateLevelMusic);
 		FARCALL(SetState_Submerged);
 		reset_anim();
@@ -1291,8 +1291,8 @@ public:
 		static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
 			wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking, 0};
 		clear(zero);
-		if (ld_and(wJumpVelTable))
-			st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+		if (rd8(wJumpVelTable))
+			wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 		CALL(UpdateLevelMusic);
 		reset_anim();
 		load_gfx(BANK_WarioIdleGfx, ADDR_WarioIdleGfx);
@@ -1310,7 +1310,7 @@ public:
 		wr8(wTouchState, TOUCH_BUMP);
 		wr8(wca94, 0x01);
 		play_sfx(SFX_025);
-		st(wWarioState, WST_PUFFY_INFLATING);
+		wr8(wWarioState, WST_PUFFY_INFLATING);
 		collision_box(-1, -27, -9, 9);
 		static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
 			wAttackCounter, wJumpVelIndex, wJumpVelTable, wIsCrouching, wIsRolling,
@@ -1336,8 +1336,7 @@ public:
 			port_SetState_FlatSinking();
 			return;
 		}
-		cpu_.b = 0x02;
-		CALL(MoveWarioDown);
+		home::move_wario_y(gb_, 0x02);
 		FARCALL(CheckAirborneCollision);
 		if (!b_and()) {
 			CALL(TriggerDownwardsFloorTransition);
@@ -1447,15 +1446,13 @@ public:
 	void port_Func_2b1cc()
 	{
 		if (!facing_right()) {
-			cpu_.b = 2;
-			CALL(MoveWarioLeft);
+			home::move_wario_x(gb_, -static_cast<int>(2));
 			if (farcall_b(BANK_Func_197b1, ADDR_Func_197b1)) {
 				cpu_.b = 2;
 				CALL(MoveWarioRight);
 			}
 		} else {
-			cpu_.b = 2;
-			CALL(MoveWarioRight);
+			home::move_wario_x(gb_, 2);
 			if (farcall_b(BANK_Func_19741, ADDR_Func_19741)) {
 				cpu_.b = 2;
 				CALL(MoveWarioLeft);
@@ -1562,8 +1559,8 @@ public:
 		static const uint16_t zero[] = {wWarioStateCounter, wFrameDuration, wAnimationFrame, 0};
 		clear(zero);
 		FARCALL(Func_19a77);
-		if (ld_and(wc1ca)) {
-			st(wWarioStateCounter, 0x01);
+		if (rd8(wc1ca)) {
+			wr8(wWarioStateCounter, 0x01);
 			frameset_by_dir(ADDR_Frameset_1fc8bc, ADDR_Frameset_1fc8d5);
 		} else {
 			frameset_by_dir(ADDR_Frameset_1fc948, ADDR_Frameset_1fc953);
@@ -1575,7 +1572,7 @@ public:
 	{
 		wr8(wWarioState, WST_BOUNCY_START);
 		wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
-		st(wJumpVelTable, 0x02);
+		wr8(wJumpVelTable, 0x02);
 		collision_box(-1, -29, -9, 9);
 		static const uint16_t zero[] = {wInvisibleFrame, wWalkVelIndex, wWarioStateCounter,
 			wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching, wIsRolling,
@@ -1600,9 +1597,8 @@ public:
 		anim(OAM1);
 		if (!anim_ended())
 			return;
-		xor_a();
 		wr8(wIsIntangible, 0);
-		st(wTransformation, TRANSFORMATION_INVISIBLE_WARIO);
+		wr8(wTransformation, TRANSFORMATION_INVISIBLE_WARIO);
 		CALL(UpdateLevelMusic);
 		FARCALL(SetState_Idling);
 	}
@@ -1993,8 +1989,7 @@ public:
 		anim(OAM1);
 		if (!ld_mask(wGlobalCounter, 0x0f))
 			port_Func_29317();
-		cpu_.b = 0x01;
-		CALL(MoveWarioDown);
+		home::move_wario_y(gb_, 0x01);
 		FARCALL(CheckCentreCollision);
 		if (!b_and())
 			return;
@@ -2210,8 +2205,7 @@ public:
 				SET_DE(gb_, gb_pop16(gb_));
 				hl = alu_.add16(ADDR_Data_2b664, REG_DE(gb_));
 				SET_HL(gb_, hl);
-				cpu_.b = rd8(hl);
-				CALL(MoveWarioDown);
+				home::move_wario_y(gb_, rd8(hl));
 				FARCALL(CheckAirborneCollision);
 				if (!b_and()) {
 					CALL(TriggerDownwardsFloorTransition);
@@ -2619,7 +2613,6 @@ public:
 		if (!anim_ended()) {
 			return;
 		}
-		xor_a();
 		wr8(wAutoMoveState, 0);
 		CALL(RecoverFromTransformation);
 	}
@@ -2661,7 +2654,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}
@@ -2835,7 +2828,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}
@@ -2879,8 +2872,7 @@ public:
 	{
 		cpu_.a = alu_.and_(rd8(wGlobalCounter), 0x01);
 		if (cpu_.a) {
-			cpu_.b = 0x01;
-			CALL(MoveWarioUp);
+			home::move_wario_y(gb_, -static_cast<int>(0x01));
 			FARCALL(CheckUpCollision);
 			if (!b_and()) {
 				return;
@@ -2936,7 +2928,6 @@ public:
 		wr8(wWarioStateCounter, cpu_.a);
 		wr8(wDirection, cpu_.a);
 	clear_vel:
-		xor_a();
 		wr8(wJumpVelIndex, 0);
 	}
 
@@ -2947,7 +2938,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}
@@ -3007,7 +2998,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}
@@ -3152,7 +3143,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}
@@ -3161,8 +3152,7 @@ public:
 		if (!b_and()) {
 			bool right = ld_and(wDirection);
 			cpu_.b = 0x01;
-			ld_cp(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
-			if (CF)
+			if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX)
 				cpu_.b = alu_.inc(cpu_.b);
 			if (right)
 				CALL(MoveWarioRight);
@@ -3215,8 +3205,7 @@ public:
 			// rising
 			cpu_.a = alu_.cpl(rd8(hl));
 			cpu_.a = alu_.inc(cpu_.a);
-			cpu_.b = cpu_.a;
-			CALL(MoveWarioUp);
+			home::move_wario_y(gb_, -static_cast<int>(cpu_.a));
 			SET_HL(gb_, wJumpVelIndex);
 			wr8(wJumpVelIndex, alu_.inc(rd8(wJumpVelIndex)));
 			FARCALL(CheckUpCollision);
@@ -3339,7 +3328,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}
@@ -3377,7 +3366,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}
@@ -3423,7 +3412,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}
@@ -3463,7 +3452,7 @@ public:
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		if (ld_and(wWaterInteraction)) {
+		if (rd8(wWaterInteraction)) {
 			CALL(RecoverFromTransformation);
 			return;
 		}

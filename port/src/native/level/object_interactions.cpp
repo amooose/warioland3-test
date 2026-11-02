@@ -7,6 +7,7 @@
 // Called by the level's frame and register-level C, so these keep the
 // original's registers, flags and return addresses (see asm_module.hpp).
 #include "../asm_module.hpp"
+#include "../home/wario.hpp"
 
 namespace wl3::level {
 
@@ -550,7 +551,7 @@ public:
 			wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching, wIsRolling,
 			wIsSmashAttacking, 0};
 		clear(zero);
-		if (ld_and(wJumpVelTable))
+		if (rd8(wJumpVelTable))
 			wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 		play_sfx(SFX_03A);
 		CALL(UpdateLevelMusic);
@@ -590,7 +591,7 @@ public:
 		clear(zero);
 		wr8(wWarioState, WST_ELECTRIC_START);
 		collision_box(-1, -27, -9, 9);
-		st(wTransformation, TRANSFORMATION_ELECTRIC);
+		wr8(wTransformation, TRANSFORMATION_ELECTRIC);
 		touch_states(TOUCH_VANISH, 0x01);
 		CALL(UpdateLevelMusic);
 		reset_anim();
@@ -878,7 +879,7 @@ public:
 		wr8(wIsIntangible, cpu_.a);
 		wr8(wAutoMoveState, cpu_.a);
 		if (ld_and(wJumpVelTable))
-			st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+			wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 		SET_HL(gb_, ADDR_WarioDefaultPal);
 		CALL(SetWarioPal);
 		load_gfx(BANK_WarioIdleGfx, ADDR_WarioIdleGfx);
@@ -1029,7 +1030,8 @@ public:
 
 	void port_Func_2168b()
 	{
-		if (rd8(wWarioState) == WST_FLAT_SQUISHED) {
+		ld_cp(wWarioState, WST_FLAT_SQUISHED);
+		if (ZF) {
 			FARCALL(SetState_FlatSquishedLifting);
 			return;
 		}
@@ -1039,7 +1041,7 @@ public:
 		cpu_.b = cpu_.a;
 		CALL(MoveWarioDown);
 		FARCALL(Func_19b25);
-		if (rd8(wWaterInteraction)) {
+		if (ld_and(wWaterInteraction)) {
 			FARCALL(DiveFromSurface_SkipSplash);
 			return;
 		}
@@ -1065,14 +1067,16 @@ public:
 		if (alu_.and_(cpu_.a, cpu_.a))
 			return;
 		if (ground) {
+			xor_a();
 			wr8(wGrabState, 0);
 			FARCALL(SetState_Idling);
 			return;
 		}
-		if (rd8(wIsCrouching)) {
+		if (ld_and(wIsCrouching)) {
 			FARCALL(StartCrouchFall);
 			return;
 		}
+		xor_a();
 		wr8(wGrabState, 0);
 		FARCALL(StartFall);
 	}
@@ -1085,6 +1089,7 @@ public:
 		}
 		port_Func_20a63();
 		wr8(wTransformation, TRANSFORMATION_SNOWMAN_WARIO);
+		xor_a();
 		wr8(wTransformationProgress, 0);
 		touch_states(TOUCH_ATTACK, 0x02);
 		FARCALL(SetState_TurningIntoSnowman);
@@ -1112,7 +1117,8 @@ public:
 
 	void port_Func_209ca()
 	{
-		if (rd8(wWarioState) == WST_ATTACKING_AIRBORNE) {
+		ld_cp(wWarioState, WST_ATTACKING_AIRBORNE);
+		if (ZF) {
 			xor_a();
 			wr8(wAttackCounter, 0);
 		}
@@ -1149,9 +1155,11 @@ public:
 		if (ld_and(wGrabState)) {
 			FARCALL(SetState_GrabIdling);
 		} else if (ld_and(wIsCrouching)) {
+			xor_a();
 			wr8(wWaterInteraction, 0);
 			FARCALL(CrouchOrSlide);
 		} else {
+			xor_a();
 			wr8(wWaterInteraction, 0);
 			FARCALL(SetState_Idling);
 		}
@@ -1283,7 +1291,7 @@ public:
 			return;
 		}
 		// .not_rolling
-		if ((rd8(wObjInteractionType) >> HEAVY_OBJ_F & 1)) {
+		if (ld_bit(wObjInteractionType, HEAVY_OBJ_F)) {
 			FARCALL(DoJumpingBump_NoSFX);
 			return;
 		}
@@ -1310,7 +1318,7 @@ public:
 		if (ld_and(wTransformation)) {
 			return;
 		}
-		if ((rd8(wInteractionSide) >> INTERACTION_DOWN_F & 1)) {
+		if (ld_bit(wInteractionSide, INTERACTION_DOWN_F)) {
 			FARCALL(StartDive);
 			return;
 		}
@@ -1485,6 +1493,7 @@ public:
 		if (ZF) {
 			FARCALL(Func_1ede9);
 		} else {
+			xor_a();
 			wr8(wGrabState, 0);
 			FARCALL(StartJump_FromInput);
 		}
@@ -1977,7 +1986,7 @@ public:
 			set_wario_pick_up();
 			return;
 		}
-		if ((rd8(wObjInteractionType) >> HEAVY_OBJ_F & 1))
+		if (ld_bit(wObjInteractionType, HEAVY_OBJ_F))
 			goto step_on_obj;
 		FARCALL(Func_1edd3);
 		return;
@@ -2120,7 +2129,7 @@ public:
 		wr8(wTransformationProgress, 1);
 		touch_states(TOUCH_BUMP, 0x02);
 		wr8(wTransformationDuration + 0, (uint8_t)(HOT_WARIO_DURATION >> 8));
-		st(wTransformationDuration + 1, (uint8_t)HOT_WARIO_DURATION);
+		wr8(wTransformationDuration + 1, (uint8_t)HOT_WARIO_DURATION);
 		CALL(UpdateLevelMusic);
 		port_SetState_OnFire_ResetStateCounter(); // fallthrough
 	}
@@ -2153,7 +2162,6 @@ public:
 		// .set_ball_o_string
 		play_sfx(SFX_039);
 		wr8(wTransformation, TRANSFORMATION_BALL_O_STRING_WARIO);
-		xor_a();
 		wr8(wTransformationProgress, 0);
 		touch_states(TOUCH_ATTACK, 0x01);
 		CALL(UpdateLevelMusic);
@@ -2778,7 +2786,7 @@ public:
 		wr8(wTouchState, TOUCH_BUMP);
 		wr8(wStingTouchState, TOUCH_VULNERABLE);
 		wr8(wca94, 0x01);
-		st(wWarioState, WST_GRABBING_OWL);
+		wr8(wWarioState, WST_GRABBING_OWL);
 		collision_box(-1, -27, -9, 9);
 		static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
 			wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking, wJumpVelTable,
