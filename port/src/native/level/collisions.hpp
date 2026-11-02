@@ -1,0 +1,27 @@
+// Wario's collision checks (src/engine/level/collisions.asm) as plain
+// functions. Each looks up the blocks at points around Wario's collision
+// box and runs their block functions (ProcessBlock, still register-level,
+// through the emulator by address: BANK(CheckCentreCollision) must be
+// mapped, as the farcall maps it). The result is what the asm leaves in b:
+// nonzero when a block collided (the block function's result), or the
+// steppable object Wario stands on (wIsOnSteppableObject).
+#pragma once
+
+#include "../native.hpp"
+
+namespace wl3::level {
+
+uint8_t check_centre_collision(GB *gb); // CheckCentreCollision
+uint8_t check_front_collision(GB *gb); // CheckFrontCollision
+uint8_t check_up_collision(GB *gb); // CheckUpCollision
+uint8_t check_airborne_collision(GB *gb); // CheckAirborneCollision
+
+// The same, for register-level code (the Wario states, through AsmModule's
+// centre_collision() etc.): the result in b and the registers the asm
+// leaves (all but a and f, which the farcall's pop af restores)
+void asm_centre_collision(GB *gb);
+void asm_front_collision(GB *gb);
+void asm_up_collision(GB *gb);
+void asm_airborne_collision(GB *gb);
+
+} // namespace wl3::level

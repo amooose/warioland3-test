@@ -198,9 +198,11 @@ Four agents ported 512 routines at once this way:
   `gb_call_ret(gb, addr, ret)` or `FARCALL_RET(Label, ret)`, which push the
   asm's own return address (`ret` = the address after the asm's `call`).
   Get the offset from the ROM rather than by counting bytes: find the
-  `call` opcode (`cd lo hi`) inside the routine. `CheckAirborneCollision`,
-  `CheckCentreCollision`, `IsOnSlipperyGround` and the `Func_35xx`
-  wrappers do this.
+  `call` opcode (`cd lo hi`) inside the routine. `IsOnSlipperyGround` and
+  the `Func_35xx` wrappers do this. (The collision checks no longer do:
+  no recording's block function reads or pops past its return address,
+  so collisions.cpp calls ProcessBlock plainly and only a fuzzed table
+  notices, which the call loop flags unrealistic.)
 - **Local labels** (jumptable targets, data tables after a routine) aren't
   in `syms.h`; take their offsets from `warioland3.sym`, which has them
   (`Func_810fc.PathNone`), and write `ADDR_Routine + offset`.
@@ -360,8 +362,11 @@ same per-frame state as the development build with `--hooks`.
 - **The main loop** halts natively and resumes at
   `InitWithoutDemoPowerUpReset.after_halt`. The fuzzer can't check the
   halt or the interrupt vectors; the traces do.
-- **The collision tails** go through `gb_call_ret_unwind`, which stops
-  where a block function pops past its caller, as the asm does.
+- **The collision checks** call ProcessBlock with `gb_call`: a block
+  function that pops past its caller (only a fuzzed table does) is
+  flagged unrealistic by the call loop, and one that comes back in
+  another bank by collisions.cpp. `gb_call_ret_unwind` has no callers
+  left.
 
 ## C++ modules (src/native)
 
@@ -509,17 +514,27 @@ primitives, home/wario.cpp, and the golf objects' animation):
   (the collision checks returning their result first, since most of the
   remaining b and flag traffic comes from them). Done at the call sites
   (06c5289: centre_collision() etc., the farcall plus ld a, b / and a).
-- collisions.cpp itself: no recording ever unwinds. With a print in
-  call_ret's may_unwind path (outside tests), all 14 recordings ran with
-  none: the block functions' push/pop pairs balance, and only a fuzzed
-  block function table makes ProcessBlock pop past its caller or come
-  back in another bank. So a plain rewrite can flag those cases
-  unrealistic under test (inconclusive, as for other unreachable fuzzed
-  states) instead of emulating them: each check computes its points from
-  Wario's position and box, calls GetBlockPtr and ProcessBlock (the
-  block functions stay register-level for now) and returns the result
-  ProcessBlock leaves in a. Keep the hooks as wrappers with the asm's
-  registers for the register-level callers (objects, block functions).
+- collisions.cpp itself, done (2026-11-02): no recording ever unwinds
+  (with a print in call_ret's may_unwind path, all 14 recordings ran
+  with none: the block functions' push/pop pairs balance), so the checks
+  are plain C++ (collisions.hpp: check_centre_collision() etc. return the
+  result the asm leaves in b). Each computes its points from Wario's
+  position and box into hPos, calls GetBlockPtr and ProcessBlock through
+  the emulator (gb_call, no return addresses; the call loop flags a
+  fuzzed table that pops past the call, process_block one that comes
+  back in another bank) and returns ProcessBlock's a. The block
+  functions are still register-level and see b and c, so those are set
+  where the asm sets them (c the last offset, b = a after each
+  ProcessBlock, b = 2 for MoveWario*), and the CPU ends with the last
+  ProcessBlock's registers, as in the asm. Every caller of the 25 hooks
+  farcalls or homecalls them, and hCallFunc / homecall pop af, so the
+  hooks clobber a and f and fix up only b (plus get_pos_y's hl and de
+  in CheckCentreCollision); Func_19720 jumps on to the floor transitions
+  and stays exact. AsmModule's centre_collision() etc. call
+  level::asm_*_collision() through Routines::in_bank (the farcall's
+  memory effects, no hCallFunc interpreted). The 14 routines only this
+  file calls lost their hooks (PORT_COVERED), after temporary
+  ALL_REGISTERS hooks passed on every recording with full asm cover.
 - Home's level-tied files (load_room, load_level, decompress_level_data,
   door/floor/room transitions, wario_mechanics1, object_mechanics,
   object_pos, IsOnSlipperyGround) go with the level code that calls
@@ -784,9 +799,9 @@ Modules so far:
   `ld [hli]` steps across a page where the `inc e` after it doesn't
   (CreateObject_GotPos); `NONE` and `OWL` are macros (constants.h), so
   enum values can't use them. Collisions and the block functions are C++
-  too (collisions.cpp, block_functions.cpp): they keep ProcessBlock's
-  unwinding and bank checks (a block function can pop past its caller or
-  come back in another bank) and every jump between block functions.
+  too (collisions.cpp, block_functions.cpp): the block functions keep
+  every jump between them; the collision checks are plain (see the level
+  engine plan).
   The object engine (update_objects.cpp, object_interactions.cpp) was
   converted with tools/c2cpp.py: it turns a register-level C file into a
   class over `AsmModule` (src/native/asm_module.hpp, the C helpers

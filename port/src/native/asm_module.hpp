@@ -13,6 +13,7 @@
 #pragma once
 
 #include "alu.hpp"
+#include "level/collisions.hpp"
 #include "native.hpp"
 #include "routines.hpp"
 
@@ -87,13 +88,23 @@ protected:
 	}
 	// Wario's collision checks (farcalled), true if they found one, with
 	// the ld a, b / and a that tests their result in b
-	bool centre_collision() { return collision_check(BANK_CheckCentreCollision, ADDR_CheckCentreCollision); }
-	bool front_collision() { return collision_check(BANK_CheckFrontCollision, ADDR_CheckFrontCollision); }
-	bool up_collision() { return collision_check(BANK_CheckUpCollision, ADDR_CheckUpCollision); }
-	bool airborne_collision() { return collision_check(BANK_CheckAirborneCollision, ADDR_CheckAirborneCollision); }
-	bool collision_check(uint8_t bank, uint16_t addr)
+	bool centre_collision()
 	{
-		port_farcall(gb_, bank, addr);
+		return collision_check(BANK_CheckCentreCollision, ADDR_CheckCentreCollision, level::asm_centre_collision);
+	}
+	bool front_collision()
+	{
+		return collision_check(BANK_CheckFrontCollision, ADDR_CheckFrontCollision, level::asm_front_collision);
+	}
+	bool up_collision() { return collision_check(BANK_CheckUpCollision, ADDR_CheckUpCollision, level::asm_up_collision); }
+	bool airborne_collision()
+	{
+		return collision_check(BANK_CheckAirborneCollision, ADDR_CheckAirborneCollision,
+			level::asm_airborne_collision);
+	}
+	bool collision_check(uint8_t bank, uint16_t addr, void (*check)(GB *))
+	{
+		routines_.in_bank(bank, addr, [&] { check(gb_); });
 		return b_and();
 	}
 	// ld a, [addr] / bit n, a
