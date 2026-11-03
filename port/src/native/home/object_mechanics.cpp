@@ -672,26 +672,23 @@ public:
 		homecall(BANK_Func_63209, ADDR_Func_63209);
 	}
 
-	// The wrappers that run ProcessBlock: homecall, then ld a, b. Block
-	// functions are whatever the level's table points at, so the call pushes the
-	// asm's own return address (the call is $0f bytes in) to keep the stack as
-	// the asm has it.
-	void homecall_process_block(uint16_t routine, uint8_t bank, uint16_t addr)
+	// The wrappers that run ProcessBlock: homecall, then ld a, b
+	void homecall_process_block(uint8_t bank, uint16_t addr)
 	{
 		homejp(bank);
-		gb_call_ret(gb_, addr, (uint16_t)(routine + 0x0f));
+		gb_call(gb_, addr);
 		pop_af();
 		bankswitch(cpu_.a);
 		cpu_.a = cpu_.b;
 	}
 
-	void port_Func_3513() { homecall_process_block(ADDR_Func_3513, BANK_Func_19bc3, ADDR_Func_19bc3); }
-	void port_Func_352b() { homecall_process_block(ADDR_Func_352b, BANK_Func_19b7b, ADDR_Func_19b7b); }
-	void port_Func_3543() { homecall_process_block(ADDR_Func_3543, BANK_Func_19b51, ADDR_Func_19b51); }
-	void port_ProcessBlockOnLeft() { homecall_process_block(ADDR_ProcessBlockOnLeft, BANK__ProcessBlockOnLeft, ADDR__ProcessBlockOnLeft); }
-	void port_ProcessBlockOnRight() { homecall_process_block(ADDR_ProcessBlockOnRight, BANK__ProcessBlockOnRight, ADDR__ProcessBlockOnRight); }
-	void port_Func_358b() { homecall_process_block(ADDR_Func_358b, BANK_Func_19b9b, ADDR_Func_19b9b); }
-	void port_Func_35a3() { homecall_process_block(ADDR_Func_35a3, BANK_Func_19b8b, ADDR_Func_19b8b); }
+	void port_Func_3513() { homecall_process_block(BANK_Func_19bc3, ADDR_Func_19bc3); }
+	void port_Func_352b() { homecall_process_block(BANK_Func_19b7b, ADDR_Func_19b7b); }
+	void port_Func_3543() { homecall_process_block(BANK_Func_19b51, ADDR_Func_19b51); }
+	void port_ProcessBlockOnLeft() { homecall_process_block(BANK__ProcessBlockOnLeft, ADDR__ProcessBlockOnLeft); }
+	void port_ProcessBlockOnRight() { homecall_process_block(BANK__ProcessBlockOnRight, ADDR__ProcessBlockOnRight); }
+	void port_Func_358b() { homecall_process_block(BANK_Func_19b9b, ADDR_Func_19b9b); }
+	void port_Func_35a3() { homecall_process_block(BANK_Func_19b8b, ADDR_Func_19b8b); }
 
 	// ld a, c / add a / add a / add a / or autoinc / ldh [index], a /
 	// ld c, LOW(data)

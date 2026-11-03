@@ -3842,15 +3842,15 @@ public:
 		alu_.cp(cpu_.a, WARIO_STATES_GROUP_2);
 		if (CF) {
 			// farcall UpdateWarioStates_Group2 / ret
-			FARCALL_RET(UpdateWarioStates_Group2, ADDR_UpdateWarioStates + 0x4c);
+			FARCALL(UpdateWarioStates_Group2);
 			return;
 		}
 		alu_.cp(cpu_.a, WARIO_STATES_GROUP_3);
 		if (CF) {
-			FARCALL_RET(UpdateWarioStates_Group3, ADDR_UpdateWarioStates + 0x3c);
+			FARCALL(UpdateWarioStates_Group3);
 			return;
 		}
-		FARCALL_RET(UpdateWarioStates_Group4, ADDR_UpdateWarioStates + 0x2c);
+		FARCALL(UpdateWarioStates_Group4);
 	}
 };
 

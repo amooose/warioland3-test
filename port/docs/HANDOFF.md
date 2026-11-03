@@ -193,16 +193,17 @@ Four agents ported 512 routines at once this way:
 - **Tail jumps are `PORT_JUMP` + `JUMP` / `JUMP_TO`.** Every exit path of a
   `PORT_JUMP` must set pc (`RET()` on a return path).
 - **Anything that reaches `ProcessBlock` from C.** Block functions run
-  whatever the level's table points at, and a plain `CALL` / `gb_call`
-  pushes a sentinel return address instead of the asm's. Use
-  `gb_call_ret(gb, addr, ret)` or `FARCALL_RET(Label, ret)`, which push the
-  asm's own return address (`ret` = the address after the asm's `call`).
-  Get the offset from the ROM rather than by counting bytes: find the
-  `call` opcode (`cd lo hi`) inside the routine. `IsOnSlipperyGround` and
-  the `Func_35xx` wrappers do this. (The collision checks no longer do:
-  no recording's block function reads or pops past its return address,
-  so collisions.cpp calls ProcessBlock plainly and only a fuzzed table
-  notices, which the call loop flags unrealistic.)
+  whatever the level's table points at, and could in principle pop past
+  their return address. No recording's does, and collisions.cpp calls
+  ProcessBlock with `gb_call` (a sentinel return address, which the call
+  loop flags unrealistic when popped), so nothing above it reads the
+  stack: the callers of the collision checks (the Wario states,
+  `IsOnSlipperyGround`, the `Func_35xx` wrappers) call them plainly now
+  (2026-11-03). `gb_call_ret` / `FARCALL_RET` stay for code that does
+  read the stack (the room drawing's queue overrun, HomeJumpRet's
+  homejp frames in the object helpers). For those, get the offset from
+  the ROM rather than by counting bytes: find the `call` opcode
+  (`cd lo hi`) inside the routine.
 - **Local labels** (jumptable targets, data tables after a routine) aren't
   in `syms.h`; take their offsets from `warioland3.sym`, which has them
   (`Func_810fc.PathNone`), and write `ADDR_Routine + offset`.
@@ -535,6 +536,33 @@ primitives, home/wario.cpp, and the golf objects' animation):
   memory effects, no hCallFunc interpreted). The 14 routines only this
   file calls lost their hooks (PORT_COVERED), after temporary
   ALL_REGISTERS hooks passed on every recording with full asm cover.
+- Block functions as plain C++: tried and backed out (2026-11-03). A
+  version with native dispatch (a table of the 138 functions the levels'
+  tables point at) and functions returning their result built and
+  matched memory once BreakBlock got its block pointer in hl (CreateParticleInBlock's
+  Func_ce3e places the debris from h and l). But the objects read
+  registers the block functions leave: after an object's collision
+  (the home wrappers Func_3513, Func_352b, Func_3543, Func_358b,
+  Func_35a3, ProcessBlockOnLeft/Right) MuddeeFunc reads h
+  (`set 6, [hl]`, muddee.asm:653), PesceFunc d and e, OctohonFunc hl,
+  ZipLineFunc c, and SetObjectFramesetPtr d and e, on paths with no write
+  first. Those values come from the block function's exit (hl and de
+  from ProcessBlock's jp hl and whatever the function loads), so the
+  block functions stay register-level until the objects are plain. Most
+  Wario state sites read none of c, d, e, h, l after a collision check
+  (checked over the asm, below), but UpdateState_FlatFalling reads de
+  (`add hl, de`, wario_states_3.asm:942, after CheckAirborneCollision at
+  :863). The attempt is in the session
+  scratchpad (plain_attempt/) if it's taken up again with the objects.
+- Register liveness over the asm (live.py, session scratchpad): for each
+  call site of a routine, which registers the code after it may read
+  before writing them. It follows jumps, jumptables (to the dispatcher's
+  exit), calls (inlined, farcall restoring a and f), a ret back to every
+  caller, including calls of the routine's local labels, and treats an
+  object's update function (object_data / object_params references) as
+  ending dead, since UpdateObject reloads every register; push / pop
+  are transparent. Usage: `python live.py cdehl Routine,Routine...` from
+  the repo root. Handy for any contract relaxing.
 - Home's level-tied files (load_room, load_level, decompress_level_data,
   door/floor/room transitions, wario_mechanics1, object_mechanics,
   object_pos, IsOnSlipperyGround) go with the level code that calls

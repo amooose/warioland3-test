@@ -37,8 +37,6 @@ public:
 	}
 
 	// returns nz if standing on slippery ground
-	// The farcalls push the asm's own return addresses: Func_19b51 runs
-	// ProcessBlock, whose block functions may look at the stack.
 	void port_IsOnSlipperyGround()
 	{
 		cpu_.a = 0;
@@ -46,14 +44,14 @@ public:
 		wr8(wIsOnSlipperyGround, 0);
 
 		get_pos_at_box_edge(true);
-		FARCALL_RET(Func_19b51, (uint16_t)(ADDR_IsOnSlipperyGround + 0x2f));
+		FARCALL(Func_19b51);
 		cpu_.a = rd8(wIsOnSlipperyGround);
 		alu_.and_(cpu_.a, cpu_.a);
 		if (!(cpu_.f & FLAG_Z))
 			return;
 
 		get_pos_at_box_edge(false);
-		FARCALL_RET(Func_19b51, (uint16_t)(ADDR_IsOnSlipperyGround + 0x5d));
+		FARCALL(Func_19b51);
 		cpu_.a = rd8(wIsOnSlipperyGround);
 		alu_.and_(cpu_.a, cpu_.a);
 	}

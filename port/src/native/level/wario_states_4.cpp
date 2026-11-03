@@ -1787,7 +1787,7 @@ public:
 		anim(OAM1);
 		if (!ld_and(wIsOnSteppableObject))
 			return;
-		gb_call_ret(gb_, ADDR_UpdateState_BlindAirborne, ADDR_SetState_BlindAirborne + 0x70);
+		LCALL(UpdateState_BlindAirborne);
 	}
 
 	void port_Func_1ed548()
@@ -1812,7 +1812,7 @@ public:
 
 	void port_UpdateState_BlindAirborne()
 	{
-		FARCALL_RET(Func_19b25, ADDR_UpdateState_BlindAirborne + 0x0f);
+		FARCALL(Func_19b25);
 		if (room_transition()) {
 			CALL(TriggerRoomTransition);
 			return;
@@ -1821,7 +1821,7 @@ public:
 			CALL(RecoverFromTransformation);
 			return;
 		}
-		FARCALL_RET(CheckFrontCollision, ADDR_UpdateState_BlindAirborne + 0x2c);
+		front_collision();
 		ld_cp(wWarioState, WST_BLIND_AIRBORNE);
 		if (!ZF) {
 			return;
@@ -1830,14 +1830,13 @@ public:
 			CALL(RecoverFromTransformation);
 			return;
 		}
-		gb_call_ret(gb_, ADDR_Func_1ee00f, ADDR_UpdateState_BlindAirborne + 0x3a);
+		LCALL(Func_1ee00f);
 		ld_cp(wWarioState, WST_BLIND_AIRBORNE);
 		if (!ZF) {
 			return;
 		}
 		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
-			FARCALL_RET(CheckUpCollision, ADDR_UpdateState_BlindAirborne + 0x56);
-			if (!b_and()) {
+			if (!up_collision()) {
 				return;
 			}
 			ld_cp(wWarioState, WST_BLIND_AIRBORNE);
@@ -1847,25 +1846,23 @@ public:
 			port_Func_1ed548();
 			return;
 		}
-		FARCALL_RET(CheckAirborneCollision, ADDR_UpdateState_BlindAirborne + 0x71);
-		if (!b_and()) {
+		if (!airborne_collision()) {
 			CALL(TriggerDownwardsFloorTransition);
 			return;
 		}
-		gb_call_ret(gb_, ADDR_TriggerFloorTransition, ADDR_UpdateState_BlindAirborne + 0x7b);
+		LCALL(TriggerFloorTransition);
 		port_SetState_BlindIdling();
 	}
 
 	void port_UpdateState_BlindIdling()
 	{
-		port_farcall_ret(gb_, OAM1, ADDR_UpdateWarioAnimation, ADDR_UpdateState_BlindIdling + 0x0f);
-		gb_call_ret(gb_, ADDR_Func_1edf93, ADDR_UpdateState_BlindIdling + 0x12);
+		anim(OAM1);
+		LCALL(Func_1edf93);
 		ld_cp(wWarioState, WST_BLIND_IDLING);
 		if (!ZF) {
 			return;
 		}
-		FARCALL_RET(CheckCentreCollision, ADDR_UpdateState_BlindIdling + 0x27);
-		if (!b_and()) {
+		if (!centre_collision()) {
 			port_Func_1ed548();
 			return;
 		}
@@ -1873,13 +1870,13 @@ public:
 
 	void port_UpdateState_BlindWalking()
 	{
-		FARCALL_RET(Func_19b25, ADDR_UpdateState_BlindWalking + 0x0f);
+		FARCALL(Func_19b25);
 		if (room_transition()) {
 			CALL(TriggerRoomTransition);
 			return;
 		}
-		port_farcall_ret(gb_, OAM1, ADDR_UpdateWarioAnimation, ADDR_UpdateState_BlindWalking + 0x25);
-		FARCALL_RET(CheckFrontCollision, ADDR_UpdateState_BlindWalking + 0x34);
+		anim(OAM1);
+		front_collision();
 		ld_cp(wWarioState, WST_BLIND_WALKING);
 		if (!ZF) {
 			return;
@@ -1888,13 +1885,12 @@ public:
 			CALL(RecoverFromTransformation);
 			return;
 		}
-		gb_call_ret(gb_, ADDR_Func_1edfa4, ADDR_UpdateState_BlindWalking + 0x42);
+		LCALL(Func_1edfa4);
 		ld_cp(wWarioState, WST_BLIND_WALKING);
 		if (!ZF) {
 			return;
 		}
-		FARCALL_RET(CheckCentreCollision, ADDR_UpdateState_BlindWalking + 0x57);
-		if (!b_and()) {
+		if (!centre_collision()) {
 			port_Func_1ed548();
 			return;
 		}
@@ -1939,7 +1935,7 @@ public:
 				port_SetState_BlindTurning();
 				return;
 			}
-			FARCALL_RET(WalkIfPossible_Right, ADDR_Func_1edfa4 + 0x2b);
+			FARCALL(WalkIfPossible_Right);
 		} else if (alu_.bit(pad, B_PAD_LEFT)) {
 			ld_cp(wDirection, DIRECTION_LEFT);
 			if (!ZF) {
@@ -1947,7 +1943,7 @@ public:
 				port_SetState_BlindTurning();
 				return;
 			}
-			FARCALL_RET(WalkIfPossible_Left, ADDR_Func_1edfa4 + 0x56);
+			FARCALL(WalkIfPossible_Left);
 		} else {
 			port_SetState_BlindIdling();
 			return;
