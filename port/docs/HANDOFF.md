@@ -536,6 +536,12 @@ primitives, home/wario.cpp, and the golf objects' animation):
   memory effects, no hCallFunc interpreted). The 14 routines only this
   file calls lost their hooks (PORT_COVERED), after temporary
   ALL_REGISTERS hooks passed on every recording with full asm cover.
+- Collision farcalls (2026-11-03): where the code after a
+  FARCALL(Check*Collision) sets a and f before reading them, it calls
+  AsmModule's run_*_collision() (the native check, result in b) instead
+  of going through hCallFunc (55 sites, 7880f22). The Blind states,
+  IsOnSlipperyGround and home's Func_35xx wrappers call the collision
+  checks without the asm's return addresses (6a9b1db).
 - Block functions as plain C++: tried and backed out (2026-11-03). A
   version with native dispatch (a table of the 138 functions the levels'
   tables point at) and functions returning their result built and
