@@ -179,7 +179,7 @@ public:
 			return;
 		}
 
-		FARCALL(CheckCentreCollision);
+		run_centre_collision();
 		ld_cp(wWarioState, WST_SLIPPING);
 		if (!ZF) {
 			return;
@@ -190,7 +190,7 @@ public:
 		}
 
 		update_pos_y();
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		ld_cp(wWarioState, WST_SLIPPING);
 		if (!ZF) {
 			return;
@@ -249,7 +249,7 @@ public:
 			return;
 		}
 
-		FARCALL(CheckCentreCollision);
+		run_centre_collision();
 		ld_cp(wWarioState, WST_CROUCH_SLIPPING);
 		if (!ZF) {
 			return;
@@ -260,7 +260,7 @@ public:
 		}
 
 		update_pos_y();
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		ld_cp(wWarioState, WST_CROUCH_SLIPPING);
 		if (!ZF) {
 			return;
@@ -784,7 +784,7 @@ public:
 			FARCALL(Func_1ede9);
 			return;
 		}
-		FARCALL(CheckCentreCollision);
+		run_centre_collision();
 		ld_cp(wWarioState, WST_GRAB_SLIPPING);
 		if (!ZF) {
 			return;
@@ -793,7 +793,7 @@ public:
 			FARCALL(Func_1edd3);
 			return;
 		}
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		ld_cp(wWarioState, WST_GRAB_SLIPPING);
 		if (!ZF) {
 			return;

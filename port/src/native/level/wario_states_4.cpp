@@ -1301,7 +1301,7 @@ public:
 		}
 		if (rd8(wWalkVelIndex) >= 0x18)
 			wr8(wWalkVelIndex, 0x14);
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		cpu_.a = alu_.and_(cpu_.b, 0x0f);
 		if (cpu_.a) {
 			port_SetState_SnowballCrash();
@@ -1576,7 +1576,7 @@ public:
 			return;
 		}
 		anim(OAM2);
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		cpu_.a = alu_.and_(cpu_.b, 0x0f);
 		if (cpu_.a) {
 			port_SetState_SnowballCrash();

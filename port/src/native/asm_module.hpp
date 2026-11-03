@@ -104,8 +104,22 @@ protected:
 	}
 	bool collision_check(uint8_t bank, uint16_t addr, void (*check)(GB *))
 	{
-		routines_.in_bank(bank, addr, [&] { check(gb_); });
+		run_check(bank, addr, check);
 		return b_and();
+	}
+	// The same farcalls with no test after them, for callers that set a and
+	// f before they read them (a and f are left as the check leaves them,
+	// not as hCallFunc's pop af would): the result in b
+	void run_centre_collision() { run_check(BANK_CheckCentreCollision, ADDR_CheckCentreCollision, level::asm_centre_collision); }
+	void run_front_collision() { run_check(BANK_CheckFrontCollision, ADDR_CheckFrontCollision, level::asm_front_collision); }
+	void run_up_collision() { run_check(BANK_CheckUpCollision, ADDR_CheckUpCollision, level::asm_up_collision); }
+	void run_airborne_collision()
+	{
+		run_check(BANK_CheckAirborneCollision, ADDR_CheckAirborneCollision, level::asm_airborne_collision);
+	}
+	void run_check(uint8_t bank, uint16_t addr, void (*check)(GB *))
+	{
+		routines_.in_bank(bank, addr, [&] { check(gb_); });
 	}
 	// ld a, [addr] / bit n, a
 	bool ld_bit(uint16_t addr, int n) { return alu_.bit(ld(addr), n); }

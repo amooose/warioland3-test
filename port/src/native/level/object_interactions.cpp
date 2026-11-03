@@ -1043,7 +1043,7 @@ public:
 			FARCALL(DiveFromSurface_SkipSplash);
 			return;
 		}
-		FARCALL(CheckCentreCollision);
+		run_centre_collision();
 		bool ground = b_and();
 		if (ground)
 			update_pos_y();

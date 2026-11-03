@@ -581,7 +581,7 @@ public:
 
 	void port_UpdateState_Idling()
 	{
-		FARCALL(CheckCentreCollision);
+		run_centre_collision();
 		if (!still_idling()) {
 			return;
 		}
@@ -929,7 +929,7 @@ public:
 			wIsCrouching, wAttackCounter, wGrabState, 0};
 		clear(zero);
 		coll_box_blrt();
-		FARCALL(CheckUpCollision);
+		run_up_collision();
 		ld_cp(wWarioState, WST_IDLING);
 		if (!ZF) {
 			return;
@@ -947,7 +947,7 @@ public:
 	// farcall CheckFrontCollision / ld a, b / and $0f / ret nz
 	bool front_blocked()
 	{
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		cpu_.a = alu_.and_(cpu_.b, 0x0f);
 		return cpu_.a != 0;
 	}
@@ -972,7 +972,7 @@ public:
 	{
 		wr8(wJumpVelTable, JUMP_VEL_KNOCK_BACK);
 		wr8(wCollisionBoxTop, (uint8_t)-27);
-		FARCALL(CheckUpCollision);
+		run_up_collision();
 		ld_cp(wWarioState, WST_CROUCHING);
 		if (!ZF) {
 			alu_.cp(cpu_.a, WST_CROUCH_WALKING);
@@ -1361,7 +1361,7 @@ public:
 		}
 		if (!(rd8(wJoypadDown) >> B_PAD_DOWN & 1)) {
 			wr8(wCollisionBoxTop, (uint8_t)-27);
-			FARCALL(CheckUpCollision);
+			run_up_collision();
 			ld_cp(wWarioState, WST_CROUCHING);
 			if (!ZF) {
 				return;
@@ -1385,7 +1385,7 @@ public:
 
 	void port_UpdateState_Diving()
 	{
-		FARCALL(CheckCentreCollision);
+		run_centre_collision();
 		ld_cp(wWarioState, WST_DIVING);
 		if (!ZF) {
 			return;
@@ -1452,7 +1452,7 @@ public:
 		SET_HL(gb_, ADDR_WarioDefaultPal);
 		CALL(SetWarioPal);
 		wr8(wCollisionBoxTop, (uint8_t)-27);
-		FARCALL(CheckUpCollision);
+		run_up_collision();
 		ld_cp(wWarioState, WST_STUNG_RECOVERY);
 		if (!ZF) {
 			return;
@@ -1613,7 +1613,7 @@ public:
 		}
 		if (!(rd8(wJoypadDown) >> B_PAD_DOWN & 1)) {
 			wr8(wCollisionBoxTop, (uint8_t)-27);
-			FARCALL(CheckUpCollision);
+			run_up_collision();
 			ld_cp(wWarioState, WST_CROUCH_WALKING);
 			if (!ZF) {
 				return;
@@ -1639,7 +1639,7 @@ public:
 			reset_anim();
 			set_frameset(right ? ADDR_Frameset_14a2f : ADDR_Frameset_14a26);
 		}
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		cpu_.a = alu_.and_(cpu_.b, 0x0f);
 		if (cpu_.a) {
 			return;
@@ -1771,7 +1771,7 @@ public:
 			return;
 		}
 		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
-			FARCALL(CheckUpCollision);
+			run_up_collision();
 			ld_cp(wWarioState, WST_BUMPING);
 			if (ZF && b_and())
 				st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
@@ -1818,7 +1818,7 @@ public:
 			if (!CF) {
 				recover = true;
 			} else {
-				FARCALL(CheckCentreCollision);
+				run_centre_collision();
 				cpu_.a = alu_.and_(cpu_.b, 0x0f);
 				if (!cpu_.a) {
 					wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
@@ -2306,7 +2306,7 @@ public:
 		if (!still_in(WST_WALKING)) {
 			return;
 		}
-		FARCALL(CheckCentreCollision);
+		run_centre_collision();
 		if (!still_in(WST_WALKING)) {
 			return;
 		}
@@ -2405,7 +2405,7 @@ public:
 		airborne_smash_attack(&f);
 		ld_cp(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 		if (CF) {
-			FARCALL(CheckUpCollision);
+			run_up_collision();
 			if (!b_and() || !still_in(WST_AIRBORNE)) {
 				return;
 			}
@@ -2417,7 +2417,7 @@ public:
 			return;
 		}
 		// .falling
-		FARCALL(CheckAirborneCollision);
+		run_airborne_collision();
 		if (!still_in(WST_AIRBORNE)) {
 			return;
 		}
@@ -2484,7 +2484,7 @@ public:
 		}
 		if (!ld_bit(wJoypadDown, B_PAD_DOWN)) {
 			wr8(wCollisionBoxTop, (uint8_t)-27);
-			FARCALL(CheckUpCollision);
+			run_up_collision();
 			if (!still_in(WST_CROUCH_AIRBORNE)) {
 				return;
 			}
@@ -2506,7 +2506,7 @@ public:
 		}
 		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
 			// rising
-			FARCALL(CheckUpCollision);
+			run_up_collision();
 			if (b_and() && still_in(WST_CROUCH_AIRBORNE))
 				st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 			return;
@@ -2551,7 +2551,7 @@ public:
 			return;
 		}
 		update_pos();
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		if (b_low_nibble()) {
 			port_DoBumpWithSmallBackOffset();
 			return;
@@ -2606,7 +2606,7 @@ public:
 			return;
 		}
 		roll_move();
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		if (b_low_nibble()) {
 			port_DoBumpWithBigBackOffset();
 			return;
@@ -2636,7 +2636,7 @@ public:
 		}
 		anim(OAM1);
 		roll_move();
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		if (b_low_nibble()) {
 			port_DoBumpWithBigBackOffset();
 			return;
@@ -2834,7 +2834,7 @@ public:
 	{
 		if (!ld_bit(wJoypadDown, B_PAD_DOWN)) {
 			wr8(wCollisionBoxTop, (uint8_t)-27);
-			FARCALL(CheckUpCollision);
+			run_up_collision();
 			if (!still_in(WST_CROUCH_SLIDING)) {
 				return;
 			}
@@ -2858,7 +2858,7 @@ public:
 		if (ld_bit(wJoypadPressed, B_PAD_A)) {
 			// .try_jump
 			wr8(wCollisionBoxTop, (uint8_t)-27);
-			FARCALL(CheckUpCollision);
+			run_up_collision();
 			if (!still_in(WST_CROUCH_SLIDING)) {
 				return;
 			}
@@ -2870,7 +2870,7 @@ public:
 			port_StartCrouchJump();
 			return;
 		}
-		FARCALL(CheckCentreCollision);
+		run_centre_collision();
 		if (!still_in(WST_CROUCH_SLIDING)) {
 			return;
 		}
@@ -2883,7 +2883,7 @@ public:
 			port_SetState_Sliding();
 			return;
 		}
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		if (!still_in(WST_CROUCH_SLIDING)) {
 			return;
 		}
@@ -2968,7 +2968,7 @@ public:
 				st(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 			return;
 		}
-		FARCALL(CheckAirborneCollision);
+		run_airborne_collision();
 		if (!still_in(WST_GRAB_AIRBORNE)) {
 			return;
 		}
@@ -3188,7 +3188,7 @@ public:
 		if (!still_in(WST_ATTACKING_AIRBORNE)) {
 			return;
 		}
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		if (!still_in(WST_ATTACKING_AIRBORNE)) {
 			return;
 		}
@@ -3211,7 +3211,7 @@ public:
 			return;
 		}
 		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
-			FARCALL(CheckUpCollision);
+			run_up_collision();
 			if (!b_and() || !still_in(WST_ATTACKING_AIRBORNE)) {
 				return;
 			}
@@ -3583,7 +3583,7 @@ public:
 			port_SetState_GrabIdling();
 			return;
 		}
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		if (b_low_nibble()) {
 			return;
 		}
@@ -3644,7 +3644,7 @@ public:
 		if (!still_in(WST_GRAB_IDLING)) {
 			return;
 		}
-		FARCALL(CheckCentreCollision);
+		run_centre_collision();
 		if (!still_in(WST_GRAB_IDLING)) {
 			return;
 		}
@@ -3693,7 +3693,7 @@ public:
 		if (!still_in(WST_ATTACKING)) {
 			return;
 		}
-		FARCALL(CheckFrontCollision);
+		run_front_collision();
 		if (!still_in(WST_ATTACKING)) {
 			return;
 		}
