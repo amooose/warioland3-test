@@ -569,6 +569,39 @@ primitives, home/wario.cpp, and the golf objects' animation):
   ending dead, since UpdateObject reloads every register; push / pop
   are transparent. Usage: `python live.py cdehl Routine,Routine...` from
   the repo root. Handy for any contract relaxing.
+- Wario's states as plain C++ (2026-11-07): wario_states_1-4.cpp derive
+  from `WarioStateBase` (level/wario_state_base.hpp), whose helpers read
+  and write memory and return values (the collision checks return the
+  result the asm leaves in b, through `in_bank`; the home primitives are
+  called directly: move_wario_x/_y, load_wario_gfx, set_wario_pal,
+  update_wario_animation under home::farcall). The AsmModule helpers that
+  set a and f for a flag test are `= delete`d there. Register traffic is
+  left only where a register-level callee takes or returns one: b for
+  CreateParticle and after Func_19741/Func_197b1/Func_198c7, c for the
+  floor transitions, the b ApplyWalkVelocity_* leaves for MoveWario*, de
+  for Func_1f863. Every kept hook clobbers all registers (the liveness
+  script found no asm caller reading one), except five reached from
+  inside a collision check (Func_19832 farcalls CrouchOrSlide; the block
+  functions SetState_FanStart, SetState_ZombieRecovering, and through
+  RecoverFromTransformation SetState_Idling and StartFall), whose
+  register-level callers see what they leave (ZipLineFunc reads c after
+  Func_19706): CrouchOrSlide, SetState_Idling and StartFall keep a
+  register-level copy (WarioStates1Exact), SetState_FanStart too
+  (FanStartExact), SetState_ZombieRecovering sets a and f as its xor a.
+  The difftests caught the last two (ResetLevelMusicWarioPalsAndState and
+  BlockFunc_WalkthroughPipe pass their registers on). When a hook that
+  others tail into loses its contract, look for these chains.
+  Func_1f863 takes de and UpdateWarioStates_Group1 a, as the asm. All 516
+  routines were fuzzed with temporary ALL_REGISTERS hooks (1000 variants,
+  every input): one failure, which the old code has too (open issue 4).
+  Coverage gaps left, where no recording
+  reaches the code: the fan states (air currents), the owl's, fences,
+  some treasure-pickup and zombie landing frames.
+- The fuzzer used to abort when native code made a `CALL`/`JUMP` into
+  ROMX with another bank mapped (a fuzzed state can map any bank); under
+  test that's now an unrealistic check and the call is skipped
+  (ported.c). The `boss` input hit it with temporary hooks on
+  Func_1b2c0 and Func_1b302 at 1000 variants, with the old code too.
 - Home's level-tied files (load_room, load_level, decompress_level_data,
   door/floor/room transitions, wario_mechanics1, object_mechanics,
   object_pos, IsOnSlipperyGround) go with the level code that calls
@@ -908,6 +941,15 @@ had. Check a candidate's entry points and their callers' register use first.
    `Func_850ff` (24/30). Most transformation states (snowman, ball, fan,
    owl, vampire, puffy, crazy, bouncy) are only checked with synthetic
    calls: recordings of those would help most.
+
+4. **`UpdateState_Crouching` on `action_help`** (2026-11-07), found with a
+   temporary hook on it at `--fuzz-variants 1000`: 1 of 4004 checks fails
+   (seed from call 64, frame 6459, variant 836). The asm run writes
+   object, scene and audio RAM in WRAM bank 3 (wObj1Var1, wObjDataPtr07,
+   wChannel6...) that the native run doesn't, as if it ran off into
+   fuzzed code. The code before the plain rewrite (6bcc579) fails the
+   same check with the same differences; nothing else does. Never seen at
+   the default 200 variants.
 
 ## Good next batches
 
