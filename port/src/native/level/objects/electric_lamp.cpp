@@ -75,8 +75,7 @@ void ElectricLamp::spark()
 	SET_BC(gb_, ADDR_Data_60040);
 	routines_.call(ADDR_ApplyObjYMovement);
 	pos_to_hram();
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a)
+	if (!hpos_block_unk1())
 		return;
 	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
 	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
@@ -94,13 +93,11 @@ void ElectricLamp::spark_run(bool right)
 	x() = static_cast<uint16_t>(x() + (right ? 2 : -2));
 	if (!state()) {
 		pos_to_hram();
-		routines_.call(ADDR_Func_3543);
-		if (gb_->cpu.a) {
+		if (hpos_block_down()) {
 			uint16_t y_pos = static_cast<uint16_t>(y() - 4);
 			mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
 			mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-			routines_.call(ADDR_Func_3513);
-			if (!gb_->cpu.a)
+			if (!hpos_block_unk4())
 				return;
 		}
 	}

@@ -126,15 +126,13 @@ void Mizuuo::spit(uint16_t page)
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a) {
+	if (hpos_block_unk4()) {
 		set_splat();
 		return;
 	}
 	uint16_t movement = ADDR_Data_60700;
 	if (var1()) {
-		routines_.call(ADDR_Func_3543);
-		if (gb_->cpu.a) {
+		if (hpos_block_down()) {
 			set_splat();
 			return;
 		}

@@ -140,7 +140,7 @@ void RoboMouse::break_blocks(bool right, uint8_t dx)
 		mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
 		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 		mem_[wBlockFuncSpecialCollision] = COLLISION_ROBO_MOUSE_BREAK;
-		routines_.call(ADDR_Func_3513);
+		hpos_block_unk4();
 	}
 }
 
@@ -174,8 +174,7 @@ void RoboMouse::run(uint16_t handler)
 	case SINKING:
 		routines_.call(ADDR_MoveObjectDown_Slow);
 		hpos_offset(0, 0);
-		routines_.call(ADDR_Func_352b);
-		if (gb_->cpu.a)
+		if (hpos_block_unk1())
 			state() = (interaction() & 0x7f) == OBJ_INTERACTION_0B ? 0x13 : 0x31;
 		return;
 	case RESET:
@@ -255,8 +254,7 @@ bool RoboMouse::walk_floor(bool right)
 {
 	right ? move_right() : move_left();
 	hpos_offset(0, 0);
-	routines_.call(ADDR_Func_3543);
-	uint8_t floor = gb_->cpu.a;
+	uint8_t floor = hpos_block_down();
 	if (!floor) {
 		state() = 0x11;
 		set_frameset(right ? ADDR_Frameset_691de : ADDR_Frameset_69220);
@@ -269,16 +267,14 @@ bool RoboMouse::walk_floor(bool right)
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 7) : static_cast<uint16_t>(x() - 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3543);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_down()) {
 		state() = right ? 0x23 : 0x22;
 		return true;
 	}
 	break_blocks(right, right ? 0x0b : 0x0c);
 	hpos_offset(-4, right ? 0x13 : -0x14);
 	mem_[wBlockFuncSpecialCollision] = COLLISION_ROBO_MOUSE_FREE;
-	routines_.call(ADDR_Func_3513);
-	if (!(gb_->cpu.a & 0x0f))
+	if (!(hpos_block_unk4() & 0x0f))
 		return false;
 	y() = static_cast<uint16_t>(y() - 6);
 	state() = right ? 0x25 : 0x24;

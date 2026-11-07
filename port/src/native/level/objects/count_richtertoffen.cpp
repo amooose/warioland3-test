@@ -156,8 +156,7 @@ void Count::hop_along()
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (!(gb_->cpu.a & 0x0f)) {
+	if (!(hpos_block_unk4() & 0x0f)) {
 		right ? move_right() : move_left();
 		return;
 	}
@@ -295,8 +294,7 @@ void Count::run(uint16_t handler)
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-		routines_.call(ADDR_Func_3543);
-		if (!gb_->cpu.a) {
+		if (!hpos_block_down()) {
 			state() = OBJSTATE_STANDING_FALL_START;
 			return;
 		}
@@ -321,8 +319,7 @@ void Count::run(uint16_t handler)
 			mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 			mem_[hXPosHi] = mem_[wCurObjXPos + 1];
 		}
-		routines_.call(ADDR_Func_358b);
-		if (gb_->cpu.a & 0x0f) { // the ceiling: turns and falls
+		if (hpos_block_unk3() & 0x0f) { // the ceiling: turns and falls
 			var2() = 0x01;
 			substate() ^= OBJSUBFLAG_HDIR;
 			jump_top();
@@ -337,8 +334,7 @@ void Count::run(uint16_t handler)
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-		routines_.call(ADDR_Func_352b);
-		if (gb_->cpu.a) {
+		if (hpos_block_unk1()) {
 			mem_[wCurObjYPos + 0] = mem_[hYPosLo];
 			mem_[wCurObjYPos + 1] = mem_[hYPosHi];
 			state() = OBJSTATE_SPECIAL_3;

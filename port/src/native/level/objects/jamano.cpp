@@ -211,8 +211,7 @@ uint8_t Jamano::wall_ahead(bool right)
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	return gb_->cpu.a;
+	return hpos_block_unk4();
 }
 
 uint8_t Jamano::ground_below()
@@ -222,8 +221,7 @@ uint8_t Jamano::ground_below()
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_352b);
-	return gb_->cpu.a;
+	return hpos_block_unk1();
 }
 
 // up to the top of the room, then down to the floor

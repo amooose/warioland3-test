@@ -234,8 +234,7 @@ void Omodonmeka::run(uint16_t handler)
 		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-		routines_.call(ADDR_Func_358b);
-		bool stop = gb_->cpu.a & 0x0f;
+		bool stop = hpos_block_unk3() & 0x0f;
 		if (!stop)
 			stop = y() == static_cast<uint16_t>((var1() | var2() << 8) - 0x40);
 		if (stop) {
@@ -313,8 +312,7 @@ void Omodonmeka::run(uint16_t handler)
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-		routines_.call(ADDR_Func_352b);
-		if (!gb_->cpu.a)
+		if (!hpos_block_unk1())
 			return;
 		mem_[wCurObjYPos + 0] = mem_[hYPosLo];
 		mem_[wCurObjYPos + 1] = mem_[hYPosHi];
@@ -587,8 +585,7 @@ void Omodonmeka::omodon()
 		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-		routines_.call(ADDR_Func_352b);
-		if (!gb_->cpu.a)
+		if (!hpos_block_unk1())
 			return;
 		y() = static_cast<uint16_t>((mem_[hYPosLo] | mem_[hYPosHi] << 8) - 0x0f);
 		play_sfx(SFX_063);

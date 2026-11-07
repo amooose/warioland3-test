@@ -114,8 +114,7 @@ bool Bubble::in_water_at(uint8_t dy)
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_358b);
-	return gb_->cpu.a;
+	return hpos_block_unk3();
 }
 
 // up a pixel (on screen, every other frame; the others sway)
@@ -155,14 +154,12 @@ bool Bubble::blocked(bool right)
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a & 0x0f)
+	if (hpos_block_unk4() & 0x0f)
 		return true;
 	y_pos = static_cast<uint16_t>(y() - 7);
 	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	return gb_->cpu.a & 0x0f;
+	return hpos_block_unk4() & 0x0f;
 }
 
 // 48 frames each way, easing along the speed list; turns at walls

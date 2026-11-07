@@ -124,8 +124,7 @@ bool FallingSnow::landed()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk1()) {
 		SET_BC(gb_, ADDR_Data_603e0);
 		routines_.call(ADDR_ApplyObjYMovement);
 		return false;

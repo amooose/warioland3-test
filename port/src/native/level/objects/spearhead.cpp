@@ -147,8 +147,7 @@ bool Spearhead::on_floor()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_3543);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_down()) {
 		state() = OBJSTATE_STANDING_FALL_START;
 		return false;
 	}
@@ -326,8 +325,7 @@ void Spearhead::run(uint16_t handler)
 		bool right = facing_right();
 		uint8_t in_block = mem_[wCurObjXPos + 0] & 0x0f;
 		if (right ? in_block + 9 >= 0x10 : in_block < 10) {
-			routines_.call(right ? ADDR_ProcessBlockOnRight : ADDR_ProcessBlockOnLeft);
-			if (!(gb_->cpu.a & 0x0f)) {
+			if (!(block_beside(right) & 0x0f)) {
 				state() = OBJSTATE_TURN_AROUND_START;
 				return;
 			}
@@ -338,8 +336,7 @@ void Spearhead::run(uint16_t handler)
 		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 		mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 		mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-		routines_.call(ADDR_Func_3513);
-		if (gb_->cpu.a) {
+		if (hpos_block_unk4()) {
 			state() = OBJSTATE_TURN_AROUND_START;
 			return;
 		}

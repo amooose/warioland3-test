@@ -195,8 +195,7 @@ void Pneumo::walking()
 	}
 	mem_[wc1ca] = 0;
 	hpos(0, 0);
-	routines_.call(ADDR_Func_352b);
-	bool on_floor = gb_->cpu.a ? mem_[wc1ca] : !mem_[wIsInWaterOrSand];
+	bool on_floor = hpos_block_unk1() ? mem_[wc1ca] : !mem_[wIsInWaterOrSand];
 	if (!on_floor) {
 		set_floating();
 		return;
@@ -216,8 +215,7 @@ void Pneumo::walk_on()
 {
 	bool right = facing_right();
 	hpos(-4, right ? 7 : -8);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a) {
+	if (hpos_block_unk4()) {
 		substate() ^= OBJSUBFLAG_HDIR;
 		return;
 	}
@@ -232,8 +230,7 @@ void Pneumo::floating()
 		return;
 	}
 	hpos(-16, 0);
-	routines_.call(ADDR_Func_358b);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk3()) {
 		if (!var1()) {
 			reset();
 			return;
@@ -274,15 +271,13 @@ void Pneumo::inflated()
 		return;
 	}
 	hpos(-16, 0);
-	routines_.call(ADDR_Func_358b);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk3()) {
 		SET_BC(gb_, ADDR_Data_60600);
 		routines_.call(ADDR_ApplyObjYMovement);
 	}
 	bool right = facing_right();
 	hpos(-4, right ? 7 : -8);
-	routines_.call(ADDR_Func_3513);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk4()) {
 		routines_.call(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 		return;
 	}
@@ -322,8 +317,7 @@ void Pneumo::rising()
 	}
 	if (up) {
 		hpos(-16, 0);
-		routines_.call(ADDR_Func_358b);
-		if (gb_->cpu.a)
+		if (hpos_block_unk3())
 			inflate();
 		else
 			move_up();
@@ -331,8 +325,7 @@ void Pneumo::rising()
 	}
 	mem_[wc1ca] = 0;
 	hpos(0, 0);
-	routines_.call(ADDR_Func_352b);
-	if (gb_->cpu.a) {
+	if (hpos_block_unk1()) {
 		if (mem_[wc1ca])
 			routines_.call(ADDR_MoveObjectDown_Slow);
 		else

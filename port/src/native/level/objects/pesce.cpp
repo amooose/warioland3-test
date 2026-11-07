@@ -233,8 +233,7 @@ void Pesce::sink_wario(uint16_t page)
 		return;
 	}
 	hpos(page, 0x06, 0);
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk1()) {
 		if (mem_[wGlobalCounter] & 0x03)
 			return;
 		gb_->cpu.b = 0x01;
@@ -266,7 +265,7 @@ void Pesce::rising()
 	if (mem_[wCurObjFramesetOffset] == 0x02 && frame_duration() == 0x01)
 		play_sfx(SFX_0AE);
 	hpos(wCurObjYPos & 0xff00, -0x18, 0);
-	routines_.call(ADDR_Func_358b);
+	hpos_block_unk3();
 	if (mem_[wIsInWaterOrSand] && screen_y() >= mem_[wWarioScreenYPos] && !(mem_[wGlobalCounter] & 0x03)) {
 		++var3();
 		move_up();
@@ -278,8 +277,7 @@ void Pesce::swim()
 {
 	bool right = facing_right();
 	hpos(wCurObjYPos & 0xff00, -0x04, right ? 0x0f : -0x10);
-	routines_.call(ADDR_Func_3513);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk4()) {
 		routines_.call(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
 		return;
 	}
@@ -340,8 +338,7 @@ void Pesce::chase()
 		}
 	}
 	hpos(wCurObjYPos & 0xff00, -0x04, right ? 0x0f : -0x10);
-	routines_.call(ADDR_Func_3513);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk4()) {
 		routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 		return;
 	}
@@ -420,8 +417,7 @@ void Pesce::beaten()
 	switch (var1()) {
 	case 0:
 		hpos(wCurObjYPos & 0xff00, 0x06, 0);
-		routines_.call(ADDR_Func_352b);
-		if (!gb_->cpu.a) {
+		if (!hpos_block_unk1()) {
 			routines_.call(ADDR_MoveObjectDown_Slow);
 			return;
 		}
@@ -441,8 +437,7 @@ void Pesce::beaten()
 		return;
 	case 2:
 		hpos(wCurObjYPos & 0xff00, -0x30, 0);
-		routines_.call(ADDR_Func_3513);
-		if (!gb_->cpu.a) {
+		if (!hpos_block_unk4()) {
 			routines_.call(ADDR_MoveObjectLeft_Slow);
 			return;
 		}
@@ -763,7 +758,7 @@ void PesceHelper::cheese()
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-		routines_.call(ADDR_Func_352b);
+		hpos_block_unk1();
 		if (mem_[wIsInWaterOrSand]) {
 			no_actions();
 			if (!(flags() & (1 << OBJFLAG_ON_SCREEN_F))) {

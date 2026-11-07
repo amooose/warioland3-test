@@ -549,8 +549,7 @@ void WolfenbossHelper::kuri()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a)
+	if (!hpos_block_unk1())
 		return;
 	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
 	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
@@ -712,8 +711,7 @@ bool WolfenbossHelper::landed()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a)
+	if (!hpos_block_unk1())
 		return false;
 	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
 	mem_[wCurObjYPos + 1] = mem_[hYPosHi];

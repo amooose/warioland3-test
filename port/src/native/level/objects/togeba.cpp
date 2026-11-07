@@ -108,8 +108,7 @@ bool Togeba::wall(uint16_t x_pos)
 {
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_352b);
-	return gb_->cpu.a;
+	return hpos_block_unk1();
 }
 
 // a pixel down every other frame, with Wario on it

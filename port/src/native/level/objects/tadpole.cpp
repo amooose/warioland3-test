@@ -140,7 +140,7 @@ void Tadpole::leaping()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_352b);
+	hpos_block_unk1();
 	if (!mem_[wIsInWaterOrSand]) {
 		SET_BC(gb_, ADDR_Data_60a40);
 		routines_.call(ADDR_ApplyObjYMovement);

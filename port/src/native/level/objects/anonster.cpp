@@ -228,8 +228,7 @@ bool Anonster::wall_ahead(uint8_t right_offset, uint8_t left_offset)
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	return gb_->cpu.a;
+	return hpos_block_unk4();
 }
 
 // walks along the ceiling, turning at walls; after a while (var3 $4f
@@ -388,8 +387,7 @@ void Anonster::drop()
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-		routines_.call(ADDR_Func_352b);
-		landed = gb_->cpu.a;
+		landed = hpos_block_unk1();
 	}
 	if (!landed) {
 		SET_BC(gb_, ADDR_Data_607f0);
@@ -463,8 +461,7 @@ void Anonster::rush()
 		uint16_t x_pos = static_cast<uint16_t>(x() + 0x17);
 		mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 		mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-		routines_.call(ADDR_Func_3543);
-		if (gb_->cpu.a) {
+		if (hpos_block_down()) {
 			move_right();
 			return;
 		}
@@ -779,8 +776,7 @@ void AnonsterHelper::sink()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a)
+	if (!hpos_block_unk1())
 		return;
 	set_frameset(ADDR_Frameset_694f5);
 	state_duration() = 0x64;
@@ -807,8 +803,7 @@ void AnonsterHelper::drift()
 	x_pos = right ? static_cast<uint16_t>(x_pos - 5) : static_cast<uint16_t>(x_pos + 4);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a)
+	if (hpos_block_unk4())
 		substate() ^= OBJSUBFLAG_HDIR;
 	else if (var2() == 0x2e)
 		turn_at_random();
@@ -829,8 +824,7 @@ void AnonsterHelper::silk_float(bool right)
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a) {
+	if (hpos_block_unk4()) {
 		set_update(right ? FLOAT_LEFT : FLOAT_RIGHT);
 		if (right)
 			substate() &= ~OBJSUBFLAG_HDIR;

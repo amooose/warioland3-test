@@ -397,8 +397,7 @@ void YellowBelly::swim()
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk4()) {
 		if (right)
 			move_right_by_var2();
 		else
@@ -673,8 +672,7 @@ void YellowBellyHelper::pump_falling()
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-		routines_.call(ADDR_Func_352b);
-		if (gb_->cpu.a) {
+		if (hpos_block_unk1()) {
 			mem_[wCurObjYPos + 0] = mem_[hYPosLo];
 			mem_[wCurObjYPos + 1] = mem_[hYPosHi];
 			set_frameset(ADDR_Frameset_6987f);
@@ -691,8 +689,7 @@ void YellowBellyHelper::pump_falling()
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a)
+	if (hpos_block_unk4())
 		return;
 	routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 }
@@ -714,8 +711,7 @@ void YellowBellyHelper::pump_landed()
 		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 		mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 		mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-		routines_.call(ADDR_Func_3513);
-		bool blocked = gb_->cpu.a;
+		bool blocked = hpos_block_unk4();
 		if (blocked) {
 			if (right)
 				substate() &= ~(1 << 7);

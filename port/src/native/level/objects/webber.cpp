@@ -203,8 +203,7 @@ bool Webber::landed()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_352b);
-	return gb_->cpu.a;
+	return hpos_block_unk1();
 }
 
 // bounced down to the floor (var3 15: done), then climbs back

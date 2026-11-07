@@ -89,8 +89,7 @@ bool Zombie::blocked(bool right)
 {
 	uint8_t in_block = mem_[wCurObjXPos + 0] & 0x0f;
 	if (right ? in_block + 3 >= 16 : in_block < 4) {
-		routines_.call(right ? ADDR_ProcessBlockOnRight : ADDR_ProcessBlockOnLeft);
-		if (!(gb_->cpu.a & 0x0f))
+		if (!(block_beside(right) & 0x0f))
 			return true;
 	}
 	uint16_t y_pos = static_cast<uint16_t>(y() - 4);
@@ -99,8 +98,7 @@ bool Zombie::blocked(bool right)
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	return gb_->cpu.a;
+	return hpos_block_unk4();
 }
 
 // creeps about underground, turning at walls and edges; rises when
@@ -113,8 +111,7 @@ void Zombie::underground()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_3543);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_down()) {
 		flags() = 0;
 		return;
 	}
@@ -277,8 +274,7 @@ void Zombie::walk_on()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_3543);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_down()) {
 		state_duration() = 0x30;
 		set_update(HEADLESS);
 		return;

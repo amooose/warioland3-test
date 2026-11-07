@@ -133,8 +133,7 @@ void BrrrBear::walk()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_3543);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_down()) {
 		state() = 0x11;
 		return;
 	}
@@ -143,8 +142,7 @@ void BrrrBear::walk()
 	bool right = facing_right();
 	uint8_t in_block = mem_[wCurObjXPos + 0] & 0x0f;
 	if (right ? in_block + 7 >= 0x10 : in_block < 8) {
-		routines_.call(right ? ADDR_ProcessBlockOnRight : ADDR_ProcessBlockOnLeft);
-		if (!(gb_->cpu.a & 0x0f)) {
+		if (!(block_beside(right) & 0x0f)) {
 			state() = 0x13;
 			return;
 		}
@@ -155,8 +153,7 @@ void BrrrBear::walk()
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a) {
+	if (hpos_block_unk4()) {
 		state() = 0x13;
 		return;
 	}

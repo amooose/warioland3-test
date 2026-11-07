@@ -85,6 +85,24 @@ protected:
 	void move_right_by_var2() { routines_.call(ADDR_MoveObjectRightByVar2); }
 	void move_up_by_var2() { routines_.call(ADDR_MoveObjectUpByVar2); }
 	void move_down_by_var2() { routines_.call(ADDR_MoveObjectDownByVar2); }
+	// The block at hPos through ProcessBlock, by the collision points it's
+	// processed with (Func_3513 and the like: homecalls of collisions.asm's
+	// routines): the block function's result, which they leave in a. The
+	// CPU keeps the rest of the block function's registers, which some
+	// objects read on.
+	uint8_t hpos_block_unk4() { return call_a(ADDR_Func_3513); } // COLLISION_UNK4
+	uint8_t hpos_block_unk1() { return call_a(ADDR_Func_352b); } // COLLISION_UNK1
+	uint8_t hpos_block_down() { return call_a(ADDR_Func_3543); } // COLLISION_DOWN
+	uint8_t hpos_block_unk3() { return call_a(ADDR_Func_358b); } // COLLISION_UNK3
+	uint8_t hpos_block_unk2() { return call_a(ADDR_Func_35a3); } // COLLISION_UNK2
+	// ProcessBlockOnRight / Left: the block beside the one at hl
+	uint8_t block_beside(bool right) { return call_a(right ? ADDR_ProcessBlockOnRight : ADDR_ProcessBlockOnLeft); }
+	// a home routine that returns its result in a
+	uint8_t call_a(uint16_t routine)
+	{
+		routines_.call(routine);
+		return gb_->cpu.a;
+	}
 	void vanish() { routines_.call(ADDR_Func_3173); } // puff, then Func_4c860 despawns it
 	void one_way_platform() { routines_.call(ADDR_SetOneWayPlatformAction); } // SetOneWayPlatformAction
 	void despawn(); // DespawnObject, with hl = wCurObjUnk02

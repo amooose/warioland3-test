@@ -151,8 +151,7 @@ bool Scowler::walk()
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a)
+	if (hpos_block_unk4())
 		return true;
 	routines_.call(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
 	return false;
@@ -163,8 +162,7 @@ void Scowler::down(bool tail)
 {
 	(void)tail;
 	hpos(0x05);
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk1()) {
 		move_down();
 		return;
 	}
@@ -176,7 +174,7 @@ void Scowler::up(bool tail)
 {
 	(void)tail;
 	hpos(-0x2c);
-	routines_.call(ADDR_Func_358b);
+	hpos_block_unk3();
 	if (mem_[wIsInWaterOrSand]) {
 		move_up();
 		return;
@@ -275,8 +273,7 @@ void Scowler::sinking()
 {
 	flashes();
 	hpos(0x05);
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk1()) {
 		SET_BC(gb_, ADDR_Data_60a60);
 		routines_.call(ADDR_ApplyObjYMovement);
 	}
@@ -371,7 +368,7 @@ void Scowler::hurt_sinking()
 		return;
 	}
 	hpos(-0x2c);
-	routines_.call(ADDR_Func_358b);
+	hpos_block_unk3();
 	if (!mem_[wIsInWaterOrSand])
 		return;
 	SET_BC(gb_, ADDR_Data_60a70);
@@ -393,7 +390,7 @@ void Scowler::defeated_rising()
 	no_actions();
 	flashes();
 	hpos(-0x18);
-	routines_.call(ADDR_Func_358b);
+	hpos_block_unk3();
 	if (mem_[wIsInWaterOrSand]) {
 		SET_BC(gb_, ADDR_Data_60a70);
 		routines_.call(ADDR_ApplyObjYMovement);
@@ -679,7 +676,7 @@ void ScowlerHelper::ink(bool right)
 		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-		routines_.call(ADDR_Func_358b);
+		hpos_block_unk3();
 		if (mem_[wIsInWaterOrSand]) {
 			if (mem_[wGlobalCounter] & 0x03)
 				return;

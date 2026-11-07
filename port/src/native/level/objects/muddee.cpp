@@ -253,7 +253,7 @@ void Muddee::hit()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_352b);
+	hpos_block_unk1();
 	if (!mem_[wIsInWaterOrSand]) {
 		SET_BC(gb_, ADDR_Data_60d40);
 		routines_.call(ADDR_ApplyObjYMovement);
@@ -324,8 +324,7 @@ void Muddee::swim_up()
 	if (!waited(ADDR_Frameset_69d04))
 		return;
 	pos_to_h(-0x1c, 0);
-	routines_.call(ADDR_Func_358b);
-	if (!gb_->cpu.a && !level_with_wario()) {
+	if (!hpos_block_unk3() && !level_with_wario()) {
 		move(ADDR_MoveObjectUp, ADDR_MoveObjectUp_Slow);
 		return;
 	}
@@ -341,7 +340,7 @@ void Muddee::swim_down()
 	if (!waited(ADDR_Frameset_69cf2))
 		return;
 	pos_to_h(0x30, 0);
-	routines_.call(ADDR_Func_352b);
+	hpos_block_unk1();
 	if (!mem_[wIsInWaterOrSand] && !level_with_wario()) {
 		move(ADDR_MoveObjectDown, ADDR_MoveObjectDown_Slow);
 		return;
@@ -358,8 +357,7 @@ void Muddee::swim_side(bool right)
 	if (!waited(right ? ADDR_Frameset_69cfb : ADDR_Frameset_69d0d))
 		return;
 	pos_to_h(0, right ? 0x18 : -0x18);
-	routines_.call(ADDR_Func_3513);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk4()) {
 		if (right)
 			move(ADDR_MoveObjectRight, ADDR_MoveObjectRight_Slow);
 		else
@@ -385,8 +383,7 @@ void Muddee::stop()
 void Muddee::sink()
 {
 	pos_to_h(0x12, 0);
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk1()) {
 		move_down();
 		return;
 	}
@@ -412,8 +409,7 @@ void Muddee::follow()
 	uint16_t x_pos = static_cast<uint16_t>(x() + (dir > 0 ? 0x08 : -0x08));
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a)
+	if (hpos_block_unk4())
 		return;
 	routines_.call(dir > 0 ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 }
@@ -468,8 +464,7 @@ void Muddee::charging()
 	sfx_0c1();
 	bool right = var2() & 1;
 	pos_to_h(0, right ? 0x18 : -0x18);
-	routines_.call(ADDR_Func_3513);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk4()) {
 		routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	} else {
 		var2() ^= 0x01;
@@ -477,14 +472,13 @@ void Muddee::charging()
 	}
 	if (!(substate() & (1 << 6))) {
 		pos_to_h(-0x1c, 0);
-		routines_.call(ADDR_Func_358b);
-		if (!gb_->cpu.a) {
+		if (!hpos_block_unk3()) {
 			routines_.call(ADDR_MoveObjectUp_Slow);
 			return;
 		}
 	} else {
 		pos_to_h(0x30, 0);
-		routines_.call(ADDR_Func_352b);
+		hpos_block_unk1();
 		if (!mem_[wIsInWaterOrSand]) {
 			routines_.call(ADDR_MoveObjectDown_Slow);
 			return;
@@ -708,8 +702,7 @@ void Turtle::swimming()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a) {
+	if (hpos_block_unk4()) {
 		set_update(TC_STOPPED);
 		return;
 	}

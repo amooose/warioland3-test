@@ -81,8 +81,7 @@ bool Octohon::wall_at(int dx)
 	uint16_t x_pos = static_cast<uint16_t>(x() + dx);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	return gb_->cpu.a;
+	return hpos_block_unk4();
 }
 
 // facing away from Wario (var1 the way it swims), at random flipped

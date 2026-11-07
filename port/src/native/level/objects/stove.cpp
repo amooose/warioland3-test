@@ -83,8 +83,7 @@ void Stove::fall()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a)
+	if (!hpos_block_unk1())
 		return;
 	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
 	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
@@ -126,8 +125,7 @@ void Stove::pushed(bool right)
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a & 0x0f) {
+	if (hpos_block_unk4() & 0x0f) {
 		set_land();
 		return;
 	}
@@ -138,8 +136,7 @@ bool Stove::ground_at(uint16_t x_pos)
 {
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_35a3);
-	return gb_->cpu.a;
+	return hpos_block_unk2();
 }
 
 // on the floor; with nothing under either side, it'll fall (and shake
@@ -150,8 +147,7 @@ void Stove::land()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_3543);
-	bool on_floor = gb_->cpu.a == 0x10;
+	bool on_floor = hpos_block_down() == 0x10;
 	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
 	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
 	if (on_floor)

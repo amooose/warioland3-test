@@ -199,8 +199,7 @@ void Coin::hop(int index, bool start)
 	velocity(h.velocities);
 	h.right ? move_right_by_var2() : move_left_by_var2();
 	pos_to_hram(-8, h.right ? 3 : -4);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a & 0x0f) {
+	if (hpos_block_unk4() & 0x0f) {
 		state() = h.right ? 0x0c : 0x0d;
 		return;
 	}
@@ -224,12 +223,10 @@ void Coin::fall(bool right, bool start)
 	right ? move_right_by_var2() : move_left_by_var2();
 	velocity(ADDR_FallingYVel_Light);
 	pos_to_hram(0, 0);
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk1()) {
 		in_water();
 		pos_to_hram(-4, right ? 3 : -4);
-		routines_.call(ADDR_Func_3513);
-		if (gb_->cpu.a & 0x0f)
+		if (hpos_block_unk4() & 0x0f)
 			state() = right ? 0x0c : 0x0d;
 		return;
 	}
@@ -260,15 +257,13 @@ void Coin::slide(bool right)
 	if (!(mem_[wGlobalCounter] & 0x1f))
 		--speed;
 	pos_to_hram(-4, right ? 3 : -4);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a & 0x0f) {
+	if (hpos_block_unk4() & 0x0f) {
 		state() = right ? 0x10 : 0x11;
 		return;
 	}
 	right ? move_right_by_var2() : move_left_by_var2();
 	pos_to_hram(0, 0);
-	routines_.call(ADDR_Func_3543);
-	bool on_floor = gb_->cpu.a == 0x10;
+	bool on_floor = hpos_block_down() == 0x10;
 	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
 	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
 	if (on_floor)
@@ -277,8 +272,7 @@ void Coin::slide(bool right)
 		uint16_t x_pos = static_cast<uint16_t>(x() + dx);
 		mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 		mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-		routines_.call(ADDR_Func_35a3);
-		if (gb_->cpu.a)
+		if (hpos_block_unk2())
 			return;
 	}
 	state() = right ? 0x0d : 0x0c;
@@ -298,8 +292,7 @@ void Coin::resting()
 		return;
 	}
 	pos_to_hram(0, 0);
-	routines_.call(ADDR_Func_3543);
-	if (!gb_->cpu.a)
+	if (!hpos_block_down())
 		state() = 0x14; // the floor's gone
 }
 
@@ -327,8 +320,7 @@ void Coin::bounce(bool start)
 	}
 	velocity(0x4040);
 	pos_to_hram(0, 0);
-	routines_.call(ADDR_Func_352b);
-	if (gb_->cpu.a) {
+	if (hpos_block_unk1()) {
 		mem_[wCurObjYPos + 0] = mem_[hYPosLo];
 		mem_[wCurObjYPos + 1] = mem_[hYPosHi];
 		state() = 0x12;

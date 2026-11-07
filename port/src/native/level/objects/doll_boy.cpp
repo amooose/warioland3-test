@@ -285,8 +285,7 @@ void DollBoy::update_stunned()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk1()) {
 		SET_BC(gb_, ADDR_FallingYVel_Light);
 		routines_.call(ADDR_ApplyObjYMovement);
 		return;
@@ -358,8 +357,7 @@ void DollBoy::walk()
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a) {
+	if (hpos_block_unk4()) {
 		set_frameset(right ? ADDR_Frameset_6965f : ADDR_Frameset_6966a);
 		state_duration() = DOLLBOY_TURN_DELAY;
 		var3() = 0;
@@ -505,8 +503,7 @@ void DollBoy::hit_wario()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_unk1()) {
 		SET_BC(gb_, ADDR_FallingYVel_Light);
 		routines_.call(ADDR_ApplyObjYMovement);
 		return;

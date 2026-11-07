@@ -68,8 +68,7 @@ bool Haridama::wall(bool right)
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	return gb_->cpu.a & 0x0f;
+	return hpos_block_unk4() & 0x0f;
 }
 
 void Haridama::turn(uint16_t frameset)
@@ -206,15 +205,13 @@ void Haridama::floating()
 	uint16_t x_pos = static_cast<uint16_t>(x() - 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_358b);
-	if (!gb_->cpu.a && mem_[wIsInWaterOrSand]) {
+	if (!hpos_block_unk3() && mem_[wIsInWaterOrSand]) {
 		mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
 		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 		x_pos = static_cast<uint16_t>(x() + 7);
 		mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 		mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-		routines_.call(ADDR_Func_358b);
-		if (!gb_->cpu.a) {
+		if (!hpos_block_unk3()) {
 			routines_.call(ADDR_MoveObjectUp_Slow);
 			return;
 		}

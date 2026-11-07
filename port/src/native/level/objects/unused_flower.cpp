@@ -120,14 +120,12 @@ void UnusedFlower::projectile(uint16_t page)
 	uint8_t s = state();
 	if (s == OBJSTATE_SPECIAL_1) { // .Roll
 		pos_to_hram(static_cast<uint16_t>(page | OBJ_Y_POS), 4);
-		routines_.call(ADDR_Func_3513);
-		if (gb_->cpu.a) {
+		if (hpos_block_unk4()) {
 			set_destroy();
 			return;
 		}
 		pos_to_hram(wCurObjYPos, 0);
-		routines_.call(ADDR_Func_3543);
-		if (gb_->cpu.a)
+		if (hpos_block_down())
 			return;
 		state() = OBJSTATE_SPECIAL_2;
 		var3() = 0;
@@ -140,8 +138,7 @@ void UnusedFlower::projectile(uint16_t page)
 	SET_BC(gb_, s ? ADDR_Data_60320 + 8 : ADDR_Data_60320); // .Jump, .Thrown
 	routines_.call(ADDR_ApplyObjYMovement);
 	pos_to_hram(wCurObjYPos, 0);
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a)
+	if (!hpos_block_unk1())
 		return;
 	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
 	mem_[wCurObjYPos + 1] = mem_[hYPosHi];

@@ -381,8 +381,7 @@ bool Shoot::ground_below(uint8_t offset)
 	uint16_t y_pos = static_cast<uint16_t>(y() + offset);
 	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	routines_.call(ADDR_Func_352b);
-	return gb_->cpu.a;
+	return hpos_block_unk1();
 }
 
 void Shoot::run(uint16_t handler)
@@ -411,8 +410,7 @@ void Shoot::run(uint16_t handler)
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-		routines_.call(ADDR_Func_352b);
-		if (gb_->cpu.a) { // grounded
+		if (hpos_block_unk1()) { // grounded
 			mem_[wCurObjYPos + 0] = mem_[hYPosLo];
 			mem_[wCurObjYPos + 1] = mem_[hYPosHi];
 			still_more_goals_needed();

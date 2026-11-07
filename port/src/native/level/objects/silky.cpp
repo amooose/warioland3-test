@@ -134,8 +134,7 @@ void Silky::crawl()
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	routines_.call(ADDR_Func_3543);
-	if (!gb_->cpu.a) {
+	if (!hpos_block_down()) {
 		state() = 0x11; // falls
 		return;
 	}
@@ -146,8 +145,7 @@ void Silky::crawl()
 	// the block ahead, once it's at the edge of this one
 	bool edge = right ? in_block + 7 >= 0x10 : in_block < 8;
 	if (edge) {
-		routines_.call(right ? ADDR_ProcessBlockOnRight : ADDR_ProcessBlockOnLeft);
-		if (!(gb_->cpu.a & 0x0f)) {
+		if (!(block_beside(right) & 0x0f)) {
 			state() = 0x13;
 			return;
 		}
@@ -158,8 +156,7 @@ void Silky::crawl()
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a) {
+	if (hpos_block_unk4()) {
 		state() = 0x13;
 		return;
 	}

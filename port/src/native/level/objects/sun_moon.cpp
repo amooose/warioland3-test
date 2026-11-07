@@ -189,8 +189,7 @@ void SunMoon::shooting()
 	follow_x();
 	hpos(0, 0);
 	mem_[wc1ca] = 0;
-	routines_.call(ADDR_Func_352b);
-	if (!gb_->cpu.a || mem_[wc1ca]) {
+	if (!hpos_block_unk1() || mem_[wc1ca]) {
 		SET_BC(gb_, ADDR_Data_60690);
 		routines_.call(ADDR_ApplyObjYMovement);
 	}
@@ -255,14 +254,12 @@ void SunMoon::follow_x()
 void SunMoon::move_x(bool right)
 {
 	hpos(-6, right ? 12 : -12);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a)
+	if (hpos_block_unk4())
 		return;
 	uint16_t y_pos = static_cast<uint16_t>(y() - 20);
 	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	routines_.call(ADDR_Func_3513);
-	if (gb_->cpu.a)
+	if (hpos_block_unk4())
 		return;
 	right ? move_right_by_var2() : move_left_by_var2();
 }
@@ -271,8 +268,7 @@ void SunMoon::move_down_()
 {
 	hpos(0, 0);
 	mem_[wc1ca] = 0;
-	routines_.call(ADDR_Func_352b);
-	if (gb_->cpu.a && !mem_[wc1ca])
+	if (hpos_block_unk1() && !mem_[wc1ca])
 		return;
 	move_down_by_var2();
 }
@@ -280,8 +276,7 @@ void SunMoon::move_down_()
 void SunMoon::move_up_()
 {
 	hpos(-24, 0);
-	routines_.call(ADDR_Func_358b);
-	if (gb_->cpu.a)
+	if (hpos_block_unk3())
 		return;
 	move_up_by_var2();
 }
