@@ -257,7 +257,7 @@ void Count::run(uint16_t handler)
 	case STATE_5A:
 		if (state_duration() == 20) {
 			if (mem_[wAutoMoveState]) {
-				routines_.call(ADDR_MoveObjectDown_Fast);
+				move_by(ADDR_MoveObjectDown_Fast);
 				return;
 			}
 			wario_above();

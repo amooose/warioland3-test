@@ -160,7 +160,7 @@ void Silky::crawl()
 		state() = 0x13;
 		return;
 	}
-	routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+	move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 }
 
 void Silky::hit_move(uint16_t routine)

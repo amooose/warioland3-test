@@ -376,7 +376,7 @@ void ParaGoom::run(uint16_t handler)
 			state() = 0x13;
 			return;
 		}
-		routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 		return;
 	}
 	case BUMP_LEFT:
@@ -448,7 +448,7 @@ void ParaGoom::run(uint16_t handler)
 		set_frameset(ADDR_Frameset_684ba);
 		return;
 	case DROPPING: // drifting down to a floor
-		routines_.call(ADDR_MoveObjectDown_Slow);
+		move_by(ADDR_MoveObjectDown_Slow);
 		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 		mem_[hXPosLo] = mem_[wCurObjXPos + 0];

@@ -321,7 +321,7 @@ void Webber::web()
 {
 	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
 	bool right = static_cast<uint8_t>(screen_x() + 0x2a) < wario;
-	routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+	move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	move_down();
 	flags() |= OBJFLAG_NO_COLLISION;
 	if (!state()) {

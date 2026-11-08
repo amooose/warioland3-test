@@ -103,7 +103,7 @@ public:
 	using Object::Object;
 
 	void fly(uint16_t page); // InvisibilityPotionFunc
-	void fly_after(uint16_t move) { routines_.call(move); fly(gb_->cpu.h << 8); } // InvisibilityPotionFunc_Left / _Right
+	void fly_after(uint16_t move) { move_by(move); fly(wCurObjFlags & 0xff00); } // InvisibilityPotionFunc_Left / _Right
 	void destroy() { routines_.farcall(BANK_VanishObject_NoSFX, ADDR_VanishObject_NoSFX); } // DestroyInvisibilityPotion
 	void land(); // Func_45453
 	void drop(); // InvisibilityPotionFunc_Drop

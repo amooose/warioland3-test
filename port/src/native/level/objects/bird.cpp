@@ -136,7 +136,7 @@ void Bird::swoop(uint16_t page)
 
 void Bird::fly()
 {
-	routines_.call(facing_right() ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+	move_by(facing_right() ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 }
 
 void Bird::stunned()

@@ -126,7 +126,7 @@ void Snake::waiting()
 void Snake::carry_wario(bool up)
 {
 	if (!(flags() & OBJFLAG_STEPPED)) {
-		routines_.call(up ? ADDR_MoveObjectUp_Slow : ADDR_MoveObjectDown_Slow);
+		move_by(up ? ADDR_MoveObjectUp_Slow : ADDR_MoveObjectDown_Slow);
 		return;
 	}
 	flags() &= ~OBJFLAG_STEPPED;

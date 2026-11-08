@@ -19,6 +19,7 @@
 #include "../native.hpp"
 #include "../ram.hpp"
 #include "../routines.hpp"
+#include "../home/object_mechanics.hpp"
 #include <initializer_list>
 
 namespace wl3::level {
@@ -75,16 +76,22 @@ protected:
 	void no_actions() { mem_[wCurObjAction] = (1 << NO_ACTIONS_F) | 1; }
 
 	// home routines
-	void set_frameset(uint16_t frameset); // SetObjectFramesetPtr
-	void move_left() { routines_.call(ADDR_MoveObjectLeft); }
-	void move_right() { routines_.call(ADDR_MoveObjectRight); }
-	void move_up() { routines_.call(ADDR_MoveObjectUp); }
-	void move_down() { routines_.call(ADDR_MoveObjectDown); }
-	// by var2
-	void move_left_by_var2() { routines_.call(ADDR_MoveObjectLeftByVar2); }
-	void move_right_by_var2() { routines_.call(ADDR_MoveObjectRightByVar2); }
-	void move_up_by_var2() { routines_.call(ADDR_MoveObjectUpByVar2); }
-	void move_down_by_var2() { routines_.call(ADDR_MoveObjectDownByVar2); }
+	void set_frameset(uint16_t frameset); // SetObjectFramesetPtr (plain: leaves no registers)
+	// home's MoveObject* (1 pixel) and MoveObject*ByVar2, plain: they leave
+	// no registers (the asm leaves hl in wCurObj and b = var2; callers that
+	// want those use the addresses and var2())
+	void move_left() { home::move_object_x(gb_, -1); }
+	void move_right() { home::move_object_x(gb_, 1); }
+	void move_up() { home::move_object_y(gb_, -1); }
+	void move_down() { home::move_object_y(gb_, 1); }
+	void move_left_by_var2() { home::move_object_x(gb_, -var2()); }
+	void move_right_by_var2() { home::move_object_x(gb_, var2()); }
+	void move_up_by_var2() { home::move_object_y(gb_, -var2()); }
+	void move_down_by_var2() { home::move_object_y(gb_, var2()); }
+	// home's MoveObject* routines by address (1 pixel, _Fast 2, _Slow 1
+	// every other frame: right and down on even frames, left and up on odd
+	// ones; ByVar2 by var2), plain; anything else is called
+	void move_by(uint16_t routine);
 	// The block at hPos through ProcessBlock, by the collision points it's
 	// processed with (Func_3513 and the like: homecalls of collisions.asm's
 	// routines): the block function's result, which they leave in a. The

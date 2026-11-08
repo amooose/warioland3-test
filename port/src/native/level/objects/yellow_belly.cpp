@@ -158,7 +158,7 @@ void YellowBelly::rising()
 {
 	no_actions();
 	if (--state_duration()) {
-		routines_.call(ADDR_MoveObjectUp_Slow);
+		move_by(ADDR_MoveObjectUp_Slow);
 		return;
 	}
 	state_duration() = static_cast<uint8_t>((mem_[rDIV] & 0x01) + 0x03);
@@ -558,7 +558,7 @@ void YellowBellyHelper::arrow_off(bool right)
 		return;
 	}
 	move_up_by_var2();
-	routines_.call(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+	move_by(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 }
 
 void YellowBellyHelper::arrow_vanish()
@@ -686,7 +686,7 @@ void YellowBellyHelper::pump_falling()
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		return;
-	routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+	move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 }
 
 // pushed about ($31); pumped ($0a), it blows the water away; an arrow

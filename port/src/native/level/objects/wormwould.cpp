@@ -304,7 +304,7 @@ void Wormwould::defeated_raise()
 {
 	no_actions();
 	if (--var3()) {
-		routines_.call(ADDR_MoveObjectUp_Fast);
+		move_by(ADDR_MoveObjectUp_Fast);
 		return;
 	}
 	set_frameset(facing(ADDR_Frameset_6972f, ADDR_Frameset_696f3));
@@ -340,7 +340,7 @@ void Wormwould::defeated_fall()
 {
 	no_actions();
 	apply_y_movement(ADDR_Data_60180);
-	routines_.call(facing_right() ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
+	move_by(facing_right() ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
 }
 
 // rolls for its duration, then on (then: .MoveLeft / .MoveRight)
@@ -349,8 +349,8 @@ void WormwouldHelper::rock_rolling(uint16_t then, uint16_t move)
 	no_actions();
 	if (!--state_duration())
 		set_update(then);
-	routines_.call(move);
-	rock(static_cast<uint16_t>(gb_->cpu.h << 8));
+	move_by(move);
+	rock(wCurObjFlags & 0xff00);
 }
 
 // along the floor (high rocks: var1); hit, it's knocked away

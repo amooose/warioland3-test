@@ -153,7 +153,7 @@ void Togeba::sink()
 
 void Togeba::rising()
 {
-	routines_.call(ADDR_MoveObjectUp_Fast);
+	move_by(ADDR_MoveObjectUp_Fast);
 	if (--state_duration())
 		return;
 	set_update(SINKING);

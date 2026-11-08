@@ -53,7 +53,7 @@ void PillarPlatform::moving(bool up)
 {
 	one_way_platform();
 	if (--state_duration()) {
-		routines_.call(up ? ADDR_MoveObjectUp_Fast : ADDR_MoveObjectDown_Fast);
+		move_by(up ? ADDR_MoveObjectUp_Fast : ADDR_MoveObjectDown_Fast);
 		return;
 	}
 	state() = 0;

@@ -361,7 +361,7 @@ void DollBoy::walk()
 	if (mem_[wCurObjFramesetOffset] < 0x06)
 		return;
 	set_interaction(OBJ_INTERACTION_BOUNCY);
-	routines_.call(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
+	move_by(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
 }
 
 // turning (a hop, the ground shaking), or walking; jumps to Wario's
@@ -715,7 +715,7 @@ void DollBoyHelper::hammer_update()
 		return;
 	}
 	if (var1()) {
-		routines_.call(ADDR_MoveObjectRight_Fast);
+		move_by(ADDR_MoveObjectRight_Fast);
 		return;
 	}
 	apply_y_movement(ADDR_Data_60860);
@@ -731,7 +731,7 @@ void DollBoyHelper::hammer_update()
 
 void DollBoyHelper::hammer_hit(uint16_t move)
 {
-	routines_.call(move);
+	move_by(move);
 	no_actions();
 	apply_y_movement(ADDR_Data_60040);
 }
@@ -754,7 +754,7 @@ void DollBoyHelper::platform_down()
 		return;
 	}
 	if (!(flags() & OBJFLAG_STEPPED)) {
-		routines_.call(ADDR_MoveObjectDown_Slow);
+		move_by(ADDR_MoveObjectDown_Slow);
 		return;
 	}
 	flags() &= ~OBJFLAG_STEPPED;
@@ -777,7 +777,7 @@ void DollBoyHelper::platform_up()
 		return;
 	}
 	if (!(flags() & OBJFLAG_STEPPED)) {
-		routines_.call(ADDR_MoveObjectUp_Slow);
+		move_by(ADDR_MoveObjectUp_Slow);
 		return;
 	}
 	flags() &= ~OBJFLAG_STEPPED;

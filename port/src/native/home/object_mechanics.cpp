@@ -7,6 +7,26 @@
 
 namespace wl3::home {
 
+void move_object_x(GB *gb, int dx)
+{
+	Memory mem(gb);
+	mem.word(wCurObjXPos) = static_cast<uint16_t>(mem.word(wCurObjXPos) + dx);
+}
+
+void move_object_y(GB *gb, int dy)
+{
+	Memory mem(gb);
+	mem.word(wCurObjYPos) = static_cast<uint16_t>(mem.word(wCurObjYPos) + dy);
+}
+
+void set_object_frameset_ptr(GB *gb, uint16_t frameset)
+{
+	Memory mem(gb);
+	mem.word(wCurObjFramesetPtr) = frameset;
+	mem[wCurObjFrameDuration] = 0;
+	mem[wCurObjFramesetOffset] = 0;
+}
+
 // UpdateObjSprite, plain: see object_mechanics.hpp
 void update_obj_sprite(GB *gb, uint16_t id, uint16_t pos)
 {

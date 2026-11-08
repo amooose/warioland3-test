@@ -407,7 +407,7 @@ void Muddee::follow()
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		return;
-	routines_.call(dir > 0 ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+	move_by(dir > 0 ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 }
 
 void Muddee::charge_start()
@@ -460,7 +460,7 @@ void Muddee::charging()
 	bool right = var2() & 1;
 	pos_to_h(0, right ? 0x18 : -0x18);
 	if (!hpos_block_unk4()) {
-		routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	} else {
 		var2() ^= 0x01;
 		state_duration() = 0x28;
@@ -468,14 +468,14 @@ void Muddee::charging()
 	if (!(substate() & (1 << 6))) {
 		pos_to_h(-0x1c, 0);
 		if (!hpos_block_unk3()) {
-			routines_.call(ADDR_MoveObjectUp_Slow);
+			move_by(ADDR_MoveObjectUp_Slow);
 			return;
 		}
 	} else {
 		pos_to_h(0x30, 0);
 		hpos_block_unk1();
 		if (!mem_[wIsInWaterOrSand]) {
-			routines_.call(ADDR_MoveObjectDown_Slow);
+			move_by(ADDR_MoveObjectDown_Slow);
 			return;
 		}
 	}
@@ -495,7 +495,7 @@ void Muddee::defeated()
 		return;
 	}
 	apply_y_movement(ADDR_Data_60180);
-	routines_.call(facing_right() ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
+	move_by(facing_right() ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
 }
 
 void Muddee::sfx_0c1()
@@ -612,7 +612,7 @@ void Turtle::swimming1()
 		return;
 	if (--state_duration()) {
 		move_right();
-		carry_wario(static_cast<uint16_t>((gb_->cpu.h << 8) | OBJ_FLAGS));
+		carry_wario(wCurObjFlags);
 		return;
 	}
 	set_update(T1_STOPPED);

@@ -161,7 +161,7 @@ void Wolfenboss::emerge_from_smoke()
 {
 	no_actions();
 	if (frame()) {
-		routines_.call(ADDR_MoveObjectUp_Slow);
+		move_by(ADDR_MoveObjectUp_Slow);
 		return;
 	}
 	set_frameset(ADDR_Frameset_69dcb);
@@ -267,7 +267,7 @@ void Wolfenboss::do_movement()
 		}
 		var2() = 0x01;
 	} else if (screen_x() != (right ? 0x98 : 0x18)) {
-		routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 		return;
 	}
 	start_turning(right ? ADDR_Frameset_69dde : ADDR_Frameset_69dd5);
@@ -307,7 +307,7 @@ void Wolfenboss::main()
 			}
 			uint8_t duration = state_duration();
 			if (duration < 41)
-				routines_.call(ADDR_MoveObjectDown_Slow);
+				move_by(ADDR_MoveObjectDown_Slow);
 			else if (duration == 41)
 				play_sfx(SFX_0A9);
 			return;
@@ -353,9 +353,8 @@ void Wolfenboss::main()
 		start_attack(facing_right() ? ADDR_Frameset_69df6 : ADDR_Frameset_69df1);
 		return;
 	case 4: { // after hurt: rises; beaten on the last hit
-		SET_HL(gb_, wCurObjVar1); // kept on the frames MoveObjectUp_Slow skips
-		routines_.call(ADDR_MoveObjectUp_Slow);
-		uint16_t page = static_cast<uint16_t>(gb_->cpu.h << 8);
+		move_by(ADDR_MoveObjectUp_Slow);
+		uint16_t page = wCurObjFlags & 0xff00; // the asm's hl is in wCurObj either way
 		if (mem_[page | OBJ_FRAMESET_OFFSET] == 0x4 && !mem_[page | OBJ_FRAME_DURATION] && (substate() & 0x0f) == 1) {
 			defeated();
 			return;
@@ -451,7 +450,7 @@ void WolfenbossHelper::spiral_move()
 			spiral_reflect(wCurObjSubState);
 		} else {
 			move_up();
-			page = static_cast<uint16_t>(gb_->cpu.h << 8);
+			page = wCurObjFlags & 0xff00;
 		}
 	} else {
 		if (screen_y() >= SCREEN_HEIGHT_PX) {
@@ -459,7 +458,7 @@ void WolfenbossHelper::spiral_move()
 			spiral_reflect(wCurObjSubState);
 		} else {
 			move_down();
-			page = static_cast<uint16_t>(gb_->cpu.h << 8);
+			page = wCurObjFlags & 0xff00;
 		}
 	}
 	Byte sub = mem_[page | OBJ_SUBSTATE];
@@ -623,8 +622,8 @@ void WolfenbossHelper::kuri_launched()
 		kuri_vanish();
 		return;
 	}
-	routines_.call(ADDR_MoveObjectUp_Fast);
-	uint16_t flags_addr = static_cast<uint16_t>((gb_->cpu.h << 8) | OBJ_FLAGS);
+	move_by(ADDR_MoveObjectUp_Fast);
+	uint16_t flags_addr = wCurObjFlags;
 	if (!(mem_[flags_addr] & (1 << OBJFLAG_ON_SCREEN_F))) {
 		mem_[flags_addr] = 0;
 		--mem_[wWolfenbossIgaguriOrKuriActive];

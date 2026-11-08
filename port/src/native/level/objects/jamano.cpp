@@ -300,7 +300,7 @@ void Jamano::hammerless()
 		play_sfx(SFX_BUMP);
 		state() = left ? 0x5b : 0x5a;
 	} else {
-		routines_.call(left ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
+		move_by(left ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
 	}
 	uint8_t y_screen = screen_y();
 	if (!(substate() & (1 << 6))) {
@@ -636,7 +636,7 @@ void Skull::flying_out()
 		++mem_[w1d147];
 		return;
 	}
-	routines_.call(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
+	move_by(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
 	apply_y_movement((id & 1) ? ADDR_Data_60d00 : ADDR_Data_60ce0);
 }
 

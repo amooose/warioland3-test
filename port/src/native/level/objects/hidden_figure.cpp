@@ -950,13 +950,10 @@ void HiddenFigure::run_hand(uint16_t handler)
 			rest(right);
 			return;
 		}
-		// the x position through the page in h
+		// the x position through the page in h (wCurObj's either way)
 		uint16_t page = wCurObjYPos & 0xff00;
-		if (mem_[wCurObjYPos + 0] != e || mem_[wCurObjYPos + 1] != d) {
-			SET_HL(gb_, wCurObjYPos + 1);
+		if (mem_[wCurObjYPos + 0] != e || mem_[wCurObjYPos + 1] != d)
 			move_up();
-			page = static_cast<uint16_t>(gb_->cpu.h << 8);
-		}
 		uint8_t hi = mem_[page | (OBJ_X_POS + 1)], lo = mem_[page | OBJ_X_POS];
 		if (hi != b || lo != c) {
 			if (hi != b ? hi < b : lo < c)

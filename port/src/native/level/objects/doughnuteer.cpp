@@ -103,7 +103,7 @@ public:
 	void aim(); // DoughnutFunc
 	void destroy() { flags() = 0; } // DoughnutFunc_Destroy
 	void fly(uint16_t page); // DoughnutFunc_LeftRight
-	void fly_after(uint16_t move) { routines_.call(move); fly(gb_->cpu.h << 8); } // DoughnutFunc_Left / _Right
+	void fly_after(uint16_t move) { move_by(move); fly(wCurObjFlags & 0xff00); } // DoughnutFunc_Left / _Right
 	void up(); // DoughnutFunc_Up
 	void moving(uint16_t movement); // DoughnutFunc_Up.Update and the rest of DoughnutFunc_LeftRight
 	void at_wario(uint16_t move); // DoughnutFunc.Update_Left / _Right
@@ -178,9 +178,9 @@ int Doughnuteer::walk(bool slow)
 	if (hpos_block_unk4())
 		return right ? 2 : 1;
 	if (slow)
-		routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	else
-		routines_.call(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
+		move_by(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
 	return 0;
 }
 
@@ -529,7 +529,7 @@ void Doughnut::moving(uint16_t movement)
 
 void Doughnut::at_wario(uint16_t move)
 {
-	routines_.call(move);
+	move_by(move);
 	no_actions();
 	apply_y_movement(ADDR_Data_60040);
 }

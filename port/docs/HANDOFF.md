@@ -700,11 +700,30 @@ primitives, home/wario.cpp, and the golf objects' animation):
   and the asm doesn't: native code runs in less emulated time, so it's
   the timing class above, not a difference in the code; the tier's 200
   variants pass.
-- Next: DoObjectAction (its exit f reaches the temple's update functions,
-  which UpdateObject_Temple calls with no flag-setting op between, so it
-  needs those flags kept or the temple objects checked), then home/object_mechanics.cpp's routines as plain
-  functions with register wrappers for the objects that read what they
-  leave (h, mostly: the object's page); then the block functions,
+- DoObjectAction, plain (2026-11-08): a switch the loop calls directly
+  (PORT_COVERED). Its exit f reached the temple's update functions (no
+  flag op between in UpdateObject_Temple), but none of the 166 update
+  functions the recordings enter reads a or f on entry except through
+  the normal loop's `or` (entry liveness with a and f, a variant of the
+  scratchpad's entry_reads2.py). update_objects.cpp is plain throughout
+  now; registers are left only as hook inputs and the outputs the
+  objects read (hl from the movement tables, e from the counts).
+- The objects' moves and framesets, plain (2026-11-08): Object's
+  move_left() and the rest, the ByVar2 moves, move_by(routine) (home's
+  MoveObject* by address: 1 pixel, _Fast 2, _Slow every other frame) at
+  the ~35 files' direct calls, and set_frameset() call home's plain
+  move_object_x / _y and set_object_frameset_ptr (home/
+  object_mechanics.hpp). The asm leaves hl in wCurObj after every move
+  that touches it, and the objects that read h on (Pesce, Muddee,
+  Wolfenboss, Hidden Figure, the doughnut, potion and rolling rock) now
+  use wCurObj's addresses; Zip Line sets b = var2 for MoveWario* itself.
+  The home hooks stay register-exact for the register-level callers
+  left. (Wolfenboss's MoveObjectUp_Slow site had hl set beforehand for
+  the frames the move skips; wCurObj again.)
+- Next: the rest of the objects' home calls the same way (the homejp
+  state wrappers Func_31xx, DecrementRemainingBossHits, the movement
+  tables' wrappers, whose h Anonster and Omodonmeka read on), the b
+  passed to MoveWario* and CreateParticle, then the block functions,
   passing Muddee, Pesce, Octohon and ZipLine what they read.
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under

@@ -342,7 +342,7 @@ void Anonster::climb()
 		return;
 	}
 	if (screen_y() >= 0x08) {
-		routines_.call(ADDR_MoveObjectUp_Slow);
+		move_by(ADDR_MoveObjectUp_Slow);
 		return;
 	}
 	state_duration() = 0x3c;
@@ -361,7 +361,7 @@ void Anonster::run_to_wario()
 	if ((mem_[wWarioScreenXPos] & 0xfe) != (screen_x() & 0xfe)) {
 		bool right = facing_right();
 		if (!wall_ahead(0x10, 0x11)) {
-			routines_.call(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+			move_by(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -724,7 +724,7 @@ void AnonsterHelper::platform()
 	if (!state_duration())
 		return;
 	--state_duration();
-	routines_.call(ADDR_MoveObjectDown_Slow);
+	move_by(ADDR_MoveObjectDown_Slow);
 }
 
 void AnonsterHelper::wave()
@@ -808,7 +808,7 @@ void AnonsterHelper::silk_float(bool right)
 		drift();
 		return;
 	}
-	routines_.call(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+	move_by(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 	uint16_t y_pos = static_cast<uint16_t>(y() - 4);
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 4) : static_cast<uint16_t>(x() - 5);
 	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);

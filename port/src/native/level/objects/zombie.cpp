@@ -286,7 +286,7 @@ void Zombie::walk_on()
 		set_turn(right ? ADDR_Frameset_68d2b : ADDR_Frameset_68d24);
 		return;
 	}
-	routines_.call(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+	move_by(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 }
 
 void Zombie::turning()

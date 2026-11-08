@@ -387,8 +387,8 @@ void Hebarii::spike()
 void Hebarii::spike_fall(bool lateral)
 {
 	if (lateral)
-		routines_.call(facing_right() ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
-	routines_.call(ADDR_MoveObjectDown_Slow);
+		move_by(facing_right() ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+	move_by(ADDR_MoveObjectDown_Slow);
 	if (--state_duration() && !state()) {
 		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];

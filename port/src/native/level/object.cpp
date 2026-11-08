@@ -13,8 +13,31 @@ void Object::set_coll_box(uint8_t top, uint8_t bottom, uint8_t left, uint8_t rig
 
 void Object::set_frameset(uint16_t frameset)
 {
-	SET_DE(gb_, frameset);
-	routines_.call(ADDR_SetObjectFramesetPtr);
+	home::set_object_frameset_ptr(gb_, frameset);
+}
+
+void Object::move_by(uint16_t routine)
+{
+	bool odd = mem_[wGlobalCounter] & 1;
+	switch (routine) {
+	case ADDR_MoveObjectLeft: move_left(); break;
+	case ADDR_MoveObjectRight: move_right(); break;
+	case ADDR_MoveObjectUp: move_up(); break;
+	case ADDR_MoveObjectDown: move_down(); break;
+	case ADDR_MoveObjectLeft_Fast: home::move_object_x(gb_, -2); break;
+	case ADDR_MoveObjectRight_Fast: home::move_object_x(gb_, 2); break;
+	case ADDR_MoveObjectUp_Fast: home::move_object_y(gb_, -2); break;
+	case ADDR_MoveObjectDown_Fast: home::move_object_y(gb_, 2); break;
+	case ADDR_MoveObjectLeft_Slow: if (odd) move_left(); break;
+	case ADDR_MoveObjectRight_Slow: if (!odd) move_right(); break;
+	case ADDR_MoveObjectUp_Slow: if (odd) move_up(); break;
+	case ADDR_MoveObjectDown_Slow: if (!odd) move_down(); break;
+	case ADDR_MoveObjectLeftByVar2: move_left_by_var2(); break;
+	case ADDR_MoveObjectRightByVar2: move_right_by_var2(); break;
+	case ADDR_MoveObjectUpByVar2: move_up_by_var2(); break;
+	case ADDR_MoveObjectDownByVar2: move_down_by_var2(); break;
+	default: routines_.call(routine); break;
+	}
 }
 
 void Object::despawn()

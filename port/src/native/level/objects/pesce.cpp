@@ -278,7 +278,7 @@ void Pesce::swim()
 	bool right = facing_right();
 	hpos(wCurObjYPos & 0xff00, -0x04, right ? 0x0f : -0x10);
 	if (!hpos_block_unk4()) {
-		routines_.call(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
+		move_by(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
 		return;
 	}
 	if (--var2())
@@ -339,7 +339,7 @@ void Pesce::chase()
 	}
 	hpos(wCurObjYPos & 0xff00, -0x04, right ? 0x0f : -0x10);
 	if (!hpos_block_unk4()) {
-		routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 		return;
 	}
 	if (--var2())
@@ -418,7 +418,7 @@ void Pesce::beaten()
 	case 0:
 		hpos(wCurObjYPos & 0xff00, 0x06, 0);
 		if (!hpos_block_unk1()) {
-			routines_.call(ADDR_MoveObjectDown_Slow);
+			move_by(ADDR_MoveObjectDown_Slow);
 			return;
 		}
 		if (facing_right()) {
@@ -438,7 +438,7 @@ void Pesce::beaten()
 	case 2:
 		hpos(wCurObjYPos & 0xff00, -0x30, 0);
 		if (!hpos_block_unk4()) {
-			routines_.call(ADDR_MoveObjectLeft_Slow);
+			move_by(ADDR_MoveObjectLeft_Slow);
 			return;
 		}
 		set_interaction(OBJ_INTERACTION_51);
@@ -533,7 +533,7 @@ void PesceHelper::dragonfly1_down()
 {
 	no_actions();
 	if (--state_duration()) {
-		routines_.call(ADDR_MoveObjectDown_Fast);
+		move_by(ADDR_MoveObjectDown_Fast);
 		return;
 	}
 	state_duration() = 0x70;
@@ -564,8 +564,8 @@ void PesceHelper::dragonfly1_flying()
 		return;
 	}
 	bool right = facing_right();
-	routines_.call(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
-	uint16_t flags_addr = static_cast<uint16_t>((gb_->cpu.h << 8) | OBJ_FLAGS);
+	move_by(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
+	uint16_t flags_addr = wCurObjFlags;
 	if (!(mem_[flags_addr] & OBJFLAG_STEPPED))
 		return;
 	mem_[flags_addr] &= ~OBJFLAG_STEPPED;
@@ -576,7 +576,7 @@ void PesceHelper::dragonfly1_flying()
 void PesceHelper::dragonfly1_off()
 {
 	no_actions();
-	routines_.call(facing_right() ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+	move_by(facing_right() ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 }
 
 void PesceHelper::dragonfly2()
@@ -630,8 +630,8 @@ void PesceHelper::dragonfly2_flying()
 		var1() = up ? 0 : 1;
 		return;
 	}
-	routines_.call(up ? ADDR_MoveObjectUp : ADDR_MoveObjectDown);
-	uint16_t flags_addr = static_cast<uint16_t>((gb_->cpu.h << 8) | OBJ_FLAGS);
+	move_by(up ? ADDR_MoveObjectUp : ADDR_MoveObjectDown);
+	uint16_t flags_addr = wCurObjFlags;
 	if (up)
 		move_wario(flags_addr, ADDR_MoveWarioUp, ADDR_HandleUpwardsFloorTransition);
 	else
@@ -762,7 +762,7 @@ void PesceHelper::cheese()
 				flags() = 0;
 				return;
 			}
-			routines_.call(ADDR_MoveObjectDown_Slow);
+			move_by(ADDR_MoveObjectDown_Slow);
 			if (--state_duration())
 				return;
 			state_duration() = 0x18;
@@ -771,7 +771,7 @@ void PesceHelper::cheese()
 			return;
 		}
 		if (flags() & (1 << OBJFLAG_ON_SCREEN_F)) {
-			routines_.call(ADDR_MoveObjectDown_Fast);
+			move_by(ADDR_MoveObjectDown_Fast);
 			return;
 		}
 		mem_[wDollBoyActiveBarrels] = 0;

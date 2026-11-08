@@ -276,7 +276,7 @@ void Teruteru::run(uint16_t handler)
 			else if (ghost != wario)
 				move_left();
 		}
-		routines_.call(ADDR_MoveObjectDown_Fast);
+		move_by(ADDR_MoveObjectDown_Fast);
 		return;
 	case RISING:
 		if (state_duration() == 0x3c)

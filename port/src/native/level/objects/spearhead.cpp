@@ -340,7 +340,7 @@ void Spearhead::run(uint16_t handler)
 			state() = OBJSTATE_TURN_AROUND_START;
 			return;
 		}
-		routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 		return;
 	}
 	case H_BUMP_LEFT_START:

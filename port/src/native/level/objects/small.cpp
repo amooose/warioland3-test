@@ -127,7 +127,7 @@ void Small::clear_gate(uint16_t frameset)
 	if (!mem_[wIsMinigameCleared])
 		return;
 	var2() = 32;
-	routines_.call(ADDR_MoveObjectUpByVar2);
+	move_by(ADDR_MoveObjectUpByVar2);
 }
 
 void Small::water_spark()

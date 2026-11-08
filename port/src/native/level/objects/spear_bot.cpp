@@ -167,7 +167,7 @@ bool SpearBot::move_on(int edge, int ahead, uint16_t move)
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		return false;
-	routines_.call(move);
+	move_by(move);
 	return true;
 }
 

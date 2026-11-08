@@ -596,7 +596,7 @@ void Omodonmeka::omodon()
 	case 0x5a: // .Func_4286b
 		if (state_duration() == 0x14) {
 			if (mem_[wAutoMoveState]) {
-				routines_.call(ADDR_MoveObjectDown_Fast);
+				move_by(ADDR_MoveObjectDown_Fast);
 				return;
 			}
 			above_wario();

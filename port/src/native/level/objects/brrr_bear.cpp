@@ -157,7 +157,7 @@ void BrrrBear::walk()
 		state() = 0x13;
 		return;
 	}
-	routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+	move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 }
 
 void BrrrBear::hit_move(uint16_t routine)

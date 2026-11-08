@@ -151,7 +151,7 @@ bool Scowler::walk()
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		return true;
-	routines_.call(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
+	move_by(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
 	return false;
 }
 
@@ -401,7 +401,7 @@ void Scowler::defeated_sinking()
 {
 	no_actions();
 	flashes();
-	routines_.call(ADDR_MoveObjectDown_Slow);
+	move_by(ADDR_MoveObjectDown_Slow);
 	apply_x_movement(ADDR_Data_60a80);
 	if (--state_duration())
 		return;
@@ -427,7 +427,7 @@ void Scowler::defeated_gone()
 			bg_pals(ADDR_Pals_54cb7);
 		}
 	}
-	routines_.call(ADDR_MoveObjectDown_Slow);
+	move_by(ADDR_MoveObjectDown_Slow);
 	apply_x_movement_loop(ADDR_Data_60a90);
 }
 
@@ -559,7 +559,7 @@ void ScowlerHelper::ring_down()
 		return;
 	}
 	if (!(flags() & OBJFLAG_STEPPED)) {
-		routines_.call(ADDR_MoveObjectDown_Slow);
+		move_by(ADDR_MoveObjectDown_Slow);
 		return;
 	}
 	flags() &= ~(1 << 5);
@@ -655,10 +655,10 @@ void ScowlerHelper::ink(bool right)
 {
 	if (state_duration()) {
 		--state_duration();
-		routines_.call(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	} else {
 		bool left_of_wario = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
-		routines_.call(left_of_wario ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		move_by(left_of_wario ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	}
 	if (state()) {
 		mem_[w1d147] = 0x01;

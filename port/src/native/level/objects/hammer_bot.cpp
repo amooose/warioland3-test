@@ -172,7 +172,7 @@ bool HammerBot::move_on(int edge, int ahead, uint16_t move)
 		state() = 0x13;
 		return false;
 	}
-	routines_.call(move);
+	move_by(move);
 	return true;
 }
 

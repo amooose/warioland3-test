@@ -172,7 +172,7 @@ void RoboMouse::run(uint16_t handler)
 	case THROWN_32DB: thrown(true, ADDR_Func_32db); return;
 	case POUNDED: pounded(); return;
 	case SINKING:
-		routines_.call(ADDR_MoveObjectDown_Slow);
+		move_by(ADDR_MoveObjectDown_Slow);
 		hpos_offset(0, 0);
 		if (hpos_block_unk1())
 			state() = (interaction() & 0x7f) == OBJ_INTERACTION_0B ? 0x13 : 0x31;
