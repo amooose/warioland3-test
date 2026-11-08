@@ -1475,160 +1475,101 @@ public:
 		collision_box(-1, -27, -9, 9);
 		load_gfx(BANK_WarioThrowGfx, ADDR_WarioThrowGfx);
 		set_oam(BANK_OAM_1606a, ADDR_OAM_1606a);
-		uint16_t fs;
-		if (!ld_and(wDirection)) {
-			if ((rd8(wWarioSlopeInteraction) >> LEFT_SLOPE_F & 1))
-				goto grab_idling;
-			fs = ld_mask(wGrabState, 1 << GRAB_HEAVY_F) ? ADDR_Frameset_163f5 : ADDR_Frameset_163ec;
-		} else {
-			if ((rd8(wWarioSlopeInteraction) >> RIGHT_SLOPE_F & 1))
-				goto grab_idling;
-			fs = ld_mask(wGrabState, 1 << GRAB_HEAVY_F) ? ADDR_Frameset_16415 : ADDR_Frameset_1640c;
+		bool right = rd8(wDirection);
+		// on a slope going up ahead, straight to grab idling
+		if (rd8(wWarioSlopeInteraction) & (1 << (right ? RIGHT_SLOPE_F : LEFT_SLOPE_F))) {
+			FARCALL(SetState_GrabIdling);
+			return;
 		}
-		set_frameset(fs);
+		bool heavy = rd8(wGrabState) & (1 << GRAB_HEAVY_F);
+		if (right)
+			set_frameset(heavy ? ADDR_Frameset_16415 : ADDR_Frameset_1640c);
+		else
+			set_frameset(heavy ? ADDR_Frameset_163f5 : ADDR_Frameset_163ec);
 		anim(OAM1);
-		return;
-	grab_idling:
-		FARCALL(SetState_GrabIdling);
 	}
 
 	void port_Func_20b6b()
 	{
-		if ((rd8(wInteractionSide) >> INTERACTION_UP_F & 1))
-			goto step_on_obj;
-		if (ld_and(wTouchState)) {
-			uint8_t a = cpu_.a;
-			alu_.cp(a, TOUCH_ATTACK);
-			if (ZF) {
-				port_AttackObject();
-				return;
-			}
-			alu_.cp(a, TOUCH_VANISH);
-			if (ZF) {
-				port_VanishObjectAndKnockBackIfZombie();
-				return;
-			}
-			alu_.cp(a, TOUCH_PASS_THROUGH);
-			if (ZF) {
-				next_obj_ = true;
-				return;
-			}
-			goto step_on_obj;
+		if (!try_pick_up())
+			port_StepOnObject(); // step_on_obj
+	}
+
+	// Func_20b6b up to .step_on_obj: picks the object up if it can (false:
+	// stepped on instead)
+	bool try_pick_up()
+	{
+		if (rd8(wInteractionSide) & (1 << INTERACTION_UP_F))
+			return false;
+		switch (rd8(wTouchState)) {
+		case 0: break;
+		case TOUCH_ATTACK: port_AttackObject(); return true;
+		case TOUCH_VANISH: port_VanishObjectAndKnockBackIfZombie(); return true;
+		case TOUCH_PASS_THROUGH: next_obj_ = true; return true;
+		default: return false;
 		}
 		// .check_water
-		ld_cp(wWarioState, WST_DIVING);
-		if (!CF) {
-			alu_.cp(cpu_.a, WST_TRYING_SUBMERGE + 1);
-			if (CF) {
-				port_Func_20899();
-				return;
-			}
+		uint8_t state = rd8(wWarioState);
+		if (state >= WST_DIVING && state <= WST_TRYING_SUBMERGE) {
+			port_Func_20899();
+			return true;
 		}
 		// .not_in_water
-		cpu_.b = ld(wIsRolling);
-		cpu_.a = alu_.or_(rd8(wAttackCounter), cpu_.b);
-		if (!ZF) {
+		if (rd8(wAttackCounter) | rd8(wIsRolling)) {
 			port_AttackObject();
-			return;
+			return true;
 		}
-		cpu_.b = ld(wIsCrouching);
-		cpu_.a = alu_.or_(rd8(wGrabState), cpu_.b);
-		if (!ZF)
-			goto step_on_obj;
-		if (rd8(wPowerUpLevel) < GRAB_GLOVE)
-			goto step_on_obj;
-		ld_cp(wWarioState, WST_LADDER_SCRATCHING);
-		if (ZF)
-			goto step_on_obj;
-		alu_.cp(cpu_.a, WST_LADDER_CLIMBING);
-		if (!CF) {
-			alu_.cp(cpu_.a, WST_LADDER_SLIDING + 1);
-			if (CF)
-				goto step_on_obj;
-		}
-		// .not_on_ladder
-		cpu_.b = rd8(wWarioScreenXPos);
-		cpu_.a = rd8(wObjScreenXPos);
-		alu_.cp(cpu_.a, cpu_.b);
-		if (!CF) {
+		if ((rd8(wGrabState) | rd8(wIsCrouching)) || rd8(wPowerUpLevel) < GRAB_GLOVE)
+			return false;
+		if (state == WST_LADDER_SCRATCHING || (state >= WST_LADDER_CLIMBING && state <= WST_LADDER_SLIDING))
+			return false;
+		// .not_on_ladder: only facing it
+		if (rd8(wObjScreenXPos) >= rd8(wWarioScreenXPos)) {
 			wr8(wInteractionSide, INTERACTION_RIGHT);
-			if (!ld_and(wDirection))
-				goto step_on_obj;
+			if (!rd8(wDirection))
+				return false;
 		} else {
 			wr8(wInteractionSide, INTERACTION_LEFT);
-			if (ld_and(wDirection))
-				goto step_on_obj;
+			if (rd8(wDirection))
+				return false;
 		}
 		// .check_invincible_counter
-		ld_cp(wInvincibleCounter, 1);
-		if (ZF) {
-			return;
-		}
-		{
-			uint16_t hl = wWarioXPos + 1;
-			uint16_t de = hXPosLo;
-			cpu_.a = rd8(hl--);
-			wr8(de--, cpu_.a);
-			cpu_.a = rd8(hl--);
-			wr8(de--, cpu_.a);
-			cpu_.a = alu_.sub(rd8(hl--), 0x08);
-			wr8(de--, cpu_.a);
-			cpu_.a = alu_.sbc(rd8(hl), 0x00);
-			wr8(de, cpu_.a);
-			SET_HL(gb_, hl);
-			SET_DE(gb_, de);
-		}
-		if (!ld_bit(wObjInteractionType, HEAVY_OBJ_F)) {
-			st(wGrabState, GRAB_PICK_UP);
-		} else {
-			ld_cp(wPowerUpLevel, SUPER_GRAB_GLOVES);
-			if (CF)
-				goto step_on_obj;
-			st(wGrabState, GRAB_PICK_UP | (1 << GRAB_HEAVY_F));
-		}
+		if (rd8(wInvincibleCounter) == 1)
+			return true;
+		// hPos = Wario's position, 8 pixels up
+		wr8(hXPosLo, rd8(wWarioXPos + 1));
+		wr8(hXPosHi, rd8(wWarioXPos + 0));
+		uint16_t y = static_cast<uint16_t>((rd8(wWarioYPos + 0) << 8 | rd8(wWarioYPos + 1)) - 8);
+		wr8(hYPosLo, static_cast<uint8_t>(y));
+		wr8(hYPosHi, static_cast<uint8_t>(y >> 8));
+		bool heavy = rd8(wObjInteractionType) & (1 << HEAVY_OBJ_F);
+		if (heavy && rd8(wPowerUpLevel) < SUPER_GRAB_GLOVES)
+			return false;
+		wr8(wGrabState, heavy ? GRAB_PICK_UP | (1 << GRAB_HEAVY_F) : GRAB_PICK_UP);
 		// .set_obj_pick_up
 		set_obj_action(OBJACTION_PICK_UP);
-		if (!ld_and(wJumpVelTable)) {
+		if (!rd8(wJumpVelTable)) {
 			set_wario_pick_up();
-			return;
+			return true;
 		}
-		if (ld_bit(wObjInteractionType, HEAVY_OBJ_F))
-			goto step_on_obj;
+		if (heavy)
+			return false;
 		FARCALL(Func_1edd3);
-		return;
-	step_on_obj:
-		port_StepOnObject();
+		return true;
 	}
 
 	void port_Func_20b41()
 	{
-		if (ld_and(wTouchState)) {
-			uint8_t a = cpu_.a;
-			alu_.cp(a, TOUCH_BUMP);
-			if (!ZF) {
-				alu_.cp(a, TOUCH_VULNERABLE);
-				if (!ZF) {
-					alu_.cp(a, TOUCH_ATTACK);
-					if (ZF) {
-						port_AttackObject();
-						return;
-					}
-					alu_.cp(a, TOUCH_VANISH);
-					if (ZF) {
-						port_VanishObjectAndKnockBackIfZombie();
-						return;
-					}
-				}
-			}
-			port_Func_20a6f();
+		switch (rd8(wTouchState)) {
+		case 0:
+			// .asm_20b5e
+			port_Func_20939();
+			set_obj_action(OBJACTION_12);
 			return;
+		case TOUCH_ATTACK: port_AttackObject(); return;
+		case TOUCH_VANISH: port_VanishObjectAndKnockBackIfZombie(); return;
 		}
-		// .asm_20b5e
-		if (ld_and(wTouchState)) {
-			return;
-		}
-		port_Func_20939();
-		set_obj_action(OBJACTION_12);
+		port_Func_20a6f();
 	}
 
 	void port_Func_20d1d()
@@ -1639,13 +1580,13 @@ public:
 	// sting on the object's front (front = true) or back
 	void obj_sting(bool front)
 	{
-		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
+		if (rd8(wInteractionSide) & (INTERACTION_UP | INTERACTION_DOWN)) {
 			port_StepOnObject();
 			return;
 		}
-		ld_cp(wObjDirection, DIRECTION_RIGHT);
-		int bit = (ZF != 0) == front ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F;
-		if (ld_bit(wInteractionSide, bit))
+		bool facing_right = rd8(wObjDirection) == DIRECTION_RIGHT;
+		int bit = facing_right == front ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F;
+		if (rd8(wInteractionSide) & (1 << bit))
 			port_Func_20670();
 		else
 			port_Func_2022c();
@@ -1656,16 +1597,13 @@ public:
 
 	void port_ObjInteraction_TopSting()
 	{
-		cpu_.a = rd8(wInteractionSide);
-		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
+		uint8_t side = rd8(wInteractionSide);
+		if (side & (1 << INTERACTION_UP_F))
 			port_Func_20670();
-			return;
-		}
-		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
+		else if (side & (1 << INTERACTION_DOWN_F))
 			port_StepOnObject();
-			return;
-		}
-		port_Func_2022c();
+		else
+			port_Func_2022c();
 	}
 
 	void port_ObjInteraction_FullSting()
@@ -1675,13 +1613,12 @@ public:
 
 	void port_Func_20e39()
 	{
-		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
+		if (rd8(wInteractionSide) & (INTERACTION_UP | INTERACTION_DOWN)) {
 			port_StepOnObject();
 			return;
 		}
-		ld_cp(wObjDirection, DIRECTION_RIGHT);
-		int bit = ZF ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F;
-		if (ld_bit(wInteractionSide, bit))
+		int bit = rd8(wObjDirection) == DIRECTION_RIGHT ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F;
+		if (rd8(wInteractionSide) & (1 << bit))
 			port_Func_20939();
 		else
 			port_Func_2022c();
@@ -1695,24 +1632,21 @@ public:
 	void port_Func_20e6a()
 	{
 		port_Func_20939();
-		if (ld_and(wTouchState)) {
-			return;
-		}
-		set_obj_action(OBJACTION_0A);
+		if (!rd8(wTouchState))
+			set_obj_action(OBJACTION_0A);
 	}
 
 	void port_Func_20e63()
 	{
-		if (ld_and(wAttackCounter)) {
+		if (rd8(wAttackCounter))
 			port_AttackObject();
-			return;
-		}
-		port_Func_20e6a(); // fallthrough
+		else
+			port_Func_20e6a(); // fallthrough
 	}
 
 	void port_ObjInteraction_Walkable()
 	{
-		if (ld_bit(wInteractionSide, INTERACTION_UP_F))
+		if (rd8(wInteractionSide) & (1 << INTERACTION_UP_F))
 			port_Func_21aac();
 		else
 			port_Func_20932();
@@ -1721,10 +1655,9 @@ public:
 	void port_ObjInteraction_Fire()
 	{
 		set_obj_action(OBJACTION_06);
-		if (ld_and(wInvincibleCounter)) {
+		if (rd8(wInvincibleCounter))
 			return;
-		}
-		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
+		if (rd8(wTransformation) & (1 << TRANSFORMATIONF_PERSISTENT_F)) {
 			port_Func_2022c();
 			return;
 		}
