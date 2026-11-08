@@ -1672,27 +1672,23 @@ public:
 
 	void port_Func_2126a()
 	{
-		if (ld_and(wIsCrouching)) {
-			wr8(wCollisionBoxTop, (uint8_t)-27);
+		if (rd8(wIsCrouching)) {
+			wr8(wCollisionBoxTop, static_cast<uint8_t>(-27));
 			if (up_collision()) {
-				st(wCollisionBoxTop, (uint8_t)-15);
+				wr8(wCollisionBoxTop, static_cast<uint8_t>(-15));
 				port_Func_2022c();
 				return;
 			}
 		}
 		// .asm_21290
 		set_obj_action(OBJACTION_06);
-		if (ld_and(wInvincibleCounter)) {
+		if (rd8(wInvincibleCounter))
 			return;
-		}
-		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
+		if (rd8(wTransformation) & (1 << TRANSFORMATIONF_PERSISTENT_F)) {
 			port_Func_2023b();
 			return;
 		}
-		cpu_.b = rd8(wWarioScreenXPos);
-		cpu_.a = rd8(wObjScreenXPos);
-		alu_.cp(cpu_.a, cpu_.b);
-		wr8(wDirection, CF ? DIRECTION_RIGHT : DIRECTION_LEFT);
+		wr8(wDirection, rd8(wObjScreenXPos) < rd8(wWarioScreenXPos) ? DIRECTION_RIGHT : DIRECTION_LEFT);
 		// .set_ball_o_string
 		play_sfx(SFX_039);
 		wr8(wTransformation, TRANSFORMATION_BALL_O_STRING_WARIO);
@@ -1705,7 +1701,6 @@ public:
 			wIsSmashAttacking, 0};
 		clear(zero);
 		collision_box(-1, -27, -9, 9);
-		xor_a();
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		SET_HL(gb_, ADDR_WarioStringPal);
@@ -1718,13 +1713,9 @@ public:
 
 	void port_ObjInteraction_Silky()
 	{
-		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
-			port_StepOnObject();
+		if (vert_step())
 			return;
-		}
-		ld_cp(wObjDirection, DIRECTION_RIGHT);
-		int bit = ZF ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F;
-		if (ld_bit(wInteractionSide, bit))
+		if (obj_side(true, true))
 			port_Func_2126a();
 		else
 			port_Func_2022c();
@@ -1735,53 +1726,44 @@ public:
 	// then ld a, [wInteractionSide] / bit INTERACTION_LEFT_F or _RIGHT_F, a
 	bool obj_side(bool use_cp, bool front)
 	{
-		bool right;
-		if (use_cp) {
-			ld_cp(wObjDirection, DIRECTION_RIGHT);
-			right = ZF != 0;
-		} else {
-			right = ld_and(wObjDirection);
-		}
-		return ld_bit(wInteractionSide, right == front ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F);
+		uint8_t dir = rd8(wObjDirection);
+		bool right = use_cp ? dir == DIRECTION_RIGHT : dir != 0;
+		return rd8(wInteractionSide) & (1 << (right == front ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F));
 	}
 
 	// ld a, [wInteractionSide] / and INTERACTION_UP | INTERACTION_DOWN / jp nz, StepOnObject
 	bool vert_step()
 	{
-		if (!ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN))
+		if (!(rd8(wInteractionSide) & (INTERACTION_UP | INTERACTION_DOWN)))
 			return false;
 		port_StepOnObject();
 		return true;
 	}
 
+	// n palette pairs from index black, a pair per H-Blank (as the asm's
+	// wait_not_hblank / wait_hblank polls)
 	void zero_pals_hblank(uint16_t index_reg, uint8_t index, uint8_t n, uint16_t data_reg)
 	{
-		cpu_.a = index;
 		wr8(index_reg, index);
-		cpu_.b = n;
-		cpu_.c = (uint8_t)data_reg;
 		do {
-			// wait_not_hblank / wait_hblank
-			while (!(cpu_.a = alu_.and_(rd8(rSTAT), STAT_MODE)))
+			while (!(rd8(rSTAT) & STAT_MODE))
 				idle(32);
-			while ((cpu_.a = alu_.and_(rd8(rSTAT), STAT_MODE)))
+			while (rd8(rSTAT) & STAT_MODE)
 				idle(32);
 			for (int i = 0; i < 2 * PAL_SIZE; i++)
-				wr8((uint16_t)(0xff00 + cpu_.c), 0);
-			cpu_.b = alu_.dec(cpu_.b);
-		} while (cpu_.b);
+				wr8(data_reg, 0);
+		} while (--n);
 	}
 
 	void port_ObjInteraction_Teruteru()
 	{
-		if (!ld_bit(wInteractionSide, INTERACTION_DOWN_F)) {
+		if (!(rd8(wInteractionSide) & (1 << INTERACTION_DOWN_F))) {
 			port_Func_2022c();
 			return;
 		}
-		if (ld_and(wInvincibleCounter)) {
+		if (rd8(wInvincibleCounter))
 			return;
-		}
-		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
+		if (rd8(wTransformation) & (1 << TRANSFORMATIONF_PERSISTENT_F)) {
 			port_Func_2022c();
 			return;
 		}
@@ -1797,10 +1779,9 @@ public:
 
 	void port_ObjInteraction_Beam()
 	{
-		if (ld_and(wInvincibleCounter)) {
+		if (rd8(wInvincibleCounter))
 			return;
-		}
-		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
+		if (rd8(wTransformation) & (1 << TRANSFORMATIONF_PERSISTENT_F)) {
 			port_Func_2022c();
 			return;
 		}
@@ -1818,7 +1799,7 @@ public:
 
 	void port_Func_21b78()
 	{
-		if (ld_bit(wInteractionSide, INTERACTION_UP_F) && ld_and(wIsSmashAttacking)) {
+		if ((rd8(wInteractionSide) & (1 << INTERACTION_UP_F)) && rd8(wIsSmashAttacking)) {
 			port_Func_20602();
 			return;
 		}
@@ -1827,20 +1808,13 @@ public:
 
 	void port_ObjInteraction_YellowBellyArrow()
 	{
-		if (ld_and(wInvincibleCounter)) {
+		if (rd8(wInvincibleCounter))
 			return;
-		}
-		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
+		if (persistent_or(TRANSFORMATION_PUFFY_WARIO)) {
 			port_Func_2022c();
 			return;
 		}
-		alu_.cp(cpu_.a, TRANSFORMATION_PUFFY_WARIO);
-		if (ZF) {
-			port_Func_2022c();
-			return;
-		}
-		ld_cp(wTransformation, TRANSFORMATION_OWL_WARIO);
-		if (ZF)
+		if (rd8(wTransformation) == TRANSFORMATION_OWL_WARIO)
 			CALL(ReleaseOwl);
 		set_obj_action(OBJACTION_06);
 		FARCALL(SetState_PuffyInflating);
@@ -1848,7 +1822,7 @@ public:
 
 	void port_ObjInteraction_Pneumo()
 	{
-		if (ld_bit(wInteractionSide, INTERACTION_DOWN_F))
+		if (rd8(wInteractionSide) & (1 << INTERACTION_DOWN_F))
 			port_ObjInteraction_YellowBellyArrow();
 		else
 			port_Func_2022c();
@@ -1856,16 +1830,10 @@ public:
 
 	void port_Func_2160a()
 	{
-		if (ld_and(wInvincibleCounter)) {
+		if (rd8(wInvincibleCounter))
 			return;
-		}
 		set_obj_action(OBJACTION_06);
-		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			port_Func_2022c();
-			return;
-		}
-		alu_.cp(cpu_.a, TRANSFORMATION_BOUNCY_WARIO);
-		if (ZF) {
+		if (persistent_or(TRANSFORMATION_BOUNCY_WARIO)) {
 			port_Func_2022c();
 			return;
 		}
@@ -1898,7 +1866,7 @@ public:
 
 	void port_Func_21c56()
 	{
-		if (ld_bit(wInteractionSide, INTERACTION_UP_F))
+		if (rd8(wInteractionSide) & (1 << INTERACTION_UP_F))
 			port_Func_21aac();
 		else
 			port_Func_20b6b();
@@ -1916,11 +1884,7 @@ public:
 
 	void port_ObjInteraction_Hebarii()
 	{
-		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
-			port_Func_20e6a();
-			return;
-		}
-		if (ld_and(wAttackCounter))
+		if (!(rd8(wInteractionSide) & (INTERACTION_UP | INTERACTION_DOWN)) && rd8(wAttackCounter))
 			port_AttackObject();
 		else
 			port_Func_20e6a();
@@ -1928,10 +1892,10 @@ public:
 
 	void port_ObjInteraction_PrinceFroggy()
 	{
-		cpu_.a = rd8(wInteractionSide);
-		if (alu_.bit(cpu_.a, INTERACTION_UP_F))
+		uint8_t side = rd8(wInteractionSide);
+		if (side & (1 << INTERACTION_UP_F))
 			port_Func_209ca();
-		else if (alu_.bit(cpu_.a, INTERACTION_DOWN_F))
+		else if (side & (1 << INTERACTION_DOWN_F))
 			port_Func_2168b();
 		else
 			port_Func_20b41();
@@ -1939,8 +1903,7 @@ public:
 
 	void port_Func_21d3b()
 	{
-		cpu_.a = rd8(wInteractionSide);
-		if (alu_.bit(cpu_.a, INTERACTION_UP_F) || alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
+		if (rd8(wInteractionSide) & (INTERACTION_UP | INTERACTION_DOWN)) {
 			port_Func_20e6a();
 			return;
 		}
@@ -1952,7 +1915,7 @@ public:
 
 	void port_Func_21d64()
 	{
-		if (ld_bit(wInteractionSide, INTERACTION_UP_F))
+		if (rd8(wInteractionSide) & (1 << INTERACTION_UP_F))
 			port_Func_20670();
 		else
 			port_Func_20e6a();
@@ -1961,7 +1924,7 @@ public:
 	// Func_21d6f.asm_21d7e
 	void func_21d7e()
 	{
-		if (ld_and(wIsSmashAttacking))
+		if (rd8(wIsSmashAttacking))
 			port_Func_20602();
 		else
 			port_Func_20e6a();
