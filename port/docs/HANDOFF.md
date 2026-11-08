@@ -830,9 +830,16 @@ primitives, home/wario.cpp, and the golf objects' animation):
   (LevelStateTable sets a and f after). Its calls keep the asm's return
   addresses and its push_wram / SRAM push af stay as stack pushes (the
   bank in a), so every return address sits where the asm's does.
-- Next: scroll.cpp (it feeds the queues: its pushes and the af it pushes
-  are what the overrun reads, so keep every push and the flags behind
-  it), then the overworld and home modules (home/load_room.cpp,
+- scroll.cpp, plain (2026-11-08): the edge rows and columns and the
+  room's first-drawing queues over memory; the hooks clobber all
+  registers (the callers are C), GetNextLevelRoomID stays exact. The
+  overrun's read lands on the stack only in
+  QueueBlockAttributesAlongRow_OddColumn's half first block (ce35 +
+  block * 4 + 3 reaches the stack, the tile tables don't), so only that
+  routine still pushes its af (the entry f) and the block map pointer.
+  The other pushes left only dead stack, which the difftest and the
+  traces ignore.
+- Next: the home and overworld modules (home/load_room.cpp,
   home/start.cpp, overworld/bank26.cpp ... by register sites).
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
