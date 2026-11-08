@@ -569,29 +569,63 @@ primitives, home/wario.cpp, and the golf objects' animation):
   ending dead, since UpdateObject reloads every register; push / pop
   are transparent. Usage: `python live.py cdehl Routine,Routine...` from
   the repo root. Handy for any contract relaxing.
-- Wario's states as plain C++: tried and backed out (2026-11-07). The
-  rewrite is on branch claude/plain-wario-states (8340be5):
-  wario_states_1-4.cpp over a `WarioStateBase` of plain helpers
-  (level/wario_state_base.hpp), every hook ALL_REGISTERS but five reached
-  from inside collision checks. Each of the 516 routines passed the
-  fuzzer alone (temporary ALL_REGISTERS hooks, 1000 variants), the quick
-  tier passed, but the full fuzz tier failed UpdateLevel and
-  LevelStateTable on 9 shards: the whole level frame. The registers the
-  states leave reach the objects. UpdateObjects sets e and hl but not b,
-  c or d, HandleGrabbedObjectCollisions sets them only with a grabbed
-  object, and object code reads them before writing (found by poisoning
-  d at points of the frame: after UpdateObjects it no longer mattered).
-  The asm liveness script says UpdateWarioStates' exit is dead because it
-  treats object update functions as dead ends, so it can't be trusted
-  for anything that flows into UpdateObjects. Bisecting showed the d
-  left by UpdateState_Walking's last update_pos_y (de = wWarioYPos + 1)
-  was enough to fail one check; the other failures are the same thing
-  through other states. So the states have to leave b, c and d as the
-  asm does until the object code no longer reads registers it didn't
-  set: do the objects (and UpdateObjects) first, then the states.
-  Also learnt there: a hook others tail into keeps an exact contract
-  (ResetLevelMusicWarioPalsAndState, the block functions), so the hooks
-  it reaches must too; the difftests catch that.
+- Wario's states as plain C++ (2026-11-07): wario_states_1-4.cpp derive
+  from `WarioStateBase` (level/wario_state_base.hpp), whose helpers read
+  and write memory and return values (the collision checks return the
+  result the asm leaves in b, through `in_bank`; the home primitives are
+  called directly). The AsmModule helpers that set a and f for a flag
+  test are `= delete`d there. Register traffic is left only where a
+  register-level callee takes or returns one (CreateParticle's b, the
+  floor transitions' c, the b ApplyWalkVelocity_* leaves for MoveWario*,
+  Func_1f863's de). Every kept hook clobbers all registers, except five
+  reached from inside a collision check, whose register-level callers
+  see what they leave: CrouchOrSlide, SetState_Idling and StartFall
+  (register-level copies, WarioStates1Exact), SetState_FanStart
+  (FanStartExact), SetState_ZombieRecovering (a and f as its xor a). A
+  hook others tail into keeps its contract (ResetLevelMusicWarioPals-
+  AndState, the block functions), so the hooks it reaches must too: the
+  difftests caught the last two. History: first landed as 8340be5, backed
+  out in d04f88f when the full fuzz tier failed UpdateLevel, landed again
+  once the register map below showed those failures were fuzzed update
+  pointers (the fuzzer now flags them).
+- The register map (2026-11-07): which object code reads registers it
+  didn't set, and whether real play reaches it.
+  - At an update function's entry: nothing in real play. The 166 update
+    functions the 14 recordings enter (logged at UpdateObject's call)
+    read none of b to l before writing them, by the asm liveness from
+    each entry (Coin's macro-made moves aside, unresolved). Poisoning
+    b to l at every update call changed no frame of any recording. Under
+    the fuzzer the same poison failed UpdateLevel, all through fuzzed
+    update pointers into the middle of routines: hCallFunc is a direct
+    call, so the interpreter's jp hl rule never saw them. The hCallFunc
+    hook (ram_code.c) now flags a call to an address with no label as
+    unrealistic, and with it the poison fails nothing.
+  - Object routines that take a register from their own caller (found
+    by the liveness from every object hook's entry, never stored as an
+    update function): SilkPlatformsFunc (bcde), AppleFunc (b), BeamFunc,
+    SunFlameFunc, MoonStarFunc, ZombieHeadFunc (bc, a movement table),
+    TreasureFunc, WallCrackFunc, ClearGateFunc (de, a frameset),
+    HandFunc.ApplyOffsetToWario (b, h), Hidden Figure's Func_4cf70 /
+    87 / 9e / bf (bc), Jamano's Func_554bc (e, hl), Muddee's .Func_55c11
+    (bcde), PillarPlatformFunc and .Func_49d43, Shoot's
+    DoPreKickingJumpYMovement, ApplyYOffsetOnKickedWarioBall,
+    Func_5725b, the Scowler palette writers (hl). Real update functions
+    that read one: ShootFunc .ScoreGoal (a stale b, in ASM_BUGS.md, not
+    reachable in play) and ZipLineFunc .Func_49369 (the c its own
+    .Func_49418 leaves). Many states read h, which UpdateObject sets to
+    the object's page.
+  - After a block check: Muddee (h), Pesce (d, e), Octohon (hl), ZipLine
+    (c) and SetObjectFramesetPtr callers read what ProcessBlock and the
+    block function leave: the block pointer and the block function's
+    values, exact as long as the block functions stay register-level.
+    Poisoning b to l after every block check the objects make changed
+    no frame either, but the recordings reach none of those four
+    objects (they reach Anonster, Coin, the bots, Bubble, Para-Goom,
+    Silky, Spearhead, Torch embers, Webber, Yellow Belly, Zombie).
+  So: the frame before an object need not keep b to l for the update's
+  sake. The block functions must stay register-level until Muddee,
+  Pesce, Octohon and ZipLine get their values passed, and a recording
+  with them would check it.
 - Objects, first step (2026-11-07): the objects' block checks through
   home's homecall wrappers (Func_3513, Func_352b, Func_3543, Func_358b,
   Func_35a3, ProcessBlockOnLeft/Right) are `Object` methods returning
@@ -613,16 +647,10 @@ primitives, home/wario.cpp, and the golf objects' animation):
   About 156 register sites are left in the objects: b for MoveWario*,
   hl / de for DespawnObject and the palette loads, reads of h's page,
   and the registers left by block functions and earlier objects.
-- What blocks going further: object code reads registers it never set
-  (the plain Wario states showed it: b, c and d flow from the states
-  through UpdateObjects into the objects). Until each such read is found
-  and either shown to be fuzz-only or given its value explicitly, every
-  routine that runs before an object in the frame (the states,
-  UpdateObjects, DoObjectAction, the block functions) has to leave b to
-  l as the asm does. A way to find them: run the full fuzz tier with
-  a poisoned register at a point of the frame (as in the bisect above)
-  and narrow down per object. Only then are home/object_mechanics.cpp,
-  UpdateObjects and the Wario states safe to make plain.
+- Next: UpdateObjects and home/object_mechanics.cpp's routines as plain
+  functions (the map above says the objects don't need the registers
+  they leave at update entry); then the block functions, passing
+  Muddee, Pesce, Octohon and ZipLine what they read.
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped
