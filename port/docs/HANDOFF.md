@@ -811,8 +811,13 @@ primitives, home/wario.cpp, and the golf objects' animation):
   with a DMA pending). The fuzzer found it (ProcessMultiBlock,
   yellowbelly, variant 124) when the hook clobbered b: a register read
   that crosses three routines, which live.py missed.
-- Next: camera.cpp / scroll.cpp (scroll.cpp also feeds the queues, so the
-  same stack care), then the overworld modules.
+- camera.cpp, plain (2026-11-08): the scrolls take their distance as a
+  parameter (the hooks pass b), every hook clobbers all registers. Its
+  callers (update_level.cpp, start_room.cpp) go on to ProcessInteractions,
+  Func_8ed9 and Func_bb85, none of which reads a register on entry, and
+  live.py finds no read after any call site.
+- Next: scroll.cpp (it feeds the queues too, so the same stack care), then
+  update_level.cpp and the overworld modules.
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped
