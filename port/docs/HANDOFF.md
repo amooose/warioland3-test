@@ -839,8 +839,20 @@ primitives, home/wario.cpp, and the golf objects' animation):
   routine still pushes its af (the entry f) and the block map pointer.
   The other pushes left only dead stack, which the difftest and the
   traces ignore.
-- Next: the home and overworld modules (home/load_room.cpp,
-  home/start.cpp, overworld/bank26.cpp ... by register sites).
+- load_room.cpp, room_gfx.cpp's room load and start.cpp, plain
+  (2026-11-08): LoadRoom and what it calls (LoadRoomGfx, the tiles, tile
+  map, palettes, block function table, animated tiles and palettes) and
+  UpdateRoomAnimatedPals clobber all registers (their callers are C and
+  read none after). The debug asserts still jump to Init with the asm's
+  push af on the stack (SP is compared). The game loop and boot code read
+  memory only; their calls keep the asm's return addresses (the
+  MainStateTable frame is on the stack during the room drawing). The
+  fuzzer can't settle GameLoop or InitWithoutDemoPowerUpReset (they run
+  whole frames), so the traces cover them. HandleSound stays
+  register-level: the audio calls take bc, and UpdateAudio reads c.
+- Next: home/load_level.cpp and decompress_level_data.cpp, then
+  overworld/bank26.cpp and the other overworld and home modules (by
+  register sites).
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped

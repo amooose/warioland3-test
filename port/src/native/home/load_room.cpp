@@ -1,367 +1,250 @@
-// home/load_room (src/home/load_room.asm), converted from the register-level
-// C port by tools/c2cpp.py: the same logic, as a class over AsmModule,
-// keeping the original's registers, flags and return addresses for its
-// callers (see src/native/asm_module.hpp).
-#include "../asm_module.hpp"
+// Loading a room (src/home/load_room.asm): its header (spawn, limits,
+// camera, objects, animated tiles and palettes), its graphics' tables,
+// tiles and palettes, and its palette cycle each frame.
+//
+// Plain C++ over memory. The callers are C (StartRoom, LoadRoomGfx, the
+// game loop) and read no registers after, so the hooks clobber them all.
+// The debug asserts jump to Init with the asm's push af still on the
+// stack.
+#include "../flags.hpp"
+#include "../native.hpp"
+#include "../routines.hpp"
+#include "memory.hpp"
+#include "pals.hpp"
 
 namespace wl3::home {
 
 namespace {
 
-class HomeLoadRoom : public AsmModule {
+constexpr uint8_t BANK_BLOCK_FUNCTION_TABLES_2 = 0x50; // BANK("Block Function Tables 2")
+constexpr uint8_t LEVEL_PALETTES = 0x33; // BANK("Level Palettes")
+constexpr uint8_t LEVEL_OBJECTS_WRAM = 0x01; // BANK("Level Objects WRAM")
+
+class RoomLoader {
 public:
-	using AsmModule::AsmModule;
+	explicit RoomLoader(GB *gb) : gb_(gb), mem_(gb), routines_(gb) {}
 
-	// ld a, [index] / add a / ld e, a / ld d, $00 / ld hl, table / add hl, de /
-	// ld a, [hli] / ld h, [hl] / ld l, a
-	void get_pointer(uint16_t index, uint16_t table)
+	void load(); // LoadRoom
+	void load_block_function_table(); // LoadBlockFunctionTable
+	void load_block_tiles(); // Func_298d
+	void load_tile_map(); // LoadRoomTileMap
+	void load_main_tiles(); // LoadRoomMainTiles
+	void load_special_tiles(); // LoadRoomSpecialTiles
+	void load_palettes(); // LoadRoomPalettes
+	void update_animated_pals(); // UpdateRoomAnimatedPals
+
+private:
+	// table's dw at index (add a: the index's low 7 bits)
+	uint16_t pointer(uint16_t table, uint8_t index)
 	{
-		cpu_.a = rd8(index);
-		cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		cpu_.e = cpu_.a;
-		cpu_.d = 0;
-		uint16_t hl = alu_.add16(table, REG_DE(gb_));
-		cpu_.a = rd8(hl++);
-		cpu_.h = rd8(hl);
-		cpu_.l = cpu_.a;
+		return Word(gb_, static_cast<uint16_t>(table + static_cast<uint8_t>(index * 2)));
 	}
-
-	// copies bc bytes from hl to de with the bank in bank_addr mapped
-	void far_copy(uint16_t bank_addr, uint16_t de, uint16_t bc)
+	// copies count bytes from src to dest with the ROM bank in bank_var
+	// mapped (by way of wTempBank)
+	void far_copy(uint16_t bank_var, uint16_t src, uint16_t dest, uint32_t count)
 	{
-		cpu_.a = rd8(bank_addr);
-		wr8(wTempBank, cpu_.a);
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = rd8(wTempBank);
-		bankswitch(cpu_.a);
-		SET_DE(gb_, de);
-		SET_BC(gb_, bc);
-		CALL(CopyHLToDE_BC);
-		pop_af();
-		bankswitch(cpu_.a);
+		uint8_t bank = mem_[bank_var];
+		mem_[wTempBank] = bank;
+		uint8_t rom = mem_[wROMBank];
+		switch_bank(bank);
+		copy(gb_, src, dest, count);
+		switch_bank(rom);
 	}
-
-	void port_Func_298d()
+	void switch_bank(uint8_t bank) { bankswitch(gb_, bank, gb_->cpu.pc); }
+	// debug_assert_not $ff: Init, with the asm's push af (a = the ROM
+	// bank it came from) on the stack
+	void reset(uint8_t rom, uint8_t f)
 	{
-		get_pointer(wRoomBlockFunctionTable, ADDR_RoomBlockTilesPointers);
-		far_copy(wRoomBlockFunctionTableBank, wRoomBlockTiles, 4 * NUM_ROOM_BLOCK_TYPES);
+		gb_push16(gb_, static_cast<uint16_t>(rom << 8 | f));
+		gb_->cpu.pc = ADDR_Init;
 	}
-
-	void port_LoadRoomTileMap()
-	{
-		get_pointer(wRoomTileMap, ADDR_RoomBlockAttributePointers);
-		cpu_.a = rd8(wc0d0);
-		wr8(wTempBank, cpu_.a);
-		SET_BC(gb_, wRoomBlockAttributes);
-		cpu_.a = rd8(wTempBank);
-		wr8(hCallFuncBank, cpu_.a);
-		HCALL(Decompress);
-	}
-
-	void port_LoadRoomMainTiles()
-	{
-		get_pointer(wRoomMainTiles, ADDR_LevelMainTilesPointers);
-		far_copy(wRoomMainTilesBank, v0Tiles2, 0x800);
-	}
-
-	void port_LoadRoomSpecialTiles()
-	{
-		cpu_.a = 1;
-		wr8(rVBK, 1);
-		get_pointer(wRoomSpecialTiles, ADDR_SpecialTilesPointers);
-		far_copy(wRoomSpecialTilesBank, v0Tiles2, 0x800);
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(rVBK, 0);
-	}
-
-	void port_LoadRoomPalettes()
-	{
-		get_pointer(wRoomPalettes, ADDR_RoomPals);
-		cpu_.a = rd8(wPaletteBank);
-		wr8(wTempBank, cpu_.a);
-		cpu_.a = rd8(wTempBank);
-		wr8(hCallFuncBank, cpu_.a);
-		HCALL(LoadPalsToTempPals1);
-	}
-
 	void wait_next_hblank()
 	{
-		while (!(cpu_.a = alu_.and_(rd8(rSTAT), STAT_MODE)))
-			idle(32);
-		while ((cpu_.a = alu_.and_(rd8(rSTAT), STAT_MODE)))
-			idle(32);
+		while (!(mem_[rSTAT] & STAT_MODE))
+			idle(gb_, 32);
+		while (mem_[rSTAT] & STAT_MODE)
+			idle(gb_, 32);
 	}
 
-	void port_UpdateRoomAnimatedPals()
-	{
-		// only animate if at least 8 scanlines from V-Blank
-		cpu_.a = rd8(rLY);
-		alu_.cp(cpu_.a, LY_VBLANK - 8);
-		if (!(cpu_.f & FLAG_C))
-			return;
-		cpu_.a = rd8(wRoomPalCycleDuration);
-		alu_.and_(cpu_.a, cpu_.a);
-		if (!cpu_.a)
-			return;
-		cpu_.b = cpu_.a;
-		cpu_.a = alu_.inc(rd8(wRoomPalCycleCounter));
-		wr8(wRoomPalCycleCounter, cpu_.a);
-		alu_.cp(cpu_.a, cpu_.b);
-		if (cpu_.f & FLAG_C)
-			return;
-
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(wRoomPalCycleCounter, 0);
-		cpu_.h = rd8(wRoomPalCyclePtr + 0);
-		cpu_.l = rd8(wRoomPalCyclePtr + 1);
-
-		cpu_.a = alu_.inc(rd8(wRoomPalCycleIndex));
-		alu_.cp(cpu_.a, ROOM_PALCYCLE_LENGTH);
-		if (!(cpu_.f & FLAG_C)) {
-			cpu_.a = 0;
-			cpu_.f = FLAG_Z; // xor a
-		}
-		wr8(wRoomPalCycleIndex, cpu_.a);
-
-		cpu_.e = cpu_.a;
-		cpu_.d = 0;
-		uint16_t hl = alu_.add16(REG_HL(gb_), REG_DE(gb_));
-		SET_HL(gb_, hl);
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = BANK_RoomPalCycles;
-		bankswitch(cpu_.a);
-		cpu_.d = 0;
-		cpu_.a = rd8(hl);
-		cpu_.a = alu_.add(cpu_.a, cpu_.a); // *2
-		cpu_.e = cpu_.a;
-		cpu_.d = alu_.rl(cpu_.d);
-		hl = alu_.add16(ADDR_RoomPals, REG_DE(gb_));
-		cpu_.a = rd8(hl++);
-		cpu_.h = rd8(hl);
-		cpu_.l = cpu_.a;
-		pop_af();
-		bankswitch(cpu_.a);
-
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = 0x33; // BANK("Level Palettes")
-		bankswitch(cpu_.a);
-		cpu_.a = BGPI_AUTOINC | 0;
-		wr8(rBGPI, cpu_.a);
-		cpu_.b = 5;
-		cpu_.c = (uint8_t)rBGPD;
-		hl = REG_HL(gb_);
-		do {
-			wait_next_hblank();
-			for (int i = 0; i < 12; i++) {
-				cpu_.a = rd8(hl++);
-				wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
-			}
-			cpu_.b = alu_.dec(cpu_.b);
-		} while (cpu_.b);
-
-		wait_next_hblank();
-		for (int i = 0; i < 3; i++) {
-			cpu_.a = rd8(hl++);
-			wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
-		}
-		cpu_.a = rd8(hl);
-		wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
-		SET_HL(gb_, hl);
-		pop_af();
-		bankswitch(cpu_.a);
-	}
-
-	#define BANK_BLOCK_FUNCTION_TABLES_2 0x50 // BANK("Block Function Tables 2")
-
-	void port_LoadBlockFunctionTable()
-	{
-		cpu_.a = rd8(wRoomBlockFunctionTable);
-		cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		cpu_.e = cpu_.a;
-		cpu_.d = 0;
-		uint16_t hl = alu_.add16(ADDR_BlockFunctionTablePointers, REG_DE(gb_));
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = BANK_BlockFunctionTablePointers;
-		bankswitch(cpu_.a);
-		cpu_.a = rd8(hl++);
-		cpu_.h = rd8(hl);
-		cpu_.l = cpu_.a;
-		cpu_.a = cpu_.h;
-		alu_.cp(cpu_.a, 0xff);
-		if (cpu_.f & FLAG_Z) {
-			JUMP(Init); // .reset
-			return;
-		}
-		cpu_.a = rd8(wRoomBlockFunctionTable);
-		alu_.cp(cpu_.a, NUM_BLOCK_FUNCTION_TABLES_GROUP_1 - 1);
-		bool group_2 = !(cpu_.f & FLAG_C);
-		if (group_2) {
-			cpu_.a = rd8(wROMBank);
-			push_af();
-			cpu_.a = BANK_BLOCK_FUNCTION_TABLES_2;
-			bankswitch(cpu_.a);
-		}
-		SET_DE(gb_, wBlockFunctionTable);
-		cpu_.b = 0;
-		CALL(CopyHLToDE);
-		pop_af();
-		bankswitch(cpu_.a);
-		if (group_2) {
-			pop_af();
-			bankswitch(cpu_.a);
-		}
-		RET();
-	}
-
-	// ld a, [hl] / swap a / and $0f (or without the swap)
-	uint8_t nibble(uint16_t hl, bool high)
-	{
-		cpu_.a = rd8(hl);
-		if (high)
-			cpu_.a = alu_.swap(cpu_.a);
-		return cpu_.a = alu_.and_(cpu_.a, 0x0f);
-	}
-
-	// ld a, [limit] / add a (shift times) / add base, then $ff if that made 0
-	void room_limit(uint16_t limit, int shift, uint8_t base, bool nonzero, uint16_t dest)
-	{
-		cpu_.a = rd8(limit);
-		for (int i = 0; i < shift; i++)
-			cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		cpu_.a = alu_.add(cpu_.a, base);
-		if (nonzero && (cpu_.f & FLAG_Z))
-			cpu_.a = 0xff;
-		wr8(dest, cpu_.a);
-	}
-
-	void port_LoadRoom()
-	{
-		cpu_.a = 0x70;
-		wr8(wPrevWarioScreenYPos, cpu_.a);
-		cpu_.a = 0x58;
-		wr8(wCamRightSpacing, cpu_.a);
-		cpu_.a = alu_.sub(cpu_.a, 0x58);
-		cpu_.a = alu_.cpl(cpu_.a);
-		cpu_.a = alu_.inc(cpu_.a);
-		cpu_.a = alu_.add(cpu_.a, 0x58);
-		wr8(wCamLeftSpacing, cpu_.a);
-
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = BANK_LevelHeaders;
-		bankswitch(cpu_.a);
-		cpu_.a = rd8(wLevel);
-		cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		cpu_.e = cpu_.a;
-		cpu_.d = 0;
-		cpu_.d = alu_.rl(cpu_.d);
-		uint16_t hl = alu_.add16(ADDR_LevelHeaders, REG_DE(gb_));
-		cpu_.a = rd8(hl++);
-		cpu_.h = rd8(hl);
-		cpu_.l = cpu_.a;
-		cpu_.a = cpu_.h;
-		alu_.cp(cpu_.a, 0xff);
-		if (cpu_.f & FLAG_Z) {
-			JUMP(Init); // debug_assert_not $ff
-			return;
-		}
-		pop_af();
-		bankswitch(cpu_.a);
-
-		cpu_.a = rd8(wLevel);
-		alu_.cp(cpu_.a, THE_GRASSLANDS_NIGHT_1);
-		uint8_t bank = (cpu_.f & FLAG_C) ? 0x30 : 0x31;
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = bank;
-		bankswitch(cpu_.a);
-
-		// .got_bank
-		cpu_.a = rd8(wLevelRoomID);
-		cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		cpu_.e = cpu_.a;
-		cpu_.d = 0;
-		hl = alu_.add16(REG_HL(gb_), REG_DE(gb_));
-		cpu_.a = rd8(hl++);
-		cpu_.e = cpu_.a;
-		cpu_.h = rd8(hl);
-		cpu_.l = cpu_.e;
-		cpu_.a = cpu_.h;
-		alu_.cp(cpu_.a, 0xff);
-		if (cpu_.f & FLAG_Z) {
-			JUMP(Init); // debug_assert_not $ff
-			return;
-		}
-		hl = REG_HL(gb_);
-		cpu_.a = rd8(hl++);
-		wr8(wWarioSpawnPos, cpu_.a);
-		wr8(wRoomUpperYLimit, nibble(hl, true));
-		wr8(wRoomLowerYLimit, nibble(hl++, false));
-		wr8(wRoomLeftXLimit, nibble(hl, true));
-		wr8(wRoomRightXLimit, nibble(hl++, false));
-		cpu_.a = rd8(hl++);
-		wr8(wCameraConfigFlags, cpu_.a);
-
-		cpu_.a = rd8(hl++);
-		wr8(wObjectGroup, cpu_.a);
-		SET_HL(gb_, hl);
-		gb_push16(gb_, REG_HL(gb_));
-		cpu_.a = rd8(rWBK); // push_wram
-		push_af();
-		cpu_.a = 0x01; // BANK("Level Objects WRAM")
-		wr8(rWBK, cpu_.a);
-		FARCALL(LoadObjectGroupData);
-		pop_af(); // pop_wram
-		wr8(rWBK, cpu_.a);
-		SET_HL(gb_, gb_pop16(gb_));
-
-		hl = REG_HL(gb_);
-		cpu_.a = rd8(hl++);
-		wr8(wAnimatedTilesGroup, cpu_.a);
-		SET_HL(gb_, hl);
-		gb_push16(gb_, REG_HL(gb_));
-		FARCALL(InitRoomAnimatedTiles);
-		SET_HL(gb_, gb_pop16(gb_));
-
-		hl = REG_HL(gb_);
-		cpu_.a = rd8(hl++);
-		wr8(wRoomPalCycle, cpu_.a);
-		SET_HL(gb_, hl);
-		gb_push16(gb_, REG_HL(gb_));
-		FARCALL(InitRoomAnimatedPals);
-		SET_HL(gb_, gb_pop16(gb_));
-
-		cpu_.a = rd8(REG_HL(gb_));
-		wr8(wRoom, cpu_.a);
-		FARCALL(LoadRoomGfx);
-		pop_af();
-		bankswitch(cpu_.a);
-
-		room_limit(wRoomLowerYLimit, 4, 0xa0, true, wc0c4);
-		room_limit(wRoomUpperYLimit, 4, 0xa0, false, wc0c5);
-		room_limit(wRoomRightXLimit, 3, 0xb0, true, wc0c7);
-		room_limit(wRoomLeftXLimit, 3, 0xb0, false, wc0c6);
-		RET();
-	}
+	GB *gb_;
+	Memory mem_;
+	Routines routines_;
 };
+
+void RoomLoader::load_block_tiles()
+{
+	uint16_t src = pointer(ADDR_RoomBlockTilesPointers, mem_[wRoomBlockFunctionTable]);
+	far_copy(wRoomBlockFunctionTableBank, src, wRoomBlockTiles, 4 * NUM_ROOM_BLOCK_TYPES);
+}
+
+void RoomLoader::load_tile_map()
+{
+	uint16_t src = pointer(ADDR_RoomBlockAttributePointers, mem_[wRoomTileMap]);
+	uint8_t bank = mem_[wc0d0];
+	mem_[wTempBank] = bank;
+	farcall(gb_, bank, ADDR_Decompress, [&] { decompress(gb_, src, wRoomBlockAttributes); });
+}
+
+void RoomLoader::load_main_tiles()
+{
+	uint16_t src = pointer(ADDR_LevelMainTilesPointers, mem_[wRoomMainTiles]);
+	far_copy(wRoomMainTilesBank, src, v0Tiles2, 0x800);
+}
+
+void RoomLoader::load_special_tiles()
+{
+	mem_[rVBK] = 1;
+	uint16_t src = pointer(ADDR_SpecialTilesPointers, mem_[wRoomSpecialTiles]);
+	far_copy(wRoomSpecialTilesBank, src, v0Tiles2, 0x800);
+	mem_[rVBK] = 0;
+}
+
+void RoomLoader::load_palettes()
+{
+	uint16_t src = pointer(ADDR_RoomPals, mem_[wRoomPalettes]);
+	uint8_t bank = mem_[wPaletteBank];
+	mem_[wTempBank] = bank;
+	farcall(gb_, bank, ADDR_LoadPalsToTempPals1, [&] { load_pals_to_temp_pals1(gb_, src); });
+}
+
+// the room's palette cycle: when its duration has passed, the next of its
+// palettes into the BG palettes, 12 bytes per H-Blank (only with at least
+// 8 scanlines to V-Blank)
+void RoomLoader::update_animated_pals()
+{
+	if (mem_[rLY] >= LY_VBLANK - 8)
+		return;
+	uint8_t duration = mem_[wRoomPalCycleDuration];
+	if (!duration)
+		return;
+	uint8_t count = static_cast<uint8_t>(mem_[wRoomPalCycleCounter] + 1);
+	mem_[wRoomPalCycleCounter] = count;
+	if (count < duration)
+		return;
+	mem_[wRoomPalCycleCounter] = 0;
+	uint16_t cycle = static_cast<uint16_t>(mem_[wRoomPalCyclePtr + 0] << 8 | mem_[wRoomPalCyclePtr + 1]);
+	uint8_t index = static_cast<uint8_t>(mem_[wRoomPalCycleIndex] + 1);
+	if (index >= ROOM_PALCYCLE_LENGTH)
+		index = 0;
+	mem_[wRoomPalCycleIndex] = index;
+
+	uint8_t rom = mem_[wROMBank];
+	switch_bank(BANK_RoomPalCycles);
+	uint8_t pal = mem_[static_cast<uint16_t>(cycle + index)];
+	uint16_t pals = Word(gb_, static_cast<uint16_t>(ADDR_RoomPals + pal * 2));
+	switch_bank(rom);
+
+	switch_bank(LEVEL_PALETTES);
+	mem_[rBGPI] = BGPI_AUTOINC | 0;
+	for (int i = 0; i < 5; i++) {
+		wait_next_hblank();
+		for (int j = 0; j < 12; j++)
+			mem_[rBGPD] = mem_[pals++];
+	}
+	wait_next_hblank();
+	for (int j = 0; j < 4; j++)
+		mem_[rBGPD] = mem_[pals++];
+	switch_bank(rom);
+}
+
+// the room's block functions: from its table in group 1 or 2's bank
+void RoomLoader::load_block_function_table()
+{
+	uint8_t table = mem_[wRoomBlockFunctionTable];
+	uint8_t offset = static_cast<uint8_t>(table * 2);
+	uint16_t at = static_cast<uint16_t>(ADDR_BlockFunctionTablePointers + offset);
+	uint8_t rom = mem_[wROMBank];
+	switch_bank(BANK_BlockFunctionTablePointers);
+	uint16_t src = Word(gb_, at);
+	if (src >> 8 == 0xff) { // .reset; push af saved add a / add hl, de's flags
+		uint8_t f = static_cast<uint8_t>((offset ? 0 : FLAG_Z)
+			| ((ADDR_BlockFunctionTablePointers & 0xfff) + offset > 0xfff ? FLAG_H : 0)
+			| (ADDR_BlockFunctionTablePointers + offset > 0xffff ? FLAG_C : 0));
+		reset(rom, f);
+		return;
+	}
+	bool group_2 = table >= NUM_BLOCK_FUNCTION_TABLES_GROUP_1 - 1;
+	if (group_2)
+		switch_bank(BANK_BLOCK_FUNCTION_TABLES_2);
+	copy(gb_, src, wBlockFunctionTable, 0x100);
+	if (group_2)
+		switch_bank(BANK_BlockFunctionTablePointers);
+	switch_bank(rom);
+	gb_->cpu.pc = gb_pop16(gb_); // ret
+}
+
+// a level's header: its rooms' headers in bank $30 or $31
+void RoomLoader::load()
+{
+	mem_[wPrevWarioScreenYPos] = 0x70;
+	mem_[wCamRightSpacing] = 0x58;
+	mem_[wCamLeftSpacing] = 0x58; // $58 - ($58 - $58)
+
+	uint8_t rom = mem_[wROMBank];
+	switch_bank(BANK_LevelHeaders);
+	uint8_t level = mem_[wLevel];
+	uint16_t rooms = Word(gb_, static_cast<uint16_t>(ADDR_LevelHeaders + level * 2));
+	if (rooms >> 8 == 0xff) {
+		reset(rom, 0); // the flags of add $58
+		return;
+	}
+	switch_bank(rom);
+
+	level = mem_[wLevel];
+	rom = mem_[wROMBank];
+	switch_bank(level < THE_GRASSLANDS_NIGHT_1 ? 0x30 : 0x31);
+	uint16_t header = Word(gb_, static_cast<uint16_t>(rooms + static_cast<uint8_t>(mem_[wLevelRoomID] * 2)));
+	if (header >> 8 == 0xff) {
+		reset(rom, flags::cp(level, THE_GRASSLANDS_NIGHT_1));
+		return;
+	}
+	mem_[wWarioSpawnPos] = mem_[header + 0];
+	uint8_t y_limits = mem_[header + 1];
+	mem_[wRoomUpperYLimit] = y_limits >> 4;
+	mem_[wRoomLowerYLimit] = y_limits & 0x0f;
+	uint8_t x_limits = mem_[header + 2];
+	mem_[wRoomLeftXLimit] = x_limits >> 4;
+	mem_[wRoomRightXLimit] = x_limits & 0x0f;
+	mem_[wCameraConfigFlags] = mem_[header + 3];
+
+	mem_[wObjectGroup] = mem_[header + 4];
+	uint8_t wbk = mem_[rWBK]; // push_wram
+	mem_[rWBK] = LEVEL_OBJECTS_WRAM;
+	routines_.farcall(BANK_LoadObjectGroupData, ADDR_LoadObjectGroupData);
+	mem_[rWBK] = wbk; // pop_wram
+
+	mem_[wAnimatedTilesGroup] = mem_[header + 5];
+	routines_.farcall(BANK_InitRoomAnimatedTiles, ADDR_InitRoomAnimatedTiles);
+	mem_[wRoomPalCycle] = mem_[header + 6];
+	routines_.farcall(BANK_InitRoomAnimatedPals, ADDR_InitRoomAnimatedPals);
+	mem_[wRoom] = mem_[header + 7];
+	routines_.farcall(BANK_LoadRoomGfx, ADDR_LoadRoomGfx);
+	switch_bank(rom);
+
+	// the camera's limits: $ff where a limit of 0 wraps to 0
+	auto limit = [](uint8_t blocks, int shift, uint8_t base) {
+		return static_cast<uint8_t>((blocks << shift) + base);
+	};
+	uint8_t lower = limit(mem_[wRoomLowerYLimit], 4, 0xa0);
+	mem_[wc0c4] = lower ? lower : 0xff;
+	mem_[wc0c5] = limit(mem_[wRoomUpperYLimit], 4, 0xa0);
+	uint8_t right = limit(mem_[wRoomRightXLimit], 3, 0xb0);
+	mem_[wc0c7] = right ? right : 0xff;
+	mem_[wc0c6] = limit(mem_[wRoomLeftXLimit], 3, 0xb0);
+	gb_->cpu.pc = gb_pop16(gb_); // ret
+}
 
 } // namespace
 
 } // namespace wl3::home
 
-using wl3::home::HomeLoadRoom;
+using wl3::home::RoomLoader;
 
-PORT_EX(Func_298d, 0, 0) { HomeLoadRoom(gb).port_Func_298d(); }
-PORT_EX(LoadRoomTileMap, 0, 0) { HomeLoadRoom(gb).port_LoadRoomTileMap(); }
-PORT_EX(LoadRoomMainTiles, 0, 0) { HomeLoadRoom(gb).port_LoadRoomMainTiles(); }
-PORT_EX(LoadRoomSpecialTiles, 0, 0) { HomeLoadRoom(gb).port_LoadRoomSpecialTiles(); }
-PORT_EX(LoadRoomPalettes, 0, 0) { HomeLoadRoom(gb).port_LoadRoomPalettes(); }
-PORT_EX(UpdateRoomAnimatedPals, 0, 0) { HomeLoadRoom(gb).port_UpdateRoomAnimatedPals(); }
-PORT_EX(LoadBlockFunctionTable, HOOK_MANUAL_RET, 0) { HomeLoadRoom(gb).port_LoadBlockFunctionTable(); }
-PORT_EX(LoadRoom, HOOK_MANUAL_RET, 0) { HomeLoadRoom(gb).port_LoadRoom(); }
+PORT_EX(Func_298d, 0, ALL_REGISTERS) { RoomLoader(gb).load_block_tiles(); }
+PORT_EX(LoadRoomTileMap, 0, ALL_REGISTERS) { RoomLoader(gb).load_tile_map(); }
+PORT_EX(LoadRoomMainTiles, 0, ALL_REGISTERS) { RoomLoader(gb).load_main_tiles(); }
+PORT_EX(LoadRoomSpecialTiles, 0, ALL_REGISTERS) { RoomLoader(gb).load_special_tiles(); }
+PORT_EX(LoadRoomPalettes, 0, ALL_REGISTERS) { RoomLoader(gb).load_palettes(); }
+PORT_EX(UpdateRoomAnimatedPals, 0, ALL_REGISTERS) { RoomLoader(gb).update_animated_pals(); }
+PORT_EX(LoadBlockFunctionTable, HOOK_MANUAL_RET, ALL_REGISTERS) { RoomLoader(gb).load_block_function_table(); }
+PORT_EX(LoadRoom, HOOK_MANUAL_RET, ALL_REGISTERS) { RoomLoader(gb).load(); }

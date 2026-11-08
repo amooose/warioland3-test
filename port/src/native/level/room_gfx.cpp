@@ -3,8 +3,10 @@
 // tilemap, tiles and palettes, its animated tiles and palette cycle, and
 // the BG map address of a block or of Wario.
 //
-// The callers are C that may read registers after these, so each entry
-// point leaves the registers and flags the original does.
+// The room load (LoadRoomGfx and the animated tiles' and palettes' setup)
+// is called only by LoadRoom, which reads no registers after, so those
+// hooks clobber them all. The others leave the registers and flags the
+// original does.
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
@@ -40,13 +42,10 @@ private:
 	Routines routines_;
 };
 
-// table + 2 * index, as ld d, 0 / add a / ld e, a / rl d / add hl, de
-// leaves de
+// table + 2 * index (ld d, 0 / add a / ld e, a / rl d / add hl, de)
 uint16_t RoomGfx::table_entry(uint16_t table, uint8_t index)
 {
-	uint16_t offset = static_cast<uint16_t>(index * 2);
-	SET_DE(gb_, offset);
-	return static_cast<uint16_t>(table + offset);
+	return static_cast<uint16_t>(table + index * 2);
 }
 
 // loads the room's block function table, tilemap, main and special tiles
@@ -54,11 +53,7 @@ uint16_t RoomGfx::table_entry(uint16_t table, uint8_t index)
 void RoomGfx::load()
 {
 	uint16_t data = Word(gb_, table_entry(ADDR_RoomBlockAndGfxData, mem_[wRoom]));
-	uint8_t high = static_cast<uint8_t>(data >> 8);
-	gb_->cpu.a = high;
-	gb_->cpu.f = flags::cp(high, 0xff);
-	if (high == 0xff) { // debug_assert_not $ff
-		SET_HL(gb_, data);
+	if (data >> 8 == 0xff) { // debug_assert_not $ff
 		gb_->cpu.pc = ADDR_Init;
 		return;
 	}
@@ -68,34 +63,17 @@ void RoomGfx::load()
 	mem_[wRoomMainTiles] = mem_[data + 2];
 	mem_[wRoomSpecialTiles] = mem_[data + 3];
 	mem_[wRoomPalettes] = mem_[data + 4];
-	SET_HL(gb_, data + 4);
 
 	// the function table's bank: one per 6 tables
-	uint8_t quotient = function_table / 6;
-	uint8_t bank = static_cast<uint8_t>(LEVEL_DATA_1 + quotient);
-	mem_[wRoomBlockFunctionTableBank] = bank;
-	gb_->cpu.b = quotient;
-	gb_->cpu.a = bank;
-	gb_->cpu.f = flags::add(LEVEL_DATA_1, quotient);
+	mem_[wRoomBlockFunctionTableBank] = static_cast<uint8_t>(LEVEL_DATA_1 + function_table / 6);
 	routines_.call(ADDR_Func_298d);
 	routines_.call(ADDR_LoadBlockFunctionTable);
-	gb_->cpu.a = mem_[wRoomBlockFunctionTableBank];
-	mem_[wc0d0] = gb_->cpu.a;
+	mem_[wc0d0] = mem_[wRoomBlockFunctionTableBank];
 	routines_.call(ADDR_LoadRoomTileMap);
-
-	uint8_t main_tiles = mem_[wRoomMainTiles] >> 3;
-	gb_->cpu.a = static_cast<uint8_t>(main_tiles + ROOM_MAIN_TILES_1);
-	gb_->cpu.f = flags::add(main_tiles, ROOM_MAIN_TILES_1);
-	mem_[wRoomMainTilesBank] = gb_->cpu.a;
+	mem_[wRoomMainTilesBank] = static_cast<uint8_t>((mem_[wRoomMainTiles] >> 3) + ROOM_MAIN_TILES_1);
 	routines_.call(ADDR_LoadRoomMainTiles);
-
-	uint8_t special_tiles = mem_[wRoomSpecialTiles] >> 3;
-	gb_->cpu.a = static_cast<uint8_t>(special_tiles + ROOM_SPECIAL_TILES_1);
-	gb_->cpu.f = flags::add(special_tiles, ROOM_SPECIAL_TILES_1);
-	mem_[wRoomSpecialTilesBank] = gb_->cpu.a;
+	mem_[wRoomSpecialTilesBank] = static_cast<uint8_t>((mem_[wRoomSpecialTiles] >> 3) + ROOM_SPECIAL_TILES_1);
 	routines_.call(ADDR_LoadRoomSpecialTiles);
-
-	gb_->cpu.a = LEVEL_PALETTES;
 	mem_[wPaletteBank] = LEVEL_PALETTES;
 	routines_.call(ADDR_LoadRoomPalettes);
 	gb_->cpu.pc = gb_pop16(gb_); // ret
@@ -108,9 +86,6 @@ void RoomGfx::init_animated_tiles()
 	mem_[wAnimatedTilesGfx] = mem_[entry + 1];
 	mem_[wAnimatedTilesFrame] = 0;
 	mem_[wAnimatedTilesFrameCount] = 0;
-	SET_HL(gb_, entry + 1);
-	gb_->cpu.a = 0;
-	gb_->cpu.f = FLAG_Z;
 }
 
 void RoomGfx::init_animated_pals()
@@ -124,10 +99,6 @@ void RoomGfx::init_animated_pals()
 	mem_[wRoomPalCycleDuration] = duration;
 	mem_[wRoomPalCycleCounter] = duration >> 1;
 	mem_[wRoomPalCycleIndex] = 0;
-	SET_DE(gb_, ROOM_PALCYCLE_LENGTH);
-	SET_HL(gb_, cycle);
-	gb_->cpu.a = 0;
-	gb_->cpu.f = FLAG_Z;
 }
 
 // wait_not_hblank / wait_hblank, letting emulated time pass as the asm's
@@ -236,14 +207,14 @@ void RoomGfx::wario_bg_ptr()
 
 using wl3::level::RoomGfx;
 
-// LoadRoomPalettes's registers (or a jump to Init for a room without data)
-PORT_EX(LoadRoomGfx, HOOK_MANUAL_RET, 0) { RoomGfx(gb).load(); }
+// (or a jump to Init for a room without data)
+PORT_EX(LoadRoomGfx, HOOK_MANUAL_RET, ALL_REGISTERS) { RoomGfx(gb).load(); }
 
 // de = 2 * the group, hl at its gfx byte; a = 0, f = Z
-PORT(InitRoomAnimatedTiles) { RoomGfx(gb).init_animated_tiles(); }
+PORT_EX(InitRoomAnimatedTiles, 0, ALL_REGISTERS) { RoomGfx(gb).init_animated_tiles(); }
 
 // de = ROOM_PALCYCLE_LENGTH, hl = the cycle's duration; a = 0, f = Z
-PORT(InitRoomAnimatedPals) { RoomGfx(gb).init_animated_pals(); }
+PORT_EX(InitRoomAnimatedPals, 0, ALL_REGISTERS) { RoomGfx(gb).init_animated_pals(); }
 
 PORT(UpdateRoomAnimatedTiles) { RoomGfx(gb).update_animated_tiles(); }
 PORT(GetBlockBGPtr) { RoomGfx(gb).block_bg_ptr(); }
