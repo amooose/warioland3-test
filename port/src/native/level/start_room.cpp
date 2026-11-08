@@ -569,20 +569,13 @@ void RoomStart::call_in_sram1(uint16_t addr, uint16_t ret)
 // a room from a transition (or the golf minigame)
 void RoomStart::from_transition()
 {
-	cpu_.a = mem_[wRoomTransitionParam] & ROOMTRANSITION_MASK;
-	cpu_.f = flags::cp(cpu_.a, ROOMTRANSITION_GOLF);
-	if (zf()) { // the golf minigame
+	if ((mem_[wRoomTransitionParam] & ROOMTRANSITION_MASK) == ROOMTRANSITION_GOLF) { // the golf minigame
 		push_wram(0x03);
-		cpu_.a = mem_[wAnimatedTilesFrameDuration];
-		mem_[wTempAnimatedTilesFrameDuration] = cpu_.a;
-		cpu_.a = mem_[wAnimatedTilesGfx];
-		mem_[wTempAnimatedTilesGroup] = cpu_.a;
+		mem_[wTempAnimatedTilesFrameDuration] = mem_[wAnimatedTilesFrameDuration];
+		mem_[wTempAnimatedTilesGroup] = mem_[wAnimatedTilesGfx];
 		pop_wram();
-		cpu_.a = mem_[wSubState];
-		mem_[wPendingSubState] = cpu_.a;
-		SET_HL(gb_, wState);
+		mem_[wPendingSubState] = mem_[wSubState];
 		mem_[wState] = ST_GOLF;
-		xor_a();
 		mem_[wSubState] = 0;
 		return;
 	}
@@ -594,27 +587,15 @@ void RoomStart::from_transition()
 	routines_.farcall_ret(BANK_InitObjectVars_FromTransition, ADDR_InitObjectVars_FromTransition, SRT(0x57));
 	pop_wram();
 
-	cpu_.a = 0x00;
 	sram_switch(0x00);
-	cpu_.a = mem_[wRoomTransitionParam] & ROOMTRANSITION_MASK;
-	cpu_.f = flags::cp(cpu_.a, ROOMTRANSITION_TELEPORT);
-	if (zf()) {
-		st(wWarioYPos + 0, 0x01);
-		xor_a();
+	if ((mem_[wRoomTransitionParam] & ROOMTRANSITION_MASK) == ROOMTRANSITION_TELEPORT) {
+		mem_[wWarioYPos + 0] = 0x01;
 		mem_[wWarioXPos + 0] = 0;
 	}
 	// .not_teleport: up a block
-	uint8_t y_lo = mem_[wWarioYPos + 1];
-	cpu_.f = flags::sub(y_lo, 0x10);
-	mem_[wWarioYPos + 1] = static_cast<uint8_t>(y_lo - 0x10);
-	bool borrow = y_lo < 0x10;
+	set_be(wWarioYPos, static_cast<uint16_t>(be(wWarioYPos) - 0x10));
 	uint8_t y_hi = mem_[wWarioYPos + 0];
-	cpu_.a = static_cast<uint8_t>(y_hi - borrow);
-	mem_[wWarioYPos + 0] = cpu_.a;
-	cpu_.b = static_cast<uint8_t>(cpu_.a << 4 | cpu_.a >> 4); // swap b
-	cpu_.a = mem_[wWarioXPos + 0] | cpu_.b;
-	cpu_.f = flags::or_(cpu_.a);
-	mem_[wUnused_ca6c] = cpu_.a;
+	mem_[wUnused_ca6c] = static_cast<uint8_t>(mem_[wWarioXPos + 0] | (y_hi << 4 | y_hi >> 4));
 
 	// the next room's ID from Wario's position
 	SET_HL(gb_, wWarioPos);
@@ -622,8 +603,7 @@ void RoomStart::from_transition()
 
 	clear({wFloorTransitionDir, wFloorTransitionTimer, wCameraYDelta, wCameraXDelta, wScrollUpEdge,
 		wScrollDownEdge, wGroundShakeCounter, wSCYShake});
-	cpu_.a = mem_[wLevelRoomID];
-	mem_[wTempLevelRoomID] = cpu_.a;
+	mem_[wTempLevelRoomID] = mem_[wLevelRoomID];
 
 	push_wram(GFX_RAM);
 	routines_.call_ret(ADDR_LoadRoom, SRT(0xbd));
@@ -636,12 +616,9 @@ void RoomStart::from_transition()
 	routines_.call_ret(ADDR_SetInitialCameraScroll, SRT(0xcf));
 	routines_.call_ret(ADDR_ApplyInitialCameraScroll, SRT(0xd2));
 
-	cpu_.a = mem_[wRoomTransitionParam];
-	cpu_.f = flags::bit(cpu_.f, cpu_.a, ROOMTRANSITIONF_RELOAD_OBJECTS_F);
-	if (cpu_.a & (1 << ROOMTRANSITIONF_RELOAD_OBJECTS_F))
+	if (mem_[wRoomTransitionParam] & (1 << ROOMTRANSITIONF_RELOAD_OBJECTS_F))
 		routines_.call_ret(ADDR_ReloadLevelObjects, SRT(0xdc));
 	// .no_object_reloading
-	xor_a();
 	mem_[wRoomTransitionParam] = 0;
 
 	routines_.call_ret(ADDR_UpdateSwitchableBlocks, SRT(0xe3));
@@ -649,20 +626,17 @@ void RoomStart::from_transition()
 	call_in_sram1(ADDR_Func_896f, SRT(0x108));
 	routines_.call_ret(ADDR_SetWarioScreenPos, SRT(0x112));
 
-	ld_cp(wWarioState, WST_ENTERING_DOOR);
-	if (zf()) {
-		xor_a();
+	if (mem_[wWarioState] == WST_ENTERING_DOOR) {
 		mem_[wFrameDuration] = 0;
 		mem_[wAnimationFrame] = 0;
 		mem_[wWarioFramesetPtr + 0] = ADDR_Frameset_14d18 >> 8;
-		st(wWarioFramesetPtr + 1, static_cast<uint8_t>(ADDR_Frameset_14d18));
+		mem_[wWarioFramesetPtr + 1] = static_cast<uint8_t>(ADDR_Frameset_14d18);
 		routines_.farcall_ret(OAM1, ADDR_UpdateWarioAnimation, SRT(0x139));
 	}
 
 	// .not_entering_door
 	routines_.call_ret(ADDR_UpdateLevelMusic, SRT(0x13c));
-	xor_a(); // FALSE
-	mem_[wBlockFuncWarioFlag] = 0;
+	mem_[wBlockFuncWarioFlag] = FALSE;
 	mem_[wIsFloorTransition] = 0;
 	push_wram(BANK_wObjects);
 	routines_.farcall_ret(BANK_UpdateObjects, ADDR_UpdateObjects, SRT(0x159));
@@ -675,17 +649,15 @@ void RoomStart::from_transition()
 	push_wram(BANK_wObjects);
 	routines_.farcall_ret(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, SRT(0x19d));
 	pop_wram();
-	xor_a();
 	mem_[wIsIntangible] = 0;
-	st(wSubState, 0x02);
-	st(rLCDC, LCDC_DEFAULT);
+	mem_[wSubState] = 0x02;
+	mem_[rLCDC] = LCDC_DEFAULT;
 }
 
 // the level's first room (or the saved level's)
 void RoomStart::from_level_start()
 {
-	xor_a(); // FALSE
-	mem_[wIsBossBattle] = 0;
+	mem_[wIsBossBattle] = FALSE;
 
 	if (!from_saved_level()) {
 		clear({wLevelRoomID, wUnused_ca6c, wTempLevelRoomID});
@@ -695,12 +667,12 @@ void RoomStart::from_level_start()
 			wLevelTime + 0, wLevelTime + 1, wLevelTime + 2, wBossState, wSwimVelIndex,
 			wWaterSurfaceFloatingCounter});
 		routines_.call_ret(ADDR_ClearTransformationValues, SRL(0x59));
-		// with a as ClearTransformationValues leaves it (0)
+		// the 0 ClearTransformationValues leaves in a
 		for (uint16_t addr : {wInvisibleFrame, wCameraRoomYScrollLimit, wIsOnSteppableObject, wGroundShakeCounter,
 			     wSCYShake, wSwimmingDirectionInput, wAnimatedTilesFrameDuration, wRoomPalCycleDuration,
 			     wRoomAnimatedTilesEnabled, wRoomAnimatedPalsEnabled, wWaterCurrent, wLastWaterCurrent,
 			     wCurWaterCurrent})
-			mem_[addr] = cpu_.a;
+			mem_[addr] = 0;
 
 		// the level's variables and its objects'
 		push_wram(BANK_wObjects);
@@ -708,8 +680,7 @@ void RoomStart::from_level_start()
 		pop_wram();
 	} else {
 		// .skip_init_vars_and_objects
-		cpu_.a = mem_[wTempLevelRoomID];
-		mem_[wLevelRoomID] = cpu_.a;
+		mem_[wLevelRoomID] = mem_[wTempLevelRoomID];
 		routines_.call_ret(ADDR_LoadWarioGfx, SRL(0xa4));
 	}
 
@@ -721,20 +692,17 @@ void RoomStart::from_level_start()
 
 	if (!from_saved_level()) {
 		routines_.call_ret(ADDR_SetWarioPositionToSpawn, SRL(0xbe));
-		st(wDirection, DIRECTION_RIGHT);
+		mem_[wDirection] = DIRECTION_RIGHT;
 		routines_.farcall_ret(BANK_SetState_Idling, ADDR_SetState_Idling, SRL(0xd2));
+		set_be(wWarioPalsPtr, ADDR_WarioDefaultPal);
+		// CopyHLToDE_Short takes hl, de and b
 		SET_HL(gb_, ADDR_WarioDefaultPal);
-		mem_[wWarioPalsPtr + 0] = cpu_.h;
-		cpu_.a = cpu_.l;
-		mem_[wWarioPalsPtr + 1] = cpu_.l;
 		SET_DE(gb_, wTempPals2);
 		cpu_.b = 2 * PAL_SIZE; // 2 palettes
 		routines_.farcall_ret(BANK_WarioDefaultPal, ADDR_CopyHLToDE_Short, SRL(0xf1));
 	} else {
 		// .asm_883a
-		cpu_.h = mem_[wWarioPalsPtr + 0];
-		cpu_.a = mem_[wWarioPalsPtr + 1];
-		cpu_.l = cpu_.a;
+		SET_HL(gb_, be(wWarioPalsPtr));
 		SET_DE(gb_, wTempPals2);
 		cpu_.b = 2 * PAL_SIZE; // 2 palettes
 		routines_.farcall_ret(BANK_WarioDefaultPal, ADDR_CopyHLToDE_Short, SRL(0x10f));
@@ -760,25 +728,21 @@ void RoomStart::from_level_start()
 		call_in_sram1(ADDR_Func_896f, SRL(0x169));
 
 	// .asm_88b7
-	ld_cp(wLevel, THE_TEMPLE);
-	if (zf()) {
-		xor_a();
-		cpu_.a = mem_[wCameraSCY + 1];
+	if (mem_[wLevel] == THE_TEMPLE) {
+		uint8_t scy = mem_[wCameraSCY + 1];
 		for (uint16_t addr : std::initializer_list<uint16_t>{wc08a, wHiddenFigureSCYShake, wSCY, rSCY})
-			mem_[addr] = cpu_.a;
-		cpu_.a = mem_[wCameraSCX + 1];
+			mem_[addr] = scy;
+		uint8_t scx = mem_[wCameraSCX + 1];
 		for (uint16_t addr : std::initializer_list<uint16_t>{wc08c, wc08b, wSCX, rSCX})
-			mem_[addr] = cpu_.a;
+			mem_[addr] = scx;
 	}
 
 	// .not_the_temple
 	routines_.call_ret(ADDR_SetWarioScreenPos, SRL(0x197));
-	xor_a(); // FALSE
-	mem_[wBlockFuncWarioFlag] = 0;
+	mem_[wBlockFuncWarioFlag] = FALSE;
 
 	if (!from_saved_level()) {
-		xor_a(); // FALSE
-		mem_[wIsFloorTransition] = 0;
+		mem_[wIsFloorTransition] = FALSE;
 		push_wram(BANK_wObjects);
 		// the objects updated twice
 		routines_.farcall_ret(BANK_UpdateObjects, ADDR_UpdateObjects, SRL(0x1bc));
@@ -786,15 +750,14 @@ void RoomStart::from_level_start()
 		pop_wram();
 	} else {
 		// .asm_8917
-		st(wIsFloorTransition, TRUE);
+		mem_[wIsFloorTransition] = TRUE;
 		push_wram(BANK_wObjects);
 		routines_.farcall_ret(BANK_UpdateObjects, ADDR_UpdateObjects, SRL(0x1eb));
 		pop_wram();
 	}
 
 	// .draw_objs
-	xor_a(); // FALSE
-	mem_[wIsFloorTransition] = 0;
+	mem_[wIsFloorTransition] = FALSE;
 	push_wram(BANK_wObjects);
 	routines_.farcall_ret(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority, SRL(0x208));
 	pop_wram();
