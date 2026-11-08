@@ -53,8 +53,7 @@ void Tadpole::spawner_wait()
 	if (below >= 0x50 || below < 0x28)
 		return;
 	set_update(SPAWNER_DONE);
-	SET_BC(gb_, ADDR_ObjParams_Tadpole);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(ADDR_ObjParams_Tadpole);
 }
 
 void Tadpole::spawner_done()
@@ -126,8 +125,7 @@ void Tadpole::leaping()
 	if (!var1()) {
 		if (state_duration()) {
 			--state_duration();
-			SET_BC(gb_, ADDR_Data_60a20);
-			routines_.call(ADDR_ApplyObjYMovement);
+			apply_y_movement(ADDR_Data_60a20);
 			routines_.call(ADDR_MoveObjectLeft_Fast);
 			return;
 		}
@@ -142,8 +140,7 @@ void Tadpole::leaping()
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
 	hpos_block_unk1();
 	if (!mem_[wIsInWaterOrSand]) {
-		SET_BC(gb_, ADDR_Data_60a40);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60a40);
 		routines_.call(ADDR_MoveObjectLeft_Fast);
 		return;
 	}

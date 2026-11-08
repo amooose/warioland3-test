@@ -394,8 +394,7 @@ void Shoot::run(uint16_t handler)
 		return;
 	case JUMPING_UP:
 		if (--state_duration()) {
-			SET_BC(gb_, ADDR_Data_603d0);
-			routines_.call(ADDR_ApplyObjYMovement);
+			apply_y_movement(ADDR_Data_603d0);
 			move_left_or_right();
 			return;
 		}
@@ -403,8 +402,7 @@ void Shoot::run(uint16_t handler)
 		var3() = 0;
 		return;
 	case JUMPING_DOWN: {
-		SET_BC(gb_, ADDR_Data_603e0);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_603e0);
 		move_left_or_right();
 		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
@@ -667,8 +665,7 @@ void Shoot::ball_56b47()
 	}
 	if (wobble && !(mem_[wGlobalCounter] & 0x0f))
 		play_sfx(SFX_06A);
-	SET_BC(gb_, ADDR_Data_60e40);
-	routines_.call(ADDR_ApplyObjYMovement_Loop);
+	apply_y_movement_loop(ADDR_Data_60e40);
 }
 
 void Shoot::ball_56bc0(uint8_t s)
@@ -811,8 +808,7 @@ void Shoot::run_ball(uint16_t handler)
 			set_frameset(ADDR_Frameset_69f5d);
 		}
 		ball_move();
-		SET_BC(gb_, var2() == 0x04 ? ADDR_Data_60e70 : ADDR_Data_60e20);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(var2() == 0x04 ? ADDR_Data_60e70 : ADDR_Data_60e20);
 		if (mem_[wCurObjYPos + 0] < 240)
 			return;
 		mem_[wCurObjYPos + 0] = 240;
@@ -858,8 +854,7 @@ void Shoot::run_ball(uint16_t handler)
 	case DEFEAT_RISE:
 		no_actions();
 		if (--state_duration()) {
-			SET_BC(gb_, ADDR_Data_60e90);
-			routines_.call(ADDR_ApplyObjYMovement);
+			apply_y_movement(ADDR_Data_60e90);
 			return;
 		}
 		var3() = 0;
@@ -870,8 +865,7 @@ void Shoot::run_ball(uint16_t handler)
 	case DEFEAT_SUSPEND:
 		no_actions();
 		if (!state_duration()) { // falls
-			SET_BC(gb_, ADDR_Data_60ea0);
-			routines_.call(ADDR_ApplyObjYMovement);
+			apply_y_movement(ADDR_Data_60ea0);
 			return;
 		}
 		if (--state_duration())

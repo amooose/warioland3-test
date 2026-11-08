@@ -68,8 +68,7 @@ void Chest::opening()
 	default: params = ADDR_ObjParams_BlueTreasure; break;
 	}
 	play_music2(mem_, MUSIC_TREASURE_FANFARE);
-	SET_BC(gb_, params);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(params);
 }
 
 // held still; its frameset once its time's up (if it has one)

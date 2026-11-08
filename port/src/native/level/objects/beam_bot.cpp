@@ -255,8 +255,7 @@ void BeamBot::run(uint16_t handler)
 		}
 		if (state_duration() != 0x19)
 			return;
-		SET_BC(gb_, facing(ADDR_ObjParams_BeamLeft, ADDR_ObjParams_BeamRight));
-		routines_.call(ADDR_CreateObjectAtRelativePos);
+		create_object_at_offset(facing(ADDR_ObjParams_BeamLeft, ADDR_ObjParams_BeamRight));
 		return;
 	case FIRED:
 		if (shaken())
@@ -429,8 +428,7 @@ void BeamBot::beam_move(uint16_t movement)
 		state() = 0;
 		play_sfx(SFX_07D);
 	}
-	SET_BC(gb_, movement);
-	routines_.call(ADDR_ApplyObjXMovement);
+	apply_x_movement(movement);
 }
 
 } // namespace wl3::level

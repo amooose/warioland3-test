@@ -133,8 +133,7 @@ void Torch::burning()
 	state_duration() = next;
 	if (flags() & OBJFLAG_ON_SCREEN)
 		play_sfx(SFX_073);
-	SET_BC(gb_, params);
-	routines_.call(ADDR_CreateObjectFromCurObjPos);
+	create_object_here(params);
 }
 
 void Torch::ember_towards_wario()
@@ -144,16 +143,14 @@ void Torch::ember_towards_wario()
 		move_right();
 	else
 		routines_.call(ADDR_MoveObjectLeft_Slow);
-	SET_BC(gb_, ADDR_Data_60320);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60320);
 	ember();
 }
 
 // arcs down until it lands (or is hit), then fizzles out
 void Torch::ember()
 {
-	SET_BC(gb_, ADDR_Data_60320);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60320);
 	flags() |= OBJFLAG_NO_COLLISION;
 	if (!state()) {
 		mem_[hYPosLo] = mem_[wCurObjYPos + 0];

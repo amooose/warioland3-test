@@ -162,8 +162,7 @@ void Futamogu::fall()
 	if (facing_right())
 		return;
 	bool super_jump_slam = mem_[wEffectivePowerUp] >= SUPER_JUMP_SLAM_OVERALLS;
-	SET_BC(gb_, super_jump_slam ? ADDR_Data_60490 : ADDR_Data_603f0);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(super_jump_slam ? ADDR_Data_60490 : ADDR_Data_603f0);
 	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];

@@ -53,8 +53,7 @@ void FallingSnow::spawner_wait()
 	state_duration() = 0x56;
 	var1() = 0;
 	set_update(SPAWNER_DROPPED);
-	SET_BC(gb_, ADDR_ObjParams_FallingSnow);
-	routines_.call(ADDR_CreateObjectFromCurObjPos);
+	create_object_here(ADDR_ObjParams_FallingSnow);
 }
 
 // a flurry above, randomly to the left
@@ -125,8 +124,7 @@ bool FallingSnow::landed()
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
 	if (!hpos_block_unk1()) {
-		SET_BC(gb_, ADDR_Data_603e0);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_603e0);
 		return false;
 	}
 	mem_[wCurObjYPos + 0] = mem_[hYPosLo];

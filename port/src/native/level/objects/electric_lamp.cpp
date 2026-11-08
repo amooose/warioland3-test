@@ -56,8 +56,7 @@ void ElectricLamp::charging()
 	set_frameset(ADDR_Frameset_68cc4);
 	set_update(DISCHARGED);
 	play_sfx(SFX_06B);
-	SET_BC(gb_, ADDR_ObjParams_ElectricLampSpark);
-	routines_.call(ADDR_CreateObjectFromCurObjPos);
+	create_object_here(ADDR_ObjParams_ElectricLampSpark);
 }
 
 void ElectricLamp::pos_to_hram()
@@ -72,8 +71,7 @@ void ElectricLamp::pos_to_hram()
 void ElectricLamp::spark()
 {
 	flags() |= OBJFLAG_NO_COLLISION;
-	SET_BC(gb_, ADDR_Data_60040);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60040);
 	pos_to_hram();
 	if (!hpos_block_unk1())
 		return;

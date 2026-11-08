@@ -122,10 +122,8 @@ void Scowler::begin()
 	mem_[wBossState] = BOSS_REGULAR;
 	routines_.call(ADDR_UpdateLevelMusic);
 	set_update(WALKING);
-	SET_BC(gb_, ADDR_ObjParams_ScrowlerTentacleRight);
-	routines_.call(ADDR_CreateObjectFromCurObjPos);
-	SET_BC(gb_, ADDR_ObjParams_ScrowlerTentacleLeft);
-	routines_.call(ADDR_CreateObjectFromCurObjPos);
+	create_object_here(ADDR_ObjParams_ScrowlerTentacleRight);
+	create_object_here(ADDR_ObjParams_ScrowlerTentacleLeft);
 }
 
 // the room left: Wario held where it is
@@ -254,8 +252,7 @@ void Scowler::walking()
 		if (state_duration() != 0x20)
 			return;
 		play_sfx(SFX_07E);
-		SET_BC(gb_, facing_right() ? ADDR_ObjParams_InkRight : ADDR_ObjParams_InkLeft);
-		routines_.call(ADDR_CreateObjectAtRelativePos);
+		create_object_at_offset(facing_right() ? ADDR_ObjParams_InkRight : ADDR_ObjParams_InkLeft);
 		return;
 	}
 	if ((s & 0xfe) != 0x08)
@@ -274,8 +271,7 @@ void Scowler::sinking()
 	flashes();
 	hpos(0x05);
 	if (!hpos_block_unk1()) {
-		SET_BC(gb_, ADDR_Data_60a60);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60a60);
 	}
 	if (--state_duration())
 		return;
@@ -371,8 +367,7 @@ void Scowler::hurt_sinking()
 	hpos_block_unk3();
 	if (!mem_[wIsInWaterOrSand])
 		return;
-	SET_BC(gb_, ADDR_Data_60a70);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60a70);
 }
 
 void Scowler::rising()
@@ -392,8 +387,7 @@ void Scowler::defeated_rising()
 	hpos(-0x18);
 	hpos_block_unk3();
 	if (mem_[wIsInWaterOrSand]) {
-		SET_BC(gb_, ADDR_Data_60a70);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60a70);
 		return;
 	}
 	state_duration() = 0x0f;
@@ -408,8 +402,7 @@ void Scowler::defeated_sinking()
 	no_actions();
 	flashes();
 	routines_.call(ADDR_MoveObjectDown_Slow);
-	SET_BC(gb_, ADDR_Data_60a80);
-	routines_.call(ADDR_ApplyObjXMovement);
+	apply_x_movement(ADDR_Data_60a80);
 	if (--state_duration())
 		return;
 	state_duration() = 0xb4;
@@ -435,8 +428,7 @@ void Scowler::defeated_gone()
 		}
 	}
 	routines_.call(ADDR_MoveObjectDown_Slow);
-	SET_BC(gb_, ADDR_Data_60a90);
-	routines_.call(ADDR_ApplyObjXMovement_Loop);
+	apply_x_movement_loop(ADDR_Data_60a90);
 }
 
 // the palettes' flashes after a hit, timed by w1d147 (paused while

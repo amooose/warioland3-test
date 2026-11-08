@@ -160,8 +160,7 @@ void Bird::hit(uint16_t stars)
 		return;
 	}
 	set_update(STUNNED);
-	SET_BC(gb_, stars);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(stars);
 }
 
 void Bird::knocked(uint16_t routine)

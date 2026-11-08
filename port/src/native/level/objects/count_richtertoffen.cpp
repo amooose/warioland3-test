@@ -325,8 +325,7 @@ void Count::run(uint16_t handler)
 			jump_top();
 			return;
 		}
-		SET_BC(gb_, ADDR_Data_603d0);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_603d0);
 		hop_along();
 		return;
 	case JUMP_FALL: // lands with a ground shake (lost in water)
@@ -342,16 +341,14 @@ void Count::run(uint16_t handler)
 			set_frameset(ADDR_Frameset_683d4);
 			state_duration() = 24;
 			play_sfx(SFX_075);
-			gb_->cpu.b = 24;
-			routines_.call(ADDR_DoGroundShake);
+			ground_shake(24);
 			return;
 		}
 		if (mem_[wIsInWaterOrSand]) {
 			routines_.call(ADDR_VanishObject2);
 			return;
 		}
-		SET_BC(gb_, ADDR_Data_603e0);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_603e0);
 		hop_along();
 		return;
 	case FALL_BOUNCE:
@@ -362,8 +359,7 @@ void Count::run(uint16_t handler)
 		}
 		if (var3() == 14)
 			set_frameset(ADDR_Frameset_683e1);
-		SET_BC(gb_, ADDR_Data_604b0);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_604b0);
 		return;
 	case STUN_LEFT_START:
 		state() = OBJSTATE_STUN_LEFT;

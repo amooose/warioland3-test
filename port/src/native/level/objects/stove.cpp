@@ -77,8 +77,7 @@ void Stove::set_fall()
 // shaking the ground on landing, unless it's just been placed
 void Stove::fall()
 {
-	SET_BC(gb_, ADDR_Data_605e0);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_605e0);
 	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
@@ -91,8 +90,7 @@ void Stove::fall()
 	if (!var1())
 		return;
 	play_sfx(SFX_063);
-	gb_->cpu.b = 24;
-	routines_.call(ADDR_DoGroundShake);
+	ground_shake(24);
 }
 
 void Stove::set_land()

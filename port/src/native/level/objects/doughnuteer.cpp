@@ -189,8 +189,7 @@ void Doughnuteer::bump_start(uint8_t s, uint16_t params)
 {
 	uint8_t f = frame();
 	if (f >= 0x24 || f < 0x06) {
-		SET_BC(gb_, params);
-		routines_.call(ADDR_CreateObjectAtRelativePos);
+		create_object_at_offset(params);
 	}
 	state() = s;
 	set_frameset(facing(ADDR_Frameset_685a8, ADDR_Frameset_685ad));
@@ -274,8 +273,7 @@ void Doughnuteer::run(uint16_t handler)
 			--state_duration();
 			if (flags() & (1 << OBJFLAG_ON_SCREEN_F))
 				play_sfx(SFX_067);
-			SET_BC(gb_, facing_right() ? ADDR_ObjParams_DoughnutRight : ADDR_ObjParams_DoughnutLeft);
-			routines_.call(ADDR_CreateObjectAtRelativePos);
+			create_object_at_offset(facing_right() ? ADDR_ObjParams_DoughnutRight : ADDR_ObjParams_DoughnutLeft);
 			return;
 		}
 		if (--state_duration()) {
@@ -526,16 +524,14 @@ void Doughnut::moving(uint16_t movement)
 		aim();
 		return;
 	}
-	SET_BC(gb_, movement);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(movement);
 }
 
 void Doughnut::at_wario(uint16_t move)
 {
 	routines_.call(move);
 	no_actions();
-	SET_BC(gb_, ADDR_Data_60040);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60040);
 }
 
 } // namespace wl3::level

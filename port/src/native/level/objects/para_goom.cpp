@@ -432,8 +432,7 @@ void ParaGoom::run(uint16_t handler)
 			mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 			mem_[hXPosHi] = mem_[wCurObjXPos + 1];
 			if (!(hpos_block_unk3() & 0x0f)) {
-				SET_BC(gb_, ADDR_Data_60530);
-				routines_.call(ADDR_ApplyObjYMovement);
+				apply_y_movement(ADDR_Data_60530);
 				return;
 			}
 		}

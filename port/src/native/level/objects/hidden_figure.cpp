@@ -179,12 +179,9 @@ void HiddenFigure::start()
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	set_frameset(ADDR_Frameset_6a06c);
 	state_duration() = 20;
-	SET_BC(gb_, ADDR_ObjParams_HiddenFigureFace);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
-	SET_BC(gb_, ADDR_ObjParams_HiddenFigureLeftHand);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
-	SET_BC(gb_, ADDR_ObjParams_HiddenFigureRightHand);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(ADDR_ObjParams_HiddenFigureFace);
+	create_object_at_offset(ADDR_ObjParams_HiddenFigureLeftHand);
+	create_object_at_offset(ADDR_ObjParams_HiddenFigureRightHand);
 }
 
 void HiddenFigure::wait_start()
@@ -650,8 +647,7 @@ void HiddenFigure::hand_sting(bool right)
 		move_y(ADDR_Data_4c540);
 		if (var3() == 0x0a) {
 			play_sfx(SFX_063);
-			gb_->cpu.b = 0x18;
-			routines_.call(ADDR_DoGroundShake);
+			ground_shake(0x18);
 			return;
 		}
 		if (var3() != 0x3f)

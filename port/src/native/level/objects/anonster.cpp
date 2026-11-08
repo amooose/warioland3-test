@@ -215,8 +215,7 @@ void Anonster::walk_frameset()
 
 void Anonster::walk_ceiling()
 {
-	SET_BC(gb_, ADDR_Data_60790);
-	routines_.call(ADDR_ApplyObjYMovement_Loop);
+	apply_y_movement_loop(ADDR_Data_60790);
 }
 
 // a wall ahead (Func_3513) at the given x offsets
@@ -321,8 +320,7 @@ void Anonster::drop_silk(uint16_t left, uint16_t right, uint8_t last, uint16_t n
 	if (state_duration() != 0x18)
 		return;
 	play_sfx(SFX_07E);
-	SET_BC(gb_, facing(left, right));
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(facing(left, right));
 }
 
 void Anonster::climb_start()
@@ -390,8 +388,7 @@ void Anonster::drop()
 		landed = hpos_block_unk1();
 	}
 	if (!landed) {
-		SET_BC(gb_, ADDR_Data_607f0);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_607f0);
 		return;
 	}
 	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
@@ -408,8 +405,7 @@ void Anonster::land()
 	uint8_t d = --state_duration();
 	if (d == 0x18) {
 		play_sfx(SFX_061);
-		gb_->cpu.b = 0x18;
-		routines_.call(ADDR_DoGroundShake);
+		ground_shake(0x18);
 		return;
 	}
 	if (d)
@@ -547,8 +543,7 @@ void Anonster::ground()
 		if (state_duration() != 0x2b)
 			return;
 		play_sfx(SFX_07E);
-		SET_BC(gb_, facing(ADDR_ObjParams_AnonsterWaveLeft, ADDR_ObjParams_AnonsterWaveRight));
-		routines_.call(ADDR_CreateObjectAtRelativePos);
+		create_object_at_offset(facing(ADDR_ObjParams_AnonsterWaveLeft, ADDR_ObjParams_AnonsterWaveRight));
 		return;
 	case 0x5c:
 		if (mem_[wTransformation] == TRANSFORMATION_BALL_O_STRING_WARIO) {
@@ -616,8 +611,7 @@ void Anonster::climb_back()
 {
 	no_actions();
 	if (screen_y() >= 0x10) {
-		SET_BC(gb_, ADDR_Data_607e0);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_607e0);
 		return;
 	}
 	if (mem_[wTransformation] != TRANSFORMATION_BALL_O_STRING_WARIO)
@@ -648,8 +642,7 @@ void Anonster::tangled2()
 void Anonster::fall_away()
 {
 	no_actions();
-	SET_BC(gb_, ADDR_Data_60180);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60180);
 	if (!facing_right())
 		move_right();
 	else
@@ -716,8 +709,7 @@ void AnonsterHelper::create_platform(uint16_t params, uint16_t next)
 		return;
 	state_duration() = 0x32;
 	set_update(next);
-	SET_BC(gb_, params);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(params);
 }
 
 void AnonsterHelper::platforms_wait()
@@ -795,8 +787,7 @@ void AnonsterHelper::drift()
 	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	bool right = facing_right();
-	SET_BC(gb_, right ? ADDR_Data_60800 : ADDR_Data_60830);
-	routines_.call(ADDR_ApplyObjXMovement_Loop);
+	apply_x_movement_loop(right ? ADDR_Data_60800 : ADDR_Data_60830);
 	// the x position through the page in h
 	uint16_t at = static_cast<uint16_t>(gb_->cpu.h << 8 | OBJ_X_POS);
 	uint16_t x_pos = static_cast<uint16_t>(mem_[at] | mem_[at + 1] << 8);

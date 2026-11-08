@@ -210,8 +210,7 @@ bool Webber::landed()
 void Webber::shaking()
 {
 	if (var3() != 15) {
-		SET_BC(gb_, ADDR_Data_604a0);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_604a0);
 		if (!landed())
 			return;
 		mem_[wCurObjYPos + 0] = mem_[hYPosLo];
@@ -266,8 +265,7 @@ void Webber::smashed()
 	if (facing_right())
 		return;
 	bool super_jump_slam = mem_[wEffectivePowerUp] >= SUPER_JUMP_SLAM_OVERALLS;
-	SET_BC(gb_, super_jump_slam ? ADDR_Data_60490 : ADDR_Data_603f0);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(super_jump_slam ? ADDR_Data_60490 : ADDR_Data_603f0);
 	if (!landed())
 		return;
 	if (super_jump_slam) {
@@ -289,8 +287,7 @@ void Webber::firing()
 	}
 	if (state_duration() != 40)
 		return;
-	SET_BC(gb_, ADDR_ObjParams_WebberProjectile);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(ADDR_ObjParams_WebberProjectile);
 }
 
 void Webber::climbing()

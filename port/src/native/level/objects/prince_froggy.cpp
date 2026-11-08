@@ -194,8 +194,7 @@ void PrinceFroggy::sit(uint16_t state_addr)
 void PrinceFroggy::vanishing()
 {
 	no_actions();
-	SET_BC(gb_, ADDR_Data_60040);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60040);
 	if (--state_duration())
 		return;
 	var2() = 0x08;

@@ -119,8 +119,7 @@ void Wolfenboss::whisp_waiting()
 	if (!(flags() & (1 << OBJFLAG_ON_SCREEN_F)))
 		return;
 	if (--state_duration()) {
-		SET_BC(gb_, ADDR_Data_60650);
-		routines_.call(ADDR_ApplyObjXMovement_Loop);
+		apply_x_movement_loop(ADDR_Data_60650);
 		return;
 	}
 	set_update(WHISP_RISING);
@@ -258,8 +257,7 @@ void Wolfenboss::do_movement()
 {
 	if (!(mem_[wGlobalCounter] & 0x1f))
 		play_sfx(SFX_0C3);
-	SET_BC(gb_, ADDR_Data_604c0);
-	routines_.call(ADDR_ApplyObjYMovement_Loop);
+	apply_y_movement_loop(ADDR_Data_604c0);
 	bool right = facing_right();
 	if (!mem_[wGlobalCounter]) {
 		bool passed = right ? mem_[wWarioScreenXPos] >= screen_x() : screen_x() >= mem_[wWarioScreenXPos];
@@ -329,8 +327,7 @@ void Wolfenboss::main()
 			if (facing_right())
 				SET_BC(gb_, igaguri ? ADDR_ObjParams_IgaguriRight : ADDR_ObjParams_MagicSpiralRight);
 			else
-				SET_BC(gb_, igaguri ? ADDR_ObjParams_IgaguriLeft : ADDR_ObjParams_MagicSpiralLeft);
-			routines_.call(ADDR_CreateObjectAtRelativePos);
+				create_object_at_offset(igaguri ? ADDR_ObjParams_IgaguriLeft : ADDR_ObjParams_MagicSpiralLeft);
 			return;
 		}
 		if (--state_duration())
@@ -344,8 +341,7 @@ void Wolfenboss::main()
 		wait_then_start_movement(wCurObjStateDuration & 0xff00);
 		return;
 	case 3: // turning, then the attack he turned back for
-		SET_BC(gb_, ADDR_Data_604c0);
-		routines_.call(ADDR_ApplyObjYMovement_Loop);
+		apply_y_movement_loop(ADDR_Data_604c0);
 		if (--state_duration())
 			return;
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -379,8 +375,7 @@ void Wolfenboss::defeat_fall()
 	if (screen_y() < 0xc0) {
 		if (var3() == 0x2b)
 			play_sfx(SFX_0A3);
-		SET_BC(gb_, ADDR_Data_60da0);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60da0);
 		return;
 	}
 	mem_[wBossState] = BOSS_DEFEATED;
@@ -543,8 +538,7 @@ void WolfenbossHelper::platform_done()
 void WolfenbossHelper::kuri()
 {
 	no_actions();
-	SET_BC(gb_, ADDR_Data_60d60);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60d60);
 	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
 	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
@@ -721,8 +715,7 @@ bool WolfenbossHelper::landed()
 void WolfenbossHelper::ground_shake()
 {
 	play_sfx(SFX_061);
-	gb_->cpu.b = 24;
-	routines_.call(ADDR_DoGroundShake);
+	Object::ground_shake(24);
 }
 
 // straight down early in the fight, else in an arc towards Wario, then
@@ -737,8 +730,7 @@ void WolfenbossHelper::igaguri_fall()
 		if (mem_[wCurObjYPos + 0] < 0x4)
 			++mem_[wCurObjYPos + 1];
 	} else {
-		SET_BC(gb_, ADDR_Data_60d80);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60d80);
 	}
 	if (!landed()) {
 		igaguri_move_x();
@@ -762,8 +754,7 @@ void WolfenbossHelper::igaguri_bounce()
 	if (mem_[wTransformation])
 		no_actions();
 	frame_duration() = 0x2;
-	SET_BC(gb_, ADDR_Data_60e00);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60e00);
 	if (!landed()) {
 		igaguri_move_x();
 		return;
@@ -806,8 +797,7 @@ void WolfenbossHelper::igaguri_hatch()
 		if (state_duration() != 5)
 			return;
 		play_sfx(SFX_0C4);
-		SET_BC(gb_, ADDR_ObjParams_Kuri);
-		routines_.call(ADDR_CreateObjectFromCurObjPos);
+		create_object_here(ADDR_ObjParams_Kuri);
 		return;
 	default:
 		return;

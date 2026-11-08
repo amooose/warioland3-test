@@ -249,8 +249,7 @@ void BrrrBear::run(uint16_t handler)
 		if (state_duration() != 0x22)
 			return;
 		play_sfx(SFX_07E);
-		SET_BC(gb_, facing(ADDR_ObjParams_SnowflakeLeft, ADDR_ObjParams_SnowflakeRight));
-		routines_.call(ADDR_CreateObjectAtRelativePos);
+		create_object_at_offset(facing(ADDR_ObjParams_SnowflakeLeft, ADDR_ObjParams_SnowflakeRight));
 		return;
 	case SET_WALK:
 		set_interaction(OBJ_INTERACTION_01);

@@ -67,8 +67,7 @@ void Bubble::spawn()
 	}
 	state_duration() = 208;
 	play_sfx(SFX_069);
-	SET_BC(gb_, ADDR_ObjParams_Bubble);
-	routines_.call(ADDR_CreateObjectFromCurObjPos);
+	create_object_here(ADDR_ObjParams_Bubble);
 }
 
 void Bubble::bubble()

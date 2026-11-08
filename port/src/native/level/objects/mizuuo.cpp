@@ -93,8 +93,7 @@ void Mizuuo::spitting()
 		if (state_duration() != 0x24)
 			return;
 		play_sfx(SFX_07F);
-		SET_BC(gb_, facing(ADDR_ObjParams_MizzouProjectileLeft, ADDR_ObjParams_MizzouProjectileRight));
-		routines_.call(ADDR_CreateObjectAtRelativePos);
+		create_object_at_offset(facing(ADDR_ObjParams_MizzouProjectileLeft, ADDR_ObjParams_MizzouProjectileRight));
 		return;
 	}
 	set_frameset(facing(ADDR_Frameset_68701, ADDR_Frameset_6870a));
@@ -142,8 +141,7 @@ void Mizuuo::spit(uint16_t page)
 		}
 		movement = ADDR_Data_60740;
 	}
-	SET_BC(gb_, movement);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(movement);
 	if (state()) {
 		set_splat();
 		return;

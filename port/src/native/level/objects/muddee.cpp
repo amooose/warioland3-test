@@ -157,8 +157,7 @@ void Muddee::leaping()
 {
 	no_actions();
 	if (var3() != 0x0e) {
-		SET_BC(gb_, ADDR_Data_60d30);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60d30);
 		return;
 	}
 	set_update(FIGHTING);
@@ -255,8 +254,7 @@ void Muddee::hit()
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
 	hpos_block_unk1();
 	if (!mem_[wIsInWaterOrSand]) {
-		SET_BC(gb_, ADDR_Data_60d40);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60d40);
 		return;
 	}
 	mem_[w1d147] = 0;
@@ -312,10 +310,8 @@ void Muddee::next(uint8_t move, uint16_t frameset, uint8_t offset)
 void Muddee::spawn_stingers()
 {
 	play_sfx(SFX_0B2);
-	SET_BC(gb_, ADDR_ObjParams_MuddeeStinger1);
-	routines_.call(ADDR_CreateObjectFromCurObjPos);
-	SET_BC(gb_, ADDR_ObjParams_MuddeeStinger2);
-	routines_.call(ADDR_CreateObjectFromCurObjPos);
+	create_object_here(ADDR_ObjParams_MuddeeStinger1);
+	create_object_here(ADDR_ObjParams_MuddeeStinger2);
 }
 
 // up to Wario's height
@@ -417,8 +413,7 @@ void Muddee::follow()
 void Muddee::charge_start()
 {
 	if (var3() != 0x0e) {
-		SET_BC(gb_, ADDR_Data_60d30);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60d30);
 		return;
 	}
 	if ((substate() & 0x0f) != 0x03) {
@@ -499,8 +494,7 @@ void Muddee::defeated()
 			play_sfx(SFX_0A3);
 		return;
 	}
-	SET_BC(gb_, ADDR_Data_60180);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60180);
 	routines_.call(facing_right() ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
 }
 

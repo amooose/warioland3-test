@@ -603,10 +603,26 @@ primitives, home/wario.cpp, and the golf objects' animation):
   What's left in the objects: arguments passed in registers to home's
   object routines (SET_BC before ApplyObjYMovement, CreateObject*; b for
   DoGroundShake, MoveWario*...), the a/f results of the others
-  (IsTreasureCollected's z...), and those block-function reads. Next:
-  typed wrappers for those calls the same way (each a method on Object
-  that sets the registers and calls), then home/object_mechanics.cpp's
-  routines as plain functions, then the block functions.
+  (IsTreasureCollected's z...), and those block-function reads.
+- Objects, second step (2026-11-07): the movement tables, object
+  creation and the ground shake are Object methods taking their argument
+  (apply_y_movement(table), apply_x_movement(_loop), create_object_at_offset
+  / create_object_here(params), ground_shake(frames)): 148 sites, where
+  SET_BC (or b) and the call were adjacent, plus three by hand. They set
+  the register and call, so nothing changes for code that reads it on.
+  About 156 register sites are left in the objects: b for MoveWario*,
+  hl / de for DespawnObject and the palette loads, reads of h's page,
+  and the registers left by block functions and earlier objects.
+- What blocks going further: object code reads registers it never set
+  (the plain Wario states showed it: b, c and d flow from the states
+  through UpdateObjects into the objects). Until each such read is found
+  and either shown to be fuzz-only or given its value explicitly, every
+  routine that runs before an object in the frame (the states,
+  UpdateObjects, DoObjectAction, the block functions) has to leave b to
+  l as the asm does. A way to find them: run the full fuzz tier with
+  a poisoned register at a point of the frame (as in the bisect above)
+  and narrow down per object. Only then are home/object_mechanics.cpp,
+  UpdateObjects and the Wario states safe to make plain.
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped

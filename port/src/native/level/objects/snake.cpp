@@ -215,8 +215,7 @@ void Snake::breathing()
 	next_mode();
 	bool right = facing_right();
 	set_frameset(right ? ADDR_Frameset_68900 : ADDR_Frameset_6888c);
-	SET_BC(gb_, right ? ADDR_ObjParams_SnakeFireRight : ADDR_ObjParams_SnakeFireLeft);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(right ? ADDR_ObjParams_SnakeFireRight : ADDR_ObjParams_SnakeFireLeft);
 }
 
 void Snake::closing()

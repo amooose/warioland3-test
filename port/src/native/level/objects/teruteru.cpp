@@ -145,8 +145,7 @@ void Teruteru::hovering()
 			}
 		}
 	}
-	SET_BC(gb_, ADDR_Data_604c0);
-	routines_.call(ADDR_ApplyObjYMovement_Loop);
+	apply_y_movement_loop(ADDR_Data_604c0);
 	uint16_t frameset;
 	if (facing_right()) {
 		if (++var1() != 0x64) {
@@ -303,8 +302,7 @@ void Teruteru::run(uint16_t handler)
 	case HOVER: hover(); return;
 	case HOVERING: hovering(); return;
 	case TURNING:
-		SET_BC(gb_, ADDR_Data_604c0);
-		routines_.call(ADDR_ApplyObjYMovement_Loop);
+		apply_y_movement_loop(ADDR_Data_604c0);
 		if (state_duration() == 9) {
 			--state_duration();
 			substate() ^= OBJSUBFLAG_HDIR;

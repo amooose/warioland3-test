@@ -86,8 +86,7 @@ void UnusedFlower::preparing()
 	state_duration() = 35;
 	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
 	bool right = static_cast<uint8_t>(screen_x() + 0x2a) < wario;
-	SET_BC(gb_, right ? ADDR_ObjParams_UnusedFlowerProjectileRight : ADDR_ObjParams_UnusedFlowerProjectileLeft);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(right ? ADDR_ObjParams_UnusedFlowerProjectileRight : ADDR_ObjParams_UnusedFlowerProjectileLeft);
 }
 
 void UnusedFlower::attack()
@@ -135,8 +134,7 @@ void UnusedFlower::projectile(uint16_t page)
 		set_destroy();
 		return;
 	}
-	SET_BC(gb_, s ? ADDR_Data_60320 + 8 : ADDR_Data_60320); // .Jump, .Thrown
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(s ? ADDR_Data_60320 + 8 : ADDR_Data_60320); // .Jump, .Thrown
 	pos_to_hram(wCurObjYPos, 0);
 	if (!hpos_block_unk1())
 		return;

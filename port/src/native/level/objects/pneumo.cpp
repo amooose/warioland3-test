@@ -272,8 +272,7 @@ void Pneumo::inflated()
 	}
 	hpos(-16, 0);
 	if (!hpos_block_unk3()) {
-		SET_BC(gb_, ADDR_Data_60600);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60600);
 	}
 	bool right = facing_right();
 	hpos(-4, right ? 7 : -8);

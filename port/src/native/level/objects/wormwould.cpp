@@ -159,8 +159,7 @@ void Wormwould::set_idle()
 void Wormwould::spawn_rock(uint16_t left, uint16_t right)
 {
 	play_sfx(SFX_TEMPLE_ROCK);
-	SET_BC(gb_, facing_right() ? right : left);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(facing_right() ? right : left);
 }
 
 // rises ($2d), shoots ($5a high, $5b low), idles (0), burrows ($5c);
@@ -271,8 +270,7 @@ void Wormwould::main()
 		return;
 	}
 	if (s == 0x3a) { // hurt
-		SET_BC(gb_, ADDR_Data_60dd0);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60dd0);
 		if (state_duration() == 30)
 			play_sfx(SFX_0A7);
 		if (--state_duration())
@@ -341,8 +339,7 @@ void Wormwould::defeated_wait()
 void Wormwould::defeated_fall()
 {
 	no_actions();
-	SET_BC(gb_, ADDR_Data_60180);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60180);
 	routines_.call(facing_right() ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
 }
 
@@ -359,9 +356,8 @@ void WormwouldHelper::rock_rolling(uint16_t then, uint16_t move)
 // along the floor (high rocks: var1); hit, it's knocked away
 void WormwouldHelper::rock(uint16_t page)
 {
-	SET_BC(gb_, var1() ? ADDR_Data_60900 : ADDR_Data_608b0);
 	if (!state()) {
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(var1() ? ADDR_Data_60900 : ADDR_Data_608b0);
 		return;
 	}
 	var3() = 0;

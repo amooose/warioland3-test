@@ -157,8 +157,7 @@ void Hebarii::crawl()
 			--state_duration();
 			if (!(flags() & OBJFLAG_ON_SCREEN))
 				return;
-			SET_BC(gb_, ADDR_ObjParams_HebariiProjectile);
-			routines_.call(ADDR_CreateObjectAtRelativePos);
+			create_object_at_offset(ADDR_ObjParams_HebariiProjectile);
 			return;
 		}
 		if (--state_duration())
@@ -273,8 +272,7 @@ void Hebarii::run(uint16_t handler)
 				routines_.call(ADDR_VanishObject2);
 				return;
 			}
-			SET_BC(gb_, ADDR_FallingYVel_Light);
-			routines_.call(ADDR_ApplyObjYMovement);
+			apply_y_movement(ADDR_FallingYVel_Light);
 			return;
 		}
 		mem_[wCurObjYPos + 0] = mem_[hYPosLo];

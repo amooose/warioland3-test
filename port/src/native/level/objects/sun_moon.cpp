@@ -190,8 +190,7 @@ void SunMoon::shooting()
 	hpos(0, 0);
 	mem_[wc1ca] = 0;
 	if (!hpos_block_unk1() || mem_[wc1ca]) {
-		SET_BC(gb_, ADDR_Data_60690);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60690);
 	}
 	if (!--state_duration()) {
 		set_following(facing_right() ? k_.right : k_.left);
@@ -200,8 +199,7 @@ void SunMoon::shooting()
 	if (state_duration() != 52)
 		return;
 	play_sfx(k_.sfx);
-	SET_BC(gb_, facing_right() ? k_.shot_right : k_.shot_left);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(facing_right() ? k_.shot_right : k_.shot_left);
 }
 
 // 32 pixels off Wario (var2 pixels a frame: 2 off screen), turning to
@@ -284,8 +282,7 @@ void SunMoon::move_up_()
 // flies along movement until it hits something
 void SunMoon::shot(uint16_t movement)
 {
-	SET_BC(gb_, movement);
-	routines_.call(ADDR_ApplyObjXMovement);
+	apply_x_movement(movement);
 	flags() |= OBJFLAG_NO_COLLISION;
 	if (!state())
 		return;

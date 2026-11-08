@@ -75,8 +75,7 @@ void WaterDrop::fall()
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
 	if (!hpos_block_unk1() && !mem_[wIsInWaterOrSand]) {
-		SET_BC(gb_, ADDR_FallingYVel_Light);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_FallingYVel_Light);
 		return;
 	}
 	mem_[wCurObjYPos + 0] = mem_[hYPosLo];

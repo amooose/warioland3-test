@@ -41,8 +41,7 @@ void BigLeaf::spawner()
 
 void BigLeaf::spawn(uint16_t params)
 {
-	SET_BC(gb_, params);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(params);
 }
 
 // 2 leaves, once Wario's left of x + 22 and the time's up

@@ -72,8 +72,7 @@ void Appleby::update()
 		return;
 	case 0x5c: // throwing (the apple at $46 frames left)
 		if (state_duration() == 0x46) {
-			SET_BC(gb_, facing_right() ? ADDR_ObjParams_AppleRight : ADDR_ObjParams_AppleLeft);
-			routines_.call(ADDR_CreateObjectAtRelativePos);
+			create_object_at_offset(facing_right() ? ADDR_ObjParams_AppleRight : ADDR_ObjParams_AppleLeft);
 		}
 		if (!--state_duration())
 			hide(wCurObjState);
@@ -200,8 +199,7 @@ void Appleby::roll(bool right, bool fast)
 		return;
 	}
 	if (s != 0x19) {
-		SET_BC(gb_, ADDR_Data_60670);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60670);
 		return;
 	}
 	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
@@ -213,8 +211,7 @@ void Appleby::bounce(bool right)
 {
 	right ? move_right() : move_left();
 	no_actions();
-	SET_BC(gb_, ADDR_Data_60040);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60040);
 }
 
 } // namespace wl3::level

@@ -171,8 +171,7 @@ void DollBoy::fall(uint8_t frame, uint8_t shake, uint8_t end, uint16_t movement)
 		after_fall();
 		return;
 	}
-	SET_BC(gb_, movement);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(movement);
 }
 
 // throws hammers; falls when a barrel under him is attacked (var1 8)
@@ -215,8 +214,7 @@ void DollBoy::barrel_phase()
 			range = 0;
 		++range;
 		play_sfx(SFX_0A2);
-		SET_BC(gb_, ADDR_ObjParams_DollBoyHammer);
-		routines_.call(ADDR_CreateObjectAtRelativePos);
+		create_object_at_offset(ADDR_ObjParams_DollBoyHammer);
 		return;
 	}
 	case 0x08:
@@ -286,8 +284,7 @@ void DollBoy::update_stunned()
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
 	if (!hpos_block_unk1()) {
-		SET_BC(gb_, ADDR_FallingYVel_Light);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_FallingYVel_Light);
 		return;
 	}
 	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
@@ -318,12 +315,11 @@ void DollBoy::update_stunned()
 // to the platform below or above
 void DollBoy::jump_platform(uint16_t movement)
 {
-	SET_BC(gb_, movement);
 	if (state_duration()) {
 		--state_duration();
 		return;
 	}
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(movement);
 	if (var3() == 0x0a)
 		ground_shake();
 	if (--var1())
@@ -341,8 +337,7 @@ void DollBoy::show_stars(uint16_t frameset, uint16_t params)
 	stop_sfx(mem_);
 	set_frameset(frameset);
 	state_duration() = 1;
-	SET_BC(gb_, params);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(params);
 }
 
 // a step, bouncy as the foot comes down; turns at walls
@@ -382,8 +377,7 @@ void DollBoy::switch_direction()
 			substate() ^= OBJSUBFLAG_HDIR;
 			ground_shake();
 		}
-		SET_BC(gb_, ADDR_Data_60c00);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60c00);
 		return;
 	}
 	if (var1()) {
@@ -504,8 +498,7 @@ void DollBoy::hit_wario()
 	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
 	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
 	if (!hpos_block_unk1()) {
-		SET_BC(gb_, ADDR_FallingYVel_Light);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_FallingYVel_Light);
 		return;
 	}
 	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
@@ -542,8 +535,7 @@ void DollBoy::defeated()
 		if (!--state_duration())
 			play_sfx(SFX_0A3);
 	}
-	SET_BC(gb_, ADDR_Data_60bd0);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60bd0);
 }
 
 // a barrel attacked from under him: its bit out of the parts left (the id's
@@ -564,8 +556,7 @@ void DollBoy::update_remaining_parts()
 void DollBoy::ground_shake()
 {
 	play_sfx(SFX_061);
-	gb_->cpu.b = 24;
-	routines_.call(ADDR_DoGroundShake);
+	Object::ground_shake(24);
 }
 
 void DollBoyHelper::barrel(uint8_t part)
@@ -599,8 +590,7 @@ void DollBoyHelper::barrel_fall(uint8_t shake, uint8_t end, uint16_t movement)
 		var1() = 0;
 		return;
 	}
-	SET_BC(gb_, movement);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(movement);
 }
 
 void DollBoyHelper::end_flashing()
@@ -721,16 +711,14 @@ void DollBoyHelper::hammer_update()
 		set_update(left ? HAMMER_HIT_LEFT : HAMMER_HIT_RIGHT);
 		var3() = 0;
 		play_sfx(SFX_049);
-		SET_BC(gb_, ADDR_ObjParams_StarsCentre);
-		routines_.call(ADDR_CreateObjectFromCurObjPos);
+		create_object_here(ADDR_ObjParams_StarsCentre);
 		return;
 	}
 	if (var1()) {
 		routines_.call(ADDR_MoveObjectRight_Fast);
 		return;
 	}
-	SET_BC(gb_, ADDR_Data_60860);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60860);
 	uint16_t movement;
 	switch (static_cast<uint8_t>(mem_[wDollBoyHammerRange])) {
 	case HAMMER_SHORT: movement = ADDR_Data_60ae0; break;
@@ -738,16 +726,14 @@ void DollBoyHelper::hammer_update()
 	case HAMMER_MID_LONG: movement = ADDR_Data_60b30; break;
 	default: movement = ADDR_Data_60b60; break;
 	}
-	SET_BC(gb_, movement);
-	routines_.call(ADDR_ApplyObjXMovement);
+	apply_x_movement(movement);
 }
 
 void DollBoyHelper::hammer_hit(uint16_t move)
 {
 	routines_.call(move);
 	no_actions();
-	SET_BC(gb_, ADDR_Data_60040);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60040);
 }
 
 void DollBoyHelper::platform()
@@ -816,8 +802,7 @@ void DollBoyHelper::spawner_spawn()
 {
 	if (!--state_duration()) {
 		set_update(SPAWNER_DO_NOTHING);
-		SET_BC(gb_, ADDR_ObjParams_HammerPlatform);
-		routines_.call(ADDR_CreateObjectAtRelativePos);
+		create_object_at_offset(ADDR_ObjParams_HammerPlatform);
 	}
 	spawner_do_nothing();
 }

@@ -187,8 +187,7 @@ void MadScienstein::bump_start(uint8_t s, uint16_t params)
 {
 	uint8_t f = frame();
 	if (f < 0x19 && (f >= 0x14 || f < 0x06)) {
-		SET_BC(gb_, params);
-		routines_.call(ADDR_CreateObjectAtRelativePos);
+		create_object_at_offset(params);
 	}
 	state() = s;
 	set_frameset(facing(ADDR_Frameset_68bc7, ADDR_Frameset_68bcc));
@@ -288,8 +287,7 @@ void MadScienstein::run(uint16_t handler)
 			if (flags() & (1 << OBJFLAG_ON_SCREEN_F))
 				play_sfx(SFX_067);
 			state() = 0x5a;
-			SET_BC(gb_, facing_right() ? ADDR_ObjParams_InvisibilityPotionRight : ADDR_ObjParams_InvisibilityPotionLeft);
-			routines_.call(ADDR_CreateObjectAtRelativePos);
+			create_object_at_offset(facing_right() ? ADDR_ObjParams_InvisibilityPotionRight : ADDR_ObjParams_InvisibilityPotionLeft);
 			return;
 		}
 		if (--state_duration()) {
@@ -515,8 +513,7 @@ void Potion::fly(uint16_t page)
 		destroy();
 		return;
 	}
-	SET_BC(gb_, ADDR_Data_60510);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60510);
 }
 
 void Potion::land()
@@ -546,8 +543,7 @@ void Potion::dropping()
 		destroy();
 		return;
 	}
-	SET_BC(gb_, ADDR_Data_60540);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60540);
 	land();
 }
 

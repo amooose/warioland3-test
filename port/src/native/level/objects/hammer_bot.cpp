@@ -209,8 +209,7 @@ void HammerBot::stars(uint8_t s, uint16_t params, uint16_t frameset)
 	var2() = 0x02;
 	flags() &= ~OBJFLAG_PRIORITY;
 	play_sfx(SFX_049);
-	SET_BC(gb_, params);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(params);
 }
 
 void HammerBot::recoil(uint16_t routine)

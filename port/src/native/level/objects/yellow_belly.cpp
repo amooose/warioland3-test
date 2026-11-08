@@ -166,8 +166,7 @@ void YellowBelly::rising()
 	var2() = 0x01;
 	var3() = 0;
 	set_update(SWIMMING);
-	SET_BC(gb_, ADDR_ObjParams_YellowBellyHead);
-	routines_.call(ADDR_CreateObjectFromCurObjPos);
+	create_object_here(ADDR_ObjParams_YellowBellyHead);
 }
 
 void YellowBelly::turn_frameset(uint16_t frameset)
@@ -230,8 +229,7 @@ void YellowBelly::shooting()
 	if (state_duration() != 0x2f)
 		return;
 	play_sfx(SFX_07C);
-	SET_BC(gb_, vdir ? ADDR_ObjParams_YellowBellyArrowRight : ADDR_ObjParams_YellowBellyArrowLeft);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(vdir ? ADDR_ObjParams_YellowBellyArrowRight : ADDR_ObjParams_YellowBellyArrowLeft);
 }
 
 // back to swimming, or to the pump when it's down
@@ -282,8 +280,7 @@ void YellowBelly::stranded()
 		count = var1();
 	} else if (count == 0x25) {
 		play_sfx(SFX_0A5);
-		SET_BC(gb_, ADDR_ObjParams_Pump);
-		routines_.call(ADDR_CreateObjectFromCurObjPos);
+		create_object_here(ADDR_ObjParams_Pump);
 		count = var1();
 	}
 	if (count < 0x92 && screen_y() >= 0x39)
@@ -348,8 +345,7 @@ void YellowBelly::swimming()
 		set_update(SINKING);
 		return;
 	}
-	SET_BC(gb_, ADDR_Data_60950);
-	routines_.call(ADDR_ApplyObjYMovement_Loop);
+	apply_y_movement_loop(ADDR_Data_60950);
 	swim();
 }
 
@@ -663,8 +659,7 @@ void YellowBellyHelper::pump()
 void YellowBellyHelper::pump_falling()
 {
 	no_actions();
-	SET_BC(gb_, ADDR_Data_609e0);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_609e0);
 	if (state_duration()) {
 		--state_duration();
 	} else {
@@ -718,8 +713,7 @@ void YellowBellyHelper::pump_landed()
 			else
 				substate() |= 1 << 7;
 		}
-		SET_BC(gb_, right != blocked ? ADDR_Data_60a10 : ADDR_Data_60a00);
-		routines_.call(ADDR_ApplyObjXMovement);
+		apply_x_movement(right != blocked ? ADDR_Data_60a10 : ADDR_Data_60a00);
 		return;
 	}
 	if (s == 0x0a) {
@@ -738,8 +732,7 @@ void YellowBellyHelper::pump_landed()
 			--state_duration();
 			return;
 		}
-		SET_BC(gb_, ADDR_Data_60040);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60040);
 		return;
 	}
 	if (s == 0x58) {

@@ -220,8 +220,7 @@ void RoboMouse::pounded()
 		state_duration() = 0x3c;
 		set_interaction(OBJ_INTERACTION_0B);
 		play_sfx(SFX_VANISH);
-		SET_BC(gb_, ADDR_ObjParams_StarsAbove);
-		routines_.call(ADDR_CreateObjectFromCurObjPos);
+		create_object_here(ADDR_ObjParams_StarsAbove);
 		run(wario_to_right() ? THROWN_54 : THROWN_55);
 		return;
 	}

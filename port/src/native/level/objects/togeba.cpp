@@ -80,8 +80,7 @@ void Togeba::idle()
 // bounced up and down, then walkable
 void Togeba::flipped()
 {
-	SET_BC(gb_, ADDR_Data_60760);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60760);
 	if (--state_duration())
 		return;
 	set_update(SINKING);

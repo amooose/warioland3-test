@@ -511,8 +511,7 @@ void PesceHelper::dragonfly_spawning()
 	}
 	if (find_active(mem_, DRAGONFLY1))
 		return;
-	SET_BC(gb_, ADDR_ObjParams_Dragonfly1);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(ADDR_ObjParams_Dragonfly1);
 }
 
 // once Pesce's swum off: the boss is beaten
@@ -674,8 +673,7 @@ void PesceHelper::fly_spawning()
 	}
 	if (find_active(mem_, FLY))
 		return;
-	SET_BC(gb_, ADDR_ObjParams_Fly);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(ADDR_ObjParams_Fly);
 }
 
 void PesceHelper::fly_done()
@@ -694,8 +692,7 @@ void PesceHelper::fly()
 	flags() |= OBJFLAG_NO_COLLISION;
 	mem_[wDollBoyActiveBarrels] = 0x03;
 	play_sfx(SFX_0BE);
-	SET_BC(gb_, ADDR_ObjParams_Cheese);
-	routines_.call(ADDR_CreateObjectFromCurObjPos);
+	create_object_here(ADDR_ObjParams_Cheese);
 }
 
 void PesceHelper::fly_update()
@@ -712,8 +709,7 @@ void PesceHelper::fly_update()
 		mem_[wDollBoyActiveBarrels] = 0x01;
 		return;
 	case 0x5b: // left, bobbing
-		SET_BC(gb_, ADDR_Data_604c0);
-		routines_.call(ADDR_ApplyObjYMovement_Loop);
+		apply_y_movement_loop(ADDR_Data_604c0);
 		if (mem_[wDollBoyActiveBarrels] && !(mem_[wGlobalCounter] & 1))
 			return;
 		move_left();

@@ -198,8 +198,7 @@ void Jamano::fighting()
 	if (turn) {
 		state() = left ? 0x5b : 0x5a;
 	} else {
-		SET_BC(gb_, left ? ADDR_Data_60c80 : ADDR_Data_60c20);
-		routines_.call(ADDR_ApplyObjXMovement_Loop);
+		apply_x_movement_loop(left ? ADDR_Data_60c80 : ADDR_Data_60c20);
 	}
 	bob();
 }
@@ -246,8 +245,7 @@ void Jamano::bob()
 			up = false;
 		}
 	}
-	SET_BC(gb_, up ? ADDR_Data_60c80 : ADDR_Data_60c20);
-	routines_.call(ADDR_ApplyObjYMovement_Loop);
+	apply_y_movement_loop(up ? ADDR_Data_60c80 : ADDR_Data_60c20);
 }
 
 void Jamano::face_y()
@@ -342,8 +340,7 @@ void Jamano::hat_loss()
 		return;
 	var2() = 0x0f;
 	move_up_by_var2();
-	SET_BC(gb_, ADDR_ObjParams_JamanoHat);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(ADDR_ObjParams_JamanoHat);
 }
 
 void Jamano::hatless()
@@ -361,8 +358,7 @@ void Jamano::hatless()
 void Jamano::falling()
 {
 	no_actions();
-	SET_BC(gb_, ADDR_Data_60d20);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement(ADDR_Data_60d20);
 }
 
 // the hammer's frameset by the range, flipped by bit 7 at flip_addr,
@@ -554,8 +550,7 @@ void Skull::spawner_start()
 	var2() = 0x14;
 	move_up_by_var2();
 	for (uint16_t params : {ADDR_ObjParams_Skull1, ADDR_ObjParams_Skull2, ADDR_ObjParams_Skull3, ADDR_ObjParams_Skull4}) {
-		SET_BC(gb_, params);
-		routines_.call(ADDR_CreateObjectAtRelativePos);
+		create_object_at_offset(params);
 	}
 	mem_[wJamanoActiveSkulls] = 0x0f; // JAMANO_SKULL1 | JAMANO_SKULL2 | JAMANO_SKULL3 | JAMANO_SKULL4
 	mem_[w1d147] = 0;
@@ -584,8 +579,7 @@ void Skull::spawner_update()
 		if (skulls & (1 << i))
 			continue;
 		skulls |= 1 << i;
-		SET_BC(gb_, PARAMS[i]);
-		routines_.call(ADDR_CreateObjectAtRelativePos);
+		create_object_at_offset(PARAMS[i]);
 		return;
 	}
 }
@@ -643,8 +637,7 @@ void Skull::flying_out()
 		return;
 	}
 	routines_.call(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
-	SET_BC(gb_, (id & 1) ? ADDR_Data_60d00 : ADDR_Data_60ce0);
-	routines_.call(ADDR_ApplyObjYMovement);
+	apply_y_movement((id & 1) ? ADDR_Data_60d00 : ADDR_Data_60ce0);
 }
 
 void Skull::at_edge()

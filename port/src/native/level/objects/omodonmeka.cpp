@@ -254,8 +254,7 @@ void Omodonmeka::run(uint16_t handler)
 	case CARRY_HOVER: {
 		if (auto_move_over())
 			return;
-		SET_BC(gb_, ADDR_Data_604c0);
-		routines_.call(ADDR_ApplyObjYMovement_Loop);
+		apply_y_movement_loop(ADDR_Data_604c0);
 		// the y position through the page in h
 		uint16_t at = static_cast<uint16_t>(gb_->cpu.h << 8 | OBJ_Y_POS);
 		uint16_t wario_y = static_cast<uint16_t>((mem_[at] | mem_[at + 1] << 8) + 0x1a);
@@ -264,8 +263,7 @@ void Omodonmeka::run(uint16_t handler)
 		return;
 	}
 	case HOVER: { // opens its mouth when Wario's close and above
-		SET_BC(gb_, ADDR_Data_604c0);
-		routines_.call(ADDR_ApplyObjYMovement_Loop);
+		apply_y_movement_loop(ADDR_Data_604c0);
 		if (!(flags() & (1 << OBJFLAG_ON_SCREEN_F)))
 			return;
 		if (mem_[wTransformation] == TRANSFORMATION_PUFFY_WARIO)
@@ -283,8 +281,7 @@ void Omodonmeka::run(uint16_t handler)
 	case MOUTH_OPEN: { // closes it when Wario moves away, or swallows him
 		if (!(mem_[wGlobalCounter] & 0x1f))
 			play_sfx(SFX_08C);
-		SET_BC(gb_, ADDR_Data_604c0);
-		routines_.call(ADDR_ApplyObjYMovement_Loop);
+		apply_y_movement_loop(ADDR_Data_604c0);
 		uint8_t dx;
 		if (wario_near(dx)) {
 			bool above = static_cast<uint8_t>(screen_y() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a);
@@ -306,8 +303,7 @@ void Omodonmeka::run(uint16_t handler)
 		return;
 	}
 	case FALL_BACK: // falls back to the ground
-		SET_BC(gb_, ADDR_Data_60500);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_60500);
 		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
@@ -336,10 +332,8 @@ void Omodonmeka::run(uint16_t handler)
 		return;
 	case KNOCKED:
 		no_actions();
-		SET_BC(gb_, ADDR_Data_604e0);
-		routines_.call(ADDR_ApplyObjYMovement);
-		SET_BC(gb_, ADDR_Data_60650);
-		routines_.call(ADDR_ApplyObjXMovement_Loop);
+		apply_y_movement(ADDR_Data_604e0);
+		apply_x_movement_loop(ADDR_Data_60650);
 		if (mem_[wTransformation] != TRANSFORMATION_FLAT_WARIO)
 			return;
 		if (!at_start())
@@ -367,8 +361,7 @@ void Omodonmeka::with_omodon_start(uint16_t omodon)
 		swallow();
 		return;
 	}
-	SET_BC(gb_, omodon);
-	routines_.call(ADDR_CreateObjectAtRelativePos);
+	create_object_at_offset(omodon);
 	set_frameset(ADDR_Frameset_68f14);
 	state_duration() = 0;
 	var3() = 0;
@@ -493,10 +486,8 @@ void Omodonmeka::run_owo(uint16_t handler)
 	}
 	case OWO_KNOCKED:
 		no_actions();
-		SET_BC(gb_, ADDR_Data_604e0);
-		routines_.call(ADDR_ApplyObjYMovement);
-		SET_BC(gb_, ADDR_Data_60650);
-		routines_.call(ADDR_ApplyObjXMovement_Loop);
+		apply_y_movement(ADDR_Data_604e0);
+		apply_x_movement_loop(ADDR_Data_60650);
 		return;
 	default:
 		unrealistic();
@@ -578,8 +569,7 @@ void Omodonmeka::omodon()
 		mem_[wCurObjCollBoxBottom] = 0x0b;
 		return;
 	case 0x2e: { // falls, and shakes the ground when it lands
-		SET_BC(gb_, ADDR_Data_605e0);
-		routines_.call(ADDR_ApplyObjYMovement);
+		apply_y_movement(ADDR_Data_605e0);
 		uint16_t y_pos = static_cast<uint16_t>(y() + 0x0f);
 		mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
 		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
@@ -589,8 +579,7 @@ void Omodonmeka::omodon()
 			return;
 		y() = static_cast<uint16_t>((mem_[hYPosLo] | mem_[hYPosHi] << 8) - 0x0f);
 		play_sfx(SFX_063);
-		gb_->cpu.b = 0x18;
-		routines_.call(ADDR_DoGroundShake);
+		ground_shake(0x18);
 		set_frameset(ADDR_Frameset_68f45);
 		omodon_land();
 		return;

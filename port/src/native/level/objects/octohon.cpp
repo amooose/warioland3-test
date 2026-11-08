@@ -247,8 +247,7 @@ void Octohon::big_swim()
 		big_lap(facing_right() ? ADDR_Frameset_69b60 : ADDR_Frameset_69b57);
 		return;
 	case 4: // knocked back
-		SET_BC(gb_, ADDR_Data_60d50);
-		routines_.call(ADDR_ApplyObjXMovement);
+		apply_x_movement(ADDR_Data_60d50);
 		[[fallthrough]];
 	case 2:
 		mem_[wCurObjAction] = 0x81;

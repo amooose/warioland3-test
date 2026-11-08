@@ -306,8 +306,7 @@ void Zombie::throwing()
 {
 	uint8_t time = --state_duration();
 	if (time == 16) {
-		SET_BC(gb_, facing_right() ? ADDR_ObjParams_ZombieHeadRight : ADDR_ObjParams_ZombieHeadLeft);
-		routines_.call(ADDR_CreateObjectAtRelativePos);
+		create_object_at_offset(facing_right() ? ADDR_ObjParams_ZombieHeadRight : ADDR_ObjParams_ZombieHeadLeft);
 		return;
 	}
 	if (time)
@@ -353,8 +352,7 @@ void Zombie::head(bool right)
 
 void Zombie::head_fly(uint16_t movement)
 {
-	SET_BC(gb_, movement);
-	routines_.call(ADDR_ApplyObjXMovement);
+	apply_x_movement(movement);
 	uint8_t s = state();
 	if (!s)
 		return;

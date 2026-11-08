@@ -97,6 +97,28 @@ protected:
 	uint8_t hpos_block_unk2() { return call_a(ADDR_Func_35a3); } // COLLISION_UNK2
 	// ProcessBlockOnRight / Left: the block beside the one at hl
 	uint8_t block_beside(bool right) { return call_a(right ? ADDR_ProcessBlockOnRight : ADDR_ProcessBlockOnLeft); }
+	// The movement tables (bc): the next velocity at var3 (y) or var2 (x),
+	// staying on the last entry, or the _Loop ones starting over
+	void apply_y_movement(uint16_t table) { call_bc(ADDR_ApplyObjYMovement, table); }
+	void apply_y_movement_loop(uint16_t table) { call_bc(ADDR_ApplyObjYMovement_Loop, table); }
+	void apply_x_movement(uint16_t table) { call_bc(ADDR_ApplyObjXMovement, table); }
+	void apply_x_movement_loop(uint16_t table) { call_bc(ADDR_ApplyObjXMovement_Loop, table); }
+	// a new object from its creation data (bc), at the data's offset from
+	// this one, or where this one is
+	void create_object_at_offset(uint16_t params) { call_bc(ADDR_CreateObjectAtRelativePos, params); }
+	void create_object_here(uint16_t params) { call_bc(ADDR_CreateObjectFromCurObjPos, params); }
+	// DoGroundShake: the ground shakes for `frames` (b), unless it already does
+	void ground_shake(uint8_t frames)
+	{
+		gb_->cpu.b = frames;
+		routines_.call(ADDR_DoGroundShake);
+	}
+	// a home routine that takes bc
+	void call_bc(uint16_t routine, uint16_t bc)
+	{
+		SET_BC(gb_, bc);
+		routines_.call(routine);
+	}
 	// a home routine that returns its result in a
 	uint8_t call_a(uint16_t routine)
 	{
