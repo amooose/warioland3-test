@@ -223,6 +223,12 @@ void BlockFuncs::process_block()
 	cpu_.a = static_cast<uint8_t>(func);
 	SET_HL(gb_, func);
 	cpu_.pc = func;
+	// The levels' tables (data/levels/function_tables*.asm) hold only
+	// this file's block functions: a fuzzed table pointing anywhere else
+	// (another routine's label) isn't comparable.
+	if (gb_->test.active && (func < ADDR_ProcessBlock || func > ADDR_BreakBlockWithColourCoin
+		|| !sym_is_rom_label(BANK_ProcessBlock, func)))
+		gb_->test.unrealistic = true;
 }
 
 // a = 0: nothing there

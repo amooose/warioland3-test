@@ -42,4 +42,6 @@ public:
 
 using wl3::pause::PausePauseMenu2;
 
-PORT_EX(DrawLevelObjectsAfterLevelReturn, 0, 0) { PausePauseMenu2(gb).port_DrawLevelObjectsAfterLevelReturn(); }
+// ends on DrawObjects, which leaves b to l as it pleases; ExitPauseMenu and
+// ReturnToLevelFromGolf read none after it (live.py)
+PORT_EX(DrawLevelObjectsAfterLevelReturn, 0, R_B | R_C | R_D | R_E | R_H | R_L) { PausePauseMenu2(gb).port_DrawLevelObjectsAfterLevelReturn(); }

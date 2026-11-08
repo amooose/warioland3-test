@@ -75,4 +75,6 @@ using wl3::home::HomeReturnLevel;
 PORT_EX(ReturnToPendingLevelState, 0, 0) { HomeReturnLevel(gb).port_ReturnToPendingLevelState(); }
 PORT_EX(ReturnToMap, 0, 0) { HomeReturnLevel(gb).port_ReturnToMap(); }
 PORT_EX(ReturnToMapFromLevel, HOOK_MANUAL_RET, 0) { HomeReturnLevel(gb).port_ReturnToMapFromLevel(); }
-PORT_EX(ReturnToLevelFromGolf, HOOK_MANUAL_RET, 0) { HomeReturnLevel(gb).port_ReturnToLevelFromGolf(); }
+// ends on DrawLevelObjectsAfterLevelReturn (b to l as it leaves them); only
+// _GolfStateTable reaches it, and nothing reads b to l after (live.py)
+PORT_EX(ReturnToLevelFromGolf, HOOK_MANUAL_RET, R_B | R_C | R_D | R_E | R_H | R_L) { HomeReturnLevel(gb).port_ReturnToLevelFromGolf(); }

@@ -647,10 +647,53 @@ primitives, home/wario.cpp, and the golf objects' animation):
   About 156 register sites are left in the objects: b for MoveWario*,
   hl / de for DespawnObject and the palette loads, reads of h's page,
   and the registers left by block functions and earlier objects.
-- Next: UpdateObjects and home/object_mechanics.cpp's routines as plain
-  functions (the map above says the objects don't need the registers
-  they leave at update entry); then the block functions, passing
-  Muddee, Pesce, Octohon and ZipLine what they read.
+- UpdateObjects, plain (2026-11-07): the update loop (UpdateObjects,
+  UpdateObject and the temple / floor transition variants), DrawObjects,
+  CheckObjectOnScreen, HandleGrabbedObjectCollisions, the object clears
+  and InitObjectVars are plain C++; home's UpdateObjSprite is
+  home::update_obj_sprite (home/object_mechanics.hpp). Their callers
+  read no register after them (live.py), so the entries' hooks clobber
+  all, and the ones only the loop calls lost theirs (PORT_COVERED, after
+  fuzzing them as temporary ALL_REGISTERS hooks). UpdateObject still
+  pushes the object's slot and its caller's return address, calls
+  DoObjectAction, the animation and hCallFunc through the emulator with
+  the asm's return addresses, and leaves hl (the end of the copy) and a
+  and f (the pointer's high byte, the `or` of the bank) for the update
+  function: the fuzzer found update functions that read a and f on entry
+  (the register map above only poisoned b to l). StartRoom_FromLevelStart
+  / _FromTransition, ProcessMultiBlock, DrawLevelObjectsAfterLevelReturn
+  and ReturnToLevelFromGolf end on these, and their callers read none of
+  b to l either, so they now clobber b to l (the difftests and the fuzz
+  tier caught them).
+- The shared object states, plain (2026-11-07): falling, thrown, arcs,
+  bumps, knock-back, vanishing, the movement tables (_ApplyObj*Movement,
+  the set movement, Func_63209's platform) and Func_632ac's count
+  (update_objects.cpp, from set_state_by_y_vel to the grabbed-object
+  collisions) are plain member functions over table_step() /
+  movement_step() (a table's next entry) and block() (a block check
+  through home's wrapper, with the asm's return address). Inputs in
+  registers stay inputs: bc for Func_62ec3 / Func_62faa (the throw's
+  table; the thrown states' entries still jump on into them, as the
+  asm's jr does, so each hook checks its own part), b for the arcs, bc
+  for the movement tables, de for the set movement, b plus h's page for
+  Func_627f0 / Func_62690. The objects reach them through home's homejp
+  and homecall wrappers and read nothing after them but h (the
+  movement tables leave hl at the position's high byte, the _Loop ones
+  e too) and Func_632ac's e, so the hooks clobber the rest; the home
+  movement wrappers clobber b and c, VanishObject, ApplyObjSetMovement
+  and Func_34fc all.
+- Two fuzzer realism rules came out of this (both only fuzzed states
+  reach): ProcessBlock flags a block function table entry that isn't one
+  of block_functions.asm's labels (a fuzzed table sent a floor check to
+  UpdateObjSprite, whose plain version leaves another a), and
+  UpdateObject flags an update pointer below $4000 (one pointed at
+  MoveWarioUp, which reads the b the asm loop leaves).
+- Next: the rest of update_objects.cpp (DoObjectAction and its actions,
+  throwing and grabbed objects, HandleGrabbedObjectCollisions, the
+  movement tables), then home/object_mechanics.cpp's routines as plain
+  functions with register wrappers for the objects that read what they
+  leave (h, mostly: the object's page); then the block functions,
+  passing Muddee, Pesce, Octohon and ZipLine what they read.
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped

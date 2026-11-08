@@ -1093,12 +1093,15 @@ void RoomStart::from_level_start()
 
 using wl3::level::RoomStart;
 
-PORT(StartRoom_FromTransition) { RoomStart(gb).from_transition(); }
-PORT(StartRoom_FromLevelStart) { RoomStart(gb).from_level_start(); }
+// These three end on UpdateObjects / DrawObjects, which leave b to l as
+// they please; only _LevelStateTable (and InitLevel, for the second)
+// reaches them, and nothing after reads b to l (live.py).
+PORT_EX(StartRoom_FromTransition, 0, R_B | R_C | R_D | R_E | R_H | R_L) { RoomStart(gb).from_transition(); }
+PORT_EX(StartRoom_FromLevelStart, 0, R_B | R_C | R_D | R_E | R_H | R_L) { RoomStart(gb).from_level_start(); }
 PORT(Func_896f) { RoomStart(gb).spawn_objects(); }
 PORT(SetInitialCameraScroll) { RoomStart(gb).set_initial_camera_scroll(); }
 PORT(ApplyInitialCameraScroll) { RoomStart(gb).apply_initial_camera_scroll(); }
 PORT(SetWarioPositionToSpawn) { RoomStart(gb).set_wario_position_to_spawn(); }
 PORT(DrawRoom_FromStart) { RoomStart(gb).draw_room(); }
-PORT(ProcessMultiBlock) { RoomStart(gb).process_multi_block(); }
+PORT_EX(ProcessMultiBlock, 0, R_B | R_C | R_D | R_E | R_H | R_L) { RoomStart(gb).process_multi_block(); }
 PORT_LOCAL_EX(ProcessMultiBlock, ProcessBlocks, 0, 0) { RoomStart(gb).process_blocks(); }

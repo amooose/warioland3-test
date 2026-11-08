@@ -3,9 +3,12 @@
 // (falling, thrown, bumped, knocked, grabbed, vanishing), object movement
 // tables and their actions.
 //
-// Objects (C++) and register-level C call these, so they keep the
-// original's registers, flags and return addresses (see asm_module.hpp).
+// Objects (C++) and register-level C call these. The loop, the shared
+// states and the movement tables are plain C++ (docs/HANDOFF.md); the rest
+// (DoObjectAction, throwing and grabbed objects) still keep the original's
+// registers, flags and return addresses (see asm_module.hpp).
 #include "../asm_module.hpp"
+#include "../home/object_mechanics.hpp"
 
 namespace wl3::level {
 
@@ -22,16 +25,11 @@ public:
 	void draw_objects(uint8_t match)
 	{
 		for (int n = 0; n < NUM_OBJECTS; n++) {
-			uint16_t obj = (uint16_t)(wObj1Flags + n * OBJ_STRUCT_SIZE);
-			SET_HL(gb_, obj);
-			cpu_.a = alu_.and_(rd8(obj),
-				OBJFLAG_ACTIVE | OBJFLAG_ON_SCREEN | OBJFLAG_INVISIBLE | OBJFLAG_PRIORITY);
-			alu_.cp(cpu_.a, match);
-			if (!(cpu_.f & FLAG_Z))
-				continue;
-			cpu_.e = (uint8_t)(wObj1ScreenYPos + n * OBJ_STRUCT_SIZE);
-			cpu_.l = (uint8_t)(wObj1Id + n * OBJ_STRUCT_SIZE);
-			CALL(UpdateObjSprite);
+			uint16_t obj = static_cast<uint16_t>(wObj1Flags + n * OBJ_STRUCT_SIZE);
+			uint8_t flags = rd8(obj) & (OBJFLAG_ACTIVE | OBJFLAG_ON_SCREEN | OBJFLAG_INVISIBLE | OBJFLAG_PRIORITY);
+			if (flags == match)
+				home::update_obj_sprite(gb_, static_cast<uint16_t>(wObj1Id + n * OBJ_STRUCT_SIZE),
+					static_cast<uint16_t>(wObj1ScreenYPos + n * OBJ_STRUCT_SIZE));
 		}
 	}
 
@@ -45,217 +43,448 @@ public:
 		draw_objects(OBJFLAG_ACTIVE | OBJFLAG_ON_SCREEN);
 	}
 
-
-
-	// One of CheckObjectOnScreen's range checks of the position hi:lo against
-	// the camera position in hl: lo += add, then if the position is past hl,
-	// hl += span and lo -= sub, and the position must be below hl. A carry out
-	// of hi on the first step counts as in range if wrap_in, otherwise it goes
-	// on to the second step. Returns whether the position is in range.
-	bool in_range(uint8_t *hi, uint8_t *lo, uint8_t add, uint8_t span, uint8_t sub,
-		bool wrap_in)
+	// One of CheckObjectOnScreen's range checks of a position against the
+	// camera's: pos + add must be past the camera (at it counts as in
+	// range; a carry out of 16 bits is in range if wrap_in, else it goes on
+	// with the wrapped value), then pos + add - sub (in range if it goes
+	// below 0) must be below the camera + span.
+	static bool in_range(uint16_t pos, uint16_t cam, uint8_t add, uint8_t span, uint8_t sub, bool wrap_in)
 	{
-		cpu_.a = *lo = alu_.add(*lo, add);
-		if (cpu_.f & FLAG_C) {
-			*hi = alu_.inc(*hi);
-			if (cpu_.f & FLAG_Z) {
-				if (wrap_in)
-					return true;
-				goto upper;
-			}
-		}
-		cpu_.a = *hi;
-		alu_.cp(*hi, cpu_.h);
-		if (cpu_.f & FLAG_C)
+		uint32_t p = pos + add;
+		if (p > 0xffff) {
+			if (wrap_in)
+				return true;
+			p &= 0xffff;
+		} else if (p < cam) {
 			return false;
-		if (cpu_.f & FLAG_Z) {
-			cpu_.a = *lo;
-			alu_.cp(*lo, cpu_.l);
-			if (cpu_.f & FLAG_C)
-				return false;
-			if (cpu_.f & FLAG_Z)
-				return true;
-		}
-	upper:
-		cpu_.a = cpu_.l = alu_.add(cpu_.l, span);
-		if (cpu_.f & FLAG_C)
-			cpu_.h = alu_.inc(cpu_.h);
-		cpu_.a = *lo = alu_.sub(*lo, sub);
-		if (cpu_.f & FLAG_C) {
-			*hi = alu_.dec(*hi);
-			cpu_.a = alu_.inc(*hi);
-			if (cpu_.f & FLAG_Z)
-				return true;
-		}
-		cpu_.a = *hi;
-		alu_.cp(*hi, cpu_.h);
-		if (cpu_.f & FLAG_C)
+		} else if (p == cam) {
 			return true;
-		if (!(cpu_.f & FLAG_Z))
-			return false;
-		cpu_.a = *lo;
-		alu_.cp(*lo, cpu_.l);
-		return cpu_.f & FLAG_C;
+		}
+		if (p < sub)
+			return true;
+		return static_cast<uint16_t>(p - sub) < static_cast<uint16_t>(cam + span);
 	}
 
-	// ld hl, addr / ld a, [hli] / ld l, [hl] / ld h, a (a big-endian pointer)
-	void load_hl_be(uint16_t addr)
-	{
-		cpu_.a = rd8(addr);
-		cpu_.l = rd8(addr + 1);
-		cpu_.h = cpu_.a;
-	}
+	// the camera positions are big-endian
+	uint16_t camera(uint16_t addr) const { return static_cast<uint16_t>(rd8(addr) << 8 | rd8(addr + 1)); }
 
 	// seems to be a function to load/unload objects
 	// that are inside and outside the screen
-	void port_CheckObjectOnScreen()
+	void check_object_on_screen()
 	{
-		cpu_.c = rd8(wCurObjYPos + 0); // y lo
-		cpu_.b = rd8(wCurObjYPos + 1); // y hi
-		cpu_.a = cpu_.e = rd8(wCurObjYPos + 2); // x lo
-		cpu_.d = rd8(wCurObjYPos + 3); // x hi
-
-		load_hl_be(wCameraSCY);
-		gb_push16(gb_, REG_BC(gb_));
-		gb_push16(gb_, REG_DE(gb_));
-		gb_push16(gb_, REG_HL(gb_));
-		bool on_screen = false;
-		if (in_range(&cpu_.b, &cpu_.c, 24, SCREEN_HEIGHT_PX, 56, false)) {
-			// .skip_y2
-			load_hl_be(wCameraSCX);
-			on_screen = in_range(&cpu_.d, &cpu_.e, 24, SCREEN_WIDTH_PX, 0x30, true);
-		} else {
-			// .asm_630fd
-			cpu_.a = alu_.and_(rd8(wCurObjState), 0xfe);
-			alu_.cp(cpu_.a, OBJSTATE_48);
-			if (cpu_.f & FLAG_Z)
-				goto pop;
-		}
-		SET_HL(gb_, wCurObjFlags);
-		if (on_screen)
-			wr8(wCurObjFlags, rd8(wCurObjFlags) | OBJFLAG_ON_SCREEN);
-		else
+		uint16_t y = mem_.word(wCurObjYPos);
+		uint16_t x = mem_.word(wCurObjXPos);
+		uint16_t cam_y = camera(wCameraSCY);
+		if (in_range(y, cam_y, 24, SCREEN_HEIGHT_PX, 56, false)) {
+			if (in_range(x, camera(wCameraSCX), 24, SCREEN_WIDTH_PX, 0x30, true))
+				wr8(wCurObjFlags, rd8(wCurObjFlags) | OBJFLAG_ON_SCREEN);
+			else
+				wr8(wCurObjFlags, rd8(wCurObjFlags) & ~OBJFLAG_ON_SCREEN);
+		} else if ((rd8(wCurObjState) & 0xfe) != OBJSTATE_48) {
 			wr8(wCurObjFlags, rd8(wCurObjFlags) & ~OBJFLAG_ON_SCREEN);
-	pop:
-		SET_HL(gb_, gb_pop16(gb_));
-		SET_DE(gb_, gb_pop16(gb_));
-		SET_BC(gb_, gb_pop16(gb_));
+		}
 
 		// whether the object is far enough outside the screen to unload
-		bool keep = false;
-		cpu_.a = alu_.rla(cpu_.d);
-		if (!(cpu_.f & FLAG_C)) {
-			cpu_.a = alu_.rla(cpu_.b);
-			if (!(cpu_.f & FLAG_C) && in_range(&cpu_.b, &cpu_.c, 92, 0x90, 0xcb, true)) {
-				// .asm_63147
-				load_hl_be(wCameraSCX);
-				keep = in_range(&cpu_.d, &cpu_.e, 0x6f, SCREEN_WIDTH_PX, 0xde, true);
-			}
-		}
-		if (keep)
+		// (a negative position always is)
+		if (!(x & 0x8000) && !(y & 0x8000) && in_range(y, cam_y, 92, 0x90, 0xcb, true)
+			&& in_range(x, camera(wCameraSCX), 0x6f, SCREEN_WIDTH_PX, 0xde, true))
 			return;
 
-		// .asm_6317e
-		cpu_.a = alu_.and_(rd8(wCurObjSubState), 0xf | OBJSUBFLAG_UNK_4);
-		alu_.cp(cpu_.a, 0x0 | OBJSUBFLAG_UNK_4);
-		if (!(cpu_.f & FLAG_C))
+		uint8_t sub = rd8(wCurObjSubState) & (0xf | OBJSUBFLAG_UNK_4);
+		if (sub >= (0x0 | OBJSUBFLAG_UNK_4))
 			return;
 		// OBJSUBFLAG_UNK_4 is not set
-		SET_HL(gb_, wCurObjUnk02);
-		alu_.and_(cpu_.a, cpu_.a);
-		if (!(cpu_.f & FLAG_Z)) {
+		if (sub) {
+			SET_HL(gb_, wCurObjUnk02);
 			FARCALL(DespawnObject);
 			return;
 		}
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
 		wr8(wCurObjFlags, 0);
 	}
 
-	// a = value to fill wObjects with, c = a bytes (0: 256)
-	void port_ClearObjects()
+	// fills wObjects' first n bytes (0: 256) with value
+	void clear_objects(uint8_t value, uint8_t n)
 	{
-		uint16_t hl = wObjects;
-		cpu_.c = cpu_.a;
-		do {
-			wr8(hl++, cpu_.a);
-			cpu_.c = alu_.dec(cpu_.c);
-		} while (cpu_.c);
-		SET_HL(gb_, hl);
+		uint16_t addr = wObjects;
+		do
+			wr8(addr++, value);
+		while (--n);
 	}
 
-	// a = value to fill wObjDataPointers with
-	void port_ClearObjDataPointers()
+	void clear_obj_data_pointers(uint8_t value)
 	{
-		uint16_t hl = wObjDataPointers;
-		cpu_.c = wObjDataPointersEnd - wObjDataPointers;
-		do {
-			wr8(hl++, cpu_.a);
-			cpu_.c = alu_.dec(cpu_.c);
-		} while (cpu_.c);
-		SET_HL(gb_, hl);
+		for (uint16_t addr = wObjDataPointers; addr < wObjDataPointersEnd; addr++)
+			wr8(addr, value);
 	}
 
-	// Sets the obj state at hl by the y velocity in hffa0: states[0] below 2,
-	// states[1] below 3, states[2] below 4, else states[3]; then HomeJumpRet.
-	void set_state_by_y_vel(const uint8_t states[4])
+	// --- the shared states, plain ---
+	//
+	// The objects reach these through home's homejp wrappers (Func_3191 and
+	// the like), which push the caller's bank for HomeJumpRet to restore;
+	// they read no register on entry unless one is passed below, and their
+	// callers none after them (live.py).
+
+	bool heavy() const { return rd8(wCurObjInteractionType) & HEAVY_OBJ; }
+	// the object's position (little-endian)
+	uint16_t obj_y() const { return mem_.word(wCurObjYPos); }
+	uint16_t obj_x() const { return mem_.word(wCurObjXPos); }
+	void set_obj_y(uint16_t v) { mem_.word(wCurObjYPos) = v; }
+	void set_obj_x(uint16_t v) { mem_.word(wCurObjXPos) = v; }
+	void set_hpos_y(uint16_t v) { wr8(hYPosLo, static_cast<uint8_t>(v)); wr8(hYPosHi, static_cast<uint8_t>(v >> 8)); }
+	void set_hpos_x(uint16_t v) { wr8(hXPosLo, static_cast<uint8_t>(v)); wr8(hXPosHi, static_cast<uint8_t>(v >> 8)); }
+	uint16_t hpos_y() const { return static_cast<uint16_t>(rd8(hYPosHi) << 8 | rd8(hYPosLo)); }
+	// hPos = the object's position
+	void hpos_at_obj() { set_hpos_y(obj_y()); set_hpos_x(obj_x()); }
+	// the x of its left edge (the box's left is negative) and right edge
+	uint16_t left_edge() const { return static_cast<uint16_t>(obj_x() - static_cast<uint8_t>(-rd8(wCurObjCollBoxLeft))); }
+	uint16_t right_edge() const { return static_cast<uint16_t>(obj_x() + rd8(wCurObjCollBoxRight)); }
+	uint16_t edge(bool left) const { return left ? left_edge() : right_edge(); }
+	// its top (the box's top is negative)
+	uint16_t top() const { return static_cast<uint16_t>(obj_y() - static_cast<uint8_t>(-rd8(wCurObjCollBoxTop))); }
+	void res_flag(uint8_t bit) { wr8(wCurObjFlags, rd8(wCurObjFlags) & ~(1 << bit)); }
+
+	// A block check through home's wrapper (Func_3513 and the like),
+	// returning to ret as the asm's call does: the block function's result
+	uint8_t block(uint16_t wrapper, uint16_t ret)
 	{
-		cpu_.a = rd8(hffa0);
-		int i;
-		for (i = 0; i < 3; i++) {
-			alu_.cp(cpu_.a, (uint8_t)(2 + i));
-			if (cpu_.f & FLAG_C)
-				break;
-		}
-		cpu_.a = states[i];
-		wr8(REG_HL(gb_), cpu_.a);
-		JUMP(HomeJumpRet);
+		gb_call_ret(gb_, wrapper, ret);
+		return cpu_.a;
 	}
 
-	void port_Func_62d57()
+	// A velocity table's next entry: the one at index's offset (an 8-bit
+	// add, within the table's page; heavy objects' entries `heavy_ofs` on).
+	// $80 ends a table, which then repeats its last entry; otherwise the
+	// index goes on.
+	uint8_t table_step(uint16_t index, uint16_t table, uint8_t heavy_ofs)
 	{
-		static const uint8_t states[4] = {OBJSTATE_STUN_LEFT_START, OBJSTATE_20, OBJSTATE_22, OBJSTATE_24};
-		set_state_by_y_vel(states);
+		uint8_t c = static_cast<uint8_t>(rd8(index) + static_cast<uint8_t>(table));
+		if (heavy())
+			c = static_cast<uint8_t>(c + heavy_ofs);
+		uint16_t page = table & 0xff00;
+		uint8_t v = rd8(static_cast<uint16_t>(page | c));
+		if (v == 0x80)
+			v = rd8(static_cast<uint16_t>(page | static_cast<uint8_t>(c - 1)));
+		else
+			wr8(index, static_cast<uint8_t>(rd8(index) + 1));
+		return v;
 	}
 
-	void port_Func_62e31()
+	void home_jump_ret() { JUMP(HomeJumpRet); }
+
+	// The state at `state` by the y velocity in hffa0: below 2, 3, 4, or
+	// more; then HomeJumpRet.
+	void set_state_by_y_vel(uint16_t state, bool left)
 	{
-		static const uint8_t states[4] = {OBJSTATE_STUN_RIGHT_START, OBJSTATE_21, OBJSTATE_23, OBJSTATE_25};
-		set_state_by_y_vel(states);
+		static const uint8_t states[2][4] = {
+			{OBJSTATE_STUN_RIGHT_START, OBJSTATE_21, OBJSTATE_23, OBJSTATE_25},
+			{OBJSTATE_STUN_LEFT_START, OBJSTATE_20, OBJSTATE_22, OBJSTATE_24},
+		};
+		uint8_t v = rd8(hffa0);
+		int i = v < 2 ? 0 : v < 3 ? 1 : v < 4 ? 2 : 3;
+		wr8(state, states[left][i]);
+		home_jump_ret();
 	}
 
-	// Stores hPos's y in wCurObjYPos, and updates OBJ_VAR_2 by the slope the
-	// object is on: set to `set` on the slope `slope_set`, kept on the slope
-	// `slope_keep`, else counted down to 0. Then hl = OBJ_STATE, and on to
-	// `next`.
-	void store_y_pos_by_slope(uint8_t slope_keep, uint8_t slope_set, bool dec, uint16_t next)
+
+	// Lands at hPos's y, with OBJ_VAR_2 by the slope it's on: set (less one
+	// for the right slope, which the left fall lands on) on the slope it
+	// falls along, kept on the other, else counted down to 0; then the
+	// state by its y velocity.
+	void land_by_slope(bool left)
 	{
 		wr8(wCurObjYPos + 0, rd8(hYPosLo));
-		cpu_.a = rd8(hYPosHi);
-		wr8(wCurObjYPos + 1, cpu_.a);
-		SET_HL(gb_, wCurObjYPos + 1);
-		cpu_.a = alu_.and_(rd8(wObjSlopeInteraction), 0x0f);
-		alu_.cp(cpu_.a, slope_keep);
-		if (!(cpu_.f & FLAG_Z)) {
-			cpu_.l = OBJ_VAR_2;
-			uint16_t hl = REG_HL(gb_);
-			alu_.cp(cpu_.a, slope_set);
-			if (cpu_.f & FLAG_Z) {
-				if (dec)
-					cpu_.a = alu_.dec(cpu_.a);
-				wr8(hl, cpu_.a);
-			} else {
-				cpu_.a = rd8(hl);
-				if (alu_.and_(cpu_.a, cpu_.a))
-					wr8(hl, alu_.dec(rd8(hl)));
-			}
+		wr8(wCurObjYPos + 1, rd8(hYPosHi));
+		uint8_t slope = rd8(wObjSlopeInteraction) & 0x0f;
+		if (slope != (left ? RIGHT_SLOPE : LEFT_SLOPE)) {
+			if (slope == (left ? 0x02 : 0x01))
+				wr8(wCurObjVar2, left ? static_cast<uint8_t>(slope - 1) : slope);
+			else if (rd8(wCurObjVar2))
+				wr8(wCurObjVar2, static_cast<uint8_t>(rd8(wCurObjVar2) - 1));
 		}
-		cpu_.l = OBJ_STATE;
-		JUMP_TO(next); // fallthrough
+		set_state_by_y_vel(wCurObjState, left);
 	}
 
-	void port_Func_62d34() { store_y_pos_by_slope(RIGHT_SLOPE, 0x02, true, ADDR_Func_62d57); }
-	void port_Func_62e0f() { store_y_pos_by_slope(LEFT_SLOPE, 0x01, false, ADDR_Func_62e31); }
+	void port_Func_62d34() { land_by_slope(true); }
+	void port_Func_62e0f() { land_by_slope(false); }
+
+	// moves the object var2 to the side (home's MoveObject*ByVar2)
+	void move_x_by_var2(bool left)
+	{
+		uint16_t x = obj_x();
+		set_obj_x(static_cast<uint16_t>(left ? x - rd8(wCurObjVar2) : x + rd8(wCurObjVar2)));
+	}
+
+	// let go once it's far enough off screen on the side it moves to
+	void let_go_off_screen(bool left)
+	{
+		uint8_t x = static_cast<uint8_t>(rd8(wCurObjScreenXPos) + 0x28);
+		if (left ? x >= 0xf0 : x < 0x10)
+			res_flag(OBJFLAG_GRABBED_F);
+	}
+
+	// An object thrown to the left (Func_62ec3) or right (Func_62faa), up by
+	// the table of y movements at table (indexed by OBJ_VAR_3, +$10 if
+	// heavy; its entries are negative) and sideways by OBJ_VAR_2, until it
+	// hits something or OBJ_STATE_DURATION runs out.
+	void thrown_object_movement(bool left, uint16_t table)
+	{
+		uint16_t routine = left ? ADDR_Func_62ec3 : ADDR_Func_62faa;
+		uint8_t v = table_step(wCurObjVar3, table, 0x10);
+		if (v) {
+			// an add with the carry taken as a negative's
+			uint8_t lo = rd8(wCurObjYPos);
+			wr8(wCurObjYPos, static_cast<uint8_t>(lo + v));
+			if (lo + v < 0x100)
+				wr8(wCurObjYPos + 1, static_cast<uint8_t>(rd8(wCurObjYPos + 1) - 1));
+		}
+		move_x_by_var2(left);
+		let_go_off_screen(left);
+
+		// its top, then 8 above its feet at the side it moves to
+		set_hpos_y(top());
+		set_hpos_x(obj_x());
+		bool collided = block(ADDR_Func_358b, static_cast<uint16_t>(routine + 0x50)) & 0x0f;
+		if (!collided) {
+			set_hpos_y(static_cast<uint16_t>(obj_y() - 8));
+			set_hpos_x(edge(left));
+			collided = block(ADDR_Func_3513, static_cast<uint16_t>(routine + (left ? 0x73 : 0x70))) & 0x0f;
+		}
+		if (!collided) {
+			uint8_t d = static_cast<uint8_t>(rd8(wCurObjStateDuration) - 1);
+			wr8(wCurObjStateDuration, d);
+			if (d) {
+				home_jump_ret();
+				return;
+			}
+		}
+		// stops when it lands or hits something, the other way after a hit
+		wr8(wCurObjState, (collided == left) ? OBJSTATE_27 : OBJSTATE_26);
+		res_flag(OBJFLAG_NO_COLLISION_F);
+		home_jump_ret();
+	}
+
+	// The thrown states' entries jump on into these with bc set, as the
+	// asm's jr does (a hook each, so the fuzzer checks each part alone)
+	void thrown(bool left, uint16_t table)
+	{
+		SET_BC(gb_, table);
+		JUMP_TO(left ? ADDR_Func_62ec3 : ADDR_Func_62faa);
+	}
+
+	// bc = the y movement table
+	void port_Func_62ec3() { thrown_object_movement(true, REG_BC(gb_)); }
+	void port_Func_62faa() { thrown_object_movement(false, REG_BC(gb_)); }
+
+	// output: e = number of objects with OBJFLAG_ACTIVE and OBJFLAG_TRANSIENT
+	void port__CountActiveTransientObjects()
+	{
+		cpu_.e = 0;
+		cpu_.d = OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT;
+		for (int n = 0; n < NUM_OBJECTS; n++) {
+			cpu_.a = alu_.and_(rd8(wObj1Flags + n * OBJ_STRUCT_SIZE), cpu_.d);
+			alu_.cp(cpu_.a, cpu_.d);
+			if (cpu_.f & FLAG_Z)
+				cpu_.e = alu_.inc(cpu_.e);
+		}
+	}
+
+	// y += the signed v
+	void add_signed_y(uint8_t v) { set_obj_y(static_cast<uint16_t>(obj_y() + static_cast<int8_t>(v))); }
+
+	// Moves the current object dx pixels right (or left), and along the arc
+	// in Data_60180 (Data_601a0 if heavy), indexed by OBJ_VAR_3.
+	void move_obj_in_arc(bool right, uint8_t dx)
+	{
+		uint16_t x = obj_x();
+		set_obj_x(static_cast<uint16_t>(right ? x + dx : x - dx));
+		uint8_t v = table_step(wCurObjVar3, ADDR_Data_60180,
+			static_cast<uint8_t>(ADDR_Data_601a0 - ADDR_Data_60180));
+		wr8(hffa0, v);
+		add_signed_y(v);
+		no_actions();
+		home_jump_ret();
+	}
+
+	void no_actions() { wr8(wCurObjAction, (1 << NO_ACTIONS_F) | 1); } // no_actions_for 1
+
+
+	// When there's no floor under it (Func_3543): `state`
+	void fall_if_no_floor(uint16_t routine, uint8_t state)
+	{
+		hpos_at_obj();
+		if (!block(ADDR_Func_3543, static_cast<uint16_t>(routine + 0x12)))
+			wr8(wCurObjState, state);
+		home_jump_ret();
+	}
+
+	void port_Func_628ea() { fall_if_no_floor(ADDR_Func_628ea, OBJSTATE_12); }
+	void port_Func_62908() { fall_if_no_floor(ADDR_Func_62908, OBJSTATE_STANDING_FALL_START); }
+
+	// --- thrown object state entries ---
+
+	// the state, OBJ_VAR_3 cleared and OBJ_STATE_DURATION by weight
+	void set_thrown_state(uint8_t state, uint8_t light, uint8_t heavy_duration)
+	{
+		wr8(wCurObjState, state);
+		wr8(wCurObjVar3, 0);
+		wr8(wCurObjStateDuration, heavy() ? heavy_duration : light);
+	}
+
+	void port_Func_62e74() { set_thrown_state(OBJSTATE_54, 0x06, 0x02); thrown(true, ADDR_Data_60300); }
+	void port_Func_62e8a() { thrown(true, ADDR_Data_60300); }
+	void port_Func_62e8f() { set_thrown_state(OBJSTATE_50, 0x04, 0x01); thrown(true, ADDR_Data_602c0); }
+	void port_Func_62ea5() { thrown(true, ADDR_Data_602c0); }
+	void port_Func_62eaa() { set_thrown_state(OBJSTATE_52, 0x05, 0x02); thrown(true, ADDR_Data_602e0); }
+	void port_Func_62ec0() { thrown(true, ADDR_Data_602e0); }
+	void port_Func_62f5b() { set_thrown_state(OBJSTATE_55, 0x06, 0x02); thrown(false, ADDR_Data_60300); }
+	void port_Func_62f71() { thrown(false, ADDR_Data_60300); }
+	void port_Func_62f76() { set_thrown_state(OBJSTATE_51, 0x04, 0x01); thrown(false, ADDR_Data_602c0); }
+	void port_Func_62f8c() { thrown(false, ADDR_Data_602c0); }
+	void port_Func_62f91() { set_thrown_state(OBJSTATE_53, 0x05, 0x02); thrown(false, ADDR_Data_602e0); }
+	void port_Func_62fa7() { thrown(false, ADDR_Data_602e0); }
+
+	// --- arcs ---
+
+	// OBJ_VAR_2, times 4 if `garlic` and the power up is at least GARLIC
+	uint8_t arc_dx(bool garlic)
+	{
+		uint8_t v = rd8(wCurObjVar2);
+		if (garlic && rd8(wEffectivePowerUp) >= GARLIC)
+			v = static_cast<uint8_t>(v << 2);
+		return v;
+	}
+
+	void port_Func_6283a() { move_obj_in_arc(true, arc_dx(false)); }
+	void port_Func_62840() { move_obj_in_arc(true, arc_dx(true)); }
+	void port_Func_62892() { move_obj_in_arc(false, arc_dx(false)); }
+	void port_Func_62898() { move_obj_in_arc(false, arc_dx(true)); }
+
+	// --- falling ---
+
+	// the next y velocity from the light or heavy table, into hffa0
+	uint8_t obj_y_vel(uint16_t light, uint16_t heavy_table)
+	{
+		uint8_t v = table_step(wCurObjVar3, light, static_cast<uint8_t>(heavy_table - light));
+		wr8(hffa0, v);
+		return v;
+	}
+
+	// The end of a fall: checks the floor (Func_352b, returning to ret) and
+	// lands in the state land_state, or on a slope, or vanishes in water/sand.
+	void obj_fall_and_land(uint16_t ret, uint8_t land_state)
+	{
+		hpos_at_obj();
+		wr8(wObjSlopeInteraction, 0);
+		if (!block(ADDR_Func_352b, ret)) {
+			if (rd8(wIsInWaterOrSand))
+				wr8(wCurObjState, OBJSTATE_VANISH_TOUCH);
+			home_jump_ret();
+			return;
+		}
+		wr8(wCurObjYPos + 0, rd8(hYPosLo));
+		wr8(wCurObjYPos + 1, rd8(hYPosHi));
+		uint8_t slope = rd8(wObjSlopeInteraction);
+		if (!slope) {
+			wr8(wCurObjState, land_state);
+			home_jump_ret();
+			return;
+		}
+		wr8(wCurObjVar2, 0x02);
+		set_state_by_y_vel(wCurObjState, (slope & 0x0f) == 0x01);
+	}
+
+	void port_Func_62926()
+	{
+		add_signed_y(obj_y_vel(ADDR_Data_60040, ADDR_Data_60060));
+		obj_fall_and_land(ADDR_Func_62926 + 0x48, OBJSTATE_0F);
+	}
+
+	// up, by a table of negative entries
+	void port_Func_629a6()
+	{
+		set_obj_y(static_cast<uint16_t>(obj_y() + obj_y_vel(ADDR_Data_602a0, ADDR_Data_602b0) - 0x100));
+		home_jump_ret();
+	}
+
+	void port__ObjState_StandingFall()
+	{
+		// speed up animation by 3x
+		if (rd8(wCurObjFrameDuration) >= 3)
+			wr8(wCurObjFrameDuration, static_cast<uint8_t>(rd8(wCurObjFrameDuration) - 3));
+		add_signed_y(obj_y_vel(ADDR_StandingFallYVel_Light, ADDR_StandingFallYVel_Heavy));
+		obj_fall_and_land(ADDR__ObjState_StandingFall + 0x53, OBJSTATE_TURN_AROUND_START);
+	}
+
+	// down, by a table of positive entries
+	void port__ObjState_Fall()
+	{
+		set_obj_y(static_cast<uint16_t>(obj_y() + obj_y_vel(ADDR_FallingYVel_Light, ADDR_FallingYVel_Heavy)));
+		obj_fall_and_land(ADDR__ObjState_Fall + 0x3d, OBJSTATE_LAND);
+	}
+
+	// Func_627f0 / Func_62690: moves the object up or down by the table entry
+	// at OBJ_VAR_3 (table_z if b was 1, else table_nz; +$20 if heavy) and
+	// advances OBJ_VAR_3 until the table's $80 end marker. OBJ_VAR_3 and
+	// OBJ_Y_POS are at `page` (h on entry, the object's page from its
+	// caller's MoveObject*ByVar2 / res).
+	void obj_y_by_table(uint16_t table_z, uint16_t table_nz, uint8_t b, uint16_t page)
+	{
+		page &= 0xff00;
+		uint8_t v = table_step(static_cast<uint16_t>(page | OBJ_VAR_3), b == 1 ? table_z : table_nz, 0x20);
+		wr8(hffa0, v);
+		if (v) {
+			uint16_t ypos = static_cast<uint16_t>(page | OBJ_Y_POS);
+			bool negative = v >= 0x80;
+			uint8_t lo = rd8(ypos);
+			wr8(ypos, static_cast<uint8_t>(lo + v));
+			bool carry = lo + v >= 0x100;
+			wr8(wCurObjStateDuration, negative ? 0x00 : 0x01);
+			uint16_t hi = static_cast<uint16_t>(ypos + 1);
+			if (negative && !carry)
+				wr8(hi, static_cast<uint8_t>(rd8(hi) - 1));
+			else if (!negative && carry)
+				wr8(hi, static_cast<uint8_t>(rd8(hi) + 1));
+		}
+		home_jump_ret();
+	}
+
+	// b = 1 for the first table; h = the object's page
+	void port_Func_627f0() { obj_y_by_table(ADDR_Data_60140, ADDR_Data_600c0, cpu_.b, REG_HL(gb_)); }
+	void port_Func_62690() { obj_y_by_table(ADDR_Data_60100, ADDR_Data_60080, cpu_.b, REG_HL(gb_)); }
+
+	// --- misc states ---
+
+	void port_Func_6303f()
+	{
+		wr8(wCurObjState, OBJSTATE_1B);
+		wr8(wCurObjVar3, 0);
+		wr8(wCurObjStateDuration, 0x07);
+		home_jump_ret();
+	}
+
+	void port_Func_63050()
+	{
+		uint8_t d = static_cast<uint8_t>(rd8(wCurObjStateDuration) - 1);
+		wr8(wCurObjStateDuration, d);
+		if (d) {
+			port_Func_629a6();
+			return;
+		}
+		wr8(wCurObjState, OBJSTATE_STANDING_FALL_START);
+		home_jump_ret();
+	}
+
+	void port_Func_6305f()
+	{
+		wr8(wCurObjState, (rd8(rDIV) & 1) ? OBJSTATE_WOBBLE_LEFT : OBJSTATE_WOBBLE_RIGHT);
+		wr8(wCurObjVar3, 0);
+		wr8(wCurObjVar2, 0x01);
+		wr8(wCurObjStateDuration, 0x04);
+		home_jump_ret();
+	}
+
+	// --- bumping and knocked-back objects (the register-level helpers are
+	// for the code further down) ---
 
 	// hPos = wCurObjYPos + (-dy, -dx), with the asm's sub / sbc
 	void set_hpos_sub(uint16_t hl, uint8_t dy)
@@ -274,500 +503,6 @@ public:
 		cpu_.b = cpu_.a;
 		return cpu_.b;
 	}
-
-	// An object thrown to the left (Func_62ec3) or right (Func_62faa): bc =
-	// table of y movements, indexed by OBJ_VAR_3 (+$10 if heavy).
-	void thrown_object_movement(bool left)
-	{
-		uint16_t routine = left ? ADDR_Func_62ec3 : ADDR_Func_62faa;
-		uint16_t hl = wCurObjVar3;
-		SET_HL(gb_, hl);
-		cpu_.a = alu_.add(rd8(hl), cpu_.c);
-		cpu_.c = cpu_.a;
-		cpu_.a = alu_.rla(rd8(wCurObjInteractionType));
-		if (cpu_.f & FLAG_C) { // heavy
-			cpu_.a = alu_.add(cpu_.c, 0x10);
-			cpu_.c = cpu_.a;
-		}
-		cpu_.a = rd8(REG_BC(gb_));
-		alu_.cp(cpu_.a, 0x80);
-		if (cpu_.f & FLAG_Z) {
-			cpu_.c = alu_.dec(cpu_.c);
-			cpu_.a = rd8(REG_BC(gb_));
-		} else {
-			wr8(hl, alu_.inc(rd8(hl)));
-		}
-		if (alu_.and_(cpu_.a, cpu_.a)) {
-			cpu_.l = OBJ_Y_POS;
-			hl = REG_HL(gb_);
-			cpu_.c = rd8(hl);
-			cpu_.a = alu_.add(cpu_.a, cpu_.c);
-			wr8(hl++, cpu_.a);
-			SET_HL(gb_, hl);
-			if (!(cpu_.f & FLAG_C))
-				wr8(hl, alu_.dec(rd8(hl)));
-		}
-		if (left)
-			CALL(MoveObjectLeftByVar2);
-		else
-			CALL(MoveObjectRightByVar2);
-
-		cpu_.a = alu_.add(rd8(wCurObjScreenXPos), 0x28);
-		alu_.cp(cpu_.a, left ? 0xf0 : 0x10);
-		if (left ? !(cpu_.f & FLAG_C) : (cpu_.f & FLAG_C)) {
-			cpu_.l = OBJ_FLAGS;
-			hl = REG_HL(gb_);
-			wr8(hl, (uint8_t)(rd8(hl) & ~(1 << OBJFLAG_GRABBED_F)));
-		}
-
-		uint8_t b = neg_into_b(wCurObjCollBoxTop);
-		set_hpos_sub(wCurObjYPos, b);
-		hl = REG_HL(gb_);
-		cpu_.a = rd8(hl++);
-		wr8(hXPosLo, cpu_.a);
-		cpu_.a = rd8(hl++);
-		wr8(hXPosHi, cpu_.a);
-		SET_HL(gb_, hl);
-		gb_call_ret(gb_, ADDR_Func_358b, (uint16_t)(routine + 0x50));
-		cpu_.a = alu_.and_(cpu_.a, 0x0f);
-		bool collided = cpu_.a != 0;
-		if (!collided) {
-			set_hpos_sub(wCurObjYPos, 8);
-			hl = REG_HL(gb_);
-			if (left) {
-				b = neg_into_b(wCurObjCollBoxLeft);
-				cpu_.a = alu_.sub(rd8(hl++), b);
-				wr8(hXPosLo, cpu_.a);
-				cpu_.a = alu_.sbc(rd8(hl++), 0);
-				wr8(hXPosHi, cpu_.a);
-			} else {
-				cpu_.a = alu_.add(rd8(wCurObjCollBoxRight), rd8(hl));
-				wr8(hXPosLo, cpu_.a);
-				hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl + 1)); // inc l
-				cpu_.a = alu_.adc(rd8(hl), 0);
-				wr8(hXPosHi, cpu_.a);
-			}
-			SET_HL(gb_, hl);
-			gb_call_ret(gb_, ADDR_Func_3513, (uint16_t)(routine + (left ? 0x73 : 0x70)));
-			cpu_.a = alu_.and_(cpu_.a, 0x0f);
-			collided = cpu_.a != 0;
-		}
-		if (!collided) {
-			SET_HL(gb_, wCurObjStateDuration);
-			uint8_t d = alu_.dec(rd8(wCurObjStateDuration));
-			wr8(wCurObjStateDuration, d);
-			if (d) {
-				JUMP(HomeJumpRet);
-				return;
-			}
-		}
-		// stops when it lands or hits something, the other way after a hit
-		cpu_.a = (collided == left) ? OBJSTATE_27 : OBJSTATE_26;
-		wr8(wCurObjState, cpu_.a);
-		SET_HL(gb_, wCurObjFlags);
-		wr8(wCurObjFlags, (uint8_t)(rd8(wCurObjFlags) & ~(1 << OBJFLAG_NO_COLLISION_F)));
-		JUMP(HomeJumpRet);
-	}
-
-	void port_Func_62ec3() { thrown_object_movement(true); }
-	void port_Func_62faa() { thrown_object_movement(false); }
-
-	// output: e = number of objects with OBJFLAG_ACTIVE and OBJFLAG_TRANSIENT
-	void port__CountActiveTransientObjects()
-	{
-		cpu_.e = 0;
-		cpu_.d = OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT;
-		for (int n = 0; n < NUM_OBJECTS; n++) {
-			cpu_.a = alu_.and_(rd8(wObj1Flags + n * OBJ_STRUCT_SIZE), cpu_.d);
-			alu_.cp(cpu_.a, cpu_.d);
-			if (cpu_.f & FLAG_Z)
-				cpu_.e = alu_.inc(cpu_.e);
-		}
-	}
-
-	// Moves the current object b pixels right (or left), and along the arc in
-	// Data_60180 (Data_601a0 if heavy), indexed by OBJ_VAR_3.
-	void move_obj_in_arc(bool right)
-	{
-		uint16_t hl = wCurObjXPos;
-		uint8_t x = rd8(hl);
-		cpu_.a = right ? alu_.add(x, cpu_.b) : alu_.sub(x, cpu_.b);
-		wr8(hl++, cpu_.a);
-		if (cpu_.f & FLAG_C)
-			wr8(hl, right ? alu_.inc(rd8(hl)) : alu_.dec(rd8(hl)));
-
-		hl = wCurObjVar3;
-		cpu_.b = (uint8_t)(ADDR_Data_60180 >> 8);
-		cpu_.a = alu_.add(rd8(hl), (uint8_t)ADDR_Data_60180);
-		cpu_.c = cpu_.a;
-		cpu_.a = alu_.rla(rd8(wCurObjInteractionType));
-		if (cpu_.f & FLAG_C) { // heavy
-			cpu_.a = alu_.add(cpu_.c, (uint8_t)(ADDR_Data_601a0 - ADDR_Data_60180));
-			cpu_.c = cpu_.a;
-		}
-		cpu_.a = rd8(REG_BC(gb_));
-		alu_.cp(cpu_.a, 0x80);
-		if (cpu_.f & FLAG_Z) {
-			cpu_.c = alu_.dec(cpu_.c);
-			cpu_.a = rd8(REG_BC(gb_));
-		} else {
-			wr8(hl, alu_.inc(rd8(hl)));
-		}
-
-		wr8(hffa0, cpu_.a);
-		hl = (uint16_t)((hl & 0xff00) | OBJ_Y_POS);
-		alu_.cp(cpu_.a, 0x80);
-		bool negative = !(cpu_.f & FLAG_C);
-		cpu_.c = rd8(hl);
-		cpu_.a = alu_.add(cpu_.a, cpu_.c);
-		wr8(hl++, cpu_.a);
-		if (negative && !(cpu_.f & FLAG_C))
-			wr8(hl, alu_.dec(rd8(hl)));
-		else if (!negative && (cpu_.f & FLAG_C))
-			wr8(hl, alu_.inc(rd8(hl)));
-		SET_HL(gb_, hl);
-
-		cpu_.a = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
-		wr8(wCurObjAction, cpu_.a);
-		JUMP(HomeJumpRet);
-	}
-
-	void port_Func_6284f() { move_obj_in_arc(true); }
-	void port_Func_628a7() { move_obj_in_arc(false); }
-
-	void port_Func_628ea()
-	{
-		uint16_t hl = wCurObjYPos;
-		wr8(hYPosLo, rd8(hl++));
-		wr8(hYPosHi, rd8(hl++));
-		wr8(hXPosLo, rd8(hl++));
-		cpu_.a = rd8(hl);
-		wr8(hXPosHi, cpu_.a);
-		SET_HL(gb_, hl);
-		gb_call_ret(gb_, ADDR_Func_3543, ADDR_Func_628ea + 0x12);
-		if (!alu_.and_(cpu_.a, cpu_.a)) {
-			cpu_.a = OBJSTATE_12;
-			wr8(wCurObjState, OBJSTATE_12);
-		}
-		JUMP(HomeJumpRet);
-	}
-
-	// --- thrown object state entries ---
-
-	// ld hl, wCurObjState / ld a, state / ld [hld], a / dec l / xor a /
-	// ld [hld], a (OBJ_VAR_3) / ld a, [wCurObjInteractionType] / rla /
-	// ld a, light / jr nc / ld a, heavy / ld [wCurObjStateDuration], a
-	void set_thrown_state(uint8_t state, uint8_t light, uint8_t heavy)
-	{
-		uint16_t hl = wCurObjState;
-		wr8(hl--, state);
-		hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl - 1)); // dec l
-		xor_a();
-		wr8(hl--, 0);
-		SET_HL(gb_, hl);
-		cpu_.a = alu_.rla(rd8(wCurObjInteractionType));
-		cpu_.a = CF ? heavy : light;
-		wr8(wCurObjStateDuration, cpu_.a);
-	}
-
-	void thrown_left(uint16_t data)
-	{
-		SET_BC(gb_, data);
-		JUMP_TO(ADDR_Func_62ec3);
-	}
-
-	void thrown_right(uint16_t data)
-	{
-		SET_BC(gb_, data);
-		JUMP_TO(ADDR_Func_62faa);
-	}
-
-	void port_Func_62e74() { set_thrown_state(OBJSTATE_54, 0x06, 0x02); thrown_left(ADDR_Data_60300); }
-	void port_Func_62e8a() { thrown_left(ADDR_Data_60300); }
-	void port_Func_62e8f() { set_thrown_state(OBJSTATE_50, 0x04, 0x01); thrown_left(ADDR_Data_602c0); }
-	void port_Func_62ea5() { thrown_left(ADDR_Data_602c0); }
-	void port_Func_62eaa() { set_thrown_state(OBJSTATE_52, 0x05, 0x02); thrown_left(ADDR_Data_602e0); }
-	void port_Func_62ec0() { thrown_left(ADDR_Data_602e0); }
-	void port_Func_62f5b() { set_thrown_state(OBJSTATE_55, 0x06, 0x02); thrown_right(ADDR_Data_60300); }
-	void port_Func_62f71() { thrown_right(ADDR_Data_60300); }
-	void port_Func_62f76() { set_thrown_state(OBJSTATE_51, 0x04, 0x01); thrown_right(ADDR_Data_602c0); }
-	void port_Func_62f8c() { thrown_right(ADDR_Data_602c0); }
-	void port_Func_62f91() { set_thrown_state(OBJSTATE_53, 0x05, 0x02); thrown_right(ADDR_Data_602e0); }
-	void port_Func_62fa7() { thrown_right(ADDR_Data_602e0); }
-
-	// --- arcs ---
-
-	// ld a, [wCurObjVar2] / ld b, a; *4 if the power up is at least GARLIC
-	void var2_into_b(bool garlic)
-	{
-		cpu_.a = rd8(wCurObjVar2);
-		cpu_.b = cpu_.a;
-		if (!garlic)
-			return;
-		ld_cp(wEffectivePowerUp, GARLIC);
-		if (CF)
-			return;
-		cpu_.b = alu_.sla(cpu_.b);
-		cpu_.b = alu_.sla(cpu_.b);
-	}
-
-	void port_Func_6283a() { var2_into_b(false); JUMP_TO(ADDR_Func_6284f); }
-	void port_Func_62840() { var2_into_b(true); JUMP_TO(ADDR_Func_6284f); }
-	void port_Func_62892() { var2_into_b(false); JUMP_TO(ADDR_Func_628a7); }
-	void port_Func_62898() { var2_into_b(true); JUMP_TO(ADDR_Func_628a7); }
-
-	void port_Func_62908()
-	{
-		uint16_t hl = wCurObjYPos;
-		wr8(hYPosLo, rd8(hl++));
-		wr8(hYPosHi, rd8(hl++));
-		wr8(hXPosLo, rd8(hl++));
-		cpu_.a = rd8(hl);
-		wr8(hXPosHi, cpu_.a);
-		SET_HL(gb_, hl);
-		gb_call_ret(gb_, ADDR_Func_3543, ADDR_Func_62908 + 0x12);
-		if (!alu_.and_(cpu_.a, cpu_.a))
-			st(wCurObjState, OBJSTATE_STANDING_FALL_START);
-		JUMP(HomeJumpRet);
-	}
-
-	// --- y velocity tables ---
-
-	// hl = wCurObjVar3, bc = light + OBJ_VAR_3 (or the heavy table), a = [bc],
-	// the last entry ($80 ends the table) repeats, else OBJ_VAR_3 goes up.
-	uint8_t obj_y_vel(uint16_t light, uint16_t heavy)
-	{
-		uint16_t hl = wCurObjVar3;
-		SET_HL(gb_, hl);
-		cpu_.b = (uint8_t)(light >> 8);
-		cpu_.a = alu_.add(rd8(hl), (uint8_t)light);
-		cpu_.c = cpu_.a;
-		cpu_.a = alu_.rla(rd8(wCurObjInteractionType));
-		if (CF) {
-			cpu_.a = alu_.add(cpu_.c, (uint8_t)(heavy - light));
-			cpu_.c = cpu_.a;
-		}
-		cpu_.a = rd8(REG_BC(gb_));
-		alu_.cp(cpu_.a, 0x80);
-		if (ZF) {
-			cpu_.c = alu_.dec(cpu_.c);
-			cpu_.a = rd8(REG_BC(gb_));
-		} else {
-			wr8(hl, alu_.inc(rd8(hl)));
-		}
-		return cpu_.a;
-	}
-
-	enum { ADD_SIGNED, ADD_POSITIVE, ADD_NEGATIVE };
-
-	// ld l, OBJ_Y_POS / (cp $80) / ld c, [hl] / add c / ld [hli], a and the
-	// carry into the high byte for a positive / negative a
-	void add_obj_y(int mode)
-	{
-		uint16_t hl = (uint16_t)((REG_HL(gb_) & 0xff00) | OBJ_Y_POS);
-		bool negative = mode == ADD_NEGATIVE;
-		if (mode == ADD_SIGNED) {
-			alu_.cp(cpu_.a, 0x80);
-			negative = !CF;
-		}
-		cpu_.c = rd8(hl);
-		cpu_.a = alu_.add(cpu_.a, cpu_.c);
-		wr8(hl++, cpu_.a);
-		SET_HL(gb_, hl);
-		if (negative && !CF)
-			wr8(hl, alu_.dec(rd8(hl)));
-		else if (!negative && CF)
-			wr8(hl, alu_.inc(rd8(hl)));
-	}
-
-	// hPos = wCurObjYPos..; hl = wCurObjYPos + 3
-	void obj_pos_to_hpos()
-	{
-		uint16_t hl = wCurObjYPos;
-		cpu_.a = rd8(hl++);
-		wr8(hYPosLo, cpu_.a);
-		cpu_.a = rd8(hl++);
-		wr8(hYPosHi, cpu_.a);
-		cpu_.a = rd8(hl++);
-		wr8(hXPosLo, cpu_.a);
-		cpu_.a = rd8(hl);
-		wr8(hXPosHi, cpu_.a);
-		SET_HL(gb_, hl);
-	}
-
-	// The end of a fall: checks the floor (Func_352b, returning to ret) and
-	// lands in the state land_state, or on a slope, or vanishes in water/sand.
-	void obj_fall_and_land(uint16_t ret, uint8_t land_state)
-	{
-		obj_pos_to_hpos();
-		xor_a();
-		wr8(wObjSlopeInteraction, 0);
-		gb_call_ret(gb_, ADDR_Func_352b, ret);
-		if (!alu_.and_(cpu_.a, cpu_.a)) {
-			if (ld_and(wIsInWaterOrSand))
-				st(wCurObjState, OBJSTATE_VANISH_TOUCH);
-			JUMP(HomeJumpRet);
-			return;
-		}
-		uint16_t hl = wCurObjYPos;
-		cpu_.a = rd8(hYPosLo);
-		wr8(hl++, cpu_.a);
-		cpu_.a = rd8(hYPosHi);
-		wr8(hl, cpu_.a);
-		hl = (uint16_t)((hl & 0xff00) | OBJ_STATE);
-		SET_HL(gb_, hl);
-		if (!ld_and(wObjSlopeInteraction)) {
-			cpu_.a = land_state;
-			wr8(hl, land_state);
-			JUMP(HomeJumpRet);
-			return;
-		}
-		cpu_.a = alu_.and_(cpu_.a, 0x0f);
-		alu_.cp(cpu_.a, 0x01);
-		st(wCurObjVar2, 0x02);
-		JUMP_TO(ZF ? ADDR_Func_62d57 : ADDR_Func_62e31);
-	}
-
-	void port_Func_62926()
-	{
-		cpu_.a = obj_y_vel(ADDR_Data_60040, ADDR_Data_60060);
-		wr8(hffa0, cpu_.a);
-		add_obj_y(ADD_SIGNED);
-		obj_fall_and_land(ADDR_Func_62926 + 0x48, OBJSTATE_0F);
-	}
-
-	void port_Func_629a6()
-	{
-		cpu_.a = obj_y_vel(ADDR_Data_602a0, ADDR_Data_602b0);
-		wr8(hffa0, cpu_.a);
-		add_obj_y(ADD_NEGATIVE);
-		JUMP(HomeJumpRet);
-	}
-
-	void port__ObjState_StandingFall()
-	{
-		// speed up animation by 3x
-		SET_HL(gb_, wCurObjFrameDuration);
-		cpu_.a = rd8(wCurObjFrameDuration);
-		alu_.cp(cpu_.a, 3);
-		if (!CF) {
-			cpu_.a = alu_.sub(cpu_.a, 3);
-			wr8(wCurObjFrameDuration, cpu_.a);
-		}
-		cpu_.a = obj_y_vel(ADDR_StandingFallYVel_Light, ADDR_StandingFallYVel_Heavy);
-		wr8(hffa0, cpu_.a);
-		add_obj_y(ADD_SIGNED);
-		obj_fall_and_land(ADDR__ObjState_StandingFall + 0x53, OBJSTATE_TURN_AROUND_START);
-	}
-
-	void port__ObjState_Fall()
-	{
-		cpu_.a = obj_y_vel(ADDR_FallingYVel_Light, ADDR_FallingYVel_Heavy);
-		wr8(hffa0, cpu_.a);
-		add_obj_y(ADD_POSITIVE);
-		obj_fall_and_land(ADDR__ObjState_Fall + 0x3d, OBJSTATE_LAND);
-	}
-
-	// Func_627f0 / Func_62690: moves the object up or down by the table entry
-	// at OBJ_VAR_3 (table_z if b was 1, else table_nz; +$20 if heavy) and
-	// advances OBJ_VAR_3 until the table's $80 end marker.
-	void obj_y_by_table(uint16_t table_z, uint16_t table_nz)
-	{
-		uint16_t hl = (uint16_t)((REG_HL(gb_) & 0xff00) | OBJ_VAR_3);
-		SET_HL(gb_, hl);
-		cpu_.a = rd8(hl);
-		cpu_.b = alu_.dec(cpu_.b);
-		uint16_t table = ZF ? table_z : table_nz;
-		cpu_.b = (uint8_t)(table >> 8);
-		cpu_.a = alu_.add(cpu_.a, (uint8_t)table);
-		cpu_.c = cpu_.a;
-		cpu_.a = alu_.rla(rd8(wCurObjInteractionType));
-		if (CF) {
-			cpu_.a = alu_.add(cpu_.c, 0x20);
-			cpu_.c = cpu_.a;
-		}
-		cpu_.a = rd8(REG_BC(gb_));
-		alu_.cp(cpu_.a, 0x80);
-		if (ZF) {
-			cpu_.c = alu_.dec(cpu_.c);
-			cpu_.a = rd8(REG_BC(gb_));
-		} else {
-			wr8(hl, alu_.inc(rd8(hl)));
-		}
-		wr8(hffa0, cpu_.a);
-		if (!alu_.and_(cpu_.a, cpu_.a)) {
-			JUMP(HomeJumpRet);
-			return;
-		}
-		hl = (uint16_t)((hl & 0xff00) | OBJ_Y_POS);
-		alu_.cp(cpu_.a, 0x80);
-		bool negative = !CF;
-		cpu_.c = rd8(hl);
-		cpu_.a = alu_.add(cpu_.a, cpu_.c);
-		wr8(hl++, cpu_.a);
-		SET_HL(gb_, hl);
-		bool carry = CF;
-		cpu_.a = negative ? 0x00 : 0x01;
-		wr8(wCurObjStateDuration, cpu_.a);
-		if (negative && !carry)
-			wr8(hl, alu_.dec(rd8(hl)));
-		else if (!negative && carry)
-			wr8(hl, alu_.inc(rd8(hl)));
-		JUMP(HomeJumpRet);
-	}
-
-	void port_Func_627f0() { obj_y_by_table(ADDR_Data_60140, ADDR_Data_600c0); }
-	void port_Func_62690() { obj_y_by_table(ADDR_Data_60100, ADDR_Data_60080); }
-
-	// --- misc states ---
-
-	void port_Func_6303f()
-	{
-		uint16_t hl = wCurObjState;
-		wr8(hl--, OBJSTATE_1B);
-		hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl - 1)); // dec l
-		xor_a();
-		wr8(hl--, 0); // OBJ_VAR_3
-		SET_HL(gb_, hl);
-		cpu_.a = 0x07;
-		wr8(wCurObjStateDuration, 0x07);
-		JUMP(HomeJumpRet);
-	}
-
-	void port_Func_63050()
-	{
-		SET_HL(gb_, wCurObjStateDuration);
-		uint8_t d = alu_.dec(rd8(wCurObjStateDuration));
-		wr8(wCurObjStateDuration, d);
-		if (d) {
-			JUMP_TO(ADDR_Func_629a6);
-			return;
-		}
-		st(wCurObjState, OBJSTATE_STANDING_FALL_START);
-		JUMP(HomeJumpRet);
-	}
-
-	void port_Func_6305f()
-	{
-		cpu_.a = alu_.rra(rd8(rDIV));
-		cpu_.a = CF ? OBJSTATE_WOBBLE_LEFT : OBJSTATE_WOBBLE_RIGHT;
-		uint16_t hl = wCurObjState;
-		wr8(hl--, cpu_.a);
-		hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl - 1)); // dec l
-		xor_a();
-		wr8(hl--, 0); // OBJ_VAR_3
-		cpu_.a = 0x01;
-		wr8(hl--, 0x01); // OBJ_VAR_2
-		SET_HL(gb_, hl);
-		cpu_.l = alu_.dec(cpu_.l); // dec l (sets the exit flags)
-		hl = REG_HL(gb_);
-		cpu_.a = 0x04;
-		wr8(hl++, 0x04); // OBJ_STATE_DURATION
-		SET_HL(gb_, hl);
-		JUMP(HomeJumpRet);
-	}
-
-	// --- bumping and knocked-back objects ---
 
 	// res OBJFLAG_GRABBED_F of the flags at the current page (ld l, OBJ_FLAGS)
 	void res_grabbed()
@@ -809,262 +544,160 @@ public:
 		SET_HL(gb_, hl);
 	}
 
-	// hl = YPos / [hli] = hYPosLo / [hl] = hYPosHi
-	void hypos_to_obj()
-	{
-		uint16_t hl = wCurObjYPos;
-		cpu_.a = rd8(hYPosLo);
-		wr8(hl++, cpu_.a);
-		cpu_.a = rd8(hYPosHi);
-		wr8(hl, cpu_.a);
-		SET_HL(gb_, hl);
-	}
-
 	// Func_62ae5 (moving left) / Func_62bce (moving right): an object that
 	// bumped into something slides back, slowing down
 	void obj_bump_slide(bool left)
 	{
 		uint16_t routine = left ? ADDR_Func_62ae5 : ADDR_Func_62bce;
-		set_hpos_sub(wCurObjYPos, 4);
-		if (left)
-			hxpos_left_edge(REG_HL(gb_));
-		else
-			hxpos_right_edge(REG_HL(gb_));
-		gb_call_ret(gb_, ADDR_Func_3513, (uint16_t)(routine + (left ? 0x1f : 0x1c)));
-		cpu_.a = alu_.and_(cpu_.a, 0x0f);
-		if (cpu_.a) {
+		set_hpos_y(static_cast<uint16_t>(obj_y() - 4));
+		set_hpos_x(edge(left));
+		if (block(ADDR_Func_3513, static_cast<uint16_t>(routine + (left ? 0x1f : 0x1c))) & 0x0f) {
 			play_sfx(SFX_01A);
-			st(wCurObjState, left ? OBJSTATE_STUN_RIGHT_START : OBJSTATE_STUN_LEFT_START);
+			wr8(wCurObjState, left ? OBJSTATE_STUN_RIGHT_START : OBJSTATE_STUN_LEFT_START);
 		} else {
-			if (left)
-				CALL(MoveObjectLeftByVar2);
-			else
-				CALL(MoveObjectRightByVar2);
-			check_offscreen_grabbed(left);
-			obj_pos_to_hpos();
-			xor_a();
+			move_x_by_var2(left);
+			let_go_off_screen(left);
+			hpos_at_obj();
 			wr8(wObjSlopeInteraction, 0);
-			gb_call_ret(gb_, ADDR_Func_3543, (uint16_t)(routine + (left ? 0x4a : 0x47)));
-			alu_.cp(cpu_.a, 0x10);
-			uint8_t f = cpu_.f;
-			hypos_to_obj();
-			cpu_.f = f;
-			if (ZF) {
-				res_grabbed();
-				cpu_.l = OBJ_STATE;
-				uint16_t hl = REG_HL(gb_);
-				cpu_.a = alu_.rra(rd8(wObjSlopeInteraction));
-				if (left ? !CF : CF) {
-					cpu_.a = left ? OBJSTATE_STUN_RIGHT_START : OBJSTATE_STUN_LEFT_START;
-					wr8(hl, cpu_.a);
-				} else {
-					cpu_.a = rd8(hl);
-					alu_.cp(cpu_.a, left ? OBJSTATE_STUN_LEFT : OBJSTATE_STUN_RIGHT);
-					if (!ZF) {
-						cpu_.a = left ? OBJSTATE_14 : OBJSTATE_15;
-						wr8(hl, cpu_.a);
-					}
-				}
-				JUMP(HomeJumpRet);
+			uint8_t floor = block(ADDR_Func_3543, static_cast<uint16_t>(routine + (left ? 0x4a : 0x47)));
+			wr8(wCurObjYPos + 0, rd8(hYPosLo));
+			wr8(wCurObjYPos + 1, rd8(hYPosHi));
+			if (floor == 0x10) {
+				// on a slope: down it, or stunned against it
+				res_flag(OBJFLAG_GRABBED_F);
+				bool slope_bit = rd8(wObjSlopeInteraction) & 1;
+				if (left ? !slope_bit : slope_bit)
+					wr8(wCurObjState, left ? OBJSTATE_STUN_RIGHT_START : OBJSTATE_STUN_LEFT_START);
+				else if (rd8(wCurObjState) != (left ? OBJSTATE_STUN_LEFT : OBJSTATE_STUN_RIGHT))
+					wr8(wCurObjState, left ? OBJSTATE_14 : OBJSTATE_15);
+				home_jump_ret();
 				return;
 			}
+			// the edge it moves to first, then the other
 			bool hit = false;
 			for (int side = 0; side < 2 && !hit; side++) {
-				// left: the left edge then the right edge; right: the other way
-				if ((side == 0) == left)
-					hxpos_left_edge(wCurObjXPos);
-				else
-					hxpos_right_edge(wCurObjXPos);
-				gb_call_ret(gb_, ADDR_Func_35a3, (uint16_t)(routine +
-					(left ? (side ? 0x81 : 0x6c) : (side ? 0x7e : 0x66))));
-				hit = alu_.and_(cpu_.a, cpu_.a) != 0;
+				set_hpos_x(edge((side == 0) == left));
+				hit = block(ADDR_Func_35a3, static_cast<uint16_t>(routine +
+					(left ? (side ? 0x81 : 0x6c) : (side ? 0x7e : 0x66)))) != 0;
 			}
 			if (!hit)
-				st(wCurObjState, left ? OBJSTATE_14 : OBJSTATE_15);
+				wr8(wCurObjState, left ? OBJSTATE_14 : OBJSTATE_15);
 		}
-		SET_HL(gb_, wCurObjVar2);
-		cpu_.a = alu_.rla(rd8(wCurObjInteractionType));
-		bool heavy = CF;
-		cpu_.a = alu_.and_(rd8(wGlobalCounter), heavy ? 0x3 : 0x7);
-		if (!cpu_.a)
-			wr8(wCurObjVar2, alu_.dec(rd8(wCurObjVar2)));
-		JUMP(HomeJumpRet);
+		// slows down every 8 frames (4 if heavy)
+		if (!(rd8(wGlobalCounter) & (heavy() ? 0x3 : 0x7)))
+			wr8(wCurObjVar2, static_cast<uint8_t>(rd8(wCurObjVar2) - 1));
+		home_jump_ret();
 	}
 
 	void port_Func_62ae5() { obj_bump_slide(true); }
 	void port_Func_62bce() { obj_bump_slide(false); }
 
-	void obj_bump(uint16_t slide)
+	// slides while OBJ_VAR_2 lasts, then turns around when
+	// OBJ_STATE_DURATION runs out
+	void obj_bump(bool left)
 	{
-		uint16_t hl = wCurObjVar2;
-		SET_HL(gb_, hl);
-		cpu_.a = rd8(hl);
-		if (alu_.and_(cpu_.a, cpu_.a)) {
-			JUMP_TO(slide);
+		if (rd8(wCurObjVar2)) {
+			obj_bump_slide(left);
 			return;
 		}
-		hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl - 2)); // dec l / dec l
-		SET_HL(gb_, hl);
-		uint8_t d = alu_.dec(rd8(hl)); // OBJ_STATE_DURATION
-		wr8(hl, d);
-		if (!d) {
-			cpu_.a = OBJSTATE_TURN_AROUND_START;
-			wr8(wCurObjState, cpu_.a);
-		}
-		JUMP(HomeJumpRet);
+		uint8_t d = static_cast<uint8_t>(rd8(wCurObjStateDuration) - 1);
+		wr8(wCurObjStateDuration, d);
+		if (!d)
+			wr8(wCurObjState, OBJSTATE_TURN_AROUND_START);
+		home_jump_ret();
 	}
 
-	void port__ObjState_BumpRight() { obj_bump(ADDR_Func_62ae5); }
-	void port__ObjState_BumpLeft() { obj_bump(ADDR_Func_62bce); }
+	void port__ObjState_BumpRight() { obj_bump(true); }
+	void port__ObjState_BumpLeft() { obj_bump(false); }
 
-	// Func_62ca8 (to the left) / Func_62d86 (to the right): an object knocked
-	// back in the air
+	// knocked to the side, falling, until it lands (on a slope as
+	// land_by_slope), vanishes in water or sand, or hits a wall
 	void obj_knocked_fall(bool left)
 	{
 		uint16_t routine = left ? ADDR_Func_62ca8 : ADDR_Func_62d86;
-		if (left)
-			CALL(MoveObjectLeftByVar2);
-		else
-			CALL(MoveObjectRightByVar2);
-		check_offscreen_grabbed(left);
-		cpu_.l = OBJ_VAR_3;
-		uint16_t hl = REG_HL(gb_);
-		cpu_.a = rd8(hl);
-		cpu_.b = (uint8_t)(ADDR_FallingYVel_Light >> 8);
-		cpu_.a = alu_.add(cpu_.a, (uint8_t)ADDR_FallingYVel_Light);
-		cpu_.c = cpu_.a;
-		cpu_.a = alu_.rla(rd8(wCurObjInteractionType));
-		if (CF) {
-			cpu_.a = alu_.add(cpu_.c, (uint8_t)(ADDR_FallingYVel_Heavy - ADDR_FallingYVel_Light));
-			cpu_.c = cpu_.a;
-		}
-		cpu_.a = rd8(REG_BC(gb_));
-		alu_.cp(cpu_.a, 0x80);
-		if (ZF) {
-			cpu_.c = alu_.dec(cpu_.c);
-			cpu_.a = rd8(REG_BC(gb_));
-		} else {
-			wr8(hl, alu_.inc(rd8(hl)));
-		}
-		wr8(hffa0, cpu_.a);
-		add_obj_y(ADD_POSITIVE);
-		obj_pos_to_hpos();
-		xor_a();
+		move_x_by_var2(left);
+		let_go_off_screen(left);
+		set_obj_y(static_cast<uint16_t>(obj_y() + obj_y_vel(ADDR_FallingYVel_Light, ADDR_FallingYVel_Heavy)));
+		hpos_at_obj();
 		wr8(wObjSlopeInteraction, 0);
 		wr8(wc1ca, 0);
-		gb_call_ret(gb_, ADDR_Func_352b, (uint16_t)(routine + 0x4f));
-		if (alu_.and_(cpu_.a, cpu_.a)) {
-			JUMP_TO(left ? ADDR_Func_62d34 : ADDR_Func_62e0f);
+		if (block(ADDR_Func_352b, static_cast<uint16_t>(routine + 0x4f))) {
+			land_by_slope(left);
 			return;
 		}
-		if (ld_and(wIsInWaterOrSand)) {
-			st(wCurObjState, OBJSTATE_VANISH_TOUCH);
-			JUMP(HomeJumpRet);
+		if (rd8(wIsInWaterOrSand)) {
+			wr8(wCurObjState, OBJSTATE_VANISH_TOUCH);
+			home_jump_ret();
 			return;
 		}
-		set_hpos_sub(wCurObjYPos, 4);
-		if (left)
-			hxpos_left_edge(REG_HL(gb_));
-		else
-			hxpos_right_edge(REG_HL(gb_));
-		gb_call_ret(gb_, ADDR_Func_3513, (uint16_t)(routine + (left ? 0x77 : 0x74)));
-		cpu_.a = alu_.and_(cpu_.a, 0x0f);
-		if (cpu_.a)
-			st(wCurObjState, left ? OBJSTATE_15 : OBJSTATE_14);
-		JUMP(HomeJumpRet);
+		set_hpos_y(static_cast<uint16_t>(obj_y() - 4));
+		set_hpos_x(edge(left));
+		if (block(ADDR_Func_3513, static_cast<uint16_t>(routine + (left ? 0x77 : 0x74))) & 0x0f)
+			wr8(wCurObjState, left ? OBJSTATE_15 : OBJSTATE_14);
+		home_jump_ret();
 	}
 
 	void port_Func_62ca8() { obj_knocked_fall(true); }
 	void port_Func_62d86() { obj_knocked_fall(false); }
 
-	// ld hl, wCurObjState / ld a, state / ld [hld], a / dec l / xor a / ld [hld], a
-	void set_state_clear_var3(uint8_t state)
+	void port_Func_62c9f()
 	{
-		uint16_t hl = wCurObjState;
-		cpu_.a = state;
-		wr8(hl--, state);
-		hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl - 1)); // dec l
-		xor_a();
-		wr8(hl--, 0);
-		SET_HL(gb_, hl);
+		wr8(wCurObjState, OBJSTATE_56);
+		wr8(wCurObjVar3, 0);
+		obj_knocked_fall(true);
 	}
 
-	void port_Func_62c9f() { set_state_clear_var3(OBJSTATE_56); obj_knocked_fall(true); }
-	void port_Func_62d7d() { set_state_clear_var3(OBJSTATE_57); obj_knocked_fall(false); }
+	void port_Func_62d7d()
+	{
+		wr8(wCurObjState, OBJSTATE_57);
+		wr8(wCurObjVar3, 0);
+		obj_knocked_fall(false);
+	}
 
 	// --- vanishing ---
 
-	void vanish_object()
-	{
-		uint16_t hl = wCurObjUpdateFunction + 1;
-		wr8(hl--, (uint8_t)(ADDR_StarsFunc >> 8));
-		cpu_.a = (uint8_t)ADDR_StarsFunc;
-		wr8(hl--, cpu_.a);
-		hl = (uint16_t)((hl & 0xff00) | OBJ_SUBSTATE);
-		cpu_.a = alu_.and_(rd8(hl), OBJSUBFLAGS_MASK);
-		wr8(hl--, cpu_.a);
-		SET_HL(gb_, hl);
-	}
-
 	// The object turns into stars (StarsFunc)
-	void port_Func_618b4()
+	void stars()
 	{
 		// (BANK(StarsFunc) - BANK("Object Functions 1")) << 4
-		st(wCurObjId, 0x30);
-		uint16_t hl = wCurObjOAMPtr;
-		wr8(hl++, (uint8_t)ADDR_OAM_18c000);
-		wr8(hl++, (uint8_t)(ADDR_OAM_18c000 >> 8));
-		wr8(hl++, (uint8_t)ADDR_Frameset_680c5);
-		cpu_.a = (uint8_t)(ADDR_Frameset_680c5 >> 8);
-		wr8(hl++, cpu_.a);
-		xor_a();
-		wr8(hl++, 0); // OBJ_FRAME_DURATION
-		wr8(hl++, 0); // OBJ_FRAMESET_OFFSET
-		cpu_.a = 33;
-		wr8(hl++, 33); // OBJ_STATE_DURATION
-
-		hl = (uint16_t)((hl & 0xff00) | OBJ_FLAGS);
-		uint8_t flags = rd8(hl);
-		flags &= (uint8_t)~(1 << OBJFLAG_GRABBED_F);
-		wr8(hl, flags);
-		wr8(hl, (uint8_t)(rd8(hl) | (1 << OBJFLAG_NO_COLLISION_F)));
-		st(wCurObjAction, (1 << NO_ACTIONS_F) | 1); // no_actions_for 1
-
-		hl = (uint16_t)((hl & 0xff00) | OBJ_Y_POS);
-		cpu_.a = alu_.sub(rd8(hl), 8);
-		wr8(hl++, cpu_.a);
-		SET_HL(gb_, hl);
-		if (CF)
-			wr8(hl, alu_.dec(rd8(hl)));
+		wr8(wCurObjId, 0x30);
+		mem_.word(wCurObjOAMPtr) = ADDR_OAM_18c000;
+		mem_.word(wCurObjFramesetPtr) = ADDR_Frameset_680c5;
+		wr8(wCurObjFrameDuration, 0);
+		wr8(wCurObjFramesetOffset, 0);
+		wr8(wCurObjStateDuration, 33);
+		wr8(wCurObjFlags, (rd8(wCurObjFlags) & ~(1 << OBJFLAG_GRABBED_F)) | (1 << OBJFLAG_NO_COLLISION_F));
+		no_actions();
+		set_obj_y(static_cast<uint16_t>(obj_y() - 8));
 	}
 
-	void port_VanishObject_NoSFX()
+	// StarsFunc as its update function, then the stars
+	void vanish(bool sfx)
 	{
-		vanish_object();
-		JUMP_TO(ADDR_Func_618b4);
+		if (sfx)
+			play_sfx(SFX_VANISH);
+		wr8(wCurObjUpdateFunction + 1, static_cast<uint8_t>(ADDR_StarsFunc >> 8));
+		wr8(wCurObjUpdateFunction + 0, static_cast<uint8_t>(ADDR_StarsFunc));
+		wr8(wCurObjSubState, rd8(wCurObjSubState) & OBJSUBFLAGS_MASK);
+		stars();
 	}
 
-	void port__VanishObject()
-	{
-		play_sfx(SFX_VANISH);
-		vanish_object();
-		JUMP_TO(ADDR_Func_618b4);
-	}
+	void port_VanishObject_NoSFX() { vanish(false); }
+	void port__VanishObject() { vanish(true); }
 
 	// --- init ---
 
 	void init_object_vars(bool level_start)
 	{
-		xor_a();
-		gb_call(gb_, ADDR_ClearObjects);
-		gb_call(gb_, ADDR_ClearObjDataPointers);
+		clear_objects(0, 0);
+		clear_obj_data_pointers(0);
 		if (level_start)
-			wr8(wFlameBlockCleared, cpu_.a);
-		wr8(wDollBoyNoFlashingBarrel, cpu_.a);
-		wr8(wDollBoyRemainingParts, cpu_.a);
-		wr8(wNumLitTorches, cpu_.a);
-		wr8(wShootGoals, cpu_.a);
-		wr8(wWarioGoals, cpu_.a);
+			wr8(wFlameBlockCleared, 0);
+		wr8(wDollBoyNoFlashingBarrel, 0);
+		wr8(wDollBoyRemainingParts, 0);
+		wr8(wNumLitTorches, 0);
+		wr8(wShootGoals, 0);
+		wr8(wWarioGoals, 0);
 	}
 
 	void port_InitObjectVars_FromLevelStart() { init_object_vars(true); }
@@ -1072,302 +705,213 @@ public:
 
 	// --- movement tables ---
 
-	// The signed add of a to the 16-bit position at hl (lo, hi): cp $80 /
-	// ld c, [hl] / add c / ld [hli], a / then inc or dec the high byte on a
-	// carry / no carry. hl ends at the high byte.
-	void add_signed_at(uint16_t hl)
+	// A movement table's next entry for the index (an 8-bit add, within
+	// the table's page). At the $80 end the last entry repeats, or with
+	// loop the table starts over; otherwise the index goes on.
+	uint8_t movement_step(uint16_t index, uint16_t table, bool loop)
 	{
-		alu_.cp(cpu_.a, 0x80);
-		bool negative = !CF;
-		cpu_.c = rd8(hl);
-		cpu_.a = alu_.add(cpu_.a, cpu_.c);
-		wr8(hl++, cpu_.a);
-		SET_HL(gb_, hl);
-		if (negative && !CF)
-			wr8(hl, alu_.dec(rd8(hl)));
-		else if (!negative && CF)
-			wr8(hl, alu_.inc(rd8(hl)));
-	}
-
-	// hl = index, a = [bc + [hl]]; at the $80 end marker the last entry
-	// repeats (loop: the table restarts), and the index goes up
-	void movement_lookup(uint16_t index, bool loop)
-	{
-		uint8_t start = cpu_.c;
-		if (loop)
-			cpu_.e = start;
-		SET_HL(gb_, index);
-		cpu_.a = alu_.add(rd8(index), cpu_.c);
-		cpu_.c = cpu_.a;
-		cpu_.a = rd8(REG_BC(gb_));
-		alu_.cp(cpu_.a, 0x80);
-		if (ZF) {
-			if (loop) {
-				xor_a();
-				wr8(index, 0);
-				cpu_.c = cpu_.e;
-			} else {
-				cpu_.c = alu_.dec(cpu_.c);
-			}
-			cpu_.a = rd8(REG_BC(gb_));
+		uint16_t page = table & 0xff00;
+		uint8_t c = static_cast<uint8_t>(rd8(index) + static_cast<uint8_t>(table));
+		uint8_t v = rd8(static_cast<uint16_t>(page | c));
+		if (v == 0x80) {
 			if (!loop)
-				return;
+				return rd8(static_cast<uint16_t>(page | static_cast<uint8_t>(c - 1)));
+			wr8(index, 0);
+			v = rd8(table);
 		}
-		wr8(index, alu_.inc(rd8(index)));
+		wr8(index, static_cast<uint8_t>(rd8(index) + 1));
+		return v;
 	}
 
-	void apply_obj_movement(uint16_t index, uint8_t pos, bool loop)
+	// The signed add of v to the position at `at`. Returns where its high
+	// byte is (hl, which the objects read the page of).
+	uint16_t add_signed_at(uint16_t at, uint8_t v)
 	{
-		movement_lookup(index, loop);
-		add_signed_at((uint16_t)((index & 0xff00) | pos));
+		uint8_t lo = rd8(at);
+		wr8(at, static_cast<uint8_t>(lo + v));
+		bool carry = lo + v > 0xff;
+		bool negative = v >= 0x80;
+		uint16_t hi = static_cast<uint16_t>(at + 1);
+		if (negative && !carry)
+			wr8(hi, static_cast<uint8_t>(rd8(hi) - 1));
+		else if (!negative && carry)
+			wr8(hi, static_cast<uint8_t>(rd8(hi) + 1));
+		return hi;
 	}
 
-	void port__ApplyObjYMovement() { apply_obj_movement(wCurObjVar3, OBJ_Y_POS, false); }
-	void port__ApplyObjXMovement() { apply_obj_movement(wCurObjVar2, OBJ_X_POS, false); }
-	void port__ApplyObjYMovement_Loop() { apply_obj_movement(wCurObjVar3, OBJ_Y_POS, true); }
-	void port__ApplyObjXMovement_Loop() { apply_obj_movement(wCurObjVar2, OBJ_X_POS, true); }
-
-	void port_Func_63209()
+	// The next entry of the table moves the object along y (index
+	// OBJ_VAR_3) or x (OBJ_VAR_2).
+	uint16_t apply_obj_movement(uint16_t index, uint8_t pos, uint16_t table, bool loop)
 	{
-		movement_lookup(wCurObjVar3, false);
-		cpu_.b = cpu_.a;
-		add_signed_at((uint16_t)((wCurObjVar3 & 0xff00) | OBJ_Y_POS));
-		cpu_.l = OBJ_FLAGS;
-		uint16_t hl = REG_HL(gb_);
-		if (!alu_.bit(rd8(hl), OBJFLAG_STEPPED_F))
+		uint8_t v = movement_step(index, table, loop);
+		return add_signed_at(static_cast<uint16_t>((index & 0xff00) | pos), v);
+	}
+
+	// bc = the table; the objects read on the h (and the e of the _Loop
+	// ones) these leave
+	void apply_obj_movement_hook(uint16_t index, uint8_t pos, bool loop)
+	{
+		uint16_t table = REG_BC(gb_);
+		SET_HL(gb_, apply_obj_movement(index, pos, table, loop));
+		if (loop)
+			cpu_.e = static_cast<uint8_t>(table);
+	}
+
+	void port__ApplyObjYMovement() { apply_obj_movement_hook(wCurObjVar3, OBJ_Y_POS, false); }
+	void port__ApplyObjXMovement() { apply_obj_movement_hook(wCurObjVar2, OBJ_X_POS, false); }
+	void port__ApplyObjYMovement_Loop() { apply_obj_movement_hook(wCurObjVar3, OBJ_Y_POS, true); }
+	void port__ApplyObjXMovement_Loop() { apply_obj_movement_hook(wCurObjVar2, OBJ_X_POS, true); }
+
+	// A platform's y movement (the table at bc), which carries Wario along
+	// when he stands on it
+	void move_platform_y(uint16_t table)
+	{
+		uint8_t v = movement_step(wCurObjVar3, table, false);
+		add_signed_at(wCurObjYPos, v);
+		if (!(rd8(wCurObjFlags) & (1 << OBJFLAG_STEPPED_F)))
 			return;
-		wr8(hl, (uint8_t)(rd8(hl) & ~(1 << OBJFLAG_STEPPED_F)));
+		wr8(wCurObjFlags, rd8(wCurObjFlags) & ~(1 << OBJFLAG_STEPPED_F));
+		cpu_.b = v;
 		CALL(MoveWarioDown);
 		FARCALL(Func_19720);
 	}
 
-	void port__ApplyObjSetMovement()
+	void port_Func_63209() { move_platform_y(REG_BC(gb_)); }
+
+	// A set movement: OBJ_VAR_1 counts down the current step's duration;
+	// then the next step (duration, y and x deltas) from the pointer in
+	// OBJ_VAR_2/3, the steps starting over at `start` at the 0 end.
+	void apply_obj_set_movement(uint16_t start)
 	{
-		uint16_t hl = wCurObjVar1;
-		SET_HL(gb_, hl);
-		uint8_t d = alu_.dec(rd8(hl));
-		wr8(hl, d);
+		uint8_t d = static_cast<uint8_t>(rd8(wCurObjVar1) - 1);
+		wr8(wCurObjVar1, d);
 		if (d)
 			return;
-		uint8_t l = alu_.inc((uint8_t)hl); // inc l
-		hl = (uint16_t)((hl & 0xff00) | l);
-		cpu_.a = rd8(hl++); // var2
-		hl = (uint16_t)((rd8(hl) << 8) | cpu_.a); // var3
-		cpu_.a = rd8(hl++);
-		if (!alu_.and_(cpu_.a, cpu_.a)) {
-			// loop
-			hl = REG_DE(gb_);
-			cpu_.a = rd8(hl++);
+		uint16_t p = static_cast<uint16_t>(rd8(wCurObjVar3) << 8 | rd8(wCurObjVar2));
+		uint8_t duration = rd8(p++);
+		if (!duration) {
+			p = start;
+			duration = rd8(p++);
 		}
-		wr8(wCurObjVar1, cpu_.a); // duration
-		cpu_.c = rd8(hl++);
-		cpu_.b = rd8(hl++);
-		cpu_.a = (uint8_t)hl;
-		wr8(wCurObjVar2, cpu_.a);
-		cpu_.a = (uint8_t)(hl >> 8);
-		wr8(wCurObjVar3, cpu_.a);
-
-		// y += c, x += b (signed)
-		hl = wCurObjYPos;
-		for (int i = 0; i < 2; i++) {
-			uint8_t v = i ? cpu_.b : cpu_.c;
-			if (i) {
-				l = alu_.inc((uint8_t)hl); // inc l
-				hl = (uint16_t)((hl & 0xff00) | l);
-			}
-			alu_.cp(v, 0x80);
-			bool negative = !CF;
-			cpu_.a = alu_.add(rd8(hl), v);
-			wr8(hl++, cpu_.a);
-			if (negative && !CF)
-				wr8(hl, alu_.dec(rd8(hl)));
-			else if (!negative && CF)
-				wr8(hl, alu_.inc(rd8(hl)));
-		}
-		SET_HL(gb_, hl);
+		wr8(wCurObjVar1, duration);
+		uint8_t dy = rd8(p++);
+		uint8_t dx = rd8(p++);
+		wr8(wCurObjVar2, static_cast<uint8_t>(p));
+		wr8(wCurObjVar3, static_cast<uint8_t>(p >> 8));
+		add_signed_at(wCurObjYPos, dy);
+		add_signed_at(wCurObjXPos, dx);
 	}
 
-	// e = the number of active transient objects with the same OBJ_UNK_01/02
-	// as the current object
-	void port_Func_632ac()
+	// de = the first step
+	void port__ApplyObjSetMovement() { apply_obj_set_movement(REG_DE(gb_)); }
+
+	// the number of active transient objects with the same OBJ_UNK_01/02 as
+	// the current object
+	uint8_t count_same_transient_objects()
 	{
-		cpu_.c = rd8(wCurObjUnk01);
-		cpu_.b = rd8(wCurObjUnk01 + 1);
-		cpu_.e = 0x00;
-		cpu_.d = OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT;
-		uint16_t hl = 0;
-		for (int n = 0; n < NUM_OBJECTS; n++) {
-			hl = (uint16_t)((wObj1 & 0xff00) | (n * 0x20));
-			cpu_.a = alu_.and_(rd8(hl++), cpu_.d);
-			alu_.cp(cpu_.a, cpu_.d);
-			if (!ZF)
-				continue;
-			cpu_.a = rd8(hl++);
-			alu_.cp(cpu_.a, cpu_.c);
-			if (!ZF)
-				continue;
-			cpu_.a = rd8(hl);
-			alu_.cp(cpu_.a, cpu_.b);
-			if (!ZF)
-				continue;
-			cpu_.e = alu_.inc(cpu_.e);
+		uint8_t n = 0;
+		for (int i = 0; i < NUM_OBJECTS; i++) {
+			uint16_t obj = static_cast<uint16_t>((wObj1 & 0xff00) | (i * 0x20));
+			if ((rd8(obj) & (OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT)) == (OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT)
+				&& rd8(obj + 1) == rd8(wCurObjUnk01) && rd8(obj + 2) == rd8(wCurObjUnk01 + 1))
+				n++;
 		}
-		SET_HL(gb_, hl);
+		return n;
 	}
+
+	// output: e
+	void port_Func_632ac() { cpu_.e = count_same_transient_objects(); }
 
 	// --- thrown objects hitting other objects ---
 
 	#define OBJ_N(addr, n) ((uint16_t)((addr) + (n) * OBJ_STRUCT_SIZE))
 
-	// [hl] = a for a in states, with hli
-	void write_states(uint16_t hl, const uint8_t *states, int n)
+	// A grabbed (thrown) object that touches another active, on-screen,
+	// visible object with collision: the states each goes to, by their
+	// weights and the throw's direction, the grab let go of if either was
+	// held, and SFX_016.
+	void handle_grabbed_object_collisions()
 	{
-		for (int i = 0; i < n; i++) {
-			cpu_.a = states[i];
-			wr8(hl++, states[i]);
-		}
-		SET_HL(gb_, hl);
-	}
-
-	// a = [hl] & $fe / cp OBJSTATE_PICKED_UP_LEFT / jr z / cp OBJSTATE_48 /
-	// jr nz, .skip / xor a / ld [wGrabState], a
-	void reset_grab_if_held(uint16_t state)
-	{
-		cpu_.a = alu_.and_(rd8(state), 0xfe);
-		alu_.cp(cpu_.a, OBJSTATE_PICKED_UP_LEFT);
-		if (!ZF) {
-			alu_.cp(cpu_.a, OBJSTATE_48);
-			if (!ZF)
-				return;
-		}
-		xor_a();
-		wr8(wGrabState, 0);
-	}
-
-	void port_HandleGrabbedObjectCollisions()
-	{
-		uint16_t hl = wObj1Flags;
-		cpu_.e = OBJFLAG_ACTIVE | OBJFLAG_GRABBED;
-		int n;
-		for (n = 0; n < NUM_OBJECTS; n++) {
-			hl = OBJ_N(wObj1Flags, n);
-			cpu_.a = alu_.and_(rd8(hl), cpu_.e);
-			alu_.cp(cpu_.a, cpu_.e);
-			if (ZF)
+		int g;
+		for (g = 0; g < NUM_OBJECTS; g++)
+			if ((rd8(OBJ_N(wObj1Flags, g)) & (OBJFLAG_ACTIVE | OBJFLAG_GRABBED)) == (OBJFLAG_ACTIVE | OBJFLAG_GRABBED))
 				break;
-		}
-		SET_HL(gb_, hl);
-		if (n == NUM_OBJECTS)
+		if (g == NUM_OBJECTS)
 			return;
 
-		gb_push16(gb_, hl);
-		hl = (uint16_t)((hl & 0xff00) | alu_.add((uint8_t)hl, OBJ_INTERACTION_TYPE - OBJ_FLAGS));
-		cpu_.a = rd8(hl++);
-		wr8(hThrownObjInteractionType, cpu_.a);
-		cpu_.b = rd8(hl++);
-		cpu_.c = rd8(hl++);
-		cpu_.d = rd8(hl++);
-		cpu_.e = rd8(hl++);
-		cpu_.a = alu_.add(alu_.add(rd8(hl), 0x2a), cpu_.b);
-		cpu_.b = cpu_.a;
-		cpu_.a = alu_.add(alu_.add(rd8(hl++), 0x2a), cpu_.c);
-		cpu_.c = cpu_.a;
-		cpu_.a = alu_.add(alu_.add(rd8(hl), 0x2a), cpu_.d);
-		cpu_.d = cpu_.a;
-		cpu_.a = alu_.add(alu_.add(rd8(hl++), 0x2a), cpu_.e);
-		cpu_.e = cpu_.a;
+		// the thrown object's box on screen (+$2a, so that it stays positive)
+		uint8_t type = rd8(OBJ_N(wObj1InteractionType, g));
+		wr8(hThrownObjInteractionType, type);
+		uint8_t sy = static_cast<uint8_t>(rd8(OBJ_N(wObj1ScreenYPos, g)) + 0x2a);
+		uint8_t sx = static_cast<uint8_t>(rd8(OBJ_N(wObj1ScreenXPos, g)) + 0x2a);
+		uint8_t top = static_cast<uint8_t>(sy + rd8(OBJ_N(wObj1CollBoxTop, g)));
+		uint8_t bottom = static_cast<uint8_t>(sy + rd8(OBJ_N(wObj1CollBoxBottom, g)));
+		uint8_t left = static_cast<uint8_t>(sx + rd8(OBJ_N(wObj1CollBoxLeft, g)));
+		uint8_t right = static_cast<uint8_t>(sx + rd8(OBJ_N(wObj1CollBoxRight, g)));
 
-		hl = (uint16_t)((hl & 0xff00) | alu_.add((uint8_t)hl, OBJ_STATE - (OBJ_SCREEN_X_POS + 1)));
-		cpu_.a = rd8(hl); // OBJ_STATE
-		bool full_throw = true;
-		alu_.cp(cpu_.a, OBJSTATE_FULL_THROW_LEFT_START);
-		if (CF) {
-			alu_.cp(cpu_.a, OBJSTATE_48);
-			if (!CF)
-				full_throw = false;
-		}
-		cpu_.a = alu_.rra(cpu_.a);
-		bool right = CF;
-		if (full_throw) {
-			cpu_.a = rd8(hThrownObjInteractionType);
-			cpu_.a = alu_.rla(cpu_.a);
-			bool heavy = CF;
+		// the states for the thrown object and the one it hits (light and
+		// heavy, then the same for the other)
+		uint8_t state = rd8(OBJ_N(wObj1State, g));
+		bool to_right = state & 1;
+		if (state >= OBJSTATE_FULL_THROW_LEFT_START || state < OBJSTATE_48) {
 			static const uint8_t states[4][4] = {
 				{OBJSTATE_28, OBJSTATE_29, OBJSTATE_WOBBLE_RIGHT_START, OBJSTATE_29},
 				{OBJSTATE_28, OBJSTATE_WOBBLE_LEFT_START, OBJSTATE_28, OBJSTATE_29},
 				{OBJSTATE_29, OBJSTATE_28, OBJSTATE_WOBBLE_LEFT_START, OBJSTATE_28},
 				{OBJSTATE_29, OBJSTATE_WOBBLE_RIGHT_START, OBJSTATE_29, OBJSTATE_28},
 			};
-			write_states(hThrownObjInteractionType + 1, states[right * 2 + heavy], 4);
+			const uint8_t *s = states[to_right * 2 + ((type & HEAVY_OBJ) ? 1 : 0)];
+			for (int i = 0; i < 4; i++)
+				wr8(static_cast<uint16_t>(hThrownObjInteractionType + 1 + i), s[i]);
 		} else {
 			// OBJSTATE_48 <= state <= OBJSTATE_4B
 			static const uint8_t states[2][2] = {
 				{OBJSTATE_WOBBLE_RIGHT_START, OBJSTATE_WOBBLE_LEFT_START},
 				{OBJSTATE_WOBBLE_LEFT_START, OBJSTATE_WOBBLE_RIGHT_START},
 			};
-			write_states(hCollidedObjState_Light, states[right], 2);
+			wr8(hCollidedObjState_Light, states[to_right][0]);
+			wr8(static_cast<uint16_t>(hCollidedObjState_Light + 1), states[to_right][1]);
 		}
 
-		for (n = 0; n < NUM_OBJECTS; n++) {
-			cpu_.a = alu_.and_(rd8(OBJ_N(wObj1Flags, n)),
-				OBJFLAG_ACTIVE | OBJFLAG_ON_SCREEN | OBJFLAG_GRABBED | OBJFLAG_NO_COLLISION | OBJFLAG_INVISIBLE);
-			alu_.cp(cpu_.a, OBJFLAG_ACTIVE | OBJFLAG_ON_SCREEN);
-			if (!ZF)
+		for (int n = 0; n < NUM_OBJECTS; n++) {
+			if ((rd8(OBJ_N(wObj1Flags, n)) & (OBJFLAG_ACTIVE | OBJFLAG_ON_SCREEN | OBJFLAG_GRABBED
+				| OBJFLAG_NO_COLLISION | OBJFLAG_INVISIBLE)) != (OBJFLAG_ACTIVE | OBJFLAG_ON_SCREEN))
 				continue;
-			cpu_.a = alu_.add(rd8(OBJ_N(wObj1ScreenYPos, n)), 0x2a);
-			cpu_.h = cpu_.a;
-			cpu_.a = alu_.add(rd8(OBJ_N(wObj1ScreenXPos, n)), 0x2a);
-			cpu_.l = cpu_.a;
-			cpu_.a = alu_.sub(alu_.add(rd8(OBJ_N(wObj1CollBoxBottom, n)), cpu_.h), cpu_.b);
-			if (CF)
-				continue;
-			cpu_.a = alu_.sub(alu_.add(rd8(OBJ_N(wObj1CollBoxTop, n)), cpu_.h), cpu_.c);
-			if (!CF)
-				continue;
-			cpu_.a = alu_.sub(alu_.add(rd8(OBJ_N(wObj1CollBoxRight, n)), cpu_.l), cpu_.d);
-			if (CF)
-				continue;
-			cpu_.a = alu_.sub(alu_.add(rd8(OBJ_N(wObj1CollBoxLeft, n)), cpu_.l), cpu_.e);
-			if (!CF)
+			// the boxes overlap (8-bit, as the asm)
+			uint8_t oy = static_cast<uint8_t>(rd8(OBJ_N(wObj1ScreenYPos, n)) + 0x2a);
+			uint8_t ox = static_cast<uint8_t>(rd8(OBJ_N(wObj1ScreenXPos, n)) + 0x2a);
+			if (static_cast<uint8_t>(rd8(OBJ_N(wObj1CollBoxBottom, n)) + oy) < top
+				|| static_cast<uint8_t>(rd8(OBJ_N(wObj1CollBoxTop, n)) + oy) >= bottom
+				|| static_cast<uint8_t>(rd8(OBJ_N(wObj1CollBoxRight, n)) + ox) < left
+				|| static_cast<uint8_t>(rd8(OBJ_N(wObj1CollBoxLeft, n)) + ox) >= right)
 				continue;
 
-			// do collision
-			hl = gb_pop16(gb_);
-			wr8(hl, (uint8_t)(rd8(hl) & ~(1 << OBJFLAG_GRABBED_F)));
-			hl = (uint16_t)((hl & 0xff00) | alu_.add((uint8_t)hl, OBJ_STATE - OBJ_FLAGS));
-			SET_HL(gb_, hl);
-			cpu_.a = alu_.and_(rd8(hl), 0xfe);
-			alu_.cp(cpu_.a, OBJSTATE_4A);
-			if (!ZF)
-				alu_.cp(cpu_.a, OBJSTATE_48);
-			uint16_t other_state = (uint16_t)((hl & 0xff00) | (uint8_t)OBJ_N(wObj1State, n));
+			uint16_t thrown = OBJ_N(wObj1Flags, g);
+			wr8(thrown, rd8(thrown) & ~(1 << OBJFLAG_GRABBED_F));
+			uint16_t thrown_state = OBJ_N(wObj1State, g);
+			uint16_t other_state = OBJ_N(wObj1State, n);
+			uint8_t s = rd8(thrown_state) & 0xfe;
 			uint16_t collided;
-			if (ZF) {
+			if (s == OBJSTATE_4A || s == OBJSTATE_48) {
 				// .CollideWithObject
-				xor_a();
 				wr8(wGrabState, 0);
-				cpu_.a = rd8(hThrownObjState_Light);
-				wr8(hl, cpu_.a);
+				wr8(thrown_state, rd8(hThrownObjState_Light));
 				collided = hCollidedObjState_Light;
 			} else {
-				cpu_.a = alu_.rla(rd8(OBJ_N(wObj1InteractionType, n)));
-				bool heavy = CF;
-				cpu_.a = rd8(heavy ? hThrownObjState_Heavy : hThrownObjState_Light);
-				wr8(hl, cpu_.a);
-				reset_grab_if_held(other_state);
-				collided = heavy ? hCollidedObjState_Heavy : hCollidedObjState_Light;
+				bool heavy_other = rd8(OBJ_N(wObj1InteractionType, n)) & HEAVY_OBJ;
+				wr8(thrown_state, rd8(heavy_other ? hThrownObjState_Heavy : hThrownObjState_Light));
+				uint8_t o = rd8(other_state) & 0xfe;
+				if (o == OBJSTATE_PICKED_UP_LEFT || o == OBJSTATE_48)
+					wr8(wGrabState, 0);
+				collided = heavy_other ? hCollidedObjState_Heavy : hCollidedObjState_Light;
 			}
-			cpu_.a = rd8(collided);
-			wr8(other_state, cpu_.a);
-			hl = (uint16_t)((hl & 0xff00) | (uint8_t)OBJ_N(wObj1Flags, n));
-			SET_HL(gb_, hl);
-			wr8(hl, (uint8_t)(rd8(hl) | (1 << OBJFLAG_NO_COLLISION_F)));
+			wr8(other_state, rd8(collided));
+			wr8(OBJ_N(wObj1Flags, n), rd8(OBJ_N(wObj1Flags, n)) | (1 << OBJFLAG_NO_COLLISION_F));
 			play_sfx(SFX_016);
 			return;
 		}
-		hl = gb_pop16(gb_);
-		SET_HL(gb_, hl);
 	}
+
 
 	// --- DoObjectAction ---
 
@@ -1537,18 +1081,16 @@ public:
 	void port_Func_62e57()
 	{
 		play_sfx(SFX_VANISH);
-		wr8(wCurObjUpdateFunction + 1, (uint8_t)(ADDR_Func_4c860 >> 8));
-		cpu_.a = (uint8_t)ADDR_Func_4c860;
-		wr8(wCurObjUpdateFunction + 0, cpu_.a);
-		SET_HL(gb_, wCurObjUpdateFunction - 1);
-		gb_call(gb_, ADDR_Func_618b4);
-		JUMP(HomeJumpRet);
+		wr8(wCurObjUpdateFunction + 1, static_cast<uint8_t>(ADDR_Func_4c860 >> 8));
+		wr8(wCurObjUpdateFunction + 0, static_cast<uint8_t>(ADDR_Func_4c860));
+		stars();
+		home_jump_ret();
 	}
 
 	void port__VanishObject2()
 	{
-		gb_call(gb_, ADDR__VanishObject);
-		JUMP(HomeJumpRet);
+		vanish(true);
+		home_jump_ret();
 	}
 
 	// --- throwing a grabbed object ---
@@ -2075,180 +1617,140 @@ public:
 	#define RET_TEMPLE_ACTION 0x5250 // UpdateObject_Temple: call DoObjectAction
 	#define RET_TEMPLE_HCALL 0x5261  // UpdateObject_Temple: call hCallFunc
 	#define RET_TEMPLE_ANIM 0x5264
-	#define RET_TEMPLE_SCREEN 0x5267
 	#define RET_NORMAL_ACTION 0x5461 // UpdateObject: call DoObjectAction
 	#define RET_NORMAL_HCALL 0x5479  // UpdateObject: call hCallFunc
 	#define RET_NORMAL_ANIM 0x547c
-	#define RET_NORMAL_SCREEN 0x547f
 	#define RET_FLOOR_HCALL 0x55b4  // UpdateObjectDuringFloorTransition: call hCallFunc
 	#define RET_FLOOR_FRAME 0x55b7
-	#define RET_FLOOR_SCREEN 0x55ba
-	#define RET_TEMPLE_GRAB 0x530e  // UpdateObjects_Temple: call HandleGrabbedObjectCollisions
 	#define RET_TEMPLE_LOOP 0x5316  // first call c, UpdateObject_Temple (then +7 each)
-	#define RET_UPDATE_GRAB 0x5368  // UpdateObjects: call HandleGrabbedObjectCollisions
 	#define RET_UPDATE_LOOP 0x5370  // first call c, UpdateObject
 	#define RET_FLOOR_LOOP 0x53aa   // first call c, UpdateObjectDuringFloorTransition
 	#define OBJFUNCS1_BANK 0x10     // BANK("Object Functions 1")
 	#define OBJFUNCS4_BANK 0x13     // BANK("Object Functions 4")
 
-	// ld a, [wCurObjId] / swap a / and $0f / or BANK("Object Functions 1") /
-	// ldh [hCallFuncBank], a / (pointer from wCurObjUpdateFunction) / call hCallFunc
+	// The update function's pointer and bank into hCallFunc (the bank by the
+	// object's id, or the temple's), and the call
 	void call_update_function(uint8_t bank, bool by_id, uint16_t ret)
 	{
 		if (by_id) {
-			cpu_.a = alu_.swap(rd8(wCurObjId));
-			cpu_.a = alu_.and_(cpu_.a, 0x0f);
-			cpu_.a = alu_.or_(cpu_.a, OBJFUNCS1_BANK);
-			bank = cpu_.a;
-		} else {
-			cpu_.a = bank;
+			uint8_t id = rd8(wCurObjId);
+			bank = static_cast<uint8_t>((((id << 4) | (id >> 4)) & 0x0f) | OBJFUNCS1_BANK);
+			cpu_.f = 0; // or BANK("Object Functions 1")
 		}
 		wr8(hCallFuncBank, bank);
-		cpu_.a = rd8(wCurObjUpdateFunction + 0);
-		wr8(hCallFuncPointer + 0, cpu_.a);
+		wr8(hCallFuncPointer + 0, rd8(wCurObjUpdateFunction + 0));
+		wr8(hCallFuncPointer + 1, rd8(wCurObjUpdateFunction + 1));
+		// Update functions read the a and f this leaves (and, as the
+		// asm's, any of the registers before)
 		cpu_.a = rd8(wCurObjUpdateFunction + 1);
-		wr8(hCallFuncPointer + 1, cpu_.a);
+		// Update functions all live in the Object Functions banks: a fuzzed
+		// pointer into home code (MoveWarioUp, reading the b the asm loop
+		// leaves) isn't comparable.
+		if (gb_->test.active && rd8(wCurObjUpdateFunction + 1) < 0x40)
+			gb_->test.unrealistic = true;
 		uint8_t entry_bank = rd8(wROMBank);
 		gb_call_ret(gb_, hCallFunc, ret);
 		if (gb_->test.active && gb_->rom_bank != entry_bank)
 			gb_->test.unrealistic = true;
 	}
 
-	void update_object(int kind)
+	// inc l: the next address in its page
+	static uint16_t next_in_page(uint16_t addr)
 	{
-		gb_push16(gb_, REG_HL(gb_));
-		cpu_.l = alu_.inc(cpu_.l);
-		cpu_.a = alu_.rla(cpu_.a);
-		wr8(wCurObjFlags, cpu_.a);
-		uint16_t hl = REG_HL(gb_);
-		for (int n = 1; n < OBJ_STRUCT_LENGTH - 1; n++) {
-			cpu_.a = rd8(hl++);
-			wr8((uint16_t)(wCurObj + n), cpu_.a);
-		}
-		cpu_.a = rd8(hl);
-		wr8((uint16_t)(wCurObj + OBJ_STRUCT_LENGTH - 1), cpu_.a);
-		SET_HL(gb_, hl);
+		return static_cast<uint16_t>((addr & 0xff00) | ((addr + 1) & 0xff));
+	}
+
+	// UpdateObject and friends: the object at obj (its flags, which the
+	// loop passes rotated in a) copied to wCurObj, its action, update
+	// function and animation run, its screen position set, and copied back
+	// (all but OBJFLAG_STEPPED, unk01, unk02 and unk1d). The object's slot
+	// stays pushed while it runs, as in the asm.
+	void update_object(int kind, uint16_t obj, uint8_t flags)
+	{
+		gb_push16(gb_, obj);
+		wr8(wCurObjFlags, flags);
+		uint16_t src = next_in_page(obj);
+		for (int n = 1; n < OBJ_STRUCT_LENGTH; n++)
+			wr8(static_cast<uint16_t>(wCurObj + n), rd8(static_cast<uint16_t>(src + n - 1)));
+		SET_HL(gb_, src + OBJ_STRUCT_LENGTH - 2); // where the copy ends
 
 		switch (kind) {
 		case UPD_NORMAL:
 			gb_call_ret(gb_, ADDR_DoObjectAction, RET_NORMAL_ACTION);
 			call_update_function(0, true, RET_NORMAL_HCALL);
 			gb_call_ret(gb_, ADDR_UpdateObjectAnimation, RET_NORMAL_ANIM);
-			gb_call_ret(gb_, ADDR_CheckObjectOnScreen, RET_NORMAL_SCREEN);
+			check_object_on_screen();
 			break;
 		case UPD_TEMPLE:
 			gb_call_ret(gb_, ADDR_DoObjectAction, RET_TEMPLE_ACTION);
 			call_update_function(OBJFUNCS4_BANK, false, RET_TEMPLE_HCALL);
 			gb_call_ret(gb_, ADDR_UpdateObjectAnimation, RET_TEMPLE_ANIM);
-			gb_call_ret(gb_, ADDR_CheckObjectOnScreen, RET_TEMPLE_SCREEN);
+			check_object_on_screen();
 			break;
 		case UPD_FLOOR:
+			// during a floor transition only an object's first update runs
 			SET_HL(gb_, wCurObjSubState);
-			if (alu_.bit(rd8(wCurObjSubState), OBJSUBFLAG_UNINITIALISED_F))
+			if (rd8(wCurObjSubState) & (1 << OBJSUBFLAG_UNINITIALISED_F))
 				call_update_function(0, true, RET_FLOOR_HCALL);
 			gb_call_ret(gb_, ADDR_UpdateObjectFrame, RET_FLOOR_FRAME);
-			gb_call_ret(gb_, ADDR_CheckObjectOnScreen, RET_FLOOR_SCREEN);
+			check_object_on_screen();
 			break;
 		}
 
-		cpu_.b = rd8(wSCY);
-		cpu_.a = alu_.add(rd8(wCurObjYPos + 0), OAM_Y_OFS);
-		cpu_.a = alu_.sub(cpu_.a, cpu_.b);
-		wr8(wCurObjScreenYPos, cpu_.a);
-		cpu_.b = rd8(wSCX);
-		cpu_.a = alu_.add(rd8(wCurObjXPos), OAM_X_OFS);
-		cpu_.a = alu_.sub(cpu_.a, cpu_.b);
-		wr8(wCurObjScreenYPos + 1, cpu_.a);
-		SET_HL(gb_, wCurObjScreenYPos + 2);
-
+		wr8(wCurObjScreenYPos, static_cast<uint8_t>(rd8(wCurObjYPos) + OAM_Y_OFS - rd8(wSCY)));
+		wr8(wCurObjScreenXPos, static_cast<uint8_t>(rd8(wCurObjXPos) + OAM_X_OFS - rd8(wSCX)));
 		if (kind == UPD_TEMPLE) {
-			SET_HL(gb_, wSCYShake);
-			cpu_.a = alu_.add(rd8(wHiddenFigureSCYShake), rd8(wSCYShake));
-			wr8(wSCY, cpu_.a);
-			cpu_.a = rd8(wc08b);
-			wr8(wSCX, cpu_.a);
+			wr8(wSCY, static_cast<uint8_t>(rd8(wHiddenFigureSCYShake) + rd8(wSCYShake)));
+			wr8(wSCX, rd8(wc08b));
 		}
-		SET_HL(gb_, gb_pop16(gb_));
+		obj = gb_pop16(gb_);
 
-		hl = REG_HL(gb_);
-		cpu_.a = alu_.and_(rd8(wCurObjFlags), 0xff ^ OBJFLAG_STEPPED);
-		wr8(hl++, cpu_.a);
-		SET_HL(gb_, hl);
-		cpu_.l = alu_.inc(cpu_.l);
-		cpu_.l = alu_.inc(cpu_.l);
-		hl = REG_HL(gb_);
-		static const uint16_t fields1[] = {
-			wCurObjYPos + 0, wCurObjYPos + 1, wCurObjXPos + 0, wCurObjXPos + 1,
-			wCurObjId, wCurObjInteractionType,
-			wCurObjCollBoxTop, wCurObjCollBoxBottom, wCurObjCollBoxLeft, wCurObjCollBoxRight,
-			wCurObjScreenYPos, wCurObjScreenXPos, wCurObjFrame,
-			wCurObjOAMPtr + 0, wCurObjOAMPtr + 1, wCurObjFramesetPtr + 0, wCurObjFramesetPtr + 1,
-			wCurObjFrameDuration + 0, wCurObjFrameDuration + 1, wCurObjStateDuration,
-			wCurObjVar1, wCurObjVar2, wCurObjVar3, wCurObjSubState, wCurObjState, wCurObjAction,
-		};
-		for (size_t i = 0; i < sizeof(fields1) / sizeof(fields1[0]); i++) {
-			cpu_.a = rd8(fields1[i]);
-			wr8(hl++, cpu_.a);
-		}
-		SET_HL(gb_, hl);
-		cpu_.l = alu_.inc(cpu_.l);
-		hl = REG_HL(gb_);
-		cpu_.a = rd8(wCurObjUpdateFunction + 0);
-		wr8(hl++, cpu_.a);
-		cpu_.a = rd8(wCurObjUpdateFunction + 1);
-		wr8(hl, cpu_.a);
-		SET_HL(gb_, hl);
+		wr8(obj, rd8(wCurObjFlags) & (0xff ^ OBJFLAG_STEPPED));
+		uint16_t dst = next_in_page(next_in_page(static_cast<uint16_t>(obj + 1)));
+		for (int n = OBJ_Y_POS; n <= OBJ_ACTION; n++)
+			wr8(dst++, rd8(static_cast<uint16_t>(wCurObj + n)));
+		dst = next_in_page(dst);
+		wr8(dst, rd8(wCurObjUpdateFunction + 0));
+		wr8(static_cast<uint16_t>(dst + 1), rd8(wCurObjUpdateFunction + 1));
 	}
 
-	void port_UpdateObject() { update_object(UPD_NORMAL); }
-	void port_UpdateObject_Temple() { update_object(UPD_TEMPLE); }
-	void port_UpdateObjectDuringFloorTransition() { update_object(UPD_FLOOR); }
-
-	// ld hl, wObj1Flags / ld a, [hl] / rra / call c, fn, then ld l, LOW(wObjNFlags)
-	// for the others
-	void update_all(uint16_t fn, uint16_t ret)
+	// Every active object (OBJFLAG_ACTIVE, bit 0) updated by kind, with the
+	// return address its call in the asm pushes
+	void update_all(int kind, uint16_t ret)
 	{
-		SET_HL(gb_, wObj1Flags);
 		for (int n = 0; n < NUM_OBJECTS; n++) {
-			if (n)
-				cpu_.l = (uint8_t)(wObj1Flags + n * OBJ_STRUCT_SIZE);
-			cpu_.a = alu_.rra(rd8(REG_HL(gb_)));
-			if (cpu_.f & FLAG_C)
-				gb_call_ret(gb_, fn, (uint16_t)(ret + n * 7));
+			uint16_t obj = static_cast<uint16_t>(wObj1Flags + n * OBJ_STRUCT_SIZE);
+			uint8_t flags = rd8(obj);
+			if (!(flags & OBJFLAG_ACTIVE))
+				continue;
+			gb_push16(gb_, static_cast<uint16_t>(ret + n * 7));
+			update_object(kind, obj, flags);
+			// the asm returns to what's there: something that changed it
+			// (a fuzzed table popping past its frame) isn't comparable
+			if (gb_pop16(gb_) != static_cast<uint16_t>(ret + n * 7))
+				if (gb_->test.active)
+					gb_->test.unrealistic = true;
 		}
 	}
 
 	void update_objects_temple()
 	{
-		gb_call_ret(gb_, ADDR_HandleGrabbedObjectCollisions, RET_TEMPLE_GRAB);
-		update_all(ADDR_UpdateObject_Temple, RET_TEMPLE_LOOP);
+		handle_grabbed_object_collisions();
+		update_all(UPD_TEMPLE, RET_TEMPLE_LOOP);
 	}
 
-	void port_UpdateObjects_Temple() { update_objects_temple(); }
 
 	void port_UpdateObjects()
 	{
-		cpu_.e = rd8(wPowerUpLevel);
-		cpu_.a = alu_.rla(rd8(wTransformation));
-		if (cpu_.f & FLAG_C)
-			cpu_.e = SUPER_JUMP_SLAM_OVERALLS;
-		cpu_.a = cpu_.e;
-		wr8(wEffectivePowerUp, cpu_.a);
-
-		cpu_.a = rd8(wLevel);
-		alu_.cp(cpu_.a, THE_TEMPLE);
-		if (cpu_.f & FLAG_Z) {
-			update_objects_temple(); // jr z, UpdateObjects_Temple
-			return;
+		wr8(wEffectivePowerUp, (rd8(wTransformation) & 0x80) ? SUPER_JUMP_SLAM_OVERALLS : rd8(wPowerUpLevel));
+		if (rd8(wLevel) == THE_TEMPLE)
+			update_objects_temple();
+		else if (rd8(wIsFloorTransition))
+			update_all(UPD_FLOOR, RET_FLOOR_LOOP);
+		else {
+			handle_grabbed_object_collisions();
+			update_all(UPD_NORMAL, RET_UPDATE_LOOP);
 		}
-		cpu_.a = rd8(wIsFloorTransition);
-		cpu_.a = alu_.and_(cpu_.a, cpu_.a);
-		if (!(cpu_.f & FLAG_Z)) {
-			update_all(ADDR_UpdateObjectDuringFloorTransition, RET_FLOOR_LOOP);
-			return;
-		}
-		gb_call_ret(gb_, ADDR_HandleGrabbedObjectCollisions, RET_UPDATE_GRAB);
-		update_all(ADDR_UpdateObject, RET_UPDATE_LOOP);
 	}
 };
 
@@ -2258,71 +1760,78 @@ public:
 
 using wl3::level::ObjectEngine;
 
-PORT_EX(DrawObjects_NoPriority, 0, 0) { ObjectEngine(gb).port_DrawObjects_NoPriority(); }
-PORT_EX(DrawObjects_WithPriority, 0, 0) { ObjectEngine(gb).port_DrawObjects_WithPriority(); }
-PORT_EX(CheckObjectOnScreen, 0, 0) { ObjectEngine(gb).port_CheckObjectOnScreen(); }
-PORT_EX(ClearObjects, 0, 0) { ObjectEngine(gb).port_ClearObjects(); }
-PORT_EX(ClearObjDataPointers, 0, 0) { ObjectEngine(gb).port_ClearObjDataPointers(); }
-PORT_EX(Func_62d57, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62d57(); }
-PORT_EX(Func_62e31, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62e31(); }
-PORT_EX(Func_62d34, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62d34(); }
-PORT_EX(Func_62e0f, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62e0f(); }
-PORT_EX(Func_62ec3, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62ec3(); }
-PORT_EX(Func_62faa, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62faa(); }
+// The entries farcalled from the level loop and start_room, and the update
+// loop's own: their callers read no register after them (live.py).
+// internal (the update loop calls them directly)
+PORT_COVERED(CheckObjectOnScreen);
+PORT_COVERED(Func_62d57);
+PORT_COVERED(Func_62e31);
+PORT_COVERED(Func_6284f);
+PORT_COVERED(Func_628a7);
+PORT_COVERED(Func_618b4);
+PORT_COVERED(HandleGrabbedObjectCollisions);
+PORT_COVERED(UpdateObject);
+PORT_COVERED(UpdateObject_Temple);
+PORT_COVERED(UpdateObjectDuringFloorTransition);
+PORT_COVERED(UpdateObjects_Temple);
+PORT_COVERED(ClearObjects);
+PORT_COVERED(ClearObjDataPointers);
+PORT_EX(DrawObjects_NoPriority, 0, ALL_REGISTERS) { ObjectEngine(gb).port_DrawObjects_NoPriority(); }
+PORT_EX(DrawObjects_WithPriority, 0, ALL_REGISTERS) { ObjectEngine(gb).port_DrawObjects_WithPriority(); }
+PORT_EX(Func_62d34, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62d34(); }
+PORT_EX(Func_62e0f, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62e0f(); }
+PORT_EX(Func_62ec3, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62ec3(); }
+PORT_EX(Func_62faa, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62faa(); }
 PORT_EX(_CountActiveTransientObjects, 0, 0) { ObjectEngine(gb).port__CountActiveTransientObjects(); }
-PORT_EX(Func_6284f, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_6284f(); }
-PORT_EX(Func_628a7, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_628a7(); }
-PORT_EX(Func_628ea, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_628ea(); }
-PORT_EX(Func_62e74, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62e74(); }
-PORT_EX(Func_62e8a, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62e8a(); }
-PORT_EX(Func_62e8f, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62e8f(); }
-PORT_EX(Func_62ea5, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62ea5(); }
-PORT_EX(Func_62eaa, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62eaa(); }
-PORT_EX(Func_62ec0, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62ec0(); }
-PORT_EX(Func_62f5b, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62f5b(); }
-PORT_EX(Func_62f71, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62f71(); }
-PORT_EX(Func_62f76, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62f76(); }
-PORT_EX(Func_62f8c, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62f8c(); }
-PORT_EX(Func_62f91, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62f91(); }
-PORT_EX(Func_62fa7, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62fa7(); }
-PORT_EX(Func_6283a, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_6283a(); }
-PORT_EX(Func_62840, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62840(); }
-PORT_EX(Func_62892, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62892(); }
-PORT_EX(Func_62898, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62898(); }
-PORT_EX(Func_62908, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62908(); }
-PORT_EX(Func_62926, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62926(); }
-PORT_EX(Func_629a6, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_629a6(); }
-PORT_EX(_ObjState_StandingFall, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port__ObjState_StandingFall(); }
-PORT_EX(_ObjState_Fall, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port__ObjState_Fall(); }
-PORT_EX(Func_627f0, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_627f0(); }
-PORT_EX(Func_62690, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62690(); }
-PORT_EX(Func_6303f, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_6303f(); }
-PORT_EX(Func_63050, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_63050(); }
-PORT_EX(Func_6305f, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_6305f(); }
-PORT_EX(Func_62ae5, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62ae5(); }
-PORT_EX(Func_62bce, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62bce(); }
-PORT_EX(_ObjState_BumpRight, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port__ObjState_BumpRight(); }
-PORT_EX(_ObjState_BumpLeft, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port__ObjState_BumpLeft(); }
-PORT_EX(Func_62ca8, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62ca8(); }
-PORT_EX(Func_62d86, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62d86(); }
-PORT_EX(Func_62c9f, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62c9f(); }
-PORT_EX(Func_62d7d, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62d7d(); }
-PORT_EX(Func_618b4, 0, 0) { ObjectEngine(gb).port_Func_618b4(); }
-PORT_EX(VanishObject_NoSFX, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_VanishObject_NoSFX(); }
-PORT_EX(_VanishObject, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port__VanishObject(); }
-PORT_EX(InitObjectVars_FromLevelStart, 0, 0) { ObjectEngine(gb).port_InitObjectVars_FromLevelStart(); }
-PORT_EX(InitObjectVars_FromTransition, 0, 0) { ObjectEngine(gb).port_InitObjectVars_FromTransition(); }
-PORT_EX(_ApplyObjYMovement, 0, 0) { ObjectEngine(gb).port__ApplyObjYMovement(); }
-PORT_EX(_ApplyObjXMovement, 0, 0) { ObjectEngine(gb).port__ApplyObjXMovement(); }
-PORT_EX(_ApplyObjYMovement_Loop, 0, 0) { ObjectEngine(gb).port__ApplyObjYMovement_Loop(); }
-PORT_EX(_ApplyObjXMovement_Loop, 0, 0) { ObjectEngine(gb).port__ApplyObjXMovement_Loop(); }
-PORT_EX(Func_63209, 0, 0) { ObjectEngine(gb).port_Func_63209(); }
-PORT_EX(_ApplyObjSetMovement, 0, 0) { ObjectEngine(gb).port__ApplyObjSetMovement(); }
-PORT_EX(Func_632ac, 0, 0) { ObjectEngine(gb).port_Func_632ac(); }
-PORT_EX(HandleGrabbedObjectCollisions, 0, 0) { ObjectEngine(gb).port_HandleGrabbedObjectCollisions(); }
+PORT_EX(Func_628ea, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_628ea(); }
+PORT_EX(Func_62e74, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62e74(); }
+PORT_EX(Func_62e8a, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62e8a(); }
+PORT_EX(Func_62e8f, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62e8f(); }
+PORT_EX(Func_62ea5, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62ea5(); }
+PORT_EX(Func_62eaa, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62eaa(); }
+PORT_EX(Func_62ec0, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62ec0(); }
+PORT_EX(Func_62f5b, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62f5b(); }
+PORT_EX(Func_62f71, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62f71(); }
+PORT_EX(Func_62f76, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62f76(); }
+PORT_EX(Func_62f8c, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62f8c(); }
+PORT_EX(Func_62f91, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62f91(); }
+PORT_EX(Func_62fa7, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62fa7(); }
+PORT_EX(Func_6283a, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_6283a(); }
+PORT_EX(Func_62840, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62840(); }
+PORT_EX(Func_62892, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62892(); }
+PORT_EX(Func_62898, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62898(); }
+PORT_EX(Func_62908, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62908(); }
+PORT_EX(Func_62926, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62926(); }
+PORT_EX(Func_629a6, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_629a6(); }
+PORT_EX(_ObjState_StandingFall, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port__ObjState_StandingFall(); }
+PORT_EX(_ObjState_Fall, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port__ObjState_Fall(); }
+PORT_EX(Func_627f0, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_627f0(); }
+PORT_EX(Func_62690, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62690(); }
+PORT_EX(Func_6303f, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_6303f(); }
+PORT_EX(Func_63050, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_63050(); }
+PORT_EX(Func_6305f, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_6305f(); }
+PORT_EX(Func_62ae5, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62ae5(); }
+PORT_EX(Func_62bce, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62bce(); }
+PORT_EX(_ObjState_BumpRight, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port__ObjState_BumpRight(); }
+PORT_EX(_ObjState_BumpLeft, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port__ObjState_BumpLeft(); }
+PORT_EX(Func_62ca8, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62ca8(); }
+PORT_EX(Func_62d86, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62d86(); }
+PORT_EX(Func_62c9f, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62c9f(); }
+PORT_EX(Func_62d7d, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62d7d(); }
+PORT_EX(VanishObject_NoSFX, 0, ALL_REGISTERS) { ObjectEngine(gb).port_VanishObject_NoSFX(); }
+PORT_EX(_VanishObject, 0, ALL_REGISTERS) { ObjectEngine(gb).port__VanishObject(); }
+PORT_EX(InitObjectVars_FromLevelStart, 0, ALL_REGISTERS) { ObjectEngine(gb).port_InitObjectVars_FromLevelStart(); }
+PORT_EX(InitObjectVars_FromTransition, 0, ALL_REGISTERS) { ObjectEngine(gb).port_InitObjectVars_FromTransition(); }
+PORT_EX(_ApplyObjYMovement, 0, R_A | R_F | R_B | R_C) { ObjectEngine(gb).port__ApplyObjYMovement(); }
+PORT_EX(_ApplyObjXMovement, 0, R_A | R_F | R_B | R_C) { ObjectEngine(gb).port__ApplyObjXMovement(); }
+PORT_EX(_ApplyObjYMovement_Loop, 0, R_A | R_F | R_B | R_C) { ObjectEngine(gb).port__ApplyObjYMovement_Loop(); }
+PORT_EX(_ApplyObjXMovement_Loop, 0, R_A | R_F | R_B | R_C) { ObjectEngine(gb).port__ApplyObjXMovement_Loop(); }
+PORT_EX(Func_63209, 0, ALL_REGISTERS) { ObjectEngine(gb).port_Func_63209(); }
+PORT_EX(_ApplyObjSetMovement, 0, ALL_REGISTERS) { ObjectEngine(gb).port__ApplyObjSetMovement(); }
+PORT_EX(Func_632ac, 0, ALL_REGISTERS & ~R_E) { ObjectEngine(gb).port_Func_632ac(); }
 PORT_EX(DoObjectAction, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_DoObjectAction(); }
-PORT_EX(Func_62e57, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62e57(); }
-PORT_EX(_VanishObject2, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port__VanishObject2(); }
+PORT_EX(Func_62e57, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62e57(); }
+PORT_EX(_VanishObject2, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port__VanishObject2(); }
 PORT_EX(ThrowObject_Left, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_ThrowObject_Left(); }
 PORT_EX(ThrowObject_Right, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_ThrowObject_Right(); }
 PORT_EX(Func_626da, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_626da(); }
@@ -2335,8 +1844,4 @@ PORT_EX(Func_621fb, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_621fb(); }
 PORT_EX(Func_622bd, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_622bd(); }
 PORT_EX(Func_6247b, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_6247b(); }
 PORT_EX(Func_62382, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62382(); }
-PORT_EX(UpdateObject, 0, 0) { ObjectEngine(gb).port_UpdateObject(); }
-PORT_EX(UpdateObject_Temple, 0, 0) { ObjectEngine(gb).port_UpdateObject_Temple(); }
-PORT_EX(UpdateObjectDuringFloorTransition, 0, 0) { ObjectEngine(gb).port_UpdateObjectDuringFloorTransition(); }
-PORT_EX(UpdateObjects_Temple, 0, 0) { ObjectEngine(gb).port_UpdateObjects_Temple(); }
-PORT_EX(UpdateObjects, 0, 0) { ObjectEngine(gb).port_UpdateObjects(); }
+PORT_EX(UpdateObjects, 0, ALL_REGISTERS) { ObjectEngine(gb).port_UpdateObjects(); }

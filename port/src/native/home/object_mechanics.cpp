@@ -3,8 +3,35 @@
 // keeping the original's registers, flags and return addresses for its
 // callers (see src/native/asm_module.hpp).
 #include "../asm_module.hpp"
+#include "object_mechanics.hpp"
 
 namespace wl3::home {
+
+// UpdateObjSprite, plain: see object_mechanics.hpp
+void update_obj_sprite(GB *gb, uint16_t id, uint16_t pos)
+{
+	Memory mem(gb);
+	uint8_t bank = mem[wROMBank];
+	uint8_t v = mem[id];
+	bankswitch(gb, static_cast<uint8_t>((((v << 4) | (v >> 4)) & 0x7) | BANK_OAM_180000), ADDR_UpdateObjSprite);
+	uint8_t y = mem[pos], x = mem[pos + 1], frame = mem[pos + 2];
+	mem[wCurSpriteYCoord] = y;
+	mem[wCurSpriteXCoord] = x;
+	mem[wCurSpriteFrame] = frame;
+	// the OAM pointer plus frame * 2 (an 8-bit add a)
+	uint16_t entry = static_cast<uint16_t>(mem.word(pos + 3) + static_cast<uint8_t>(frame * 2));
+	uint16_t data = mem.word(entry);
+	uint16_t oam = static_cast<uint16_t>((wVirtualOAM & 0xff00) | mem[wVirtualOAMByteSize]);
+	while ((oam & 0xff) < (wVirtualOAMEnd & 0xff) && mem[data] != 0x80) {
+		mem[oam++] = static_cast<uint8_t>(mem[data++] + y); // SPRITEOAMSTRUCT_YCOORD
+		mem[oam++] = static_cast<uint8_t>(mem[data++] + x); // SPRITEOAMSTRUCT_XCOORD
+		mem[oam++] = mem[data++]; // SPRITEOAMSTRUCT_TILE_ID
+		mem[oam++] = mem[data]; // SPRITEOAMSTRUCT_ATTRIBUTES
+		mem[wVirtualOAMByteSize] = static_cast<uint8_t>(oam);
+		data++;
+	}
+	bankswitch(gb, bank, ADDR_UpdateObjSprite);
+}
 
 namespace {
 
@@ -31,62 +58,6 @@ public:
 	{
 		homejp(bank);
 		gb_call(gb_, addr);
-		pop_af();
-		bankswitch(cpu_.a);
-	}
-
-	// given the obj struct in hl
-	// update its sprite with its current position
-	void port_UpdateObjSprite()
-	{
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = rd8(REG_HL(gb_)); // unk7
-		cpu_.a = (uint8_t)(((cpu_.a << 4 | cpu_.a >> 4) & 0x7) | BANK_OAM_180000);
-		bankswitch(cpu_.a);
-		uint16_t hl = (uint16_t)(cpu_.h << 8 | cpu_.e);
-		wr8(wCurSpriteYCoord, rd8(hl++));
-		wr8(wCurSpriteXCoord, rd8(hl++));
-		uint8_t frame = rd8(hl++);
-		wr8(wCurSpriteFrame, frame);
-		uint8_t lo = rd8(hl++);
-		hl = (uint16_t)(rd8(hl) << 8 | lo);
-		// ld a, [wCurSpriteFrame] / ld d, $00 / add a / ld e, a / add hl, de
-		frame = rd8(wCurSpriteFrame);
-		cpu_.a = alu_.add(frame, frame);
-		hl = alu_.add16(hl, cpu_.a);
-		uint16_t de = (uint16_t)(rd8(hl + 1) << 8 | rd8(hl));
-		hl++;
-
-		cpu_.c = rd8(wCurSpriteXCoord);
-		cpu_.b = rd8(wCurSpriteYCoord);
-		hl = (uint16_t)((wVirtualOAM >> 8) << 8 | rd8(wVirtualOAMByteSize));
-		for (;;) {
-			cpu_.a = (uint8_t)hl;
-			alu_.cp(cpu_.a, (wVirtualOAMEnd & 0xff));
-			if (!(cpu_.f & FLAG_C))
-				break;
-			cpu_.a = rd8(de);
-			alu_.cp(cpu_.a, 0x80);
-			if (cpu_.f & FLAG_Z)
-				break;
-			cpu_.a = alu_.add(rd8(de), cpu_.b);
-			wr8(hl++, cpu_.a); // SPRITEOAMSTRUCT_YCOORD
-			de++;
-			cpu_.a = alu_.add(rd8(de), cpu_.c);
-			wr8(hl++, cpu_.a); // SPRITEOAMSTRUCT_XCOORD
-			de++;
-			cpu_.a = rd8(de);
-			wr8(hl++, cpu_.a); // SPRITEOAMSTRUCT_TILE_ID
-			de++;
-			cpu_.a = rd8(de);
-			wr8(hl++, cpu_.a); // SPRITEOAMSTRUCT_ATTRIBUTES
-			cpu_.a = (uint8_t)hl;
-			wr8(wVirtualOAMByteSize, cpu_.a);
-			de++;
-		}
-		SET_HL(gb_, hl);
-		SET_DE(gb_, de);
 		pop_af();
 		bankswitch(cpu_.a);
 	}
@@ -756,7 +727,8 @@ public:
 
 using wl3::home::HomeObjectMechanics;
 
-PORT_EX(UpdateObjSprite, 0, 0) { HomeObjectMechanics(gb).port_UpdateObjSprite(); }
+// only DrawObjects calls it, and reads none after it
+PORT_EX(UpdateObjSprite, 0, ALL_REGISTERS) { wl3::home::update_obj_sprite(gb, REG_HL(gb), static_cast<uint16_t>(gb->cpu.h << 8 | gb->cpu.e)); }
 PORT_EX(DecrementRemainingBossHits, 0, 0) { HomeObjectMechanics(gb).port_DecrementRemainingBossHits(); }
 PORT_EX(UpdateObjectFrame, 0, 0) { HomeObjectMechanics(gb).port_UpdateObjectFrame(); }
 PORT_EX(UpdateObjectAnimation, 0, 0) { HomeObjectMechanics(gb).port_UpdateObjectAnimation(); }
@@ -826,15 +798,20 @@ PORT_EX(Func_33f8, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_33f8(
 PORT_EX(Func_3407, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3407(); }
 PORT_EX(CreateObjectAtRelativePos, 0, 0) { HomeObjectMechanics(gb).port_CreateObjectAtRelativePos(); }
 PORT_EX(CreateObjectFromCurObjPos, 0, 0) { HomeObjectMechanics(gb).port_CreateObjectFromCurObjPos(); }
-PORT_EX(Func_3444, 0, 0) { HomeObjectMechanics(gb).port_Func_3444(); }
+PORT_EX(Func_3444, 0, ALL_REGISTERS & ~R_E) { HomeObjectMechanics(gb).port_Func_3444(); }
 PORT_EX(CountActiveTransientObjects, 0, 0) { HomeObjectMechanics(gb).port_CountActiveTransientObjects(); }
-PORT_EX(ApplyObjSetMovement, 0, 0) { HomeObjectMechanics(gb).port_ApplyObjSetMovement(); }
-PORT_EX(ApplyObjYMovement_Loop, 0, 0) { HomeObjectMechanics(gb).port_ApplyObjYMovement_Loop(); }
-PORT_EX(ApplyObjXMovement_Loop, 0, 0) { HomeObjectMechanics(gb).port_ApplyObjXMovement_Loop(); }
-PORT_EX(ApplyObjYMovement, 0, 0) { HomeObjectMechanics(gb).port_ApplyObjYMovement(); }
-PORT_EX(ApplyObjXMovement, 0, 0) { HomeObjectMechanics(gb).port_ApplyObjXMovement(); }
-PORT_EX(VanishObject, 0, 0) { HomeObjectMechanics(gb).port_VanishObject(); }
-PORT_EX(Func_34fc, 0, 0) { HomeObjectMechanics(gb).port_Func_34fc(); }
+// The movement wrappers homecall update_objects.cpp's plain movement code,
+// which leaves b and c (and for the set movement and Func_34fc all of them)
+// as it pleases: the objects read only the d, e and h these pass on
+// (live.py), and e from Func_3444.
+PORT_EX(ApplyObjSetMovement, 0, ALL_REGISTERS) { HomeObjectMechanics(gb).port_ApplyObjSetMovement(); }
+PORT_EX(ApplyObjYMovement_Loop, 0, R_B | R_C) { HomeObjectMechanics(gb).port_ApplyObjYMovement_Loop(); }
+PORT_EX(ApplyObjXMovement_Loop, 0, R_B | R_C) { HomeObjectMechanics(gb).port_ApplyObjXMovement_Loop(); }
+PORT_EX(ApplyObjYMovement, 0, R_B | R_C) { HomeObjectMechanics(gb).port_ApplyObjYMovement(); }
+PORT_EX(ApplyObjXMovement, 0, R_B | R_C) { HomeObjectMechanics(gb).port_ApplyObjXMovement(); }
+// homecalls the plain _VanishObject; its callers read no register after it
+PORT_EX(VanishObject, 0, ALL_REGISTERS) { HomeObjectMechanics(gb).port_VanishObject(); }
+PORT_EX(Func_34fc, 0, ALL_REGISTERS) { HomeObjectMechanics(gb).port_Func_34fc(); }
 PORT_EX(Func_3513, 0, 0) { HomeObjectMechanics(gb).port_Func_3513(); }
 PORT_EX(Func_352b, 0, 0) { HomeObjectMechanics(gb).port_Func_352b(); }
 PORT_EX(Func_3543, 0, 0) { HomeObjectMechanics(gb).port_Func_3543(); }
