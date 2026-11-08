@@ -19,207 +19,117 @@ public:
 
 	#define ProcessInteractions_table (ADDR_ProcessInteractions + 0x150) // after the $ef
 
-	// a = [lo] + [hi]-style "ld a, [x] / add [hl] / sub e"
-	uint8_t pi_edge(uint16_t pos, uint16_t box)
+	// an edge of a collision box on screen: pos + the box's offset - $d0
+	uint8_t edge(uint16_t pos, uint16_t box) { return static_cast<uint8_t>(rd8(pos) + rd8(box) - 0xd0); }
+
+	// How far two boxes overlap along one axis, from both ends (false if
+	// they don't): Wario's box from a_start to a_end, the object's from
+	// b_start to b_end
+	bool overlap(uint8_t a_end, uint8_t b_start, uint8_t b_end, uint8_t a_start, uint8_t &first, uint8_t &second)
 	{
-		SET_HL(gb_, box);
-		cpu_.a = alu_.add(rd8(pos), rd8(box));
-		return cpu_.a = alu_.sub(cpu_.a, cpu_.e);
+		if (a_end < b_start || b_end < a_start)
+			return false;
+		first = static_cast<uint8_t>(a_end - b_start);
+		second = static_cast<uint8_t>(b_end - a_start);
+		return true;
 	}
 
-	// ProcessInteractions from .loop_objects (or .next_obj), up to the
-	// interaction's jumptable: whether it got there (or past the objects)
-	bool pi_run(bool next)
+	// the smaller overlap in lo (both, if equal), else in hi
+	void record_overlap(uint8_t first, uint8_t second, uint16_t lo, uint16_t hi)
 	{
-		uint16_t hl;
-		if (next)
-			goto next_obj;
-	loop_objects:
-		cpu_.a = cpu_.h;
-		alu_.cp(cpu_.a, (uint8_t)((wObjects >> 8) + 1));
-		if (ZF)
-			return false; // past the last object
-		wr8(wObjPtr + 0, cpu_.a);
-		cpu_.a = cpu_.l;
-		wr8(wObjPtr + 1, cpu_.a);
-		cpu_.a = alu_.and_(rd8(REG_HL(gb_)), OBJFLAG_ACTIVE | OBJFLAG_ON_SCREEN);
-		alu_.cp(cpu_.a, OBJFLAG_ACTIVE | OBJFLAG_ON_SCREEN);
-		if (ZF)
-			goto is_visible;
-	next_obj:
-		cpu_.a = rd8(wObjPtr + 0);
-		cpu_.h = cpu_.a;
-		cpu_.a = rd8(wObjPtr + 1);
-		cpu_.l = cpu_.a;
-		SET_DE(gb_, OBJ_STRUCT_LENGTH);
-		SET_HL(gb_, alu_.add16(REG_HL(gb_), OBJ_STRUCT_LENGTH));
-		goto loop_objects;
-
-	is_visible:
-		hl = REG_HL(gb_);
-		gb_push16(gb_, hl);
-		cpu_.e = OBJ_UNK_1D;
-		cpu_.d = 0;
-		hl = alu_.add16(hl, OBJ_UNK_1D);
-		cpu_.a = rd8(hl);
-		hl--;
-		wr8(wUnused_c1b8, cpu_.a);
-		cpu_.a = rd8(hl);
-		hl = gb_pop16(gb_);
-		SET_HL(gb_, hl);
-		alu_.and_(cpu_.a, cpu_.a);
-		if (!ZF)
-			goto next_obj;
-
-		cpu_.e = OBJ_INTERACTION_TYPE;
-		cpu_.d = 0;
-		hl = alu_.add16(hl, OBJ_INTERACTION_TYPE);
-		static const uint16_t dst[] = {wObjInteractionType, wObjCollBoxTop, wObjCollBoxBottom,
-			wObjCollBoxLeft, wObjCollBoxRight, wObjScreenYPos, wObjScreenXPos};
-		for (int i = 0; i < 7; i++) {
-			cpu_.a = rd8(hl);
-			wr8(dst[i], cpu_.a);
-			if (i < 6)
-				hl++;
-		}
-		cpu_.e = OBJ_SUBSTATE - OBJ_SCREEN_X_POS;
-		cpu_.d = 0;
-		hl = alu_.add16(hl, OBJ_SUBSTATE - OBJ_SCREEN_X_POS);
-		SET_HL(gb_, hl);
-		cpu_.a = rd8(hl);
-		cpu_.a = alu_.bit(cpu_.a, OBJSUBFLAG_HDIR_F) ? DIRECTION_RIGHT : DIRECTION_LEFT;
-		wr8(wObjDirection, cpu_.a);
-
-		wr8(wInteractionSide, 0);
-		cpu_.a = 0xff;
-		wr8(wc1c2, 0xff);
-		wr8(wc1c1, 0xff);
-		wr8(wc1c3, 0xff);
-		wr8(wc1c4, 0xff);
-
-		cpu_.e = 0xd0;
-		cpu_.b = pi_edge(wObjScreenYPos, wObjCollBoxTop);
-		pi_edge(wWarioScreenYPos, wCollisionBoxBottom);
-		cpu_.a = alu_.sub(cpu_.a, cpu_.b);
-		if (CF)
-			goto next_obj;
-		cpu_.c = cpu_.a;
-		cpu_.b = pi_edge(wWarioScreenYPos, wCollisionBoxTop);
-		pi_edge(wObjScreenYPos, wObjCollBoxBottom);
-		cpu_.a = alu_.sub(cpu_.a, cpu_.b);
-		if (CF)
-			goto next_obj;
-		cpu_.d = cpu_.a;
-		cpu_.a = alu_.sub(cpu_.d, cpu_.c);
-		if (!CF) {
-			cpu_.a = cpu_.c;
-			wr8(wc1c1, cpu_.a);
-			if (ZF) {
-				cpu_.a = cpu_.d;
-				wr8(wc1c2, cpu_.a);
-			}
+		if (second >= first) {
+			wr8(lo, first);
+			if (second == first)
+				wr8(hi, second);
 		} else {
-			cpu_.a = cpu_.d;
-			wr8(wc1c2, cpu_.a);
+			wr8(hi, second);
 		}
+	}
 
-		cpu_.b = pi_edge(wObjScreenXPos, wObjCollBoxLeft);
-		pi_edge(wWarioScreenXPos, wCollisionBoxRight);
-		cpu_.a = alu_.sub(cpu_.a, cpu_.b);
-		if (CF)
-			goto next_obj;
-		cpu_.c = cpu_.a;
-		cpu_.b = pi_edge(wWarioScreenXPos, wCollisionBoxLeft);
-		pi_edge(wObjScreenXPos, wObjCollBoxRight);
-		cpu_.a = alu_.sub(cpu_.a, cpu_.b);
-		if (CF)
-			goto next_obj;
-		cpu_.d = cpu_.a;
-		cpu_.a = alu_.sub(cpu_.a, cpu_.c);
-		if (!CF) {
-			cpu_.a = cpu_.c;
-			wr8(wc1c3, cpu_.a);
-			if (ZF) {
-				cpu_.a = cpu_.d;
-				wr8(wc1c4, cpu_.a);
-			}
-		} else {
-			cpu_.a = cpu_.d;
-			wr8(wc1c4, cpu_.a);
-		}
+	// ProcessInteractions from .loop_objects (or .next_obj, after the object
+	// at wObjPtr): the next active, on-screen object Wario overlaps, its
+	// interaction data copied to wObj*, the sides he's touching it from in
+	// wInteractionSide; the handler of its interaction, or 0 past the
+	// objects. (The handlers read no register: the asm's entry liveness.)
+	uint16_t pi_run(bool next)
+	{
+		uint16_t obj = next ? static_cast<uint16_t>((rd8(wObjPtr + 0) << 8 | rd8(wObjPtr + 1)) + OBJ_STRUCT_LENGTH)
+				    : static_cast<uint16_t>(wObjects);
+		for (;; obj = static_cast<uint16_t>(obj + OBJ_STRUCT_LENGTH)) {
+			if ((obj >> 8) == (wObjects >> 8) + 1)
+				return 0; // past the last object
+			wr8(wObjPtr + 0, static_cast<uint8_t>(obj >> 8));
+			wr8(wObjPtr + 1, static_cast<uint8_t>(obj));
+			if ((rd8(obj) & (OBJFLAG_ACTIVE | OBJFLAG_ON_SCREEN)) != (OBJFLAG_ACTIVE | OBJFLAG_ON_SCREEN))
+				continue;
+			wr8(wUnused_c1b8, rd8(static_cast<uint16_t>(obj + OBJ_UNK_1D)));
+			if (rd8(static_cast<uint16_t>(obj + OBJ_UNK_1D - 1)))
+				continue;
+			static const uint16_t dst[] = {wObjInteractionType, wObjCollBoxTop, wObjCollBoxBottom,
+				wObjCollBoxLeft, wObjCollBoxRight, wObjScreenYPos, wObjScreenXPos};
+			for (int i = 0; i < 7; i++)
+				wr8(dst[i], rd8(static_cast<uint16_t>(obj + OBJ_INTERACTION_TYPE + i)));
+			bool right = rd8(static_cast<uint16_t>(obj + OBJ_SUBSTATE)) & (1 << OBJSUBFLAG_HDIR_F);
+			wr8(wObjDirection, right ? DIRECTION_RIGHT : DIRECTION_LEFT);
+			wr8(wInteractionSide, 0);
+			for (uint16_t at : {wc1c2, wc1c1, wc1c3, wc1c4})
+				wr8(at, 0xff);
 
-		{
+			uint8_t y1, y2, x1, x2;
+			if (!overlap(edge(wWarioScreenYPos, wCollisionBoxBottom), edge(wObjScreenYPos, wObjCollBoxTop),
+				    edge(wObjScreenYPos, wObjCollBoxBottom), edge(wWarioScreenYPos, wCollisionBoxTop), y1, y2))
+				continue;
+			record_overlap(y1, y2, wc1c1, wc1c2);
+			if (!overlap(edge(wWarioScreenXPos, wCollisionBoxRight), edge(wObjScreenXPos, wObjCollBoxLeft),
+				    edge(wObjScreenXPos, wObjCollBoxRight), edge(wWarioScreenXPos, wCollisionBoxLeft), x1, x2))
+				continue;
+			record_overlap(x1, x2, wc1c3, wc1c4);
+
+			// the side Wario's touching it from: the smaller overlap of each
+			// axis, then of the two
 			uint8_t side = INTERACTION_LEFT | INTERACTION_RIGHT | INTERACTION_UP | INTERACTION_DOWN;
-			SET_HL(gb_, wInteractionSide);
-			cpu_.a = side;
+			uint8_t x = rd8(wc1c4), x_left = rd8(wc1c3);
+			if (x_left != x) {
+				if (x_left > x) {
+					side &= static_cast<uint8_t>(~INTERACTION_RIGHT);
+				} else {
+					side &= static_cast<uint8_t>(~INTERACTION_LEFT);
+					x = x_left;
+				}
+			}
+			uint8_t y = rd8(wc1c2), y_up = rd8(wc1c1);
+			if (y_up != y) {
+				if (y_up > y) {
+					side &= static_cast<uint8_t>(~INTERACTION_UP);
+				} else {
+					side &= static_cast<uint8_t>(~INTERACTION_DOWN);
+					y = y_up;
+				}
+			}
+			if (x != y)
+				side &= static_cast<uint8_t>(x > y ? ~(INTERACTION_LEFT | INTERACTION_RIGHT)
+								   : ~(INTERACTION_UP | INTERACTION_DOWN));
 			wr8(wInteractionSide, side);
-			cpu_.a = rd8(wc1c4);
-			cpu_.b = cpu_.a;
-			cpu_.a = rd8(wc1c3);
-			cpu_.c = cpu_.a;
-			alu_.cp(cpu_.a, cpu_.b);
-			if (!ZF) {
-				if (!CF) {
-					side &= (uint8_t)~INTERACTION_RIGHT;
-				} else {
-					side &= (uint8_t)~INTERACTION_LEFT;
-					cpu_.b = cpu_.c;
-				}
-				wr8(wInteractionSide, side);
-			}
-			cpu_.a = rd8(wc1c2);
-			cpu_.d = cpu_.a;
-			cpu_.a = rd8(wc1c1);
-			cpu_.e = cpu_.a;
-			alu_.cp(cpu_.a, cpu_.d);
-			if (!ZF) {
-				if (!CF) {
-					side &= (uint8_t)~INTERACTION_UP;
-				} else {
-					side &= (uint8_t)~INTERACTION_DOWN;
-					cpu_.d = cpu_.e;
-				}
-				wr8(wInteractionSide, side);
-			}
-			cpu_.a = cpu_.b;
-			alu_.cp(cpu_.a, cpu_.d);
-			if (!ZF) {
-				if (!CF)
-					side &= (uint8_t)~(INTERACTION_LEFT | INTERACTION_RIGHT);
-				else
-					side &= (uint8_t)~(INTERACTION_UP | INTERACTION_DOWN);
-				wr8(wInteractionSide, side);
-			}
-		}
 
-		// .do_interaction
-		cpu_.a = alu_.and_(rd8(wObjInteractionType), INTERACTION_MASK);
-		// rst JumpTable
-		gb_push16(gb_, ProcessInteractions_table);
-		cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		hl = gb_pop16(gb_);
-		cpu_.e = cpu_.a;
-		cpu_.d = 0;
-		hl = alu_.add16(hl, REG_DE(gb_));
-		cpu_.a = rd8(hl);
-		cpu_.h = rd8((uint16_t)(hl + 1));
-		cpu_.l = cpu_.a;
-		return true; // hl = the interaction
+			// .do_interaction: the jumptable after the $ef
+			uint16_t entry = static_cast<uint16_t>(ProcessInteractions_table + (rd8(wObjInteractionType) & INTERACTION_MASK) * 2);
+			return static_cast<uint16_t>(rd8(entry) | rd8(static_cast<uint16_t>(entry + 1)) << 8);
+		}
 	}
 
 	void port_ProcessInteractions()
 	{
-		if (ld_and(wIsIntangible) || ld_and(wIsFloorTransition) || ld_and(wAutoMoveState)) {
+		if (rd8(wIsIntangible) || rd8(wIsFloorTransition) || rd8(wAutoMoveState))
 			return;
-		}
-		xor_a();
 		wr8(wIsOnSteppableObject, 0);
-		SET_HL(gb_, wObjects);
 		// each interaction ends the loop (the asm's ret) or goes on with the
 		// next object (its jp .next_obj)
-		for (bool next = false; pi_run(next); next = true) {
+		for (bool next = false;; next = true) {
+			uint16_t handler = pi_run(next);
+			if (!handler)
+				return;
 			next_obj_ = false;
-			interaction(REG_HL(gb_));
+			interaction(handler);
 			if (!next_obj_)
 				return;
 		}
@@ -323,38 +233,30 @@ public:
 	// b = OBJACTION_* constant
 	// Sets the action of the object at wObjPtr, and records which side Wario
 	// interacted with it from.
-	void port_SetObjAction()
+	// SetObjAction: the action of the object at wObjPtr, and the sides
+	// Wario touched it from (in OBJ_UNK_1D's high nibble)
+	void set_obj_action(uint8_t action)
 	{
-		uint16_t obj = (uint16_t)(rd8(wObjPtr + 0) << 8 | rd8(wObjPtr + 1));
-		cpu_.d = 0;
-		cpu_.e = OBJ_ACTION;
-		uint16_t hl = alu_.add16(obj, OBJ_ACTION);
-		wr8(hl, cpu_.b);
-		cpu_.h = (uint8_t)(hl >> 8);
-		cpu_.l = alu_.inc((uint8_t)hl); // inc l
-		hl = REG_HL(gb_);
-
-		cpu_.b = rd8(wInteractionSide);
-		cpu_.a = alu_.or_(alu_.and_(rd8(hl), 0x0f), cpu_.b); // OBJ_UNK_1D
-		wr8(hl, cpu_.a);
+		uint16_t obj = static_cast<uint16_t>(rd8(wObjPtr + 0) << 8 | rd8(wObjPtr + 1));
+		uint16_t at = static_cast<uint16_t>(obj + OBJ_ACTION);
+		wr8(at, action);
+		at = static_cast<uint16_t>((at & 0xff00) | static_cast<uint8_t>(at + 1)); // inc l
+		wr8(at, static_cast<uint8_t>((rd8(at) & 0x0f) | rd8(wInteractionSide)));
 	}
 
 	void port_Func_20a63()
 	{
-		cpu_.b = OBJACTION_07;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_07);
 	}
 
 	void port_Func_20a69()
 	{
-		cpu_.b = OBJACTION_0D;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_0D);
 	}
 
 	void port_Func_21cc9()
 	{
-		cpu_.b = OBJACTION_13;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_13);
 	}
 
 	void port_CollectKey()
@@ -391,8 +293,7 @@ public:
 
 	void port_VanishObjectAndKnockBackIfZombie()
 	{
-		cpu_.b = OBJACTION_VANISH_TOUCH;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_VANISH_TOUCH);
 		ld_cp(wTransformation, TRANSFORMATION_ZOMBIE_WARIO);
 		if (!ZF)
 			return;
@@ -421,8 +322,7 @@ public:
 
 	void port_Func_20fe8()
 	{
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 	}
 
 	void port_ObjInteraction_None()
@@ -431,14 +331,12 @@ public:
 
 	void port_ObjInteraction_Ink()
 	{
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 	}
 
 	void port_Func_2092d()
 	{
-		cpu_.b = OBJACTION_VANISH_TOUCH;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_VANISH_TOUCH);
 	}
 
 	void port_ObjInteraction_Hand()
@@ -457,8 +355,7 @@ public:
 		if (!ZF) {
 			return;
 		}
-		cpu_.b = OBJACTION_0E;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_0E);
 	}
 
 	void port_SetState_FlatStretching()
@@ -570,8 +467,7 @@ public:
 		ld_cp(wObjScreenXPos, cpu_.b);
 		cpu_.a = alu_.or_(rd8(wInteractionSide), CF ? INTERACTION_LEFT : INTERACTION_RIGHT);
 		wr8(wInteractionSide, cpu_.a);
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 
 		if (rd8(wInvincibleCounter))
 			return;
@@ -671,8 +567,7 @@ public:
 
 	void port_ObjInteraction_RollingRock()
 	{
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		if (rd8(wIsRolling))
 			return;
 		ld(wObjDirection);
@@ -692,8 +587,7 @@ public:
 	{
 		if (invincible_or_persistent())
 			return;
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		wr8(wTransformation, TRANSFORMATION_VAMPIRE_WARIO);
 		FARCALL(Func_19b25);
 		if (rd8(wTransformation) != TRANSFORMATION_VAMPIRE_WARIO)
@@ -705,8 +599,7 @@ public:
 	{
 		if (invincible_or_persistent())
 			return;
-		cpu_.b = OBJACTION_07;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_07);
 		wr8(wTransformation, TRANSFORMATION_BUBBLE);
 		touch_states(TOUCH_BUMP, 0x01);
 		FARCALL(Func_2ac7d);
@@ -727,8 +620,7 @@ public:
 			port_Func_20a69();
 			return;
 		}
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		play_sfx(SFX_028);
 		wr8(wTransformation, TRANSFORMATION_ZOMBIE_WARIO);
 		touch_states(TOUCH_VANISH, 0x02);
@@ -798,8 +690,7 @@ public:
 		cpu_.a = alu_.or_(rd8(wInteractionSide), CF ? INTERACTION_LEFT : INTERACTION_RIGHT);
 		wr8(wInteractionSide, cpu_.a);
 		play_sfx(SFX_014);
-		cpu_.b = OBJACTION_WOBBLE;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_WOBBLE);
 		if (ld_and(wTransformation) || ld_bit(wInteractionSide, INTERACTION_UP_F)) {
 			return;
 		}
@@ -830,8 +721,7 @@ public:
 		alu_.cp(cpu_.a, TRANSFORMATION_RAIL);
 		if (ZF)
 			return;
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		play_sfx(SFX_HANG_GRAB);
 		wr8(wTransformation, TRANSFORMATION_RAIL);
 		wr8(wTouchState, TOUCH_BUMP);
@@ -984,8 +874,7 @@ public:
 			}
 			return;
 		}
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		port_SetState_WaterStung(); // fallthrough
 	}
 
@@ -1004,8 +893,7 @@ public:
 		gb_call(gb_, stung);
 		stop_sfx();
 		st(wWarioState, state);
-		cpu_.b = OBJACTION_TELEPORT;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_TELEPORT);
 	}
 
 	void port_ObjInteraction_WaterTeleporting() { teleport(ADDR_SetState_WaterStung, WST_WATER_TELEPORTING); }
@@ -1103,8 +991,7 @@ public:
 				return;
 			}
 		}
-		cpu_.b = OBJACTION_07;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_07);
 		play_sfx(SFX_028);
 		wr8(wTransformation, TRANSFORMATION_ICE_SKATIN);
 		touch_states(TOUCH_ATTACK, 0x02);
@@ -1133,8 +1020,7 @@ public:
 			cpu_.b = cpu_.a;
 			CALL(MoveWarioUp);
 		}
-		cpu_.b = OBJACTION_STEP_ON;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_STEP_ON);
 		if (!ld_and(wJumpVelTable) || ld_and(wAttackCounter) || ld_and(wIsRolling)) {
 			next_obj_ = true;
 			return;
@@ -1261,8 +1147,7 @@ public:
 		// .spawn_stars
 		cpu_.b = PARTICLE_STARS;
 		FARCALL(CreateParticle);
-		cpu_.b = OBJACTION_ATTACK;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_ATTACK);
 		cpu_.a = rd8(wTransformation);
 		alu_.cp(cpu_.a, TRANSFORMATION_FAT_WARIO);
 		if (ZF) {
@@ -1373,8 +1258,7 @@ public:
 			port_Func_207ed();
 			return;
 		}
-		cpu_.b = OBJACTION_11;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_11);
 		FARCALL(SetState_Swallowed);
 	}
 
@@ -1450,15 +1334,13 @@ public:
 		if (ld_and(wInvincibleCounter) || ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
 			return;
 		}
-		cpu_.b = OBJACTION_FLATTEN;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_FLATTEN);
 		FARCALL(SetState_FlatAirborne);
 	}
 
 	void port_Func_21abb()
 	{
-		cpu_.b = OBJACTION_ATTACK;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_ATTACK);
 		port_Func_20a6f();
 	}
 
@@ -1501,8 +1383,7 @@ public:
 				wr8(wJumpVelIndex, 0);
 			}
 		}
-		cpu_.b = OBJACTION_VANISH_TOUCH;
-		port_SetObjAction(); // fallthrough
+		set_obj_action(OBJACTION_VANISH_TOUCH); // fallthrough
 	}
 
 	void port_Func_21aac()
@@ -1514,8 +1395,7 @@ public:
 		}
 		// smash attack object
 		port_Func_20602();
-		cpu_.b = OBJACTION_SMASH_ATTACK_WALKABLE;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_SMASH_ATTACK_WALKABLE);
 	}
 
 	void port_ObjInteraction_Stove()
@@ -1537,8 +1417,7 @@ public:
 
 	void port_ObjInteraction_WaterDrop()
 	{
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		cpu_.a = rd8(wTransformation);
 		alu_.and_(cpu_.a, cpu_.a);
 		if (cpu_.f & FLAG_Z) {
@@ -1567,8 +1446,7 @@ public:
 			port_AttackObject();
 			return;
 		}
-		cpu_.b = OBJACTION_BUMP;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_BUMP);
 		ld_cp(wInvincibleCounter, 0x01);
 		if (ZF) { // is invincible
 			return;
@@ -1637,8 +1515,7 @@ public:
 			port_Func_2023b();
 			return;
 		}
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		ld_cp(wInvincibleCounter, 0x01);
 		if (ZF) {
 			return;
@@ -1706,8 +1583,7 @@ public:
 			}
 			side_by_x();
 			play_sfx(SFX_014);
-			cpu_.b = OBJACTION_WOBBLE;
-			port_SetObjAction();
+			set_obj_action(OBJACTION_WOBBLE);
 			ld_cp(wTransformation, TRANSFORMATION_FLAT_WARIO);
 			if (ZF) {
 				port_Func_2028a();
@@ -1789,8 +1665,7 @@ public:
 		}
 	sfx:
 		play_sfx(SFX_014);
-		cpu_.b = OBJACTION_WOBBLE;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_WOBBLE);
 	}
 
 	void port_Func_20670()
@@ -1838,8 +1713,7 @@ public:
 			st(wDirection, DIRECTION_RIGHT);
 		else
 			st(wDirection, DIRECTION_LEFT);
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		ld_cp(wInvincibleCounter, 0x01);
 		if (ZF) {
 			return;
@@ -1975,8 +1849,7 @@ public:
 			st(wGrabState, GRAB_PICK_UP | (1 << GRAB_HEAVY_F));
 		}
 		// .set_obj_pick_up
-		cpu_.b = OBJACTION_PICK_UP;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_PICK_UP);
 		if (!ld_and(wJumpVelTable)) {
 			set_wario_pick_up();
 			return;
@@ -2017,8 +1890,7 @@ public:
 			return;
 		}
 		port_Func_20939();
-		cpu_.b = OBJACTION_12;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_12);
 	}
 
 	void port_Func_20d1d()
@@ -2088,8 +1960,7 @@ public:
 		if (ld_and(wTouchState)) {
 			return;
 		}
-		cpu_.b = OBJACTION_0A;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_0A);
 	}
 
 	void port_Func_20e63()
@@ -2111,8 +1982,7 @@ public:
 
 	void port_ObjInteraction_Fire()
 	{
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		if (ld_and(wInvincibleCounter)) {
 			return;
 		}
@@ -2140,8 +2010,7 @@ public:
 			}
 		}
 		// .asm_21290
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		if (ld_and(wInvincibleCounter)) {
 			return;
 		}
@@ -2245,8 +2114,7 @@ public:
 			port_Func_2022c();
 			return;
 		}
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		wr8(wTransformation, TRANSFORMATION_BLIND);
 		wr8(wTouchState, TOUCH_BUMP);
 		wr8(wStingTouchState, TOUCH_VULNERABLE);
@@ -2265,8 +2133,7 @@ public:
 			port_Func_2022c();
 			return;
 		}
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		wr8(wTransformation, TRANSFORMATION_SPLIT);
 		touch_states(TOUCH_PASS_THROUGH, 0x02);
 		FARCALL(SetState_SplitHit);
@@ -2275,8 +2142,7 @@ public:
 	void port_Func_21b3a()
 	{
 		port_Func_20939();
-		cpu_.b = OBJACTION_NONE;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_NONE);
 	}
 
 	void port_Func_21b78()
@@ -2305,8 +2171,7 @@ public:
 		ld_cp(wTransformation, TRANSFORMATION_OWL_WARIO);
 		if (ZF)
 			CALL(ReleaseOwl);
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		FARCALL(SetState_PuffyInflating);
 	}
 
@@ -2323,8 +2188,7 @@ public:
 		if (ld_and(wInvincibleCounter)) {
 			return;
 		}
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
 			port_Func_2022c();
 			return;
@@ -2472,8 +2336,7 @@ public:
 		cpu_.a = rd8(wObjDirection);
 		wr8(wDirection, cpu_.a);
 		FARCALL(SetState_Launched);
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 	}
 
 	void port_Func_21d88()
@@ -2522,8 +2385,7 @@ public:
 			port_Func_2022c();
 			return;
 		}
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		wr8(wTransformation, TRANSFORMATION_MAGIC);
 		touch_states(TOUCH_PASS_THROUGH, 0x02);
 		FARCALL(SetState_MagicRising);
@@ -2640,8 +2502,7 @@ public:
 			return;
 		}
 		// turn Wario into ball form
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		wr8(wTransformation, TRANSFORMATION_BALL);
 		touch_states(TOUCH_PASS_THROUGH, 0x02);
 		FARCALL(SetState_BallStart);
@@ -2687,8 +2548,7 @@ public:
 			if (!b_and()) {
 				FARCALL(Func_19741);
 				if (!b_and()) {
-					cpu_.b = OBJACTION_FLATTEN;
-					port_SetObjAction();
+					set_obj_action(OBJACTION_FLATTEN);
 					FARCALL(SetState_FlatAirborne);
 					return;
 				}
@@ -2705,8 +2565,7 @@ public:
 			port_Func_2022c();
 			return;
 		}
-		cpu_.b = OBJACTION_0C;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_0C);
 		ld_cp(wTransformation, TRANSFORMATION_FLAT_WARIO);
 		if (ZF) {
 			port_SetState_FlatStretching();
@@ -2753,8 +2612,7 @@ public:
 			port_Func_2022c();
 			return;
 		}
-		cpu_.b = OBJACTION_06;
-		port_SetObjAction();
+		set_obj_action(OBJACTION_06);
 		wr8(wTransformation, TRANSFORMATION_CRAZY_WARIO);
 		touch_states(TOUCH_ATTACK, 0x01);
 		FARCALL(SetState_CrazySpinning);
