@@ -170,14 +170,16 @@ private:
 		cpu_.a &= mask;
 		cpu_.f = flags::and_(cpu_.a);
 	}
-	bool wario_flag() { return ld_and(wBlockFuncWarioFlag); }
-	bool coll_bit(int n) { return ld_bit(wCollisionPoints, n); }
-	// the play_sfx macro: a ends as the SFX's low byte
-	void sfx(uint16_t id)
+	// big-endian words (hPos, wWarioXPos, wBlockPtr)
+	uint16_t word_be(uint16_t addr) const { return static_cast<uint16_t>(mem_[addr] << 8 | mem_[addr + 1]); }
+	void set_word_be(uint16_t addr, uint16_t v)
 	{
-		play_sfx(mem_, id);
-		cpu_.a = static_cast<uint8_t>(id);
+		mem_[addr] = static_cast<uint8_t>(v >> 8);
+		mem_[addr + 1] = static_cast<uint8_t>(v);
 	}
+	bool wario_flag() const { return mem_[wBlockFuncWarioFlag]; }
+	bool coll_bit(int n) const { return mem_[wCollisionPoints] & (1 << n); }
+	void sfx(uint16_t id) { play_sfx(mem_, id); }
 	// ld a, HIGH(ptr) / ld [addr + 0], a / ld a, LOW(ptr) / ld [addr + 1], a
 	void st_ptr(uint16_t addr, uint16_t ptr)
 	{
@@ -186,7 +188,6 @@ private:
 	}
 	void clear(std::initializer_list<uint16_t> addrs)
 	{
-		xor_a();
 		for (uint16_t addr : addrs)
 			mem_[addr] = 0;
 	}
@@ -197,8 +198,9 @@ private:
 	void replace_and_break();
 	void free_if_strong();
 	bool robo_mouse();
+	bool breaks_cracked() const;
 	bool breaks(bool head_smash_reads_a);
-	void multi_or(uint8_t n);
+	void multi_or(uint8_t base, uint8_t n);
 	bool multi_start(uint16_t low, uint8_t n, uint16_t high);
 	bool multi_robo_mouse(uint8_t n, uint16_t broken);
 
@@ -573,12 +575,12 @@ void BlockFuncs::solid()
 
 void BlockFuncs::water()
 {
-	st(wIsInWaterOrSand, TRUE);
+	mem_[wIsInWaterOrSand] = TRUE;
 	if (!wario_flag())
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(FREE);
-	st(wWaterInteraction, SUBMERSIBLE_WATER);
+	mem_[wWaterInteraction] = SUBMERSIBLE_WATER;
 	GOTO(FREE);
 }
 
@@ -586,31 +588,25 @@ void BlockFuncs::water()
 void BlockFuncs::block_func_current(uint8_t current)
 {
 	if (coll_bit(COLLISION_UNK7_F))
-		st(wWaterCurrent, current);
+		mem_[wWaterCurrent] = current;
 	GOTO(WATER);
 }
 
 void BlockFuncs::floor()
 {
-	st(wc1ca, TRUE);
-	cpu_.a = mem_[wCollisionPoints];
-	bool solid = bit_a(COLLISION_DOWN_F) || bit_a(COLLISION_UNK2_F);
-	if (!solid) {
-		and_a(COLLISION_UNK3 | COLLISION_UNK4 | COLLISION_UNK5 | COLLISION_UNK7);
-		if (!zf())
+	mem_[wc1ca] = TRUE;
+	uint8_t points = mem_[wCollisionPoints];
+	if (!(points & (COLLISION_DOWN | COLLISION_UNK2))) {
+		if (points & (COLLISION_UNK3 | COLLISION_UNK4 | COLLISION_UNK5 | COLLISION_UNK7))
 			GOTO(FREE);
-		cpu_.a = mem_[hYPosLo] & 0x0f;
-		cp_a(0x05);
-		if (!cf())
+		if ((mem_[hYPosLo] & 0x0f) >= 0x05)
 			GOTO(FREE);
 	}
 	// .asm_18228
 	if (!wario_flag())
 		GOTO(SOLID);
-	ld_cp(wWarioState, WST_ZOMBIE_LANDING);
-	if (!zf())
-		cp_a(WST_ZOMBIE_SLIPPING_THROUGH_FLOOR);
-	GOTO(zf() ? FREE : SOLID);
+	uint8_t state = mem_[wWarioState];
+	GOTO(state == WST_ZOMBIE_LANDING || state == WST_ZOMBIE_SLIPPING_THROUGH_FLOOR ? FREE : SOLID);
 }
 
 // a = 0, like BlockFunc_Free
@@ -627,20 +623,16 @@ void BlockFuncs::ladder_or_floor()
 {
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(FLOOR);
-	st(wLadderInteraction, LADDER_UNDERNEATH);
+	mem_[wLadderInteraction] = LADDER_UNDERNEATH;
 	GOTO(ADDR_Func_1808c);
 }
 
 void BlockFuncs::enter_door()
 {
 	// centred on the door
-	uint8_t x = mem_[wWarioXPos + 1] & 0xf0;
-	cpu_.f = flags::add(x, 0x08);
-	cpu_.a = static_cast<uint8_t>(x + 0x08);
-	mem_[wWarioXPos + 1] = cpu_.a;
+	mem_[wWarioXPos + 1] = static_cast<uint8_t>((mem_[wWarioXPos + 1] & 0xf0) + 0x08);
 	sfx(SFX_0E6);
-	st(wWarioState, WST_ENTERING_DOOR);
-	xor_a();
+	mem_[wWarioState] = WST_ENTERING_DOOR;
 	for (uint16_t addr : {wSFXLoopCounter, wWarioStateCounter, wGrabState, wAttackCounter, wJumpVelIndex,
 		     wJumpVelTable, wIsCrouching, wFrameDuration, wAnimationFrame})
 		mem_[addr] = 0;
@@ -649,7 +641,7 @@ void BlockFuncs::enter_door()
 	routines_.call(ADDR_LoadWarioGfx);
 	mem_[wWarioOAMBank] = BANK_OAM_14a82;
 	st_ptr(wWarioOAMPtr, ADDR_OAM_14a82);
-	bool right = ld_and(wDirection);
+	bool right = mem_[wDirection];
 	st_ptr(wWarioFramesetPtr, right ? ADDR_Frameset_14d10 : ADDR_Frameset_14d0b);
 	routines_.farcall(OAM1, ADDR_UpdateWarioAnimation);
 	GOTO(FREE);
@@ -668,20 +660,11 @@ void BlockFuncs::block_func_c18d(uint8_t v)
 // a slope a block up: solid to an air attack
 void BlockFuncs::slope_above(uint16_t collision)
 {
-	if (wario_flag()) {
-		ld_cp(wWarioState, WST_ATTACKING_AIRBORNE);
-		if (zf())
-			GOTO(SOLID);
-	}
-	if (!ld_mask(wCollisionPoints, COLLISION_DOWN | COLLISION_UNK1))
+	if (wario_flag() && mem_[wWarioState] == WST_ATTACKING_AIRBORNE)
+		GOTO(SOLID);
+	if (!(mem_[wCollisionPoints] & (COLLISION_DOWN | COLLISION_UNK1)))
 		GOTO(FREE);
-	uint8_t lo = mem_[hYPosLo];
-	mem_[hYPosLo] = static_cast<uint8_t>(lo - 0x10);
-	bool borrow = lo < 0x10;
-	uint8_t hi = mem_[hYPosHi];
-	cpu_.f = flags::sub(hi, 0, borrow);
-	cpu_.a = static_cast<uint8_t>(hi - borrow);
-	mem_[hYPosHi] = cpu_.a;
+	set_word_be(hYPosHi, static_cast<uint16_t>(word_be(hYPosHi) - 0x10));
 	GOTO(collision);
 }
 
@@ -690,31 +673,20 @@ void BlockFuncs::slope_below(uint16_t collision)
 {
 	if (!coll_bit(COLLISION_DOWN_F))
 		GOTO(FREE);
-	unsigned lo = mem_[hYPosLo] + 0x10;
-	mem_[hYPosLo] = static_cast<uint8_t>(lo);
-	uint8_t hi = mem_[hYPosHi];
-	cpu_.f = flags::add(hi, 0, lo > 0xff);
-	cpu_.a = static_cast<uint8_t>(hi + (lo > 0xff));
-	mem_[hYPosHi] = cpu_.a;
+	set_word_be(hYPosHi, static_cast<uint16_t>(word_be(hYPosHi) + 0x10));
 	GOTO(collision);
 }
 
 // Wario's or the object's slope interaction
 void BlockFuncs::set_slope_interaction(uint8_t slope)
 {
-	st(wario_flag() ? wWarioSlopeInteraction : wObjSlopeInteraction, ON_SLOPE | slope);
+	mem_[wario_flag() ? wWarioSlopeInteraction : wObjSlopeInteraction] = ON_SLOPE | slope;
 }
 
 // hYPos = the block's top + c
 void BlockFuncs::hypos_top_plus_c()
 {
-	uint8_t top = mem_[hYPosLo] & 0xf0;
-	unsigned lo = top + cpu_.c;
-	mem_[hYPosLo] = static_cast<uint8_t>(lo);
-	uint8_t hi = mem_[hYPosHi];
-	cpu_.f = flags::add(hi, 0, lo > 0xff);
-	cpu_.a = static_cast<uint8_t>(hi + (lo > 0xff));
-	mem_[hYPosHi] = cpu_.a;
+	set_word_be(hYPosHi, static_cast<uint16_t>((word_be(hYPosHi) & 0xfff0) + cpu_.c));
 }
 
 void BlockFuncs::right_slope_collision()
@@ -722,16 +694,15 @@ void BlockFuncs::right_slope_collision()
 	uint8_t x = mem_[hXPosLo] & 0x0f;
 	cpu_.c = static_cast<uint8_t>(0x10 - x);
 	hypos_top_plus_c();
-	if (ld_mask(wCollisionPoints, COLLISION_DOWN | COLLISION_UNK1))
+	if ((mem_[wCollisionPoints] & (COLLISION_DOWN | COLLISION_UNK1)))
 		set_slope_interaction(RIGHT_SLOPE);
 	GOTO(ADDR_Func_18064);
 }
 
 void BlockFuncs::left_slope_collision()
 {
-	if (ld_mask(wCollisionPoints, COLLISION_DOWN | COLLISION_UNK1)) {
-		cpu_.a = static_cast<uint8_t>((mem_[hXPosLo] & 0x0f) + 2);
-		cpu_.c = cpu_.a;
+	if (mem_[wCollisionPoints] & (COLLISION_DOWN | COLLISION_UNK1)) {
+		cpu_.c = static_cast<uint8_t>((mem_[hXPosLo] & 0x0f) + 2);
 		hypos_top_plus_c();
 		set_slope_interaction(LEFT_SLOPE);
 	}
@@ -740,38 +711,35 @@ void BlockFuncs::left_slope_collision()
 
 void BlockFuncs::right_slope()
 {
-	if (!ld_mask(wCollisionPoints, COLLISION_DOWN | COLLISION_UNK1))
+	uint8_t points = mem_[wCollisionPoints];
+	if (!(points & (COLLISION_DOWN | COLLISION_UNK1)))
 		GOTO(FREE);
-	if (!coll_bit(COLLISION_UNK1_F))
+	if (!(points & COLLISION_UNK1))
 		GOTO(ADDR_RightSlopeCollision);
 	cpu_.b = mem_[hYPosLo] & 0x0f;
-	uint8_t x = mem_[hXPosLo] & 0x0f;
-	cpu_.a = static_cast<uint8_t>(x + cpu_.b);
-	cp_a(0x10);
-	GOTO(cf() ? FREE : ADDR_RightSlopeCollision);
+	GOTO((mem_[hXPosLo] & 0x0f) + cpu_.b < 0x10 ? FREE : ADDR_RightSlopeCollision);
 }
 
 void BlockFuncs::left_slope()
 {
-	if (!ld_mask(wCollisionPoints, COLLISION_DOWN | COLLISION_UNK1))
+	uint8_t points = mem_[wCollisionPoints];
+	if (!(points & (COLLISION_DOWN | COLLISION_UNK1)))
 		GOTO(FREE);
-	if (!bit_a(COLLISION_UNK1_F))
+	if (!(points & COLLISION_UNK1))
 		GOTO(ADDR_LeftSlopeCollision);
 	cpu_.b = mem_[hYPosLo] & 0x0f;
-	cpu_.a = mem_[hXPosLo] & 0x0f;
-	cp_a(cpu_.b);
-	GOTO(cf() ? ADDR_LeftSlopeCollision : FREE);
+	GOTO((mem_[hXPosLo] & 0x0f) < cpu_.b ? ADDR_LeftSlopeCollision : FREE);
 }
 
 void BlockFuncs::water_surface()
 {
 	if (coll_bit(COLLISION_UNK1_F))
 		GOTO(FLOOR);
-	if (ld_mask(hYPosLo, 0x0e))
+	if ((mem_[hYPosLo] & (0x0e)))
 		GOTO(WATER);
-	if (!ld_mask(wCollisionPoints, COLLISION_DOWN | COLLISION_UNK2))
+	if (!(mem_[wCollisionPoints] & (COLLISION_DOWN | COLLISION_UNK2)))
 		GOTO(WATER);
-	st(wIsInWaterOrSand, TRUE);
+	mem_[wIsInWaterOrSand] = TRUE;
 	GOTO(SOLID);
 }
 
@@ -780,18 +748,13 @@ void BlockFuncs::object_floor()
 {
 	if (wario_flag())
 		GOTO(FREE);
-	st(wc1ca, TRUE);
-	cpu_.a = mem_[wCollisionPoints];
-	if (bit_a(COLLISION_DOWN_F))
+	mem_[wc1ca] = TRUE;
+	uint8_t points = mem_[wCollisionPoints];
+	if (points & (COLLISION_DOWN | COLLISION_UNK2))
 		GOTO(SOLID);
-	if (bit_a(COLLISION_UNK2_F))
-		GOTO(SOLID);
-	and_a(COLLISION_UNK3 | COLLISION_UNK4 | COLLISION_UNK5 | COLLISION_UNK7);
-	if (cpu_.a)
+	if (points & (COLLISION_UNK3 | COLLISION_UNK4 | COLLISION_UNK5 | COLLISION_UNK7))
 		GOTO(FREE);
-	cpu_.a = mem_[hYPosLo] & 0x0f;
-	cp_a(0x05);
-	GOTO(cf() ? SOLID : FREE);
+	GOTO((mem_[hYPosLo] & 0x0f) < 0x05 ? SOLID : FREE);
 }
 
 void BlockFuncs::ladder()
@@ -800,7 +763,7 @@ void BlockFuncs::ladder()
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(FREE);
-	st(wLadderInteraction, LADDER_COLLISION);
+	mem_[wLadderInteraction] = LADDER_COLLISION;
 	GOTO(ADDR_Func_1808c);
 }
 
@@ -815,56 +778,42 @@ void BlockFuncs::ladder_transition(uint8_t param)
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(FREE);
-	st(wLadderInteraction, LADDER_COLLISION);
-	st(wRoomTransitionParam, param);
+	mem_[wLadderInteraction] = LADDER_COLLISION;
+	mem_[wRoomTransitionParam] = param;
 	GOTO(FREE);
 }
 
 void BlockFuncs::spike(uint16_t next)
 {
-	if (!wario_flag())
+	if (!wario_flag() || mem_[wInvincibleCounter] || mem_[wca94] == 0x02)
 		GOTO(next);
-	if (ld_and(wInvincibleCounter))
-		GOTO(next);
-	ld_cp(wca94, 0x02);
-	if (zf())
-		GOTO(next);
-	cpu_.a = mem_[wWarioState];
-	cp_a(WST_STUNG);
-	if (zf())
-		GOTO(next);
-	cp_a(WST_STUNG_RECOVERY);
-	if (zf())
+	uint8_t state = mem_[wWarioState];
+	if (state == WST_STUNG || state == WST_STUNG_RECOVERY)
 		GOTO(next);
 	// turned around
-	st(wDirection, ld_and(wDirection) ? DIRECTION_LEFT : DIRECTION_RIGHT);
-	if (!ld_and(wca94)) {
+	mem_[wDirection] = mem_[wDirection] ? DIRECTION_LEFT : DIRECTION_RIGHT;
+	uint8_t touch = mem_[wca94];
+	if (!touch)
 		routines_.farcall(BANK_SetState_Stung, ADDR_SetState_Stung);
-		GOTO(next);
-	}
-	cp_a(0x01);
-	if (zf())
+	else if (touch == 0x01)
 		routines_.farcall(BANK_Func_206eb, ADDR_Func_206eb);
 	GOTO(next);
 }
 
 void BlockFuncs::water_spike()
 {
-	if (!wario_flag())
+	if (!wario_flag() || mem_[wInvincibleCounter])
 		GOTO(WATER);
-	if (ld_and(wInvincibleCounter))
-		GOTO(WATER);
-	ld_cp(wWarioState, WST_WATER_STUNG);
-	if (!zf())
+	if (mem_[wWarioState] != WST_WATER_STUNG)
 		routines_.farcall(BANK_SetState_WaterStung, ADDR_SetState_WaterStung);
 	GOTO(WATER);
 }
 
 void BlockFuncs::enter_pipe(bool down)
 {
-	st(wRoomTransitionParam, ROOMTRANSITION_PIPE | ROOMTRANSITIONF_RELOAD_OBJECTS | ROOMTRANSITIONF_DELAY);
+	mem_[wRoomTransitionParam] = ROOMTRANSITION_PIPE | ROOMTRANSITIONF_RELOAD_OBJECTS | ROOMTRANSITIONF_DELAY;
 	sfx(SFX_PIPE_ENTER);
-	st(wWarioState, down ? WST_PIPE_GOING_DOWN : WST_PIPE_GOING_UP);
+	mem_[wWarioState] = down ? WST_PIPE_GOING_DOWN : WST_PIPE_GOING_UP;
 	clear({wFrameDuration, wAnimationFrame, wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter,
 		wJumpVelIndex, wJumpVelTable, wIsCrouching});
 	if (down)
@@ -885,51 +834,28 @@ void BlockFuncs::pipe(uint8_t state1, uint8_t state2, uint8_t coll, int button, 
 {
 	if (!wario_flag())
 		GOTO(SOLID);
-	cpu_.a = mem_[wWarioState];
-	cp_a(state1);
-	if (!zf()) {
-		cp_a(state2);
-		if (!zf())
-			GOTO(SOLID);
-	}
-	if (!ld_mask(wCollisionPoints, coll))
+	uint8_t state = mem_[wWarioState];
+	if (state != state1 && state != state2)
 		GOTO(SOLID);
-	if (!ld_bit(wJoypadDown, button))
+	if (!(mem_[wCollisionPoints] & coll) || !(mem_[wJoypadDown] & (1 << button)))
 		GOTO(SOLID);
-	uint8_t x = mem_[wWarioXPos + 1] & 0xf0;
-	uint8_t add = left ? 0x18 : 0x08;
-	cpu_.f = flags::add(x, add);
-	cpu_.a = static_cast<uint8_t>(x + add);
-	mem_[wWarioXPos + 1] = cpu_.a;
-	if (left) {
-		bool carry = x + add > 0xff;
-		uint8_t hi = mem_[wWarioXPos + 0];
-		cpu_.f = flags::add(hi, 0, carry);
-		cpu_.a = static_cast<uint8_t>(hi + carry);
-		mem_[wWarioXPos + 0] = cpu_.a;
-	}
+	// centred on the pipe (the left one's x carrying into the high byte)
+	unsigned lo = (mem_[wWarioXPos + 1] & 0xf0) + (left ? 0x18 : 0x08);
+	mem_[wWarioXPos + 1] = static_cast<uint8_t>(lo);
+	if (left)
+		mem_[wWarioXPos + 0] = static_cast<uint8_t>(mem_[wWarioXPos + 0] + (lo > 0xff));
 	enter_pipe(button == B_PAD_DOWN);
 }
 
 // a door: Wario in front of it pressing up while idling (or slipping)
 void BlockFuncs::door(bool slipping, uint8_t param)
 {
-	if (!wario_flag())
+	if (!wario_flag() || !coll_bit(COLLISION_UNK7_F) || !(mem_[wJoypadPressed] & (1 << B_PAD_UP)))
 		GOTO(FREE);
-	if (!coll_bit(COLLISION_UNK7_F))
+	uint8_t state = mem_[wWarioState];
+	if (state != WST_IDLING && !(slipping && state == WST_SLIPPING) && state != WST_GRAB_IDLING)
 		GOTO(FREE);
-	if (!ld_bit(wJoypadPressed, B_PAD_UP))
-		GOTO(FREE);
-	cpu_.a = mem_[wWarioState];
-	cp_a(WST_IDLING);
-	if (!zf() && slipping)
-		cp_a(WST_SLIPPING);
-	if (!zf()) {
-		cp_a(WST_GRAB_IDLING);
-		if (!zf())
-			GOTO(FREE);
-	}
-	st(wRoomTransitionParam, param);
+	mem_[wRoomTransitionParam] = param;
 	GOTO(ADDR_EnterDoor);
 }
 
@@ -939,41 +865,27 @@ void BlockFuncs::underwater_door(bool water, uint8_t param)
 	uint16_t next = water ? WATER : FREE;
 	if (!wario_flag())
 		GOTO(next);
-	ld_cp(wTransformation, TRANSFORMATION_INVISIBLE_WARIO);
-	if (!zf()) {
-		cpu_.f = flags::and_(cpu_.a);
-		if (cpu_.a)
-			GOTO(next);
-	}
+	uint8_t transformation = mem_[wTransformation];
+	if (transformation != TRANSFORMATION_INVISIBLE_WARIO && transformation)
+		GOTO(next);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(next);
 	if (water)
-		st(wWaterInteraction, SUBMERSIBLE_WATER);
-	if (ld_bit(wJoypadPressed, B_PAD_UP))
-		st(wRoomTransitionParam, param);
+		mem_[wWaterInteraction] = SUBMERSIBLE_WATER;
+	if (mem_[wJoypadPressed] & (1 << B_PAD_UP))
+		mem_[wRoomTransitionParam] = param;
 	GOTO(FREE);
 }
 
 void BlockFuncs::treasure_door()
 {
-	if (!wario_flag())
+	if (!wario_flag() || !(mem_[wJoypadPressed] & (1 << B_PAD_UP)) || mem_[wTransformation])
 		GOTO(FREE);
-	if (!ld_bit(wJoypadPressed, B_PAD_UP))
+	uint8_t state = mem_[wWarioState];
+	if (state != WST_IDLING && state != WST_SLIPPING && state != WST_GRAB_IDLING)
 		GOTO(FREE);
-	if (ld_and(wTransformation))
-		GOTO(FREE);
-	cpu_.a = mem_[wWarioState];
-	cp_a(WST_IDLING);
-	if (!zf())
-		cp_a(WST_SLIPPING);
-	if (!zf()) {
-		cp_a(WST_GRAB_IDLING);
-		if (!zf())
-			GOTO(FREE);
-	}
-	xor_a();
 	mem_[wGrabState] = 0;
-	st(wLevelEndScreen, LVLEND_NO_TREASURE);
+	mem_[wLevelEndScreen] = LVLEND_NO_TREASURE;
 	GOTO(FREE);
 }
 
@@ -983,18 +895,14 @@ void BlockFuncs::transition_block(uint16_t next, uint8_t param)
 		GOTO(next);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(next);
-	st(wRoomTransitionParam, param);
+	mem_[wRoomTransitionParam] = param;
 	GOTO(next);
 }
 
 void BlockFuncs::walkthrough_pipe()
 {
-	if (!wario_flag())
-		GOTO(FREE);
-	ld_cp(wTransformation, TRANSFORMATION_INVISIBLE_WARIO);
-	if (!zf())
-		GOTO(FREE);
-	routines_.call(ADDR_RecoverFromTransformation_WithoutInvincibility);
+	if (wario_flag() && mem_[wTransformation] == TRANSFORMATION_INVISIBLE_WARIO)
+		routines_.call(ADDR_RecoverFromTransformation_WithoutInvincibility);
 	GOTO(FREE);
 }
 
@@ -1002,61 +910,43 @@ void BlockFuncs::light_source()
 {
 	if (!wario_flag())
 		GOTO(FREE);
-	cpu_.a = mem_[wTransformation];
-	cp_a(TRANSFORMATION_ZOMBIE_WARIO);
-	if (zf()) {
+	uint8_t transformation = mem_[wTransformation];
+	if (transformation == TRANSFORMATION_ZOMBIE_WARIO)
 		routines_.farcall(BANK_SetState_ZombieRecovering, ADDR_SetState_ZombieRecovering);
-		GOTO(FREE);
-	}
-	cp_a(TRANSFORMATION_VAMPIRE_WARIO);
-	if (!zf())
-		GOTO(FREE);
-	routines_.call(ADDR_RecoverFromTransformation_WithoutInvincibility);
+	else if (transformation == TRANSFORMATION_VAMPIRE_WARIO)
+		routines_.call(ADDR_RecoverFromTransformation_WithoutInvincibility);
 	GOTO(FREE);
 }
 
 // sand / non-submersible water: in it, and Wario's in it if he touches it
 void BlockFuncs::in_block(uint16_t addr, uint8_t v)
 {
-	st(wIsInWaterOrSand, TRUE);
+	mem_[wIsInWaterOrSand] = TRUE;
 	if (!wario_flag())
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(FREE);
-	st(addr, v);
+	mem_[addr] = v;
 	GOTO(FREE);
 }
 
 // solid to Vampire Wario, who's pushed out of it
 void BlockFuncs::vampire_block()
 {
-	if (!wario_flag())
-		GOTO(FREE);
-	ld_cp(wTransformation, TRANSFORMATION_VAMPIRE_WARIO);
-	if (!zf())
+	if (!wario_flag() || mem_[wTransformation] != TRANSFORMATION_VAMPIRE_WARIO)
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(SOLID);
-	if (!ld_mask(wWarioXPos + 1, 0x08)) {
-		cpu_.a = mem_[wCollisionBoxRight];
-		cpu_.b = cpu_.a;
-		uint8_t x = mem_[wWarioXPos + 1] & 0xf0;
-		mem_[wWarioXPos + 1] = static_cast<uint8_t>(x - cpu_.b);
-		bool borrow = x < cpu_.b;
-		uint8_t hi = mem_[wWarioXPos + 0];
-		cpu_.f = flags::sub(hi, 0, borrow);
-		cpu_.a = static_cast<uint8_t>(hi - borrow);
+	// pushed out past the block's edge, by b
+	uint16_t x = static_cast<uint16_t>(word_be(wWarioXPos) & 0xfff0);
+	if (!(mem_[wWarioXPos + 1] & 0x08)) {
+		cpu_.b = mem_[wCollisionBoxRight];
+		x = static_cast<uint16_t>(x - cpu_.b);
 	} else {
-		cpu_.a = mem_[wCollisionBoxLeft];
-		cpu_.b = static_cast<uint8_t>(0x10 - cpu_.a);
-		uint8_t x = mem_[wWarioXPos + 1] & 0xf0;
-		unsigned lo = x + cpu_.b;
-		mem_[wWarioXPos + 1] = static_cast<uint8_t>(lo);
-		uint8_t hi = mem_[wWarioXPos + 0];
-		cpu_.f = flags::add(hi, 0, lo > 0xff);
-		cpu_.a = static_cast<uint8_t>(hi + (lo > 0xff));
+		cpu_.b = static_cast<uint8_t>(0x10 - mem_[wCollisionBoxLeft]);
+		x = static_cast<uint16_t>(x + cpu_.b);
 	}
-	mem_[wWarioXPos + 0] = cpu_.a;
+	set_word_be(wWarioXPos, x);
 	GOTO(SOLID);
 }
 
@@ -1069,7 +959,7 @@ void BlockFuncs::wario_or_else(uint16_t wario, uint16_t other)
 // touching it with the bottom points
 void BlockFuncs::fire()
 {
-	if (!wario_flag())
+	if (!ld_and(wBlockFuncWarioFlag)) // the flags this leaves reach the ret
 		GOTO(FREE);
 	if (ld_mask(wCollisionPoints, COLLISION_DOWN | COLLISION_UNK1 | COLLISION_UNK2 | COLLISION_UNK6))
 		GOTO(FREE);
@@ -1095,7 +985,7 @@ void BlockFuncs::fence()
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(FREE);
-	st(wIsNearFence, TRUE);
+	mem_[wIsNearFence] = TRUE;
 	GOTO(ADDR_Func_1808c);
 }
 
@@ -1105,15 +995,15 @@ void BlockFuncs::air_current()
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(FREE);
-	if (ld_and(wInvincibleCounter))
+	if (mem_[wInvincibleCounter])
 		GOTO(FREE);
-	st(wIsInAirCurrent, TRUE);
-	if (ld_and(wTransformation))
+	mem_[wIsInAirCurrent] = TRUE;
+	if (mem_[wTransformation])
 		GOTO(FREE);
-	st(wTransformation, TRANSFORMATION_FAN);
-	st(wTouchState, TOUCH_BUMP);
-	st(wStingTouchState, TOUCH_VULNERABLE);
-	st(wca94, 0x01);
+	mem_[wTransformation] = TRANSFORMATION_FAN;
+	mem_[wTouchState] = TOUCH_BUMP;
+	mem_[wStingTouchState] = TOUCH_VULNERABLE;
+	mem_[wca94] = 0x01;
 	routines_.farcall(BANK_SetState_FanStart, ADDR_SetState_FanStart);
 	GOTO(FREE);
 }
@@ -1122,58 +1012,43 @@ void BlockFuncs::slippery(uint16_t next)
 {
 	if (!wario_flag())
 		GOTO(next);
-	if (!ld_mask(wCollisionPoints, COLLISION_DOWN))
+	if (!(mem_[wCollisionPoints] & (COLLISION_DOWN)))
 		GOTO(next);
-	st(wIsOnSlipperyGround, TRUE);
+	mem_[wIsOnSlipperyGround] = TRUE;
 	GOTO(next);
 }
 
 void BlockFuncs::cloud_platform_1()
 {
-	cpu_.a = mem_[wRoomPalCycleIndex];
-	cp_a(0x07);
-	if (!zf()) {
-		cp_a(0x04);
-		if (!cf())
-			GOTO(FREE);
-	}
-	GOTO(FLOOR);
+	uint8_t i = mem_[wRoomPalCycleIndex];
+	GOTO(i == 0x07 || i < 0x04 ? FLOOR : FREE);
 }
 
 void BlockFuncs::cloud_platform_2()
 {
-	ld_cp(wRoomPalCycleIndex, 0x03);
-	GOTO(cf() ? FREE : FLOOR);
+	GOTO(mem_[wRoomPalCycleIndex] < 0x03 ? FREE : FLOOR);
 }
 
 void BlockFuncs::small_gap()
 {
 	if (!wario_flag())
 		GOTO(FREE);
-	ld_cp(wTransformation, TRANSFORMATION_FLAT_WARIO);
-	GOTO(zf() ? FREE : SOLID);
+	GOTO(mem_[wTransformation] == TRANSFORMATION_FLAT_WARIO ? FREE : SOLID);
 }
 
 // toggles the switch Wario hit (and with it every switchable block), then
 // it's solid
 void BlockFuncs::switch_block()
 {
-	if (!wario_flag())
+	if (!wario_flag() || !(mem_[wCollisionPoints] & (COLLISION_UNK3 | COLLISION_UNK5)))
 		GOTO(SOLID);
-	cpu_.a = mem_[wCollisionPoints] & (COLLISION_UNK3 | COLLISION_UNK5);
-	cpu_.f = flags::and_(cpu_.a);
-	if (zf())
-		GOTO(SOLID);
-	uint16_t at = static_cast<uint16_t>(mem_[wBlockPtr] << 8 | mem_[wBlockPtr + 1]);
+	uint16_t at = word_be(wBlockPtr);
 	SET_HL(gb_, at);
 	uint8_t block = mem_[at];
 	mem_[wSwitchState] = block;
-	cpu_.a = block ^ 0x08;
-	mem_[at] = cpu_.a;
+	mem_[at] = block ^ 0x08;
 	routines_.call(ADDR_Func_e31);
-	cpu_.a = mem_[wSwitchStateUpdated] ^ 1;
-	cpu_.f = flags::xor_(cpu_.a);
-	mem_[wSwitchStateUpdated] = cpu_.a;
+	mem_[wSwitchStateUpdated] = mem_[wSwitchStateUpdated] ^ 1;
 	sfx(SFX_SWITCH);
 	cpu_.b = 16;
 	routines_.call(ADDR_DoGroundShake);
@@ -1280,14 +1155,10 @@ void BlockFuncs::replace_and_break()
 // (garlic, or the super jump slam overalls for a ground pound)
 void BlockFuncs::free_if_strong()
 {
-	if (ld_and(wIsRolling))
+	if (mem_[wIsRolling] || mem_[wTransformation] == TRANSFORMATION_FAT_WARIO)
 		GOTO(FREE);
-	ld_cp(wTransformation, TRANSFORMATION_FAT_WARIO);
-	if (zf())
-		GOTO(FREE);
-	bool smash = ld_and(wIsSmashAttacking);
-	ld_cp(wPowerUpLevel, smash ? SUPER_JUMP_SLAM_OVERALLS : GARLIC);
-	GOTO(cf() ? SOLID : FREE);
+	uint8_t needs = mem_[wIsSmashAttacking] ? SUPER_JUMP_SLAM_OVERALLS : GARLIC;
+	GOTO(mem_[wPowerUpLevel] < needs ? SOLID : FREE);
 }
 
 // Func_18f32 / Func_19246 / Func_193dc: saves the block, then breaks it
@@ -1295,7 +1166,7 @@ void BlockFuncs::saved_break(bool floor_transition, uint16_t next)
 {
 	save_block();
 	if (floor_transition) {
-		st(wIsFloorTransition, TRUE);
+		mem_[wIsFloorTransition] = TRUE;
 		GOTO(next);
 	}
 	replace_and_break();
@@ -1311,13 +1182,13 @@ void BlockFuncs::break_free()
 void BlockFuncs::break_free_if_rolling()
 {
 	replace_and_break();
-	GOTO(ld_and(wIsRolling) ? FREE : SOLID);
+	GOTO(mem_[wIsRolling] ? FREE : SOLID);
 }
 
 void BlockFuncs::break_multi()
 {
 	save_block();
-	st(wIsFloorTransition, TRUE);
+	mem_[wIsFloorTransition] = TRUE;
 	replace_and_break();
 	free_if_strong();
 }
@@ -1326,8 +1197,7 @@ void BlockFuncs::break_multi()
 void BlockFuncs::break_by_object()
 {
 	replace_block(true);
-	cpu_.a = mem_[wCurObjFlags];
-	if (bit_a(OBJFLAG_ON_SCREEN_F))
+	if (mem_[wCurObjFlags] & (1 << OBJFLAG_ON_SCREEN_F))
 		routines_.call(ADDR_BreakBlock);
 	else
 		sfx(SFX_BLOCK_BREAK);
@@ -1336,53 +1206,43 @@ void BlockFuncs::break_by_object()
 
 void BlockFuncs::doughnut_block()
 {
-	if (!wario_flag())
-		GOTO(SOLID);
-	ld_cp(wTransformation, TRANSFORMATION_FAT_WARIO);
-	if (!zf())
-		GOTO(SOLID);
-	if (!ld_mask(wCollisionPoints, COLLISION_UNK1 | COLLISION_UNK6))
-		GOTO(SOLID);
-	replace_and_break();
+	if (wario_flag() && mem_[wTransformation] == TRANSFORMATION_FAT_WARIO
+		&& (mem_[wCollisionPoints] & (COLLISION_UNK1 | COLLISION_UNK6)))
+		replace_and_break();
 	GOTO(SOLID);
 }
 
 // the robo mouse breaks (Func_19423) or passes through: true if it jumped
 bool BlockFuncs::robo_mouse()
 {
-	cpu_.a = mem_[wBlockFuncSpecialCollision];
-	cp_a(COLLISION_ROBO_MOUSE_BREAK);
-	if (zf()) {
+	uint8_t special = mem_[wBlockFuncSpecialCollision];
+	if (special == COLLISION_ROBO_MOUSE_BREAK) {
 		next_ = ADDR_Func_19423;
 		return true;
 	}
-	cp_a(COLLISION_ROBO_MOUSE_FREE);
-	if (zf()) {
+	if (special == COLLISION_ROBO_MOUSE_FREE) {
 		next_ = FREE;
 		return true;
 	}
 	return false;
 }
 
+// a cracked block's break: by an attack or a roll (from the side), a head
+// smash with the helmet (above), or a ground pound
+bool BlockFuncs::breaks_cracked() const
+{
+	if (coll_bit(COLLISION_UNK4_F))
+		return mem_[wAttackCounter] || mem_[wIsRolling];
+	if (coll_bit(COLLISION_UNK5_F) || coll_bit(COLLISION_UNK3_F))
+		return mem_[wPowerUpLevel] >= HEAD_SMASH_HELMET && (mem_[wJumpVelTable] || mem_[wSwimVelIndex]);
+	return mem_[wCollisionPoints] & (COLLISION_UNK1 | COLLISION_UNK6);
+}
+
 // b = the block that replaces it: broken by an attack or a roll (from the
 // side), a head smash with the helmet (above), or a ground pound
 void BlockFuncs::cracked_block(uint16_t break_func)
 {
-	if (!ld_and(wBlockFuncBreakFlag))
-		GOTO(SOLID);
-	bool brk;
-	if (coll_bit(COLLISION_UNK4_F)) {
-		brk = ld_and(wAttackCounter) || ld_and(wIsRolling);
-	} else if (coll_bit(COLLISION_UNK5_F) || coll_bit(COLLISION_UNK3_F)) {
-		ld_cp(wPowerUpLevel, HEAD_SMASH_HELMET);
-		if (cf())
-			GOTO(SOLID);
-		brk = ld_and(wJumpVelTable) || ld_and(wSwimVelIndex);
-	} else {
-		and_a(COLLISION_UNK1 | COLLISION_UNK6);
-		brk = !zf();
-	}
-	if (!brk)
+	if (!mem_[wBlockFuncBreakFlag] || !breaks_cracked())
 		GOTO(SOLID);
 	replace_block(false);
 	routines_.call(break_func);
@@ -1403,30 +1263,20 @@ void BlockFuncs::non_cracked()
 {
 	if (robo_mouse())
 		return;
-	if (!ld_and(wBlockFuncBreakFlag))
+	if (!mem_[wBlockFuncBreakFlag])
 		GOTO(SOLID);
-	ld_cp(wTransformation, TRANSFORMATION_FAT_WARIO);
-	if (zf()) {
-		bool pound = ld_mask(wCollisionPoints, COLLISION_UNK1 | COLLISION_UNK6);
-		GOTO(pound ? ADDR_Func_18df1 : SOLID);
-	}
-	ld_cp(wPowerUpLevel, GARLIC);
-	if (cf())
+	if (mem_[wTransformation] == TRANSFORMATION_FAT_WARIO)
+		GOTO(mem_[wCollisionPoints] & (COLLISION_UNK1 | COLLISION_UNK6) ? ADDR_Func_18df1 : SOLID);
+	if (mem_[wPowerUpLevel] < GARLIC)
 		GOTO(SOLID);
 	bool brk;
 	if (coll_bit(COLLISION_UNK4_F)) {
-		brk = ld_and(wAttackCounter) || ld_and(wIsRolling);
+		brk = mem_[wAttackCounter] || mem_[wIsRolling];
 	} else if (coll_bit(COLLISION_UNK5_F) || coll_bit(COLLISION_UNK3_F)) {
-		ld_cp(wPowerUpLevel, HEAD_SMASH_HELMET);
-		if (cf())
-			GOTO(SOLID);
-		brk = ld_and(wJumpVelTable) || ld_and(wSwimVelIndex);
+		brk = mem_[wPowerUpLevel] >= HEAD_SMASH_HELMET && (mem_[wJumpVelTable] || mem_[wSwimVelIndex]);
 	} else {
-		and_a(COLLISION_UNK1 | COLLISION_UNK6);
-		if (zf())
-			GOTO(SOLID);
-		ld_cp(wPowerUpLevel, SUPER_JUMP_SLAM_OVERALLS);
-		brk = !cf();
+		brk = (mem_[wCollisionPoints] & (COLLISION_UNK1 | COLLISION_UNK6))
+			&& mem_[wPowerUpLevel] >= SUPER_JUMP_SLAM_OVERALLS;
 	}
 	GOTO(brk ? ADDR_Func_18df1 : SOLID);
 }
@@ -1434,21 +1284,14 @@ void BlockFuncs::non_cracked()
 // broken by a thrown object
 void BlockFuncs::enemy_block()
 {
-	ld_cp(wBlockFuncSpecialCollision, COLLISION_THROWN_OBJ);
-	GOTO(zf() ? ADDR_Func_19423 : SOLID);
+	GOTO(mem_[wBlockFuncSpecialCollision] == COLLISION_THROWN_OBJ ? ADDR_Func_19423 : SOLID);
 }
 
 // burnt by Hot Wario once he's engulfed in flames
 void BlockFuncs::bonfire_block()
 {
-	if (!wario_flag())
-		GOTO(SOLID);
-	ld_cp(wTransformation, TRANSFORMATION_HOT_WARIO);
-	if (zf()) {
-		ld_cp(wTransformationProgress, 2);
-		if (!cf())
-			GOTO(ADDR_Func_19481);
-	}
+	if (wario_flag() && mem_[wTransformation] == TRANSFORMATION_HOT_WARIO && mem_[wTransformationProgress] >= 2)
+		GOTO(ADDR_Func_19481);
 	GOTO(SOLID);
 }
 
@@ -1467,11 +1310,9 @@ void BlockFuncs::ldb_jump(uint8_t block, uint16_t target)
 }
 
 // or n / ld [wMultiBlockParam], a
-void BlockFuncs::multi_or(uint8_t n)
+void BlockFuncs::multi_or(uint8_t base, uint8_t n)
 {
-	cpu_.a |= n;
-	cpu_.f = flags::or_(cpu_.a);
-	mem_[wMultiBlockParam] = cpu_.a;
+	mem_[wMultiBlockParam] = base | n;
 }
 
 // wMultiBlockParam: bits 0-2 the part already handled (-> low), bits 3-7 a
@@ -1479,12 +1320,13 @@ void BlockFuncs::multi_or(uint8_t n)
 // jumped
 bool BlockFuncs::multi_start(uint16_t low, uint8_t n, uint16_t high)
 {
-	if (ld_mask(wMultiBlockParam, 0x07)) {
+	uint8_t param = mem_[wMultiBlockParam];
+	if (param & 0x07) {
 		next_ = low;
 		return true;
 	}
-	if (ld_mask(wMultiBlockParam, 0xf8)) {
-		multi_or(n);
+	if (param & 0xf8) {
+		multi_or(param & 0xf8, n);
 		next_ = high;
 		return true;
 	}
@@ -1497,26 +1339,16 @@ void BlockFuncs::transformation_multi(uint8_t n, uint8_t transformation, Progres
 {
 	if (multi_start(FREE, n, ADDR_Func_18f32))
 		return;
-	if (!wario_flag())
+	if (!wario_flag() || mem_[wTransformation] != transformation)
 		GOTO(SOLID);
-	ld_cp(wTransformation, transformation);
-	if (!zf())
+	uint8_t done = mem_[wTransformationProgress];
+	if (progress == Progress::SNOWBALL && done < 1)
 		GOTO(SOLID);
-	if (progress != Progress::ANY) {
-		cpu_.a = mem_[wTransformationProgress];
-		if (progress == Progress::SNOWBALL) {
-			cp_a(1);
-			if (cf())
-				GOTO(SOLID);
-		} else {
-			cp_a(3);
-			if (!zf())
-				GOTO(SOLID);
-		}
-	}
-	st(wMultiBlockParam, n);
+	if (progress == Progress::BIG_SNOWBALL && done != 3)
+		GOTO(SOLID);
+	mem_[wMultiBlockParam] = n;
 	if (n == 3)
-		multi_or(3);
+		multi_or(n, 3);
 	GOTO(ADDR_Func_18f32);
 }
 
@@ -1524,15 +1356,13 @@ void BlockFuncs::transformation_multi(uint8_t n, uint8_t transformation, Progres
 // if it jumped
 bool BlockFuncs::multi_robo_mouse(uint8_t n, uint16_t broken)
 {
-	cpu_.a = mem_[wBlockFuncSpecialCollision];
-	cp_a(COLLISION_ROBO_MOUSE_FREE);
-	if (zf()) {
+	uint8_t special = mem_[wBlockFuncSpecialCollision];
+	if (special == COLLISION_ROBO_MOUSE_FREE) {
 		next_ = FREE;
 		return true;
 	}
-	cp_a(COLLISION_ROBO_MOUSE_BREAK);
-	if (zf()) {
-		st(wMultiBlockParam, n);
+	if (special == COLLISION_ROBO_MOUSE_BREAK) {
+		mem_[wMultiBlockParam] = n;
 		next_ = broken;
 		return true;
 	}
@@ -1546,23 +1376,9 @@ void BlockFuncs::cracked_multi(uint8_t n)
 		return;
 	if (multi_robo_mouse(n, ADDR_Func_18f32))
 		return;
-	if (!ld_and(wBlockFuncBreakFlag))
+	if (!mem_[wBlockFuncBreakFlag] || !breaks_cracked())
 		GOTO(SOLID);
-	bool brk;
-	if (coll_bit(COLLISION_UNK4_F)) {
-		brk = ld_and(wAttackCounter) || ld_and(wIsRolling);
-	} else if (coll_bit(COLLISION_UNK5_F) || coll_bit(COLLISION_UNK3_F)) {
-		ld_cp(wPowerUpLevel, HEAD_SMASH_HELMET);
-		if (cf())
-			GOTO(SOLID);
-		brk = ld_and(wJumpVelTable) || ld_and(wSwimVelIndex);
-	} else {
-		and_a(COLLISION_UNK1 | COLLISION_UNK6);
-		brk = !zf();
-	}
-	if (!brk)
-		GOTO(SOLID);
-	st(wMultiBlockParam, n);
+	mem_[wMultiBlockParam] = n;
 	GOTO(ADDR_Func_19086);
 }
 
@@ -1574,45 +1390,36 @@ void BlockFuncs::noncracked_multi(uint8_t n)
 		return;
 	if (multi_robo_mouse(n, ADDR_Func_19246))
 		return;
-	if (!ld_and(wBlockFuncBreakFlag))
+	if (!mem_[wBlockFuncBreakFlag])
 		GOTO(SOLID);
-	ld_cp(wTransformation, TRANSFORMATION_FAT_WARIO);
 	bool overalls; // needs the super jump slam overalls
-	if (zf()) {
-		if (!ld_mask(wCollisionPoints, COLLISION_UNK1 | COLLISION_UNK6))
+	if (mem_[wTransformation] == TRANSFORMATION_FAT_WARIO) {
+		if (!(mem_[wCollisionPoints] & (COLLISION_UNK1 | COLLISION_UNK6)))
 			GOTO(SOLID);
 		overalls = false;
 	} else {
-		ld_cp(wPowerUpLevel, GARLIC);
-		if (cf())
+		if (mem_[wPowerUpLevel] < GARLIC)
 			GOTO(SOLID);
 		if (coll_bit(COLLISION_UNK4_F)) {
-			if (ld_and(wAttackCounter))
+			if (mem_[wAttackCounter])
 				overalls = false;
-			else if (ld_and(wIsRolling))
+			else if (mem_[wIsRolling])
 				overalls = n == 1; // only Func_190fe checks them when rolling
 			else
 				GOTO(SOLID);
 		} else if (coll_bit(COLLISION_UNK5_F) || coll_bit(COLLISION_UNK3_F)) {
-			ld_cp(wPowerUpLevel, HEAD_SMASH_HELMET);
-			if (cf())
-				GOTO(SOLID);
-			if (!ld_and(wJumpVelTable) && !ld_and(wSwimVelIndex))
+			if (mem_[wPowerUpLevel] < HEAD_SMASH_HELMET || (!mem_[wJumpVelTable] && !mem_[wSwimVelIndex]))
 				GOTO(SOLID);
 			overalls = false;
 		} else {
-			and_a(COLLISION_UNK1 | COLLISION_UNK6);
-			if (zf())
+			if (!(mem_[wCollisionPoints] & (COLLISION_UNK1 | COLLISION_UNK6)))
 				GOTO(SOLID);
 			overalls = true;
 		}
 	}
-	if (overalls) {
-		ld_cp(wPowerUpLevel, SUPER_JUMP_SLAM_OVERALLS);
-		if (cf())
-			GOTO(SOLID);
-	}
-	st(wMultiBlockParam, n);
+	if (overalls && mem_[wPowerUpLevel] < SUPER_JUMP_SLAM_OVERALLS)
+		GOTO(SOLID);
+	mem_[wMultiBlockParam] = n;
 	GOTO(ADDR_Func_193dc);
 }
 
@@ -1621,8 +1428,7 @@ void BlockFuncs::ball_o_string_block()
 {
 	if (!wario_flag())
 		GOTO(SOLID);
-	ld_cp(wTransformation, TRANSFORMATION_BALL_O_STRING_WARIO);
-	GOTO(zf() ? ADDR_Func_19481 : SOLID);
+	GOTO(mem_[wTransformation] == TRANSFORMATION_BALL_O_STRING_WARIO ? ADDR_Func_19481 : SOLID);
 }
 
 #undef GOTO
@@ -1635,274 +1441,278 @@ using wl3::level::BlockFuncs;
 using wl3::level::Progress;
 
 // Each ends where the asm does (HOOK_MANUAL_RET): a jump on to another
-// block function, or a ret.
+// block function, or a ret. At a jump a and f are dead: no block function
+// reads them on entry (the asm's entry liveness, over all 269), and every
+// chain ends in Free, Solid, Func_1808c, Func_18064 or Func_18078, which set
+// them, or Fire's ret, which is exact. So the hooks that only jump on
+// clobber them; the rest stay exact.
 PORT_EX(ProcessBlock, HOOK_MANUAL_RET, 0) { BlockFuncs(gb).process_block(); }
 PORT(BlockFunc_Free) { BlockFuncs(gb).free(); }
 PORT(BlockFunc_Solid) { BlockFuncs(gb).solid(); }
-PORT_EX(BlockFunc_Water, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Water); b.jump_on(); }
-PORT_EX(BlockFunc_RightCurrent, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_RightCurrent); b.jump_on(); }
-PORT_EX(BlockFunc_UpCurrent, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UpCurrent); b.jump_on(); }
-PORT_EX(BlockFunc_LeftCurrent, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LeftCurrent); b.jump_on(); }
-PORT_EX(BlockFunc_DownCurrent, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DownCurrent); b.jump_on(); }
-PORT_EX(BlockFunc_Floor, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Floor); b.jump_on(); }
+PORT_EX(BlockFunc_Water, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Water); b.jump_on(); }
+PORT_EX(BlockFunc_RightCurrent, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_RightCurrent); b.jump_on(); }
+PORT_EX(BlockFunc_UpCurrent, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UpCurrent); b.jump_on(); }
+PORT_EX(BlockFunc_LeftCurrent, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LeftCurrent); b.jump_on(); }
+PORT_EX(BlockFunc_DownCurrent, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DownCurrent); b.jump_on(); }
+PORT_EX(BlockFunc_Floor, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Floor); b.jump_on(); }
 PORT(Func_1808c) { BlockFuncs(gb).free_1808c(); }
-PORT_EX(Func_182ec, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_182ec); b.jump_on(); }
-PORT_EX(EnterDoor, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_EnterDoor); b.jump_on(); }
+PORT_EX(Func_182ec, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_182ec); b.jump_on(); }
+PORT_EX(EnterDoor, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_EnterDoor); b.jump_on(); }
 PORT(Func_18064) { BlockFuncs(gb).block_func_c18d(0x10); }
 PORT(Func_18078) { BlockFuncs(gb).block_func_c18d(0x01); }
-PORT_EX(BlockFunc_180b5, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_180b5); b.jump_on(); }
-PORT_EX(BlockFunc_1813f, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1813f); b.jump_on(); }
-PORT_EX(BlockFunc_1809f, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1809f); b.jump_on(); }
-PORT_EX(BlockFunc_18129, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18129); b.jump_on(); }
-PORT_EX(RightSlopeCollision, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_RightSlopeCollision); b.jump_on(); }
-PORT_EX(LeftSlopeCollision, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_LeftSlopeCollision); b.jump_on(); }
-PORT_EX(BlockFunc_RightSlope, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_RightSlope); b.jump_on(); }
-PORT_EX(BlockFunc_LeftSlope, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LeftSlope); b.jump_on(); }
-PORT_EX(BlockFunc_WaterSurface, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_WaterSurface); b.jump_on(); }
-PORT_EX(BlockFunc_18262, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18262); b.jump_on(); }
-PORT_EX(BlockFunc_Ladder, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Ladder); b.jump_on(); }
-PORT_EX(BlockFunc_182dc, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_182dc); b.jump_on(); }
-PORT_EX(BlockFunc_LadderTop, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LadderTop); b.jump_on(); }
-PORT_EX(BlockFunc_182fe, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_182fe); b.jump_on(); }
-PORT_EX(Func_1831a, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1831a); b.jump_on(); }
-PORT_EX(BlockFunc_NonSolidSpike, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonSolidSpike); b.jump_on(); }
-PORT_EX(BlockFunc_SolidSpike, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SolidSpike); b.jump_on(); }
-PORT_EX(BlockFunc_WaterSpike, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_WaterSpike); b.jump_on(); }
-PORT_EX(EnterPipeDown, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_EnterPipeDown); b.jump_on(); }
-PORT_EX(EnterPipeUp, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_EnterPipeUp); b.jump_on(); }
-PORT_EX(BlockFunc_DownPipe_Left, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DownPipe_Left); b.jump_on(); }
-PORT_EX(BlockFunc_DownPipe_Right, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DownPipe_Right); b.jump_on(); }
-PORT_EX(BlockFunc_UpPipe_Left, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UpPipe_Left); b.jump_on(); }
-PORT_EX(BlockFunc_UpPipe_Right, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UpPipe_Right); b.jump_on(); }
-PORT_EX(BlockFunc_Door, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Door); b.jump_on(); }
-PORT_EX(BlockFunc_MinigameDoor, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_MinigameDoor); b.jump_on(); }
-PORT_EX(Func_18624, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18624); b.jump_on(); }
-PORT_EX(Func_1864e, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1864e); b.jump_on(); }
-PORT_EX(BlockFunc_UnderwaterDoor, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UnderwaterDoor); b.jump_on(); }
-PORT_EX(BlockFunc_18727, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18727); b.jump_on(); }
-PORT_EX(Func_18755, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18755); b.jump_on(); }
-PORT_EX(BlockFunc_TreasureDoor, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_TreasureDoor); b.jump_on(); }
-PORT_EX(BlockFunc_187b0, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_187b0); b.jump_on(); }
-PORT_EX(Func_187c7, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_187c7); b.jump_on(); }
-PORT_EX(BlockFunc_187de, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_187de); b.jump_on(); }
-PORT_EX(Func_187f5, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_187f5); b.jump_on(); }
-PORT_EX(BlockFunc_WalkthroughPipe, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_WalkthroughPipe); b.jump_on(); }
-PORT_EX(BlockFunc_LightSource, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LightSource); b.jump_on(); }
-PORT_EX(BlockFunc_Sand, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Sand); b.jump_on(); }
-PORT_EX(BlockFunc_NonSubmersibleWater, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonSubmersibleWater); b.jump_on(); }
-PORT_EX(BlockFunc_18868, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18868); b.jump_on(); }
-PORT_EX(BlockFunc_188ba, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_188ba); b.jump_on(); }
-PORT_EX(BlockFunc_189f1, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_189f1); b.jump_on(); }
+PORT_EX(BlockFunc_180b5, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_180b5); b.jump_on(); }
+PORT_EX(BlockFunc_1813f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1813f); b.jump_on(); }
+PORT_EX(BlockFunc_1809f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1809f); b.jump_on(); }
+PORT_EX(BlockFunc_18129, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18129); b.jump_on(); }
+PORT_EX(RightSlopeCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_RightSlopeCollision); b.jump_on(); }
+PORT_EX(LeftSlopeCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_LeftSlopeCollision); b.jump_on(); }
+PORT_EX(BlockFunc_RightSlope, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_RightSlope); b.jump_on(); }
+PORT_EX(BlockFunc_LeftSlope, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LeftSlope); b.jump_on(); }
+PORT_EX(BlockFunc_WaterSurface, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_WaterSurface); b.jump_on(); }
+PORT_EX(BlockFunc_18262, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18262); b.jump_on(); }
+PORT_EX(BlockFunc_Ladder, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Ladder); b.jump_on(); }
+PORT_EX(BlockFunc_182dc, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_182dc); b.jump_on(); }
+PORT_EX(BlockFunc_LadderTop, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LadderTop); b.jump_on(); }
+PORT_EX(BlockFunc_182fe, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_182fe); b.jump_on(); }
+PORT_EX(Func_1831a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1831a); b.jump_on(); }
+PORT_EX(BlockFunc_NonSolidSpike, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonSolidSpike); b.jump_on(); }
+PORT_EX(BlockFunc_SolidSpike, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SolidSpike); b.jump_on(); }
+PORT_EX(BlockFunc_WaterSpike, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_WaterSpike); b.jump_on(); }
+PORT_EX(EnterPipeDown, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_EnterPipeDown); b.jump_on(); }
+PORT_EX(EnterPipeUp, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_EnterPipeUp); b.jump_on(); }
+PORT_EX(BlockFunc_DownPipe_Left, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DownPipe_Left); b.jump_on(); }
+PORT_EX(BlockFunc_DownPipe_Right, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DownPipe_Right); b.jump_on(); }
+PORT_EX(BlockFunc_UpPipe_Left, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UpPipe_Left); b.jump_on(); }
+PORT_EX(BlockFunc_UpPipe_Right, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UpPipe_Right); b.jump_on(); }
+PORT_EX(BlockFunc_Door, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Door); b.jump_on(); }
+PORT_EX(BlockFunc_MinigameDoor, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_MinigameDoor); b.jump_on(); }
+PORT_EX(Func_18624, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18624); b.jump_on(); }
+PORT_EX(Func_1864e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1864e); b.jump_on(); }
+PORT_EX(BlockFunc_UnderwaterDoor, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UnderwaterDoor); b.jump_on(); }
+PORT_EX(BlockFunc_18727, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18727); b.jump_on(); }
+PORT_EX(Func_18755, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18755); b.jump_on(); }
+PORT_EX(BlockFunc_TreasureDoor, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_TreasureDoor); b.jump_on(); }
+PORT_EX(BlockFunc_187b0, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_187b0); b.jump_on(); }
+PORT_EX(Func_187c7, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_187c7); b.jump_on(); }
+PORT_EX(BlockFunc_187de, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_187de); b.jump_on(); }
+PORT_EX(Func_187f5, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_187f5); b.jump_on(); }
+PORT_EX(BlockFunc_WalkthroughPipe, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_WalkthroughPipe); b.jump_on(); }
+PORT_EX(BlockFunc_LightSource, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LightSource); b.jump_on(); }
+PORT_EX(BlockFunc_Sand, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Sand); b.jump_on(); }
+PORT_EX(BlockFunc_NonSubmersibleWater, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonSubmersibleWater); b.jump_on(); }
+PORT_EX(BlockFunc_18868, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18868); b.jump_on(); }
+PORT_EX(BlockFunc_188ba, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_188ba); b.jump_on(); }
+PORT_EX(BlockFunc_189f1, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_189f1); b.jump_on(); }
 PORT_EX(BlockFunc_Fire, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Fire); b.jump_on(); }
-PORT_EX(BlockFunc_Fence, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Fence); b.jump_on(); }
-PORT_EX(BlockFunc_AirCurrent, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_AirCurrent); b.jump_on(); }
-PORT_EX(BlockFunc_SlipperySolid, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SlipperySolid); b.jump_on(); }
-PORT_EX(BlockFunc_SlipperyFloor, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SlipperyFloor); b.jump_on(); }
-PORT_EX(BlockFunc_CloudPlatform1, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CloudPlatform1); b.jump_on(); }
-PORT_EX(BlockFunc_CloudPlatform2, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CloudPlatform2); b.jump_on(); }
-PORT_EX(BlockFunc_SmallGap, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SmallGap); b.jump_on(); }
-PORT_EX(BlockFunc_Switch, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Switch); b.jump_on(); }
+PORT_EX(BlockFunc_Fence, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Fence); b.jump_on(); }
+PORT_EX(BlockFunc_AirCurrent, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_AirCurrent); b.jump_on(); }
+PORT_EX(BlockFunc_SlipperySolid, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SlipperySolid); b.jump_on(); }
+PORT_EX(BlockFunc_SlipperyFloor, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SlipperyFloor); b.jump_on(); }
+PORT_EX(BlockFunc_CloudPlatform1, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CloudPlatform1); b.jump_on(); }
+PORT_EX(BlockFunc_CloudPlatform2, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CloudPlatform2); b.jump_on(); }
+PORT_EX(BlockFunc_SmallGap, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SmallGap); b.jump_on(); }
+PORT_EX(BlockFunc_Switch, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Switch); b.jump_on(); }
 PORT(BreakBlock) { BlockFuncs(gb).break_block(true, ADDR_ObjParams_Coin); }
 PORT(BreakBlockWithColourCoin) { BlockFuncs(gb).break_block(false, ADDR_ObjParams_ColourCoin); }
-PORT_EX(Func_18f32, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f32); b.jump_on(); }
-PORT_EX(Func_19246, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19246); b.jump_on(); }
-PORT_EX(Func_19481, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19481); b.jump_on(); }
-PORT_EX(Func_18df1, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18df1); b.jump_on(); }
-PORT_EX(Func_19086, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19086); b.jump_on(); }
-PORT_EX(Func_19423, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19423); b.jump_on(); }
-PORT_EX(DoughnutBlockCollision, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_DoughnutBlockCollision); b.jump_on(); }
-PORT_EX(CrackedBlockWithColourCoinCollision, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_CrackedBlockWithColourCoinCollision); b.jump_on(); }
-PORT_EX(CrackedBlockCollision, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_CrackedBlockCollision); b.jump_on(); }
-PORT_EX(NonCrackedBlockCollision, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_NonCrackedBlockCollision); b.jump_on(); }
-PORT_EX(EnemyBlockCollision, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_EnemyBlockCollision); b.jump_on(); }
-PORT_EX(BonfireBlockCollision, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BonfireBlockCollision); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlockWithColourCoin_78, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_78); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlockWithColourCoin_79, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_79); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7a, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7a); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7b); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7c, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7c); b.jump_on(); }
-PORT_EX(Func_18a0f, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a0f); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7e, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7e); b.jump_on(); }
-PORT_EX(Func_18a17, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a17); b.jump_on(); }
-PORT_EX(Func_18aa8, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18aa8); b.jump_on(); }
-PORT_EX(Func_18aec, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18aec); b.jump_on(); }
-PORT_EX(Func_18b2d, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b2d); b.jump_on(); }
-PORT_EX(Func_18b71, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b71); b.jump_on(); }
-PORT_EX(Func_18bb5, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bb5); b.jump_on(); }
-PORT_EX(Func_18bf9, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bf9); b.jump_on(); }
-PORT_EX(Func_18c3a, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c3a); b.jump_on(); }
-PORT_EX(Func_18c7e, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c7e); b.jump_on(); }
-PORT_EX(Func_19522, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19522); b.jump_on(); }
-PORT_EX(Func_19560, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19560); b.jump_on(); }
-PORT_EX(Func_1959b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1959b); b.jump_on(); }
-PORT_EX(YarnBlockCollision, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_YarnBlockCollision); b.jump_on(); }
-PORT_EX(Func_18e2c, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e2c); b.jump_on(); }
-PORT_EX(Func_18ec0, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ec0); b.jump_on(); }
-PORT_EX(Func_18f7d, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f7d); b.jump_on(); }
-PORT_EX(Func_19011, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19011); b.jump_on(); }
-PORT_EX(Func_190fe, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190fe); b.jump_on(); }
-PORT_EX(Func_191b3, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191b3); b.jump_on(); }
-PORT_EX(Func_19291, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19291); b.jump_on(); }
-PORT_EX(Func_19346, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19346); b.jump_on(); }
-PORT_EX(Func_193dc, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_193dc); b.jump_on(); }
-PORT_EX(Func_19502, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19502); b.jump_on(); }
-PORT_EX(Func_18a9a, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a9a); b.jump_on(); }
-PORT_EX(Func_18a9e, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a9e); b.jump_on(); }
-PORT_EX(Func_18aa2, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18aa2); b.jump_on(); }
-PORT_EX(BlockFunc_18aa6, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18aa6); b.jump_on(); }
-PORT_EX(Func_18ade, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ade); b.jump_on(); }
-PORT_EX(Func_18ae2, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ae2); b.jump_on(); }
-PORT_EX(Func_18ae6, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ae6); b.jump_on(); }
-PORT_EX(BlockFunc_18aea, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18aea); b.jump_on(); }
-PORT_EX(BlockFunc_18b23, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b23); b.jump_on(); }
-PORT_EX(BlockFunc_18b2b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b2b); b.jump_on(); }
-PORT_EX(BlockFunc_18b67, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b67); b.jump_on(); }
-PORT_EX(BlockFunc_18b6f, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b6f); b.jump_on(); }
-PORT_EX(BlockFunc_18bb3, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18bb3); b.jump_on(); }
-PORT_EX(BlockFunc_18bf7, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18bf7); b.jump_on(); }
-PORT_EX(BlockFunc_18c30, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c30); b.jump_on(); }
-PORT_EX(BlockFunc_18c38, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c38); b.jump_on(); }
-PORT_EX(BlockFunc_18c74, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c74); b.jump_on(); }
-PORT_EX(BlockFunc_18c7c, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c7c); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_78, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_78); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_79, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_79); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_7a, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7a); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_7b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7b); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_7c, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7c); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_7d, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7d); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_7e, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7e); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_7f, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7f); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_78, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_78); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_79, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_79); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_7a, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7a); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_7b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7b); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_7c, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7c); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_7d, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7d); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_7e, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7e); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_7f, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7f); b.jump_on(); }
-PORT_EX(BlockFunc_18e0e, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e0e); b.jump_on(); }
-PORT_EX(BlockFunc_18e1a, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e1a); b.jump_on(); }
-PORT_EX(BlockFunc_18e26, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e26); b.jump_on(); }
-PORT_EX(BlockFunc_18e2a, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e2a); b.jump_on(); }
-PORT_EX(BlockFunc_18ea2, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18ea2); b.jump_on(); }
-PORT_EX(BlockFunc_18eae, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18eae); b.jump_on(); }
-PORT_EX(BlockFunc_18ebe, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18ebe); b.jump_on(); }
-PORT_EX(BlockFunc_18f5f, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18f5f); b.jump_on(); }
-PORT_EX(BlockFunc_18f6b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18f6b); b.jump_on(); }
-PORT_EX(BlockFunc_18f7b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18f7b); b.jump_on(); }
-PORT_EX(BlockFunc_18ff3, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18ff3); b.jump_on(); }
-PORT_EX(BlockFunc_18fff, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18fff); b.jump_on(); }
-PORT_EX(BlockFunc_19007, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19007); b.jump_on(); }
-PORT_EX(BlockFunc_1900f, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1900f); b.jump_on(); }
-PORT_EX(BlockFunc_190e4, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_190e4); b.jump_on(); }
-PORT_EX(BlockFunc_190e8, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_190e8); b.jump_on(); }
-PORT_EX(BlockFunc_190fc, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_190fc); b.jump_on(); }
-PORT_EX(BlockFunc_19199, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19199); b.jump_on(); }
-PORT_EX(BlockFunc_1919d, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1919d); b.jump_on(); }
-PORT_EX(BlockFunc_191b1, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_191b1); b.jump_on(); }
-PORT_EX(BlockFunc_19277, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19277); b.jump_on(); }
-PORT_EX(BlockFunc_1927b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1927b); b.jump_on(); }
-PORT_EX(BlockFunc_1928f, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1928f); b.jump_on(); }
-PORT_EX(BlockFunc_1932c, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1932c); b.jump_on(); }
-PORT_EX(BlockFunc_19330, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19330); b.jump_on(); }
-PORT_EX(BlockFunc_19344, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19344); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_78, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_78); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_79, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_79); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_7a, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7a); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_7b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7b); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_7c, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7c); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_7d, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7d); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_7e, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7e); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_7f, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7f); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_78, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_78); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_79, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_79); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_7a, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7a); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_7b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7b); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_7c, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7c); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_7d, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7d); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_7e, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7e); b.jump_on(); }
-PORT_EX(BlockFunc_DoughnutBlock_78, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_78); b.jump_on(); }
-PORT_EX(BlockFunc_DoughnutBlock_79, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_79); b.jump_on(); }
-PORT_EX(BlockFunc_DoughnutBlock_7a, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_7a); b.jump_on(); }
-PORT_EX(BlockFunc_DoughnutBlock_7b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_7b); b.jump_on(); }
-PORT_EX(BlockFunc_19518, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19518); b.jump_on(); }
-PORT_EX(BlockFunc_19520, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19520); b.jump_on(); }
-PORT_EX(BlockFunc_19552, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19552); b.jump_on(); }
-PORT_EX(BlockFunc_19556, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19556); b.jump_on(); }
-PORT_EX(BlockFunc_1955e, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1955e); b.jump_on(); }
-PORT_EX(BlockFunc_1958d, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1958d); b.jump_on(); }
-PORT_EX(BlockFunc_19599, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19599); b.jump_on(); }
-PORT_EX(BlockFunc_YarnBlock_79, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_YarnBlock_79); b.jump_on(); }
-PORT_EX(BlockFunc_YarnBlock_78, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_YarnBlock_78); b.jump_on(); }
-PORT_EX(Func_19467, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19467); b.jump_on(); }
-PORT_EX(Func_194a7, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194a7); b.jump_on(); }
-PORT_EX(Func_194ab, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194ab); b.jump_on(); }
-PORT_EX(Func_194af, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194af); b.jump_on(); }
-PORT_EX(Func_194b3, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194b3); b.jump_on(); }
-PORT_EX(Func_194e4, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194e4); b.jump_on(); }
-PORT_EX(Func_194e8, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194e8); b.jump_on(); }
-PORT_EX(Func_194ec, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194ec); b.jump_on(); }
-PORT_EX(Func_194f0, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194f0); b.jump_on(); }
-PORT_EX(Func_194f4, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194f4); b.jump_on(); }
-PORT_EX(Func_194f8, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194f8); b.jump_on(); }
-PORT_EX(Func_194fc, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194fc); b.jump_on(); }
-PORT_EX(Func_19500, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19500); b.jump_on(); }
-PORT_EX(Func_195cf, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_195cf); b.jump_on(); }
-PORT_EX(Func_195d3, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_195d3); b.jump_on(); }
-PORT_EX(Func_19514, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19514); b.jump_on(); }
-PORT_EX(Func_1951c, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1951c); b.jump_on(); }
-PORT_EX(Func_1955a, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1955a); b.jump_on(); }
-PORT_EX(Func_19591, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19591); b.jump_on(); }
-PORT_EX(Func_19595, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19595); b.jump_on(); }
-PORT_EX(Func_19328, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19328); b.jump_on(); }
-PORT_EX(Func_19334, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19334); b.jump_on(); }
-PORT_EX(Func_19338, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19338); b.jump_on(); }
-PORT_EX(Func_1933c, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1933c); b.jump_on(); }
-PORT_EX(Func_19340, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19340); b.jump_on(); }
-PORT_EX(Func_19273, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19273); b.jump_on(); }
-PORT_EX(Func_1927f, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1927f); b.jump_on(); }
-PORT_EX(Func_19283, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19283); b.jump_on(); }
-PORT_EX(Func_19287, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19287); b.jump_on(); }
-PORT_EX(Func_1928b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1928b); b.jump_on(); }
-PORT_EX(Func_19195, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19195); b.jump_on(); }
-PORT_EX(Func_191a1, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191a1); b.jump_on(); }
-PORT_EX(Func_191a5, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191a5); b.jump_on(); }
-PORT_EX(Func_191a9, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191a9); b.jump_on(); }
-PORT_EX(Func_191ad, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191ad); b.jump_on(); }
-PORT_EX(Func_18b1f, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b1f); b.jump_on(); }
-PORT_EX(Func_18b27, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b27); b.jump_on(); }
-PORT_EX(Func_18b63, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b63); b.jump_on(); }
-PORT_EX(Func_18b6b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b6b); b.jump_on(); }
-PORT_EX(Func_18ba7, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ba7); b.jump_on(); }
-PORT_EX(Func_18bab, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bab); b.jump_on(); }
-PORT_EX(Func_18baf, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18baf); b.jump_on(); }
-PORT_EX(Func_18beb, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18beb); b.jump_on(); }
-PORT_EX(Func_18bef, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bef); b.jump_on(); }
-PORT_EX(Func_18bf3, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bf3); b.jump_on(); }
-PORT_EX(Func_18c2c, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c2c); b.jump_on(); }
-PORT_EX(Func_18c34, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c34); b.jump_on(); }
-PORT_EX(Func_18c70, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c70); b.jump_on(); }
-PORT_EX(Func_18c78, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c78); b.jump_on(); }
-PORT_EX(Func_18e12, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e12); b.jump_on(); }
-PORT_EX(Func_18e16, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e16); b.jump_on(); }
-PORT_EX(Func_18e1e, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e1e); b.jump_on(); }
-PORT_EX(Func_18e22, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e22); b.jump_on(); }
-PORT_EX(Func_18ea6, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ea6); b.jump_on(); }
-PORT_EX(Func_18eaa, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eaa); b.jump_on(); }
-PORT_EX(Func_18eb2, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eb2); b.jump_on(); }
-PORT_EX(Func_18eb6, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eb6); b.jump_on(); }
-PORT_EX(Func_18eba, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eba); b.jump_on(); }
-PORT_EX(Func_18f63, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f63); b.jump_on(); }
-PORT_EX(Func_18f67, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f67); b.jump_on(); }
-PORT_EX(Func_18f6f, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f6f); b.jump_on(); }
-PORT_EX(Func_18f73, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f73); b.jump_on(); }
-PORT_EX(Func_18f77, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f77); b.jump_on(); }
-PORT_EX(Func_18ff7, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ff7); b.jump_on(); }
-PORT_EX(Func_18ffb, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ffb); b.jump_on(); }
-PORT_EX(Func_19003, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19003); b.jump_on(); }
-PORT_EX(Func_1900b, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1900b); b.jump_on(); }
-PORT_EX(Func_190e0, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190e0); b.jump_on(); }
-PORT_EX(Func_190ec, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190ec); b.jump_on(); }
-PORT_EX(Func_190f0, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190f0); b.jump_on(); }
-PORT_EX(Func_190f4, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190f4); b.jump_on(); }
-PORT_EX(Func_190f8, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190f8); b.jump_on(); }
+PORT_EX(Func_18f32, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f32); b.jump_on(); }
+PORT_EX(Func_19246, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19246); b.jump_on(); }
+PORT_EX(Func_19481, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19481); b.jump_on(); }
+PORT_EX(Func_18df1, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18df1); b.jump_on(); }
+PORT_EX(Func_19086, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19086); b.jump_on(); }
+PORT_EX(Func_19423, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19423); b.jump_on(); }
+PORT_EX(DoughnutBlockCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_DoughnutBlockCollision); b.jump_on(); }
+PORT_EX(CrackedBlockWithColourCoinCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_CrackedBlockWithColourCoinCollision); b.jump_on(); }
+PORT_EX(CrackedBlockCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_CrackedBlockCollision); b.jump_on(); }
+PORT_EX(NonCrackedBlockCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_NonCrackedBlockCollision); b.jump_on(); }
+PORT_EX(EnemyBlockCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_EnemyBlockCollision); b.jump_on(); }
+PORT_EX(BonfireBlockCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BonfireBlockCollision); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlockWithColourCoin_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_78); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlockWithColourCoin_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_79); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7a); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7b); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7c); b.jump_on(); }
+PORT_EX(Func_18a0f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a0f); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7e); b.jump_on(); }
+PORT_EX(Func_18a17, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a17); b.jump_on(); }
+PORT_EX(Func_18aa8, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18aa8); b.jump_on(); }
+PORT_EX(Func_18aec, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18aec); b.jump_on(); }
+PORT_EX(Func_18b2d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b2d); b.jump_on(); }
+PORT_EX(Func_18b71, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b71); b.jump_on(); }
+PORT_EX(Func_18bb5, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bb5); b.jump_on(); }
+PORT_EX(Func_18bf9, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bf9); b.jump_on(); }
+PORT_EX(Func_18c3a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c3a); b.jump_on(); }
+PORT_EX(Func_18c7e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c7e); b.jump_on(); }
+PORT_EX(Func_19522, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19522); b.jump_on(); }
+PORT_EX(Func_19560, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19560); b.jump_on(); }
+PORT_EX(Func_1959b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1959b); b.jump_on(); }
+PORT_EX(YarnBlockCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_YarnBlockCollision); b.jump_on(); }
+PORT_EX(Func_18e2c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e2c); b.jump_on(); }
+PORT_EX(Func_18ec0, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ec0); b.jump_on(); }
+PORT_EX(Func_18f7d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f7d); b.jump_on(); }
+PORT_EX(Func_19011, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19011); b.jump_on(); }
+PORT_EX(Func_190fe, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190fe); b.jump_on(); }
+PORT_EX(Func_191b3, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191b3); b.jump_on(); }
+PORT_EX(Func_19291, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19291); b.jump_on(); }
+PORT_EX(Func_19346, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19346); b.jump_on(); }
+PORT_EX(Func_193dc, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_193dc); b.jump_on(); }
+PORT_EX(Func_19502, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19502); b.jump_on(); }
+PORT_EX(Func_18a9a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a9a); b.jump_on(); }
+PORT_EX(Func_18a9e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a9e); b.jump_on(); }
+PORT_EX(Func_18aa2, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18aa2); b.jump_on(); }
+PORT_EX(BlockFunc_18aa6, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18aa6); b.jump_on(); }
+PORT_EX(Func_18ade, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ade); b.jump_on(); }
+PORT_EX(Func_18ae2, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ae2); b.jump_on(); }
+PORT_EX(Func_18ae6, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ae6); b.jump_on(); }
+PORT_EX(BlockFunc_18aea, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18aea); b.jump_on(); }
+PORT_EX(BlockFunc_18b23, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b23); b.jump_on(); }
+PORT_EX(BlockFunc_18b2b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b2b); b.jump_on(); }
+PORT_EX(BlockFunc_18b67, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b67); b.jump_on(); }
+PORT_EX(BlockFunc_18b6f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b6f); b.jump_on(); }
+PORT_EX(BlockFunc_18bb3, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18bb3); b.jump_on(); }
+PORT_EX(BlockFunc_18bf7, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18bf7); b.jump_on(); }
+PORT_EX(BlockFunc_18c30, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c30); b.jump_on(); }
+PORT_EX(BlockFunc_18c38, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c38); b.jump_on(); }
+PORT_EX(BlockFunc_18c74, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c74); b.jump_on(); }
+PORT_EX(BlockFunc_18c7c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c7c); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_78); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_79); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_7a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7a); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7b); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_7c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7c); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_7d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7d); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_7e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7e); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_7f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7f); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_78); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_79); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_7a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7a); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7b); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_7c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7c); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_7d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7d); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_7e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7e); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_7f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7f); b.jump_on(); }
+PORT_EX(BlockFunc_18e0e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e0e); b.jump_on(); }
+PORT_EX(BlockFunc_18e1a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e1a); b.jump_on(); }
+PORT_EX(BlockFunc_18e26, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e26); b.jump_on(); }
+PORT_EX(BlockFunc_18e2a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e2a); b.jump_on(); }
+PORT_EX(BlockFunc_18ea2, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18ea2); b.jump_on(); }
+PORT_EX(BlockFunc_18eae, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18eae); b.jump_on(); }
+PORT_EX(BlockFunc_18ebe, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18ebe); b.jump_on(); }
+PORT_EX(BlockFunc_18f5f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18f5f); b.jump_on(); }
+PORT_EX(BlockFunc_18f6b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18f6b); b.jump_on(); }
+PORT_EX(BlockFunc_18f7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18f7b); b.jump_on(); }
+PORT_EX(BlockFunc_18ff3, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18ff3); b.jump_on(); }
+PORT_EX(BlockFunc_18fff, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18fff); b.jump_on(); }
+PORT_EX(BlockFunc_19007, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19007); b.jump_on(); }
+PORT_EX(BlockFunc_1900f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1900f); b.jump_on(); }
+PORT_EX(BlockFunc_190e4, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_190e4); b.jump_on(); }
+PORT_EX(BlockFunc_190e8, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_190e8); b.jump_on(); }
+PORT_EX(BlockFunc_190fc, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_190fc); b.jump_on(); }
+PORT_EX(BlockFunc_19199, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19199); b.jump_on(); }
+PORT_EX(BlockFunc_1919d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1919d); b.jump_on(); }
+PORT_EX(BlockFunc_191b1, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_191b1); b.jump_on(); }
+PORT_EX(BlockFunc_19277, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19277); b.jump_on(); }
+PORT_EX(BlockFunc_1927b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1927b); b.jump_on(); }
+PORT_EX(BlockFunc_1928f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1928f); b.jump_on(); }
+PORT_EX(BlockFunc_1932c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1932c); b.jump_on(); }
+PORT_EX(BlockFunc_19330, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19330); b.jump_on(); }
+PORT_EX(BlockFunc_19344, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19344); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_78); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_79); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_7a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7a); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7b); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_7c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7c); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_7d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7d); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_7e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7e); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_7f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7f); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_78); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_79); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_7a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7a); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7b); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_7c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7c); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_7d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7d); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_7e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7e); b.jump_on(); }
+PORT_EX(BlockFunc_DoughnutBlock_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_78); b.jump_on(); }
+PORT_EX(BlockFunc_DoughnutBlock_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_79); b.jump_on(); }
+PORT_EX(BlockFunc_DoughnutBlock_7a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_7a); b.jump_on(); }
+PORT_EX(BlockFunc_DoughnutBlock_7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_7b); b.jump_on(); }
+PORT_EX(BlockFunc_19518, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19518); b.jump_on(); }
+PORT_EX(BlockFunc_19520, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19520); b.jump_on(); }
+PORT_EX(BlockFunc_19552, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19552); b.jump_on(); }
+PORT_EX(BlockFunc_19556, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19556); b.jump_on(); }
+PORT_EX(BlockFunc_1955e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1955e); b.jump_on(); }
+PORT_EX(BlockFunc_1958d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1958d); b.jump_on(); }
+PORT_EX(BlockFunc_19599, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19599); b.jump_on(); }
+PORT_EX(BlockFunc_YarnBlock_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_YarnBlock_79); b.jump_on(); }
+PORT_EX(BlockFunc_YarnBlock_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_YarnBlock_78); b.jump_on(); }
+PORT_EX(Func_19467, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19467); b.jump_on(); }
+PORT_EX(Func_194a7, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194a7); b.jump_on(); }
+PORT_EX(Func_194ab, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194ab); b.jump_on(); }
+PORT_EX(Func_194af, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194af); b.jump_on(); }
+PORT_EX(Func_194b3, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194b3); b.jump_on(); }
+PORT_EX(Func_194e4, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194e4); b.jump_on(); }
+PORT_EX(Func_194e8, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194e8); b.jump_on(); }
+PORT_EX(Func_194ec, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194ec); b.jump_on(); }
+PORT_EX(Func_194f0, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194f0); b.jump_on(); }
+PORT_EX(Func_194f4, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194f4); b.jump_on(); }
+PORT_EX(Func_194f8, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194f8); b.jump_on(); }
+PORT_EX(Func_194fc, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194fc); b.jump_on(); }
+PORT_EX(Func_19500, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19500); b.jump_on(); }
+PORT_EX(Func_195cf, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_195cf); b.jump_on(); }
+PORT_EX(Func_195d3, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_195d3); b.jump_on(); }
+PORT_EX(Func_19514, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19514); b.jump_on(); }
+PORT_EX(Func_1951c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1951c); b.jump_on(); }
+PORT_EX(Func_1955a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1955a); b.jump_on(); }
+PORT_EX(Func_19591, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19591); b.jump_on(); }
+PORT_EX(Func_19595, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19595); b.jump_on(); }
+PORT_EX(Func_19328, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19328); b.jump_on(); }
+PORT_EX(Func_19334, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19334); b.jump_on(); }
+PORT_EX(Func_19338, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19338); b.jump_on(); }
+PORT_EX(Func_1933c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1933c); b.jump_on(); }
+PORT_EX(Func_19340, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19340); b.jump_on(); }
+PORT_EX(Func_19273, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19273); b.jump_on(); }
+PORT_EX(Func_1927f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1927f); b.jump_on(); }
+PORT_EX(Func_19283, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19283); b.jump_on(); }
+PORT_EX(Func_19287, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19287); b.jump_on(); }
+PORT_EX(Func_1928b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1928b); b.jump_on(); }
+PORT_EX(Func_19195, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19195); b.jump_on(); }
+PORT_EX(Func_191a1, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191a1); b.jump_on(); }
+PORT_EX(Func_191a5, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191a5); b.jump_on(); }
+PORT_EX(Func_191a9, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191a9); b.jump_on(); }
+PORT_EX(Func_191ad, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191ad); b.jump_on(); }
+PORT_EX(Func_18b1f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b1f); b.jump_on(); }
+PORT_EX(Func_18b27, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b27); b.jump_on(); }
+PORT_EX(Func_18b63, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b63); b.jump_on(); }
+PORT_EX(Func_18b6b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b6b); b.jump_on(); }
+PORT_EX(Func_18ba7, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ba7); b.jump_on(); }
+PORT_EX(Func_18bab, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bab); b.jump_on(); }
+PORT_EX(Func_18baf, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18baf); b.jump_on(); }
+PORT_EX(Func_18beb, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18beb); b.jump_on(); }
+PORT_EX(Func_18bef, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bef); b.jump_on(); }
+PORT_EX(Func_18bf3, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bf3); b.jump_on(); }
+PORT_EX(Func_18c2c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c2c); b.jump_on(); }
+PORT_EX(Func_18c34, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c34); b.jump_on(); }
+PORT_EX(Func_18c70, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c70); b.jump_on(); }
+PORT_EX(Func_18c78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c78); b.jump_on(); }
+PORT_EX(Func_18e12, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e12); b.jump_on(); }
+PORT_EX(Func_18e16, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e16); b.jump_on(); }
+PORT_EX(Func_18e1e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e1e); b.jump_on(); }
+PORT_EX(Func_18e22, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e22); b.jump_on(); }
+PORT_EX(Func_18ea6, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ea6); b.jump_on(); }
+PORT_EX(Func_18eaa, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eaa); b.jump_on(); }
+PORT_EX(Func_18eb2, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eb2); b.jump_on(); }
+PORT_EX(Func_18eb6, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eb6); b.jump_on(); }
+PORT_EX(Func_18eba, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eba); b.jump_on(); }
+PORT_EX(Func_18f63, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f63); b.jump_on(); }
+PORT_EX(Func_18f67, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f67); b.jump_on(); }
+PORT_EX(Func_18f6f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f6f); b.jump_on(); }
+PORT_EX(Func_18f73, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f73); b.jump_on(); }
+PORT_EX(Func_18f77, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f77); b.jump_on(); }
+PORT_EX(Func_18ff7, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ff7); b.jump_on(); }
+PORT_EX(Func_18ffb, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ffb); b.jump_on(); }
+PORT_EX(Func_19003, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19003); b.jump_on(); }
+PORT_EX(Func_1900b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1900b); b.jump_on(); }
+PORT_EX(Func_190e0, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190e0); b.jump_on(); }
+PORT_EX(Func_190ec, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190ec); b.jump_on(); }
+PORT_EX(Func_190f0, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190f0); b.jump_on(); }
+PORT_EX(Func_190f4, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190f4); b.jump_on(); }
+PORT_EX(Func_190f8, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190f8); b.jump_on(); }

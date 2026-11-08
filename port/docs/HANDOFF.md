@@ -751,10 +751,30 @@ primitives, home/wario.cpp, and the golf objects' animation):
   floor_for_y_pos, handle_up/downwards_floor_transition, run by
   call_home; checked under temporary ALL_REGISTERS hooks, 603/603 each).
   They never touch hl, so Omodonmeka's RISE reads wCurObjStateDuration.
-- Next: the block functions. Of the objects' reads after a block check,
-  only Octohon's is left: .asm_4a6eb writes 0 through the hl Func_3513's
-  block function leaves (its big charge into a wall), so a plain block
-  check must return its exit hl.
+- The block functions, plain (2026-11-08), in two commits:
+  - 8a8659b: native dispatch. A block function leaves the one it jumps on
+    to in next_ (GOTO), dispatch(func) maps an address to its function
+    (a switch built from the hook table), and ProcessBlock runs the chain
+    itself when bank 6 is mapped (else it sets pc, as the asm's jp hl
+    runs whatever's mapped). The hooks stay as entries: dispatch, then
+    jump_on() (pc = next_, or the ret).
+  - The functions as plain C++: conditions read memory directly
+    (mem_[x], word_be for hPos / wWarioXPos / wBlockPtr), without the a
+    and f the asm computes on the way. a and f are dead at every jump: no
+    block function reads them on entry (entry_reads_af.py over all 269),
+    and every chain ends in Free, Solid, Func_1808c, Func_18064 or
+    Func_18078 (which set them) or Fire's ret. So the 261 hooks that only
+    jump on clobber R_A | R_F, and ProcessBlock, Fire (its ret leaves the
+    flags of its last check) and the terminal ones stay exact. b, c, d,
+    e, h and l are still set where the asm sets them: the collision
+    checks hand the last block function's to their callers (Octohon's
+    .asm_4a6eb writes 0 through hl), and they're the register-level
+    callees' arguments (Func_e31, CreateParticleInBlock, CopyHLToDE,
+    DoGroundShake).
+- Next: object_interactions.cpp (386 register sites; ProcessInteractions
+  clobbers all registers, so its members can go plain as long as the exact
+  hooks it shares with the block functions, SetState_Stung and the like,
+  keep their exits), then start_room.cpp.
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped
