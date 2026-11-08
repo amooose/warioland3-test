@@ -825,9 +825,15 @@ primitives, home/wario.cpp, and the golf objects' animation):
   with bc anywhere (ccfe), and 16-bit offsets failed every shard.
   CreateParticle, Func_ce3e and CreateParticleInBlock stay exact (BreakBlock
   calls the last inside the block function chain).
+- update_level.cpp, plain (2026-11-08): the level's frame reads and
+  writes memory between its calls; UpdateLevel clobbers all registers
+  (LevelStateTable sets a and f after). Its calls keep the asm's return
+  addresses and its push_wram / SRAM push af stay as stack pushes (the
+  bank in a), so every return address sits where the asm's does.
 - Next: scroll.cpp (it feeds the queues: its pushes and the af it pushes
-  are what the overrun reads, so keep every push and the flags behind it),
-  then update_level.cpp and the overworld modules.
+  are what the overrun reads, so keep every push and the flags behind
+  it), then the overworld and home modules (home/load_room.cpp,
+  home/start.cpp, overworld/bank26.cpp ... by register sites).
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped
