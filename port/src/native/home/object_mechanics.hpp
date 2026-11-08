@@ -20,4 +20,15 @@ void move_object_y(GB *gb, int dy);
 // (duration and offset 0)
 void set_object_frameset_ptr(GB *gb, uint16_t frameset);
 
+// UpdateObjectAnimation: the current object's frame duration down one; at
+// its end the frameset's next (frame, duration) entry ($ff starts over);
+// UpdateObjectFrame: just the frame at the offset, unless the duration
+// lasts (the floor transitions')
+void update_object_animation(GB *gb);
+void update_object_frame(GB *gb);
+
+// SetOneWayPlatformAction: no actions for the current object for a frame
+// while Wario's under it (unless he's stepped on it)
+void set_one_way_platform_action(GB *gb);
+
 } // namespace wl3::home

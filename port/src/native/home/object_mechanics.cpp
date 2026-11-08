@@ -53,6 +53,54 @@ void update_obj_sprite(GB *gb, uint16_t id, uint16_t pos)
 	bankswitch(gb, bank, ADDR_UpdateObjSprite);
 }
 
+void update_object_animation(GB *gb)
+{
+	Memory mem(gb);
+	uint8_t duration = mem[wCurObjFrameDuration];
+	mem[wCurObjFrameDuration] = static_cast<uint8_t>(duration - 1);
+	if (duration) // sub 1 / ret nc
+		return;
+	uint8_t bank = mem[wROMBank];
+	bankswitch(gb, BANK_Frameset_68000, ADDR_UpdateObjectAnimation);
+	uint16_t frameset = mem.word(wCurObjFramesetPtr);
+	auto entry = static_cast<uint16_t>(frameset + mem[wCurObjFramesetOffset]);
+	if (mem[entry] != 0xff) {
+		mem[wCurObjFrame] = mem[entry];
+		mem[wCurObjFramesetOffset] = static_cast<uint8_t>(mem[wCurObjFramesetOffset] + 2);
+		mem[wCurObjFrameDuration] = mem[static_cast<uint16_t>(entry + 1)];
+	} else { // .reset
+		mem[wCurObjFramesetOffset] = 2;
+		mem[wCurObjFrame] = mem[frameset];
+		mem[wCurObjFrameDuration] = mem[static_cast<uint16_t>(frameset + 1)];
+	}
+	bankswitch(gb, bank, ADDR_HomeJumpRet);
+}
+
+void update_object_frame(GB *gb)
+{
+	Memory mem(gb);
+	if (mem[wCurObjFrameDuration]) // sub 1 / ret nc
+		return;
+	uint8_t bank = mem[wROMBank];
+	bankswitch(gb, BANK_Frameset_68000, ADDR_UpdateObjectFrame);
+	uint16_t frameset = mem.word(wCurObjFramesetPtr);
+	uint8_t frame = mem[static_cast<uint16_t>(frameset + mem[wCurObjFramesetOffset])];
+	mem[wCurObjFrame] = frame == 0xff ? mem[frameset] : frame;
+	bankswitch(gb, bank, ADDR_HomeJumpRet);
+}
+
+void set_one_way_platform_action(GB *gb)
+{
+	Memory mem(gb);
+	if (mem[wCurObjFlags] & OBJFLAG_STEPPED)
+		return;
+	// wCurObjCollBoxTop + wCurObjScreenYPos + $2a + 3, against Wario's + $2a
+	auto top = static_cast<uint8_t>(mem[wCurObjScreenYPos] + 0x2a + 3 + mem[wCurObjCollBoxTop]);
+	if (static_cast<uint8_t>(mem[wWarioScreenYPos] + 0x2a) < top)
+		return; // Wario is over the collision box
+	mem[wCurObjAction] = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
+}
+
 namespace {
 
 class HomeObjectMechanics : public AsmModule {
@@ -82,238 +130,6 @@ public:
 		bankswitch(cpu_.a);
 	}
 
-	// some bosses hold the number of hits required to be defeated
-	// in the substate variable of their object struct
-	// this routine decrements this counter to a minimum of 0
-	void port_DecrementRemainingBossHits()
-	{
-		cpu_.l = OBJ_SUBSTATE;
-		uint16_t hl = REG_HL(gb_);
-		cpu_.a = alu_.and_(rd8(hl), 0x0f);
-		cpu_.a = alu_.dec(cpu_.a);
-		if (cpu_.f & FLAG_Z)
-			return;
-		wr8(hl, alu_.dec(rd8(hl)));
-	}
-
-	void port_UpdateObjectFrame()
-	{
-		cpu_.a = alu_.sub(rd8(wCurObjFrameDuration), 1);
-		SET_HL(gb_, wCurObjFrameDuration - 1);
-		if (!(cpu_.f & FLAG_C))
-			return;
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		bankswitch(BANK_Frameset_68000);
-		cpu_.e = rd8(wCurObjFramesetPtr);
-		cpu_.d = rd8(wCurObjFramesetPtr + 1);
-		SET_HL(gb_, wCurObjFramesetOffset);
-		cpu_.c = alu_.add(rd8(wCurObjFramesetOffset), cpu_.e);
-		cpu_.b = alu_.adc(cpu_.d, 0);
-		cpu_.a = rd8(REG_BC(gb_));
-		alu_.cp(cpu_.a, 0xff);
-		if (cpu_.f & FLAG_Z)
-			cpu_.a = rd8(REG_DE(gb_)); // first frame
-		wr8(wCurObjFrame, cpu_.a);
-		// HomeJumpRet
-		pop_af();
-		bankswitch(cpu_.a);
-	}
-
-	void port_UpdateObjectAnimation()
-	{
-		cpu_.a = alu_.sub(rd8(wCurObjFrameDuration), 1);
-		wr8(wCurObjFrameDuration, cpu_.a);
-		SET_HL(gb_, wCurObjFrameDuration - 1);
-		if (!(cpu_.f & FLAG_C))
-			return;
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		bankswitch(BANK_Frameset_68000);
-		cpu_.e = rd8(wCurObjFramesetPtr);
-		cpu_.d = rd8(wCurObjFramesetPtr + 1);
-		cpu_.c = alu_.add(rd8(wCurObjFramesetOffset), cpu_.e);
-		cpu_.b = alu_.adc(cpu_.d, 0);
-		cpu_.a = rd8(REG_BC(gb_));
-		alu_.cp(cpu_.a, 0xff);
-		if (!(cpu_.f & FLAG_Z)) {
-			wr8(wCurObjFrame, cpu_.a);
-			cpu_.a = alu_.add(rd8(wCurObjFramesetOffset), 2);
-			wr8(wCurObjFramesetOffset, cpu_.a);
-			SET_BC(gb_, REG_BC(gb_) + 1);
-			cpu_.a = rd8(REG_BC(gb_));
-			wr8(wCurObjFrameDuration, cpu_.a);
-		} else {
-			// .reset
-			cpu_.a = 2;
-			wr8(wCurObjFramesetOffset, 2);
-			cpu_.a = rd8(REG_DE(gb_)); // first frame
-			wr8(wCurObjFrame, cpu_.a);
-			SET_DE(gb_, REG_DE(gb_) + 1);
-			cpu_.a = rd8(REG_DE(gb_)); // first duration
-			wr8(wCurObjFrameDuration, cpu_.a);
-		}
-		SET_HL(gb_, wCurObjFrameDuration);
-		// HomeJumpRet
-		pop_af();
-		bankswitch(cpu_.a);
-	}
-
-	// Object positions are 16-bit little-endian: the low byte at the label, the
-	// high byte after it.
-
-	// ld a, [hl] / add or sub n / ld [hli], a / ret nc / inc or dec [hl]
-	void move_pos_by(uint16_t pos, uint8_t n, bool subtract)
-	{
-		uint8_t lo = rd8(pos);
-		cpu_.a = subtract ? alu_.sub(lo, n) : alu_.add(lo, n);
-		wr8(pos, cpu_.a);
-		SET_HL(gb_, pos + 1);
-		if (!(cpu_.f & FLAG_C))
-			return;
-		uint8_t hi = rd8(pos + 1);
-		wr8(pos + 1, subtract ? alu_.dec(hi) : alu_.inc(hi));
-	}
-
-	// ld hl, pos / inc [hl] / ret nz / inc l / inc [hl]
-	void inc_pos(uint16_t pos)
-	{
-		SET_HL(gb_, pos);
-		uint8_t lo = alu_.inc(rd8(pos));
-		wr8(pos, lo);
-		if (lo)
-			return;
-		cpu_.l = alu_.inc(cpu_.l);
-		uint16_t hl = REG_HL(gb_);
-		wr8(hl, alu_.inc(rd8(hl)));
-	}
-
-	// ld a, [wGlobalCounter] / rra: the slow movers only move every other frame.
-	// Returns the carry (bit 0 of the counter).
-	bool rra_global_counter()
-	{
-		uint8_t v = rd8(wGlobalCounter);
-		bool carry = v & 1;
-		cpu_.a = (uint8_t)((v >> 1) | ((cpu_.f & FLAG_C) ? 0x80 : 0));
-		cpu_.f = carry ? FLAG_C : 0;
-		return carry;
-	}
-
-	void port_MoveObjectLeftByVar2()
-	{
-		cpu_.b = rd8(wCurObjVar2);
-		move_pos_by(wCurObjXPos, cpu_.b, true);
-	}
-
-	void port_MoveObjectRightByVar2()
-	{
-		cpu_.b = rd8(wCurObjVar2);
-		move_pos_by(wCurObjXPos, cpu_.b, false);
-	}
-
-	void port_MoveObjectUpByVar2()
-	{
-		cpu_.b = rd8(wCurObjVar2);
-		move_pos_by(wCurObjYPos, cpu_.b, true);
-	}
-
-	void port_MoveObjectDownByVar2()
-	{
-		cpu_.b = rd8(wCurObjVar2);
-		move_pos_by(wCurObjYPos, cpu_.b, false);
-	}
-
-	void port_MoveObjectLeft_Fast()
-	{
-		move_pos_by(wCurObjXPos, 2, true);
-	}
-
-	void port_MoveObjectRight_Fast()
-	{
-		move_pos_by(wCurObjXPos, 2, false);
-	}
-
-	void port_MoveObjectDown_Fast()
-	{
-		move_pos_by(wCurObjYPos, 2, false);
-	}
-
-	void port_MoveObjectUp_Fast()
-	{
-		move_pos_by(wCurObjYPos, 2, true);
-	}
-
-	// moves current object right
-	// by 0.5 pixel per frame
-	void port_MoveObjectRight_Slow()
-	{
-		if (!rra_global_counter())
-			inc_pos(wCurObjXPos);
-	}
-
-	// moves current object right
-	// at 1 pixel per frame
-	void port_MoveObjectRight()
-	{
-		inc_pos(wCurObjXPos);
-	}
-
-	// moves current object left
-	// by 0.5 pixel per frame
-	void port_MoveObjectLeft_Slow()
-	{
-		if (rra_global_counter())
-			move_pos_by(wCurObjXPos, 1, true);
-	}
-
-	// moves current object left
-	// at 1 pixel per frame
-	void port_MoveObjectLeft()
-	{
-		move_pos_by(wCurObjXPos, 1, true);
-	}
-
-	// moves current object down
-	// at 0.5 pixel per frame
-	void port_MoveObjectDown_Slow()
-	{
-		if (!rra_global_counter())
-			inc_pos(wCurObjYPos);
-	}
-
-	// moves current object down
-	// at 1 pixel per frame
-	void port_MoveObjectDown()
-	{
-		inc_pos(wCurObjYPos);
-	}
-
-	void port_MoveObjectUp_Slow()
-	{
-		if (rra_global_counter())
-			move_pos_by(wCurObjYPos, 1, true);
-	}
-
-	// moves current object up
-	// at 1 pixel per frame
-	void port_MoveObjectUp()
-	{
-		move_pos_by(wCurObjYPos, 1, true);
-	}
-
-	// input:
-	// - de = frameset pointer
-	void port_SetObjectFramesetPtr()
-	{
-		wr8(wCurObjFramesetPtr + 0, cpu_.e);
-		wr8(wCurObjFramesetPtr + 1, cpu_.d);
-		wr8(wCurObjFramesetPtr + 2, 0); // OBJ_FRAME_DURATION
-		wr8(wCurObjFramesetPtr + 3, 0); // OBJ_FRAMESET_OFFSET
-		SET_HL(gb_, wCurObjFramesetPtr + 4);
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-	}
-
 	// The tail of routines entered with homejp, which pushed the caller's bank.
 	void port_HomeJumpRet()
 	{
@@ -321,23 +137,6 @@ public:
 		bankswitch(cpu_.a);
 	}
 
-	// if Wario is underneath a one-way platform,
-	// then don't process any actions for it
-	void port_SetOneWayPlatformAction()
-	{
-		cpu_.a = alu_.and_(rd8(wCurObjFlags), OBJFLAG_STEPPED);
-		if (cpu_.a)
-			return;
-		cpu_.b = rd8(wCurObjCollBoxTop);
-		// wCurObjCollBoxTop + wCurObjScreenYPos + $2a + 3
-		cpu_.b = alu_.add(alu_.add(rd8(wCurObjScreenYPos), 0x2a + 3), cpu_.b);
-		cpu_.a = alu_.add(rd8(wWarioScreenYPos), 0x2a);
-		alu_.cp(cpu_.a, cpu_.b);
-		if (cpu_.f & FLAG_C)
-			return; // Wario is over the collision box
-		cpu_.a = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
-		wr8(wCurObjAction, cpu_.a);
-	}
 	void port_Func_3173()
 	{
 		homejp(BANK_Func_62e57);
@@ -721,31 +520,64 @@ public:
 } // namespace wl3::home
 
 using wl3::home::HomeObjectMechanics;
+using namespace wl3::home;
 
 // only DrawObjects calls it, and reads none after it
 PORT_EX(UpdateObjSprite, 0, ALL_REGISTERS) { wl3::home::update_obj_sprite(gb, REG_HL(gb), static_cast<uint16_t>(gb->cpu.h << 8 | gb->cpu.e)); }
-PORT_EX(DecrementRemainingBossHits, 0, 0) { HomeObjectMechanics(gb).port_DecrementRemainingBossHits(); }
-PORT_EX(UpdateObjectFrame, 0, 0) { HomeObjectMechanics(gb).port_UpdateObjectFrame(); }
-PORT_EX(UpdateObjectAnimation, 0, 0) { HomeObjectMechanics(gb).port_UpdateObjectAnimation(); }
-PORT_EX(MoveObjectLeftByVar2, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectLeftByVar2(); }
-PORT_EX(MoveObjectRightByVar2, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectRightByVar2(); }
-PORT_EX(MoveObjectUpByVar2, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectUpByVar2(); }
-PORT_EX(MoveObjectDownByVar2, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectDownByVar2(); }
-PORT_EX(MoveObjectLeft_Fast, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectLeft_Fast(); }
-PORT_EX(MoveObjectRight_Fast, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectRight_Fast(); }
-PORT_EX(MoveObjectDown_Fast, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectDown_Fast(); }
-PORT_EX(MoveObjectUp_Fast, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectUp_Fast(); }
-PORT_EX(MoveObjectRight_Slow, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectRight_Slow(); }
-PORT_EX(MoveObjectRight, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectRight(); }
-PORT_EX(MoveObjectLeft_Slow, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectLeft_Slow(); }
-PORT_EX(MoveObjectLeft, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectLeft(); }
-PORT_EX(MoveObjectDown_Slow, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectDown_Slow(); }
-PORT_EX(MoveObjectDown, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectDown(); }
-PORT_EX(MoveObjectUp_Slow, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectUp_Slow(); }
-PORT_EX(MoveObjectUp, 0, 0) { HomeObjectMechanics(gb).port_MoveObjectUp(); }
-PORT_EX(SetObjectFramesetPtr, 0, 0) { HomeObjectMechanics(gb).port_SetObjectFramesetPtr(); }
+// The object movers, animation and frameset, plain: the objects (C++)
+// call them plain (Object::call_home) and UpdateObjects reads no register
+// after the animation, so the hooks clobber them all.
+namespace {
+
+void move_slow(GB *gb, bool x, int d)
+{
+	// ld a, [wGlobalCounter] / rra: right and down on even frames, left
+	// and up on odd ones
+	bool odd = wl3::Memory(gb)[wGlobalCounter] & 1;
+	if (odd == (d < 0)) {
+		if (x)
+			wl3::home::move_object_x(gb, d);
+		else
+			wl3::home::move_object_y(gb, d);
+	}
+}
+
+uint8_t var2(GB *gb) { return wl3::Memory(gb)[wCurObjVar2]; }
+
+} // namespace
+
+// h = the object's page: its hits left (the substate's low nibble) down
+// one, unless it's the last
+PORT_EX(DecrementRemainingBossHits, 0, ALL_REGISTERS)
+{
+	wl3::Memory mem(gb);
+	auto substate = static_cast<uint16_t>(gb->cpu.h << 8 | OBJ_SUBSTATE);
+	if ((mem[substate] & 0x0f) != 1)
+		mem[substate] = static_cast<uint8_t>(mem[substate] - 1);
+}
+PORT_EX(UpdateObjectFrame, 0, ALL_REGISTERS) { update_object_frame(gb); }
+PORT_EX(UpdateObjectAnimation, 0, ALL_REGISTERS) { update_object_animation(gb); }
+PORT_EX(MoveObjectLeftByVar2, 0, ALL_REGISTERS) { move_object_x(gb, -var2(gb)); }
+PORT_EX(MoveObjectRightByVar2, 0, ALL_REGISTERS) { move_object_x(gb, var2(gb)); }
+PORT_EX(MoveObjectUpByVar2, 0, ALL_REGISTERS) { move_object_y(gb, -var2(gb)); }
+PORT_EX(MoveObjectDownByVar2, 0, ALL_REGISTERS) { move_object_y(gb, var2(gb)); }
+PORT_EX(MoveObjectLeft_Fast, 0, ALL_REGISTERS) { move_object_x(gb, -2); }
+PORT_EX(MoveObjectRight_Fast, 0, ALL_REGISTERS) { move_object_x(gb, 2); }
+PORT_EX(MoveObjectDown_Fast, 0, ALL_REGISTERS) { move_object_y(gb, 2); }
+PORT_EX(MoveObjectUp_Fast, 0, ALL_REGISTERS) { move_object_y(gb, -2); }
+PORT_EX(MoveObjectRight_Slow, 0, ALL_REGISTERS) { move_slow(gb, true, 1); }
+PORT_EX(MoveObjectRight, 0, ALL_REGISTERS) { move_object_x(gb, 1); }
+PORT_EX(MoveObjectLeft_Slow, 0, ALL_REGISTERS) { move_slow(gb, true, -1); }
+PORT_EX(MoveObjectLeft, 0, ALL_REGISTERS) { move_object_x(gb, -1); }
+PORT_EX(MoveObjectDown_Slow, 0, ALL_REGISTERS) { move_slow(gb, false, 1); }
+PORT_EX(MoveObjectDown, 0, ALL_REGISTERS) { move_object_y(gb, 1); }
+PORT_EX(MoveObjectUp_Slow, 0, ALL_REGISTERS) { move_slow(gb, false, -1); }
+PORT_EX(MoveObjectUp, 0, ALL_REGISTERS) { move_object_y(gb, -1); }
+// de = the frameset
+PORT_EX(SetObjectFramesetPtr, 0, ALL_REGISTERS) { set_object_frameset_ptr(gb, REG_DE(gb)); }
 PORT_EX(HomeJumpRet, 0, 0) { HomeObjectMechanics(gb).port_HomeJumpRet(); }
-PORT_EX(SetOneWayPlatformAction, 0, 0) { HomeObjectMechanics(gb).port_SetOneWayPlatformAction(); }
+// the objects (C++) read no register after it
+PORT_EX(SetOneWayPlatformAction, 0, ALL_REGISTERS) { set_one_way_platform_action(gb); }
 PORT_EX(Func_3173, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3173(); }
 PORT_EX(VanishObject2, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_VanishObject2(); }
 PORT_EX(Func_3191, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3191(); }
