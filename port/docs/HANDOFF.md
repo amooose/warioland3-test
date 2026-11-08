@@ -858,9 +858,27 @@ primitives, home/wario.cpp, and the golf objects' animation):
   and spawn_edge (their registers reach ProcessBlock); scroll,
   start_room and block_queue call the plain ones. block_ptr reads x
   after writing wBlockPtr's high byte and bank, as the asm does.
-- Next: overworld/bank26.cpp, home/overworld.cpp (plain helpers in
-  ow.hpp for the C++ callers), then the other overworld and home modules
-  (by register sites).
+- bank26.cpp and home/overworld.cpp, plain (2026-11-08): the level
+  treasures clobber all registers (C callers), LoadLevelTreasureData
+  leaves pop_wram's a and f. home/ow.hpp has ow_coord_in_tilemap,
+  load_level_name, start_hdma, load_far_bg_map, apply_pal_config and
+  apply_ow_movement; their hooks stay exact for the asm, and the C++
+  callers (scenes, temple, prologue, epilogue, map walk, events,
+  cutscenes) call the plain ones (their hooks are all ALL_REGISTERS).
+  bank21's ApplyPalConfig* wrap apply_pal_config. door_transition.cpp
+  plain (LevelStateTable sets a and f after it).
+- The V-Blank functions copied to wVBlankFunc (overworld, OW scene,
+  cutscene, prologue/epilogue, golf building) are plain; they end with
+  a = HIGH(wVirtualOAM) and a jump to hTransferVirtualOAM, which reads
+  only a, so their hooks clobber everything else (ALL_REGISTERS & ~R_A).
+- load_objects.cpp's LoadObjectGroupData and LoadHiddenFigureData plain
+  (LoadRoom calls the first): the pointer loop returns where it stopped,
+  for LoadObjPals (home::load_obj_pals) to read the palettes after it.
+  SpawnObject, CreateObject*, DespawnAllObjects keep their register
+  interfaces (objects and the block queue pass them registers).
+- Next: home/wario_mechanics1.cpp, golf/hole_ram.cpp,
+  home/load_golf_sprite.cpp, home/sprites.cpp, home/system.cpp,
+  overworld/bank2b_2.cpp ... (by register sites).
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped

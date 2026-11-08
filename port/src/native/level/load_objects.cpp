@@ -8,6 +8,7 @@
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
+#include "../home/pals.hpp"
 
 namespace wl3::level {
 
@@ -33,7 +34,7 @@ private:
 	uint16_t slot(int n) const { return static_cast<uint16_t>(wObj1 + n * OBJ_STRUCT_LENGTH); }
 	int free_slot();
 	uint8_t relative(uint16_t pos, uint8_t offset, uint16_t &at);
-	void load_data_pointers(uint16_t from, uint8_t count);
+	uint16_t load_data_pointers(uint16_t from, uint8_t count);
 
 	GB *gb_;
 	CPU &cpu_;
@@ -225,34 +226,23 @@ void ObjectLoader::despawn_all()
 }
 
 // wObjDataPtr01 on: up to count of the pointers at from, until a $ffxx
-// one (hffa0 counts down)
-void ObjectLoader::load_data_pointers(uint16_t from, uint8_t count)
+// one (hffa0 counts down); returns where the reading stopped
+uint16_t ObjectLoader::load_data_pointers(uint16_t from, uint8_t count)
 {
 	mem_[hffa0] = count;
-	uint16_t dest = wObjDataPtr01;
+	uint8_t dest = static_cast<uint8_t>(wObjDataPtr01); // inc e: within the page
 	uint16_t src = from;
 	for (;;) {
-		uint8_t c = mem_[src++];
-		uint8_t b = mem_[src++];
-		cpu_.c = c;
-		cpu_.b = b;
-		SET_HL(gb_, src);
-		cpu_.f = flags::inc(cpu_.f, b);
-		cpu_.a = static_cast<uint8_t>(b + 1);
-		if (b == 0xff)
+		uint8_t lo = mem_[src++];
+		uint8_t hi = mem_[src++];
+		if (hi == 0xff)
 			break;
-		mem_[dest] = c;
-		dest = static_cast<uint16_t>((dest & 0xff00) | static_cast<uint8_t>(dest + 1)); // inc e
-		mem_[dest] = b;
-		dest = static_cast<uint16_t>((dest & 0xff00) | static_cast<uint8_t>(dest + 1));
-		uint8_t left = mem_[hffa0];
-		cpu_.f = flags::dec(cpu_.f, left);
-		cpu_.a = static_cast<uint8_t>(left - 1);
-		mem_[hffa0] = cpu_.a;
-		if (!cpu_.a)
+		mem_[static_cast<uint16_t>((wObjDataPtr01 & 0xff00) | dest++)] = lo;
+		mem_[static_cast<uint16_t>((wObjDataPtr01 & 0xff00) | dest++)] = hi;
+		if (!--mem_[hffa0])
 			break;
 	}
-	SET_DE(gb_, dest);
+	return src;
 }
 
 // the Hidden Figure's room: its object data alone
@@ -263,21 +253,15 @@ void ObjectLoader::load_hidden_figure_data()
 
 // the room's object group: the object data pointers (the dummy object in
 // every unused slot), the chest, key and musical coin data and their
-// palette, the 4 enemy graphics slots, then the object palettes
+// palette, the 4 enemy graphics slots, then the object palettes after the
+// pointers (LoadObjPals)
 void ObjectLoader::load_group()
 {
 	for (int i = 0; i < 0x10; i++)
 		Word(gb_, wObjDataPointers + 2 * i) = ADDR_DummyObjectData;
-	SET_BC(gb_, ADDR_DummyObjectData);
-	cpu_.e = 0;
-	cpu_.f = FLAG_Z | FLAG_N | (cpu_.f & FLAG_C); // dec e: 1 -> 0
-
 	uint8_t group = mem_[wObjectGroup];
-	cpu_.a = group;
-	cpu_.f = flags::cp(group, OBJECT_GROUP_HIDDEN_FIGURE);
 	if (group == OBJECT_GROUP_HIDDEN_FIGURE) {
 		load_hidden_figure_data();
-		cpu_.pc = gb_pop16(gb_); // ret
 		return;
 	}
 
@@ -285,34 +269,23 @@ void ObjectLoader::load_group()
 	uint16_t items = Word(gb_, entry);
 	for (int i = 0; i < 6; i++) // chest, key and musical coin
 		mem_[wChestObjDataPtr + i] = mem_[items + i];
-	SET_HL(gb_, items + 6);
-	SET_DE(gb_, wTempPals2 + 3 * PAL_SIZE);
-	cpu_.b = PAL_SIZE;
-	routines_.call(ADDR_CopyHLToDE_Short);
+	home::copy_short(gb_, static_cast<uint16_t>(items + 6), wTempPals2 + 3 * PAL_SIZE, PAL_SIZE);
 
 	uint16_t enemies = Word(gb_, entry + 2);
 	mem_[rVBK] = VRAM1;
-	uint8_t gfx_bank = mem_[enemies];
-	mem_[hffa0] = gfx_bank;
+	mem_[hffa0] = mem_[enemies];
 	static constexpr uint16_t dest[4] = {
 		v1Tiles0, v1Tiles0 + 0x40 * TILE_SIZE, v1Tiles1, v1Tiles1 + 0x40 * TILE_SIZE,
 	};
 	uint16_t ptrs = enemies + 1;
 	for (int i = 0; i < 4; i++) {
-		SET_HL(gb_, Word(gb_, ptrs));
+		uint16_t src = Word(gb_, ptrs);
 		ptrs += 2;
-		SET_BC(gb_, dest[i]);
-		cpu_.e = static_cast<uint8_t>(ENEMY_GFX_1_SLOT_1 + i);
-		uint8_t bank = static_cast<uint8_t>(gfx_bank + cpu_.e);
-		cpu_.f = flags::add(gfx_bank, cpu_.e);
-		mem_[hCallFuncBank] = bank;
-		routines_.farcall(bank, ADDR_Decompress); // hcall Decompress
-		gfx_bank = mem_[hffa0];
+		uint8_t bank = static_cast<uint8_t>(mem_[hffa0] + ENEMY_GFX_1_SLOT_1 + i);
+		routines_.in_bank(bank, ADDR_Decompress, [&] { routines_.decompress(src, dest[i]); }); // hcall Decompress
 	}
 	mem_[rVBK] = 0; // VRAM0
-	cpu_.f = FLAG_Z; // xor a
-	load_data_pointers(ptrs, 13);
-	cpu_.pc = ADDR_LoadObjPals; // jp LoadObjPals
+	home::load_obj_pals(gb_, load_data_pointers(ptrs, 13));
 }
 
 } // namespace
@@ -329,7 +302,8 @@ PORT(CreateObject_GotPos) { ObjectLoader(gb).create_got_pos(gb->cpu.a, REG_HL(gb
 PORT(_CreateObjectFromCurObjPos) { ObjectLoader(gb).create_from_cur_obj_pos(); }
 PORT(_CreateObjectAtRelativePos) { ObjectLoader(gb).create_at_relative_pos(); }
 PORT(DespawnAllObjects) { ObjectLoader(gb).despawn_all(); }
-PORT(LoadHiddenFigureData) { ObjectLoader(gb).load_hidden_figure_data(); }
+PORT_EX(LoadHiddenFigureData, 0, ALL_REGISTERS) { ObjectLoader(gb).load_hidden_figure_data(); }
 
 // ends in jp LoadObjPals (or LoadHiddenFigureData's ret)
-PORT_EX(LoadObjectGroupData, HOOK_MANUAL_RET, 0) { ObjectLoader(gb).load_group(); }
+// LoadRoom farcalls it and reads no registers after
+PORT_EX(LoadObjectGroupData, 0, ALL_REGISTERS) { ObjectLoader(gb).load_group(); }
