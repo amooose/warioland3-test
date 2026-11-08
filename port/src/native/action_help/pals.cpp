@@ -1,5 +1,5 @@
 // Action Help's palettes (see pals.hpp), and the V-Blank function it
-// copies to wVBlankFunc, which stays register-level (run from RAM).
+// copies to wVBlankFunc.
 #include "pals.hpp"
 
 #include "../asm_module.hpp"
@@ -114,46 +114,28 @@ class ActionHelpPals : public AsmModule {
 public:
 	using AsmModule::AsmModule;
 
-	// VBlank_1fb6b7.Func, as copied to wVBlankFunc (see ram_code.c). Its call
-	// returns to base + n, the block's start wherever it runs from.
+	// VBlank_1fb6b7.Func, as copied to wVBlankFunc, plain over memory: the
+	// V-Blank handler pushes and pops every register around it. The pending
+	// DMA (wPendingDMASourceBank, then the source, destination bank and
+	// destination, and the length), the scroll, then hTransferVirtualOAM
+	// (a = wVirtualOAM's page).
 	void port_VBlank_1fb6b7__Func()
 	{
 		uint16_t base = cpu_.pc;
-		cpu_.a = rd8(wIsDMATransferPending);
-		cpu_.a = alu_.and_(cpu_.a, cpu_.a);
-		if (!(cpu_.f & FLAG_Z)) {
-			uint16_t hl = wPendingDMASourceBank;
-			cpu_.a = rd8(hl++);
-			wr8(rROMB0 + 0x100, cpu_.a);
-			cpu_.c = (uint8_t)rVDMA_SRC_HIGH;
-			cpu_.a = rd8(hl++);
-			wr8((uint16_t)(0xff00 | cpu_.c), cpu_.a);
-			cpu_.c = alu_.inc(cpu_.c);
-			cpu_.a = rd8(hl++);
-			wr8((uint16_t)(0xff00 | cpu_.c), cpu_.a);
-			cpu_.a = rd8(hl++);
-			wr8(rVBK, cpu_.a);
-			cpu_.c = alu_.inc(cpu_.c);
-			cpu_.a = rd8(hl++);
-			wr8((uint16_t)(0xff00 | cpu_.c), cpu_.a);
-			cpu_.c = alu_.inc(cpu_.c);
-			cpu_.a = rd8(hl++);
-			wr8((uint16_t)(0xff00 | cpu_.c), cpu_.a);
-			cpu_.c = alu_.inc(cpu_.c);
-			cpu_.a = rd8(hl);
-			wr8((uint16_t)(0xff00 | cpu_.c), cpu_.a);
-			SET_HL(gb_, hl);
-			cpu_.a = 0;
-			cpu_.f = FLAG_Z; // xor a
-			wr8(wIsDMATransferPending, cpu_.a);
+		if (mem_[wIsDMATransferPending]) {
+			mem_[rROMB0 + 0x100] = mem_[wPendingDMASourceBank];
+			mem_[rVDMA_SRC_HIGH] = mem_[wPendingDMASourceBank + 1];
+			mem_[rVDMA_SRC_LOW] = mem_[wPendingDMASourceBank + 2];
+			mem_[rVBK] = mem_[wPendingDMASourceBank + 3];
+			mem_[rVDMA_DEST_HIGH] = mem_[wPendingDMASourceBank + 4];
+			mem_[rVDMA_DEST_LOW] = mem_[wPendingDMASourceBank + 5];
+			mem_[rVDMA_LEN] = mem_[wPendingDMASourceBank + 6];
+			mem_[wIsDMATransferPending] = 0;
 		}
-		// .not_pending
-		cpu_.a = rd8(wSCY);
-		wr8(rSCY, cpu_.a);
-		cpu_.a = rd8(wSCX);
-		wr8(rSCX, cpu_.a);
-		cpu_.a = (uint8_t)(wVirtualOAM >> 8);
-		gb_call_ret(gb_, hTransferVirtualOAM, (uint16_t)(base + 0x33));
+		mem_[rSCY] = mem_[wSCY];
+		mem_[rSCX] = mem_[wSCX];
+		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
+		gb_call_ret(gb_, hTransferVirtualOAM, static_cast<uint16_t>(base + 0x33));
 		RET();
 	}
 };
@@ -164,7 +146,7 @@ public:
 
 using wl3::action_help::ActionHelpPals;
 
-PORT_LOCAL_EX(VBlank_1fb6b7, Func, HOOK_MANUAL_RET, 0) { ActionHelpPals(gb).port_VBlank_1fb6b7__Func(); }
+PORT_LOCAL_EX(VBlank_1fb6b7, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { ActionHelpPals(gb).port_VBlank_1fb6b7__Func(); }
 
 // unreferenced: hl = a sprite's y (on the BG map), x, frame and attributes,
 // drawn from OAM_1e6bab

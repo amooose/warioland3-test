@@ -1,119 +1,93 @@
-// title/raster (src/engine/title/raster.asm), converted from the register-level
-// C port by tools/c2cpp.py: the same logic, as a class over AsmModule,
-// keeping the original's registers, flags and return addresses for its
-// callers (see src/native/asm_module.hpp).
+// title/raster (src/engine/title/raster.asm): the title screen's raster
+// effects, which wait on rLY as the original does, and the V-Blank
+// function copied to wVBlankFunc, as plain C++. The raster effects' callers
+// are the title's state table (C++, by address), which leaves a and f as
+// the asm does: their hooks set them.
 #include "../asm_module.hpp"
+#include "../flags.hpp"
+#include "../home/memory.hpp"
+#include "../home/system.hpp"
 
 namespace wl3::title {
 
 namespace {
 
+// waits until rLY reaches ly, letting time pass
+void wait_ly(GB *gb, uint8_t ly)
+{
+	Memory mem(gb);
+	while (mem[rLY] < ly)
+		home::idle(gb, 32);
+}
+
+// PanIntroBackgroundLayers: the intro airplane scene's background, each
+// horizontal layer scrolling at its own speed (unless wceef); false if
+// skipped
+bool pan_intro_background_layers(GB *gb)
+{
+	Memory mem(gb);
+	if (mem[wceef])
+		return false;
+	static const struct {
+		uint8_t ly;
+		uint16_t scx;
+	} layers[] = {
+		{0x5b, wIntroBGXOffsetFar},    // after the sky
+		{0x63, wIntroBGXOffsetCentre}, // the far layer
+		{0x73, wIntroBGXOffsetNear},   // the centre layer
+		{0x83, wSCX},                  // the near layer
+	};
+	for (const auto &layer : layers) {
+		wait_ly(gb, layer.ly);
+		home::wait_next_hblank(gb);
+		mem[rSCX] = mem[layer.scx];
+	}
+	return true;
+}
+
+// AdjustJapaneseTimeAttackDescriptionWindow: rSCY 7 lower at each of its
+// lines (the Japanese text's spacing); false if English. Returns the last
+// rSCY before its add.
+bool adjust_japanese_time_attack_description_window(GB *gb, uint8_t *last)
+{
+	Memory mem(gb);
+	if (mem[wLanguage])
+		return false;
+	static const uint8_t lines[] = {0x2f, 0x38, 0x41, 0x5a, 0x63, 0x6c};
+	for (uint8_t ly : lines) {
+		wait_ly(gb, ly);
+		home::wait_next_hblank(gb);
+		*last = mem[rSCY];
+		mem[rSCY] = static_cast<uint8_t>(*last + 0x07);
+	}
+	return true;
+}
+
 class TitleRaster : public AsmModule {
 public:
 	using AsmModule::AsmModule;
 
-	// The title screen's register-level parts (see src/native/title): the
-	// raster effects, which wait on rLY as the original does, and the V-Blank
-	// function copied to wVBlankFunc.
-
-	// waits until rLY reaches ly, letting time pass
-	void wait_ly(uint8_t ly)
-	{
-		for (;;) {
-			cpu_.a = rd8(rLY);
-			alu_.cp(cpu_.a, ly);
-			if (!(cpu_.f & FLAG_C))
-				break;
-			idle(32);
-		}
-	}
-
-	// pans the background of the intro airplane scene
-	// each horizontal layer scrolls at different speed
-	void port_PanIntroBackgroundLayers()
-	{
-		cpu_.a = rd8(wceef);
-		alu_.and_(cpu_.a, cpu_.a);
-		if (cpu_.a)
-			return;
-		wait_ly(0x5b); // sky
-		CALL(WaitNextHBlank);
-		cpu_.a = rd8(wIntroBGXOffsetFar);
-		wr8(rSCX, cpu_.a);
-		wait_ly(0x63); // far layer
-		CALL(WaitNextHBlank);
-		cpu_.a = rd8(wIntroBGXOffsetCentre);
-		wr8(rSCX, cpu_.a);
-		wait_ly(0x73); // centre layer
-		CALL(WaitNextHBlank);
-		cpu_.a = rd8(wIntroBGXOffsetNear);
-		wr8(rSCX, cpu_.a);
-		wait_ly(0x83); // near layer
-		CALL(WaitNextHBlank);
-		cpu_.a = rd8(wSCX);
-		wr8(rSCX, cpu_.a);
-	}
-
-	void port_AdjustJapaneseTimeAttackDescriptionWindow()
-	{
-		cpu_.a = rd8(wLanguage);
-		cpu_.a = alu_.and_(cpu_.a, cpu_.a);
-		if (cpu_.a)
-			return; // return if English
-
-		static const uint8_t lines[] = { 0x2f, 0x38, 0x41, 0x5a, 0x63, 0x6c };
-		for (int i = 0; i < 6; i++) {
-			for (;;) {
-				cpu_.a = rd8(rLY);
-				alu_.cp(cpu_.a, lines[i]);
-				if (!(cpu_.f & FLAG_C))
-					break;
-				idle(32);
-			}
-			CALL(WaitNextHBlank);
-			cpu_.a = alu_.add(rd8(rSCY), 0x07);
-			wr8(rSCY, cpu_.a);
-		}
-	}
-
-	// VBlank_Title.Func, as copied to wVBlankFunc (see ram_code.c). Its calls
-	// return to base + n, the block's start wherever it runs from.
+	// VBlank_Title.Func, as copied to wVBlankFunc, plain over memory: the
+	// V-Blank handler pushes and pops every register around it. The title
+	// box's two tilemap rows (wcee4 bit 7), the scroll, then
+	// hTransferVirtualOAM (a = wVirtualOAM's page).
 	void port_VBlank_Title__Func()
 	{
 		uint16_t base = cpu_.pc;
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = BANK_TitleScreenBoxTilemap;
-		bankswitch(cpu_.a);
-		cpu_.a = rd8(wcee4);
-		if (alu_.bit(cpu_.a, 7)) {
-			SET_HL(gb_, ADDR_TitleScreenBoxTilemap);
-			cpu_.a = 0;
-			cpu_.f = FLAG_Z; // xor a (VRAM0)
-			wr8(rVBK, cpu_.a);
-			SET_DE(gb_, v0BGMap0 + 14 * TILEMAP_WIDTH + 4); // debgcoord 4, 14
-			gb_push16(gb_, REG_DE(gb_));
-			cpu_.b = 12;
-			gb_call_ret(gb_, ADDR_CopyHLToDE, (uint16_t)(base + 0x22));
-			SET_DE(gb_, gb_pop16(gb_));
-			cpu_.a = alu_.add(cpu_.e, TILEMAP_WIDTH);
-			cpu_.e = cpu_.a;
-			cpu_.a = alu_.adc(cpu_.d, 0);
-			cpu_.d = cpu_.a;
-			cpu_.b = 12;
-			gb_call_ret(gb_, ADDR_CopyHLToDE, (uint16_t)(base + 0x30));
-			SET_HL(gb_, wcee4);
-			wr8(wcee4, (uint8_t)(rd8(wcee4) & 0x7f));
+		uint8_t bank = mem_[wROMBank];
+		bankswitch(BANK_TitleScreenBoxTilemap);
+		if (mem_[wcee4] & 0x80) {
+			mem_[rVBK] = 0;
+			constexpr uint16_t dest = v0BGMap0 + 14 * TILEMAP_WIDTH + 4; // debgcoord 4, 14
+			home::copy(gb_, ADDR_TitleScreenBoxTilemap, dest, 12);
+			home::copy(gb_, ADDR_TitleScreenBoxTilemap + 12, dest + TILEMAP_WIDTH, 12);
+			mem_[wcee4] &= 0x7f;
 		}
-		// .skip
-		pop_af();
-		bankswitch(cpu_.a);
-		cpu_.a = rd8(wSCY);
-		wr8(rSCY, cpu_.a);
-		cpu_.a = rd8(wSCX);
-		wr8(rSCX, cpu_.a);
-		cpu_.a = (uint8_t)(wVirtualOAM >> 8);
-		gb_call_ret(gb_, hTransferVirtualOAM, (uint16_t)(base + 0x4b));
+		bankswitch(bank);
+		mem_[rSCY] = mem_[wSCY];
+		mem_[rSCX] = mem_[wSCX];
+		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
+		gb_call_ret(gb_, hTransferVirtualOAM, static_cast<uint16_t>(base + 0x4b));
 		RET();
 	}
 };
@@ -122,8 +96,31 @@ public:
 
 } // namespace wl3::title
 
-using wl3::title::TitleRaster;
+using namespace wl3::title;
+namespace flags = wl3::flags;
 
-PORT_EX(PanIntroBackgroundLayers, 0, 0) { TitleRaster(gb).port_PanIntroBackgroundLayers(); }
-PORT_EX(AdjustJapaneseTimeAttackDescriptionWindow, 0, 0) { TitleRaster(gb).port_AdjustJapaneseTimeAttackDescriptionWindow(); }
-PORT_LOCAL_EX(VBlank_Title, Func, HOOK_MANUAL_RET, 0) { TitleRaster(gb).port_VBlank_Title__Func(); }
+// a = wceef and its and, or the last layer's wSCX after WaitNextHBlank's
+// and STAT_MODE
+PORT_EX(PanIntroBackgroundLayers, 0, ALL_REGISTERS & ~(R_A | R_F))
+{
+	if (pan_intro_background_layers(gb)) {
+		gb->cpu.a = wl3::Memory(gb)[wSCX];
+		gb->cpu.f = FLAG_Z | FLAG_H;
+	} else {
+		gb->cpu.a = wl3::Memory(gb)[wceef];
+		gb->cpu.f = flags::and_(gb->cpu.a);
+	}
+}
+// a = the language and its and, or the last rSCY and its add
+PORT_EX(AdjustJapaneseTimeAttackDescriptionWindow, 0, ALL_REGISTERS & ~(R_A | R_F))
+{
+	uint8_t last = 0;
+	if (adjust_japanese_time_attack_description_window(gb, &last)) {
+		gb->cpu.a = static_cast<uint8_t>(last + 0x07);
+		gb->cpu.f = flags::add(last, 0x07);
+	} else {
+		gb->cpu.a = wl3::Memory(gb)[wLanguage];
+		gb->cpu.f = flags::and_(gb->cpu.a);
+	}
+}
+PORT_LOCAL_EX(VBlank_Title, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { TitleRaster(gb).port_VBlank_Title__Func(); }

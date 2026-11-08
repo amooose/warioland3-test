@@ -1,8 +1,8 @@
-// credits/credits (src/engine/credits/credits.asm), converted from the register-level
-// C port by tools/c2cpp.py: the same logic, as a class over AsmModule,
-// keeping the original's registers, flags and return addresses for its
-// callers (see src/native/asm_module.hpp).
+// credits/credits (src/engine/credits/credits.asm): the credits' V-Blank
+// function (the rest is C++, src/native/screens/credits.cpp).
 #include "../asm_module.hpp"
+#include "../home/memory.hpp"
+#include "../home/pals.hpp"
 
 namespace wl3::credits {
 
@@ -12,76 +12,47 @@ class CreditsCredits : public AsmModule {
 public:
 	using AsmModule::AsmModule;
 
-	// C++, src/native/screens/credits.cpp)
-
-	// VBlank_160439.Func, as copied to wVBlankFunc (see ram_code.c). Its calls
-	// return to base + n, the block's start wherever it runs from.
+	// VBlank_160439.Func, as copied to wVBlankFunc, plain over memory: the
+	// V-Blank handler pushes and pops every register around it. The
+	// scroll, then the step wcee4 bit 7 asks for: 1 the text line, 2 the
+	// palettes and the window, else the line's attributes and blanks (then
+	// step 1); hTransferVirtualOAM (a = wVirtualOAM's page) at the end.
 	void port_VBlank_160439__Func()
 	{
 		uint16_t base = cpu_.pc;
-		cpu_.a = rd8(wSCY);
-		wr8(rSCY, cpu_.a);
-		cpu_.a = rd8(wSCX);
-		wr8(rSCX, cpu_.a);
-		cpu_.a = rd8(wcee4);
-		if (!alu_.bit(cpu_.a, 7))
-			goto dma_transfer;
-		cpu_.a = alu_.and_(cpu_.a, 0x7f);
-		cpu_.a = alu_.dec(cpu_.a);
-		if (cpu_.f & FLAG_Z) {
-			// .write_text
-			cpu_.a = rd8(wCreditsBGMapPtr);
-			cpu_.e = rd8(wCreditsBGMapPtr + 1);
-			cpu_.d = cpu_.a;
-			uint16_t hl = wCreditsTextBuffer;
-			for (;;) {
-				cpu_.a = rd8(hl++);
-				alu_.cp(cpu_.a, 0x7f); // '\n'
-				if (cpu_.f & FLAG_Z)
-					break;
-				wr8(REG_DE(gb_), cpu_.a);
-				cpu_.e = alu_.inc(cpu_.e);
+		mem_[rSCY] = mem_[wSCY];
+		mem_[rSCX] = mem_[wSCX];
+		uint8_t step = mem_[wcee4];
+		if (step & 0x80) {
+			uint16_t bg_map = static_cast<uint16_t>(mem_[wCreditsBGMapPtr] << 8 | mem_[wCreditsBGMapPtr + 1]);
+			switch (step & 0x7f) {
+			case 1: // .write_text, to the '\n' (the e of de wraps in its page)
+				for (uint16_t src = wCreditsTextBuffer;; src++) {
+					uint8_t c = mem_[src];
+					if (c == 0x7f)
+						break;
+					mem_[bg_map] = c;
+					bg_map = static_cast<uint16_t>((bg_map & 0xff00) | static_cast<uint8_t>(bg_map + 1));
+				}
+				mem_[wcee4] &= 0x7f;
+				break;
+			case 2: // .asm_160499
+				home::apply_bg_pals(gb_, wTempPals1);
+				home::apply_ob_pals(gb_, wTempPals2);
+				mem_[rLCDC] |= LCDC_WIN_ON | LCDC_WIN_9C00;
+				mem_[wcee4] &= 0x7f;
+				break;
+			default:
+				mem_[rVBK] = 1; // BANK("VRAM1")
+				home::copy(gb_, wCreditsTextPals, bg_map, CREDITS_TEXT_LENGTH);
+				mem_[rVBK] = 0;
+				home::fill(gb_, bg_map, 0x7e, CREDITS_TEXT_LENGTH);
+				mem_[wcee4] = 0x01 | (1 << 7);
+				break;
 			}
-			SET_HL(gb_, hl);
-			goto clear_pending;
 		}
-		cpu_.a = alu_.dec(cpu_.a);
-		if (cpu_.f & FLAG_Z) {
-			// .asm_160499
-			gb_call_ret(gb_, ADDR_ApplyTempPals1ToBGPals, (uint16_t)(base + 0x57));
-			gb_call_ret(gb_, ADDR_ApplyTempPals2ToOBPals, (uint16_t)(base + 0x5a));
-			SET_HL(gb_, rLCDC);
-			cpu_.a = alu_.or_(rd8(rLCDC), LCDC_WIN_ON | LCDC_WIN_9C00);
-			wr8(rLCDC, cpu_.a);
-			goto clear_pending;
-		}
-		cpu_.a = 1; // BANK("VRAM1")
-		wr8(rVBK, cpu_.a);
-		cpu_.a = rd8(wCreditsBGMapPtr);
-		cpu_.e = rd8(wCreditsBGMapPtr + 1);
-		cpu_.d = cpu_.a;
-		SET_HL(gb_, wCreditsTextPals);
-		cpu_.b = CREDITS_TEXT_LENGTH;
-		gb_call_ret(gb_, ADDR_CopyHLToDE, (uint16_t)(base + 0x2b));
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(rVBK, cpu_.a);
-		cpu_.a = rd8(wCreditsBGMapPtr);
-		cpu_.l = rd8(wCreditsBGMapPtr + 1);
-		cpu_.h = cpu_.a;
-		cpu_.a = 0x7e;
-		cpu_.b = CREDITS_TEXT_LENGTH;
-		gb_call_ret(gb_, ADDR_WriteAToHL_BTimes, (uint16_t)(base + 0x3b));
-		cpu_.a = 0x01 | (1 << 7);
-		wr8(wcee4, cpu_.a);
-		goto dma_transfer;
-	clear_pending:
-		// .asm_1604a6
-		SET_HL(gb_, wcee4);
-		wr8(wcee4, (uint8_t)(rd8(wcee4) & 0x7f));
-	dma_transfer:
-		cpu_.a = (uint8_t)(wVirtualOAM >> 8);
-		gb_call_ret(gb_, hTransferVirtualOAM, (uint16_t)(base + 0x6b));
+		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
+		gb_call_ret(gb_, hTransferVirtualOAM, static_cast<uint16_t>(base + 0x6b));
 		RET();
 	}
 };
@@ -92,4 +63,4 @@ public:
 
 using wl3::credits::CreditsCredits;
 
-PORT_LOCAL_EX(VBlank_160439, Func, HOOK_MANUAL_RET, 0) { CreditsCredits(gb).port_VBlank_160439__Func(); }
+PORT_LOCAL_EX(VBlank_160439, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { CreditsCredits(gb).port_VBlank_160439__Func(); }
