@@ -12,73 +12,61 @@ class HomeLevelVblank : public AsmModule {
 public:
 	using AsmModule::AsmModule;
 
-	// apply scroll X and Y, including shake effect, then push OAM
+	// apply scroll X and Y, including shake effect, then push OAM (a and f
+	// as hTransferVirtualOAM leaves them: its dec loop keeps the carry of
+	// the shake's add)
 	void apply_scroll_and_oam()
 	{
-		SET_HL(gb_, wSCYShake);
-		cpu_.a = alu_.add(rd8(wSCY), rd8(wSCYShake));
-		wr8(rSCY, cpu_.a);
-		cpu_.a = rd8(wSCX);
-		wr8(rSCX, cpu_.a);
-		cpu_.a = (uint8_t)(wVirtualOAM >> 8);
+		uint8_t scy = mem_[wSCY], shake = mem_[wSCYShake];
+		alu_.add(scy, shake); // the add's flags
+		mem_[rSCY] = static_cast<uint8_t>(scy + shake);
+		mem_[rSCX] = mem_[wSCX];
+		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
 		gb_call(gb_, hTransferVirtualOAM);
 	}
 
-	// this function is called during level V-Blank
+	// called during level V-Blank: the pending DMA, or the tile queue (the
+	// RAM code at wVBlankFunc + $10 takes hl and bc)
 	void port_LevelVBlankFunc()
 	{
-		cpu_.a = rd8(wIsDMATransferPending);
-		alu_.and_(cpu_.a, cpu_.a);
-		if (!cpu_.a) {
-			cpu_.a = 0;
-			cpu_.f = FLAG_Z; // xor a
-			wr8(rRAMB + 0x100, 0); // SRAM0
+		if (!mem_[wIsDMATransferPending]) {
+			mem_[rRAMB + 0x100] = 0; // SRAM0
 			apply_scroll_and_oam();
-			// write tiles in wBGMapTileVRAM0Queue to the corresponding
-			// addresses in wBGMapAddressQueue
+			// the tiles in wBGMapTileVRAM0Queue to the addresses in
+			// wBGMapAddressQueue
 			SET_HL(gb_, wBGMapAddressQueue);
 			SET_BC(gb_, wBGMapTileVRAM0Queue);
 			JUMP_TO(wVBlankFunc + 0x10);
 			return;
 		}
-
-		uint16_t hl = wPendingDMASourceBank;
-		cpu_.a = rd8(hl++);
-		wr8(rROMB0 + 0x100, cpu_.a);
-		cpu_.c = (uint8_t)rVDMA_SRC_HIGH;
-		cpu_.a = rd8(hl++); // wPendingDMASourcePtr
-		wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
-		cpu_.c = alu_.inc(cpu_.c);
-		cpu_.a = rd8(hl++);
-		wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
-		cpu_.a = rd8(hl++); // wPendingDMADestinationBank
-		wr8(rVBK, cpu_.a);
-		cpu_.c = alu_.inc(cpu_.c);
-		cpu_.a = rd8(hl++); // wPendingDMADestinationPtr
-		wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
-		cpu_.c = alu_.inc(cpu_.c);
-		cpu_.a = rd8(hl++);
-		wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
-		cpu_.c = alu_.inc(cpu_.c);
-		cpu_.a = rd8(hl); // wPendingDMALength
-		wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
-
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(wIsDMATransferPending, 0);
+		// wPendingDMASourceBank, then the source, destination bank and
+		// destination (big-endian) and length
+		mem_[rROMB0 + 0x100] = mem_[wPendingDMASourceBank];
+		mem_[rVDMA_SRC_HIGH] = mem_[wPendingDMASourceBank + 1];
+		mem_[rVDMA_SRC_LOW] = mem_[wPendingDMASourceBank + 2];
+		mem_[rVBK] = mem_[wPendingDMASourceBank + 3];
+		mem_[rVDMA_DEST_HIGH] = mem_[wPendingDMASourceBank + 4];
+		mem_[rVDMA_DEST_LOW] = mem_[wPendingDMASourceBank + 5];
+		mem_[rVDMA_LEN] = mem_[wPendingDMASourceBank + 6];
+		mem_[wIsDMATransferPending] = 0;
 		apply_scroll_and_oam();
+		mem_[wBGMapTileQueueSize] = 0;
+		mem_[wBGMapAddressQueueSize] = 0;
+		// the asm's c, hl (the shake's, ld hl, wSCYShake / add [hl]) and
+		// xor a
+		cpu_.c = static_cast<uint8_t>(rVDMA_LEN);
+		SET_HL(gb_, wSCYShake);
 		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(wBGMapTileQueueSize, 0);
-		wr8(wBGMapAddressQueueSize, 0);
+		cpu_.f = FLAG_Z;
 		RET();
 	}
 
-	// called within level VBlank
+	// called within level V-Blank: the RAM code at wVBlankFuncExtended
+	// takes hl and bc
 	void port_ProcessLevelTileQueue_VRAM1()
 	{
 		cpu_.a = BANK_v1Tiles0; // BANK("VRAM1")
-		wr8(rVBK, cpu_.a);
+		mem_[rVBK] = cpu_.a;
 		SET_HL(gb_, wBGMapAddressQueue);
 		SET_BC(gb_, wBGMapTileVRAM1Queue);
 		JUMP_TO(wVBlankFuncExtended);
@@ -88,8 +76,8 @@ public:
 	{
 		cpu_.a = 0;
 		cpu_.f = FLAG_Z; // xor a
-		wr8(wBGMapTileQueueSize, 0);
-		wr8(wBGMapAddressQueueSize, 0);
+		mem_[wBGMapTileQueueSize] = 0;
+		mem_[wBGMapAddressQueueSize] = 0;
 	}
 };
 

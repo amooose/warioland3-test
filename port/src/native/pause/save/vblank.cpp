@@ -12,39 +12,33 @@ class PauseSaveVblank : public AsmModule {
 public:
 	using AsmModule::AsmModule;
 
-	// VBlank_Saving.Func, as copied to wVBlankFunc (see ram_code.c). Its calls
-	// return to cpu_.pc + n, the block's start wherever it runs from.
-	void port_VBlank_Saving__Func()
+	// The save screens' V-Blank functions, as copied to wVBlankFunc (see
+	// ram_code.c), plain over memory: the V-Blank handler pushes and pops
+	// every register around them. Their calls return to cpu_.pc + n, the
+	// block's start wherever it runs from.
+	void transfer_oam(uint16_t ret)
 	{
-		uint16_t base = cpu_.pc;
-		cpu_.a = (uint8_t)(wVirtualOAM >> 8);
-		gb_call_ret(gb_, hTransferVirtualOAM, (uint16_t)(base + 0x05));
+		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
+		gb_call_ret(gb_, hTransferVirtualOAM, ret);
 		RET();
 	}
 
-	// VBlank_SaveScreen.Func, as copied to wVBlankFunc
+	void port_VBlank_Saving__Func() { transfer_oam(static_cast<uint16_t>(cpu_.pc + 0x05)); }
+
+	// VBlank_SaveScreen.Func: the queued tile (wcee4 bit 7; its big-endian
+	// address in wBGMapTileVRAM0Queue): tile $02, palette 5
 	void port_VBlank_SaveScreen__Func()
 	{
 		uint16_t base = cpu_.pc;
-		cpu_.a = rd8(wcee4);
-		if (!alu_.bit(cpu_.a, 7))
-			goto transfer;
-		cpu_.a = rd8(wBGMapTileVRAM0Queue);
-		cpu_.l = rd8(wBGMapTileVRAM0Queue + 1);
-		cpu_.h = cpu_.a;
-		cpu_.a = 1; // BANK("VRAM1")
-		wr8(rVBK, cpu_.a);
-		wr8(REG_HL(gb_), 0x05); // pal
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(rVBK, cpu_.a);
-		wr8(REG_HL(gb_), 0x02);
-		SET_HL(gb_, wcee4);
-		wr8(wcee4, (uint8_t)(rd8(wcee4) & 0x7f));
-	transfer:
-		cpu_.a = (uint8_t)(wVirtualOAM >> 8);
-		gb_call_ret(gb_, hTransferVirtualOAM, (uint16_t)(base + 0x22));
-		RET();
+		if (mem_[wcee4] & 0x80) {
+			uint16_t at = static_cast<uint16_t>(mem_[wBGMapTileVRAM0Queue] << 8 | mem_[wBGMapTileVRAM0Queue + 1]);
+			mem_[rVBK] = 1; // BANK("VRAM1")
+			mem_[at] = 0x05; // pal
+			mem_[rVBK] = 0;
+			mem_[at] = 0x02;
+			mem_[wcee4] &= 0x7f;
+		}
+		transfer_oam(static_cast<uint16_t>(base + 0x22));
 	}
 };
 
@@ -54,5 +48,5 @@ public:
 
 using wl3::pause::PauseSaveVblank;
 
-PORT_LOCAL_EX(VBlank_Saving, Func, HOOK_MANUAL_RET, 0) { PauseSaveVblank(gb).port_VBlank_Saving__Func(); }
-PORT_LOCAL_EX(VBlank_SaveScreen, Func, HOOK_MANUAL_RET, 0) { PauseSaveVblank(gb).port_VBlank_SaveScreen__Func(); }
+PORT_LOCAL_EX(VBlank_Saving, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { PauseSaveVblank(gb).port_VBlank_Saving__Func(); }
+PORT_LOCAL_EX(VBlank_SaveScreen, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { PauseSaveVblank(gb).port_VBlank_SaveScreen__Func(); }

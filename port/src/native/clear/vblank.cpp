@@ -1,7 +1,5 @@
-// clear/vblank (src/engine/clear/vblank.asm), converted from the register-level
-// C port by tools/c2cpp.py: the same logic, as a class over AsmModule,
-// keeping the original's registers, flags and return addresses for its
-// callers (see src/native/asm_module.hpp).
+// clear/vblank (src/engine/clear/vblank.asm): the clear screens' V-Blank
+// functions.
 #include "../asm_module.hpp"
 
 namespace wl3::clear {
@@ -12,93 +10,72 @@ class ClearVblank : public AsmModule {
 public:
 	using AsmModule::AsmModule;
 
-	// are C++, src/native/clear)
+	// The clear screens' V-Blank functions, as copied to wVBlankFunc,
+	// plain over memory: the V-Blank handler pushes and pops every register
+	// around them. They call hTransferVirtualOAM (a = wVirtualOAM's page)
+	// at the end.
 
-	// ld hl, src / ld c, [hl] / ld b, TILE_SIZE - 1 / ld de, src - 2 /
-	// .loop: ld a, [de] / ld [hld], a / dec l / dec e / dec e / dec b /
-	// jr nz, .loop / ld [hl], c
+	// a tile's bit plane rotated down a row: from src (its last row's byte)
+	// up, each byte the one 2 above (dec l and dec e x2 stay in the page)
 	void rotate_tile_plane(uint16_t src)
 	{
-		SET_HL(gb_, src);
-		cpu_.c = rd8(src);
-		cpu_.b = TILE_SIZE - 1;
-		SET_DE(gb_, (uint16_t)(src - 2));
-		do {
-			cpu_.a = rd8(REG_DE(gb_));
-			uint16_t hl = REG_HL(gb_);
-			wr8(hl, cpu_.a);
-			SET_HL(gb_, (uint16_t)(hl - 1));
-			cpu_.l = alu_.dec(cpu_.l);
-			cpu_.e = alu_.dec(cpu_.e);
-			cpu_.e = alu_.dec(cpu_.e);
-			cpu_.b = alu_.dec(cpu_.b);
-		} while (!(cpu_.f & FLAG_Z));
-		wr8(REG_HL(gb_), cpu_.c);
+		uint8_t last = mem_[src];
+		uint16_t at = src;
+		uint8_t from = static_cast<uint8_t>(src - 2);
+		for (int i = 0; i < TILE_SIZE - 1; i++) {
+			mem_[at] = mem_[static_cast<uint16_t>((src & 0xff00) | from)];
+			at = static_cast<uint16_t>(at - 1); // ld [hld], a
+			at = static_cast<uint16_t>((at & 0xff00) | static_cast<uint8_t>(at - 1)); // dec l
+			from = static_cast<uint8_t>(from - 2);
+		}
+		mem_[at] = last;
 	}
 
-	// VBlank_ClearScreen.Func, as copied to wVBlankFunc
+	void transfer_oam(uint16_t ret)
+	{
+		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
+		gb_call_ret(gb_, hTransferVirtualOAM, ret);
+		RET();
+	}
+
+	// VBlank_ClearScreen.Func: the scroll, and tile $71's rows rotated
 	void port_VBlank_ClearScreen__Func()
 	{
 		uint16_t base = cpu_.pc;
-		cpu_.a = rd8(wSCY);
-		wr8(rSCY, cpu_.a);
-		cpu_.a = rd8(wSCX);
-		wr8(rSCX, cpu_.a);
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(rVBK, cpu_.a);
+		mem_[rSCY] = mem_[wSCY];
+		mem_[rSCX] = mem_[wSCX];
+		mem_[rVBK] = 0;
 		rotate_tile_plane(v0Tiles2 + 0x71 * TILE_SIZE + (TILE_SIZE - 2));
 		rotate_tile_plane(v0Tiles2 + 0x71 * TILE_SIZE + (TILE_SIZE - 1));
-		cpu_.a = (uint8_t)(wVirtualOAM >> 8);
-		gb_call_ret(gb_, hTransferVirtualOAM, (uint16_t)(base + 0x36));
-		RET();
+		transfer_oam(static_cast<uint16_t>(base + 0x36));
 	}
 
-	// ld a, [hli] / ld d, a / ld a, [hli] / ld e, a: the queued address
-	uint16_t queue_addr(uint16_t hl)
+	// the queue's next (big-endian address, byte) entry at at
+	uint16_t write_queued(uint16_t at)
 	{
-		cpu_.a = rd8(hl);
-		cpu_.d = cpu_.a;
-		cpu_.a = rd8((uint16_t)(hl + 1));
-		cpu_.e = cpu_.a;
-		return (uint16_t)(hl + 2);
+		uint16_t dest = static_cast<uint16_t>(mem_[at] << 8 | mem_[at + 1]);
+		mem_[dest] = mem_[at + 2];
+		return static_cast<uint16_t>(at + 3);
 	}
 
-	// VBlank_MusicalCoinsScreen.Func, as copied to wVBlankFunc
+	// VBlank_MusicalCoinsScreen.Func: the scroll, and the queued writes
+	// (wcee4 bit 7): an attribute (with its low bits set) or two tiles
 	void port_VBlank_MusicalCoinsScreen__Func()
 	{
 		uint16_t base = cpu_.pc;
-		cpu_.a = rd8(wSCY);
-		wr8(rSCY, cpu_.a);
-		cpu_.a = rd8(wSCX);
-		wr8(rSCX, cpu_.a);
-		cpu_.a = rd8(wcee4);
-		if (alu_.bit(cpu_.a, 7)) {
-			cpu_.a = alu_.and_(cpu_.a, 0x7f);
-			uint16_t hl;
-			if (!(cpu_.f & FLAG_Z)) {
-				// .asm_d47d9
-				cpu_.a = 1; // BANK("VRAM1")
-				wr8(rVBK, cpu_.a);
-				hl = queue_addr(wBGMapTileVRAM0Queue);
-				cpu_.a = rd8(hl);
-				wr8(REG_DE(gb_), cpu_.a);
+		mem_[rSCY] = mem_[wSCY];
+		mem_[rSCX] = mem_[wSCX];
+		uint8_t queued = mem_[wcee4];
+		if (queued & 0x80) {
+			if (queued & 0x7f) { // .asm_d47d9
+				mem_[rVBK] = 1; // BANK("VRAM1")
+				write_queued(wBGMapTileVRAM0Queue);
 			} else {
-				hl = queue_addr(wBGMapTileVRAM0Queue);
-				cpu_.a = rd8(hl++);
-				wr8(REG_DE(gb_), cpu_.a);
-				hl = queue_addr(hl);
-				cpu_.a = rd8(hl++);
-				wr8(REG_DE(gb_), cpu_.a);
+				write_queued(write_queued(wBGMapTileVRAM0Queue));
 			}
-			// .asm_d47e6
-			SET_HL(gb_, wcee4);
-			wr8(wcee4, (uint8_t)(rd8(wcee4) & 0x7f));
+			mem_[wcee4] &= 0x7f;
 		}
-		// .dma_transfer
-		cpu_.a = (uint8_t)(wVirtualOAM >> 8);
-		gb_call_ret(gb_, hTransferVirtualOAM, (uint16_t)(base + 0x3d));
-		RET();
+		transfer_oam(static_cast<uint16_t>(base + 0x3d));
 	}
 };
 
@@ -108,5 +85,5 @@ public:
 
 using wl3::clear::ClearVblank;
 
-PORT_LOCAL_EX(VBlank_ClearScreen, Func, HOOK_MANUAL_RET, 0) { ClearVblank(gb).port_VBlank_ClearScreen__Func(); }
-PORT_LOCAL_EX(VBlank_MusicalCoinsScreen, Func, HOOK_MANUAL_RET, 0) { ClearVblank(gb).port_VBlank_MusicalCoinsScreen__Func(); }
+PORT_LOCAL_EX(VBlank_ClearScreen, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { ClearVblank(gb).port_VBlank_ClearScreen__Func(); }
+PORT_LOCAL_EX(VBlank_MusicalCoinsScreen, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { ClearVblank(gb).port_VBlank_MusicalCoinsScreen__Func(); }
