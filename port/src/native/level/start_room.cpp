@@ -406,52 +406,36 @@ void RoomStart::draw_room_column(uint16_t queue)
 // the column, and the tiles and attributes of its blocks
 void RoomStart::queue_row_tiles_and_attributes()
 {
+	// the BG map addresses down the column (from GetBlockBGPtr's hl; the
+	// queue's index wraps in its page, as the asm's inc e)
 	routines_.call(ADDR_GetBlockBGPtr);
-	cpu_.b = mem_[wBGMapAddressQueueSize];
-	SET_DE(gb_, wBGMapAddressQueue);
-	cpu_.f = flags::add(cpu_.e, cpu_.b);
-	cpu_.e = static_cast<uint8_t>(cpu_.e + cpu_.b);
-	cpu_.b = TILEMAP_HEIGHT;
-	do {
-		cpu_.a = cpu_.h;
-		mem_[REG_DE(gb_)] = cpu_.a;
-		cpu_.f = flags::inc(cpu_.f, cpu_.e);
-		cpu_.e++;
-		cpu_.a = cpu_.l;
-		mem_[REG_DE(gb_)] = cpu_.a;
-		cpu_.f = flags::inc(cpu_.f, cpu_.e);
-		cpu_.e++;
-		add_hl(TILEMAP_WIDTH);
-		cpu_.a = cpu_.h & 0xfb;
-		cpu_.f = flags::and_(cpu_.a);
-		cpu_.h = cpu_.a;
-		cpu_.f = flags::dec(cpu_.f, cpu_.b);
-	} while (--cpu_.b);
+	uint16_t bg = REG_HL(gb_);
+	uint8_t at = static_cast<uint8_t>(wBGMapAddressQueue + mem_[wBGMapAddressQueueSize]);
+	for (int i = 0; i < TILEMAP_HEIGHT; i++) {
+		mem_[static_cast<uint16_t>((wBGMapAddressQueue & 0xff00) | at++)] = static_cast<uint8_t>(bg >> 8);
+		mem_[static_cast<uint16_t>((wBGMapAddressQueue & 0xff00) | at++)] = static_cast<uint8_t>(bg);
+		bg = static_cast<uint16_t>((bg + TILEMAP_WIDTH) & 0xfbff); // wrapping in the BG map
+	}
+	mem_[wBGMapAddressQueueSize] = static_cast<uint8_t>(mem_[wBGMapAddressQueueSize] + 2 * TILEMAP_HEIGHT);
 
-	uint8_t addresses = mem_[wBGMapAddressQueueSize];
-	cpu_.f = flags::add(addresses, 2 * TILEMAP_HEIGHT);
-	cpu_.a = static_cast<uint8_t>(addresses + 2 * TILEMAP_HEIGHT);
-	mem_[wBGMapAddressQueueSize] = cpu_.a;
-
+	// the tiles and attributes of the column's blocks: the queue routines
+	// take the block pointer in hl, and keep the asm's push and return
+	// addresses (their overrun reads them, see HANDOFF.md)
 	SET_HL(gb_, wBlockPos);
 	routines_.call(ADDR_GetBlockPtr);
-	cpu_.a = mem_[wBlockPtrBank];
-	sram_switch(cpu_.a);
+	sram_switch(mem_[wBlockPtrBank]);
+	bool odd = mem_[wBlockXPos + 1] & 0x08;
+	// the a and f hCallFunc's push af saves: and $08's
 	cpu_.a = mem_[wBlockXPos + 1] & 0x08;
 	cpu_.f = flags::and_(cpu_.a);
-	bool odd = cpu_.a;
 	gb_push16(gb_, REG_HL(gb_));
 	routines_.farcall(BANK_QueueBlockTilesAlongRow_OddColumn,
 		odd ? ADDR_QueueBlockTilesAlongRow_OddColumn : ADDR_QueueBlockTilesAlongRow_EvenColumn);
 	SET_HL(gb_, gb_pop16(gb_));
-	cpu_.a = mem_[wBlockPtrBank];
-	sram_switch(cpu_.a);
+	sram_switch(mem_[wBlockPtrBank]);
 	routines_.farcall(BANK_QueueBlockTilesAlongRow_OddColumn,
 		odd ? ADDR_QueueBlockAttributesAlongRow_OddColumn : ADDR_QueueBlockAttributesAlongRow_EvenColumn);
-	uint8_t tiles = mem_[wBGMapTileQueueSize];
-	cpu_.f = flags::add(tiles, TILEMAP_WIDTH);
-	cpu_.a = static_cast<uint8_t>(tiles + TILEMAP_WIDTH);
-	mem_[wBGMapTileQueueSize] = cpu_.a;
+	mem_[wBGMapTileQueueSize] = static_cast<uint8_t>(mem_[wBGMapTileQueueSize] + TILEMAP_WIDTH);
 }
 
 // draws all of the room that the BG map shows, column by column

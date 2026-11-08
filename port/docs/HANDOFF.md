@@ -785,9 +785,23 @@ primitives, home/wario.cpp, and the golf objects' animation):
   backup, clear, collision_box, load_gfx...), since their register exits
   reach ProcessBlock's callers. What's left: b for CreateParticle and the
   collision checks' result in b.
-- Next: start_room.cpp (409 register sites; its room-drawing queues read
-  the asm's return addresses off the stack, and its hooks keep a and f
-  exact), then camera.cpp / scroll.cpp / block_queue.cpp.
+- The room start, plain (2026-11-08, 86d907b to the queue commit):
+  home/object_pos.hpp has the object map positions (Func_cc0, cf8, d3e,
+  d81, d8c) as plain functions, their hooks wrapping them with the asm's
+  b to l (no caller reads a or f). start_room.cpp's spawning, Wario's
+  spawn point, the initial camera scroll, the room drawing,
+  ProcessMultiBlock's block walk and both StartRoom_* bodies read and
+  write memory directly. Their hooks clobber all registers:
+  LevelStateTable sets a and f itself after the state, and nothing reads
+  b to l they leave (live.py over every call site; the `pop af` hits
+  are the tool's: it treats push / pop as transparent). Kept exact on
+  purpose: the calls' return addresses (call_ret) and, around the
+  QueueBlock*AlongRow_* farcalls, the push hl and the af hCallFunc
+  pushes, since the queue overrun reads the stack. Registers are left
+  only as callee arguments (GetNextLevelRoomID's hl, CopyHLToDE*'s hl /
+  de / b, SpawnObject's c / de, the queue routines' hl).
+- Next: camera.cpp / scroll.cpp / block_queue.cpp (scroll.cpp also feeds
+  the queues, so the same stack care), then the overworld modules.
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped
