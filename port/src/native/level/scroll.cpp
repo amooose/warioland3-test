@@ -12,6 +12,7 @@
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
+#include "../home/level_map.hpp"
 
 namespace wl3::level {
 
@@ -181,9 +182,7 @@ void EdgeQueue::queue_column_at_block()
 	}
 	mem_[wBGMapAddressQueueSize] = static_cast<uint8_t>(mem_[wBGMapAddressQueueSize] + 2 * 23);
 
-	SET_HL(gb_, wBlockPos);
-	routines_.call(ADDR_GetBlockPtr);
-	uint16_t map = REG_HL(gb_);
+	uint16_t map = home::block_ptr(gb_, wBlockPos).ptr;
 	sram_switch(mem_[wBlockPtrBank]);
 	int offset = (mem_[wBlockXPos + 1] & 0x08) ? 1 : 0;
 	queue_column(map, wBGMapTileVRAM0Queue, wcce7, wRoomBlockTiles, offset, false); // Func_a2aa / Func_aca6
@@ -255,9 +254,7 @@ void EdgeQueue::queue_edge_row()
 	}
 	mem_[wBGMapAddressQueueSize] = static_cast<uint8_t>(mem_[wBGMapAddressQueueSize] + 2 * 25);
 
-	SET_HL(gb_, wBlockPos);
-	routines_.call(ADDR_GetBlockPtr);
-	uint16_t map = REG_HL(gb_);
+	uint16_t map = home::block_ptr(gb_, wBlockPos).ptr;
 	sram_switch(mem_[wBlockPtrBank]);
 	bool bottom = mem_[wBlockYPos + 1] & 0x08;
 	queue_row(map, wBGMapTileVRAM0Queue, wcce7, wRoomBlockTiles, bottom, false);

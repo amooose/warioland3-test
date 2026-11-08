@@ -10,6 +10,7 @@
 #include "../native.hpp"
 #include "../routines.hpp"
 #include "../home/object_pos.hpp"
+#include "../home/level_map.hpp"
 
 #include <initializer_list>
 
@@ -421,8 +422,7 @@ void RoomStart::queue_row_tiles_and_attributes()
 	// the tiles and attributes of the column's blocks: the queue routines
 	// take the block pointer in hl, and keep the asm's push and return
 	// addresses (their overrun reads them, see HANDOFF.md)
-	SET_HL(gb_, wBlockPos);
-	routines_.call(ADDR_GetBlockPtr);
+	SET_HL(gb_, home::block_ptr(gb_, wBlockPos).ptr);
 	sram_switch(mem_[wBlockPtrBank]);
 	bool odd = mem_[wBlockXPos + 1] & 0x08;
 	// the a and f hCallFunc's push af saves: and $08's

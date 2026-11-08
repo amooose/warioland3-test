@@ -1,215 +1,165 @@
-// home/load_level (src/home/load_level.asm), converted from the register-level
-// C port by tools/c2cpp.py: the same logic, as a class over AsmModule,
-// keeping the original's registers, flags and return addresses for its
-// callers (see src/native/asm_module.hpp).
-#include "../asm_module.hpp"
+// Loading a level's block and object maps (src/home/load_level.asm), and
+// reloading only the objects' bits of the block map.
+//
+// Plain C++ over memory. The callers are C (StartRoom) and read no
+// registers after, so the hooks clobber them all. A level without maps
+// ($ff) jumps to InvalidLevelData with the asm's push af on the stack.
+#include "../native.hpp"
+#include "../routines.hpp"
 
 namespace wl3::home {
 
 namespace {
 
-class HomeLoadLevel : public AsmModule {
+#define ADDR_RLO_OnlyHighBit (ADDR_ReloadLevelObjects + 0x38) // .DecompressLevelBlockMap_OnlyHighBit
+#define ADDR_RLO_Decompress (ADDR_ReloadLevelObjects + 0x71)  // .Decompress
+
+class LevelLoader {
 public:
-	using AsmModule::AsmModule;
+	explicit LevelLoader(GB *gb) : gb_(gb), mem_(gb) {}
 
-	#define ADDR_RLO_OnlyHighBit (ADDR_ReloadLevelObjects + 0x38) // .DecompressLevelBlockMap_OnlyHighBit
-	#define ADDR_RLO_Decompress (ADDR_ReloadLevelObjects + 0x71)  // .Decompress
+	void load(); // LoadLevelBlockMapAndObjects
+	void reload_objects(); // ReloadLevelObjects
+	void reload_objects_bits(); // .DecompressLevelBlockMap_OnlyHighBit
+	void or_objects_bits(uint16_t src); // .Decompress
 
-	void port_InvalidLevelData()
+private:
+	void sram_switch(uint8_t bank)
 	{
-		JUMP(Init);
+		mem_[wSRAMBank] = bank;
+		mem_[rRAMB + 0x100] = bank;
 	}
-
-	// ld d, $00 / ld a, [wLevel] / add a / ld e, a / rl d / ld hl, LevelBlockAndObjectMaps /
-	// add hl, de / ld a, [wROMBank] / push af / ld a, BANK(LevelBlockAndObjectMaps) /
-	// bankswitch / ld a, [hli] / ld h, [hl] / ld l, a / ld a, h / inc a
-	// Returns whether the pointer is valid (z clear).
-	bool level_maps_pointer()
+	void rom_switch(uint8_t bank)
 	{
-		cpu_.d = 0;
-		cpu_.a = rd8(wLevel);
-		cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		cpu_.e = cpu_.a;
-		cpu_.d = alu_.rl(cpu_.d);
-		uint16_t hl = alu_.add16(ADDR_LevelBlockAndObjectMaps, REG_DE(gb_));
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = BANK_LevelBlockAndObjectMaps;
-		bankswitch(cpu_.a);
-		cpu_.a = rd8(hl++);
-		cpu_.h = rd8(hl);
-		cpu_.l = cpu_.a;
-		cpu_.a = alu_.inc(cpu_.h);
-		return !(cpu_.f & FLAG_Z);
+		mem_[wROMBank] = bank;
+		mem_[rROMB0 + 0x100] = bank;
 	}
+	bool maps(uint8_t &rom, uint16_t &header);
+	uint16_t read_block_map_header(uint16_t header);
 
-	// ld a, [hli] / ld [wCompressedLevelBlockMapPtr + 1], a / ld a, [hli] /
-	// ld [wCompressedLevelBlockMapPtr + 0], a / ld a, [hl] / ld [wTempBank], a
-	void read_map_header()
-	{
-		uint16_t hl = REG_HL(gb_);
-		cpu_.a = rd8(hl++);
-		wr8(wCompressedLevelBlockMapPtr + 1, cpu_.a);
-		cpu_.a = rd8(hl++);
-		wr8(wCompressedLevelBlockMapPtr + 0, cpu_.a);
-		cpu_.a = rd8(hl);
-		wr8(wTempBank, cpu_.a);
-		SET_HL(gb_, hl);
-	}
-
-	// loads data related to the level block and object map
-	// and stores them in SRAM
-	void port_LoadLevelBlockMapAndObjects()
-	{
-		if (!level_maps_pointer()) {
-			JUMP(InvalidLevelData); // null
-			return;
-		}
-		read_map_header();
-		gb_push16(gb_, REG_HL(gb_));
-		CALL(DecompressLevelBlockMap);
-		SET_HL(gb_, gb_pop16(gb_));
-
-		uint16_t hl = REG_HL(gb_);
-		cpu_.a = rd8(hl++);
-		wr8(wTempBank, cpu_.a);
-		cpu_.a = rd8(hl++);
-		wr8(wCompressedLevelBlockMapPtr + 1, cpu_.a);
-		cpu_.a = rd8(hl);
-		wr8(wCompressedLevelBlockMapPtr + 0, cpu_.a);
-		SET_HL(gb_, hl);
-		pop_af();
-		bankswitch(cpu_.a);
-		gb_push16(gb_, REG_HL(gb_));
-		cpu_.a = alu_.and_(rd8(wceef), 0x3c);
-		if (cpu_.f & FLAG_Z)
-			CALL(DecompressLevelObjectMap);
-		SET_HL(gb_, gb_pop16(gb_));
-		RET();
-	}
-
-	void port_ReloadLevelObjects()
-	{
-		if (!level_maps_pointer()) {
-			JUMP(InvalidLevelData); // null
-			return;
-		}
-		read_map_header();
-		pop_af();
-		bankswitch(cpu_.a);
-		gb_call(gb_, ADDR_RLO_OnlyHighBit);
-		RET();
-	}
-
-	// almost identical to DecompressLevelBlockMap
-	// but instead only copies over the highest bit
-	void port_ReloadLevelObjects__DecompressLevelBlockMap_OnlyHighBit()
-	{
-		cpu_.a = alu_.and_(rd8(wceef), 0x3c);
-		if (!(cpu_.f & FLAG_Z))
-			return;
-		cpu_.a = rd8(wSRAMBank);
-		push_af();
-		cpu_.a = BANK_sLevelBlockObjectMap; // BANK("SRAM1")
-		sramswitch(cpu_.a);
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = rd8(wTempBank);
-		bankswitch(cpu_.a);
-		cpu_.a = rd8(wCompressedLevelBlockMapPtr + 0);
-		cpu_.d = cpu_.a;
-		cpu_.a = rd8(wCompressedLevelBlockMapPtr + 1);
-		cpu_.e = cpu_.a;
-		gb_call(gb_, ADDR_RLO_Decompress);
-		pop_af();
-		bankswitch(cpu_.a);
-		pop_af();
-		sramswitch(cpu_.a);
-	}
-
-	// ld l, LOW(STARTOF(SRAM)) / inc h / ld a, h / cp $c0 / jr nz, ... /
-	// ld h, HIGH(STARTOF(SRAM)) / ld a, [wSRAMBank] / inc a / sramswitch
-	void next_row()
-	{
-		cpu_.l = 0x00;
-		cpu_.h = alu_.inc(cpu_.h);
-		cpu_.a = cpu_.h;
-		alu_.cp(cpu_.a, 0xc0); // check if already outside SRAM
-		if (!(cpu_.f & FLAG_Z))
-			return;
-		cpu_.h = 0xa0;
-		cpu_.a = alu_.inc(rd8(wSRAMBank));
-		sramswitch(cpu_.a);
-	}
-
-	// ld a, [wRepeatByte] or [de] & $80 / or [hl] / ld [hli], a / ld a, l / cp c
-	bool or_into_map(uint8_t v)
-	{
-		uint16_t hl = REG_HL(gb_);
-		cpu_.a = alu_.or_(v, rd8(hl));
-		wr8(hl++, cpu_.a);
-		SET_HL(gb_, hl);
-		cpu_.a = cpu_.l;
-		alu_.cp(cpu_.a, cpu_.c);
-		return cpu_.f & FLAG_Z;
-	}
-
-	void port_ReloadLevelObjects__Decompress()
-	{
-		cpu_.c = LEVEL_WIDTH;
-		SET_HL(gb_, sLevelBlockObjectMap);
-		for (;;) {
-			// .loop_data
-			cpu_.a = rd8(REG_DE(gb_));
-			cpu_.a = alu_.and_(cpu_.a, cpu_.a);
-			if (cpu_.f & FLAG_Z)
-				return; // done
-			if (!alu_.bit(cpu_.a, 7)) {
-				cpu_.b = cpu_.a; // num rows
-				SET_DE(gb_, REG_DE(gb_) + 1);
-				cpu_.a = alu_.and_(rd8(REG_DE(gb_)), 0x80);
-				wr8(wRepeatByte, cpu_.a);
-				SET_DE(gb_, REG_DE(gb_) + 1);
-				do {
-					// .asm_f61
-					if (or_into_map(rd8(wRepeatByte)))
-						next_row(); // .next_row_1
-					// .next_repeat
-					cpu_.b = alu_.dec(cpu_.b);
-				} while (!(cpu_.f & FLAG_Z));
-			} else {
-				// .asm_f85
-				cpu_.a = alu_.and_(cpu_.a, 0x7f);
-				cpu_.b = cpu_.a;
-				SET_DE(gb_, REG_DE(gb_) + 1);
-				do {
-					// .loop_copy
-					cpu_.a = alu_.and_(rd8(REG_DE(gb_)), 0x80);
-					uint16_t hl = REG_HL(gb_);
-					cpu_.a = alu_.or_(cpu_.a, rd8(hl));
-					wr8(hl++, cpu_.a);
-					SET_HL(gb_, hl);
-					SET_DE(gb_, REG_DE(gb_) + 1);
-					cpu_.a = cpu_.l;
-					alu_.cp(cpu_.a, cpu_.c);
-					if (cpu_.f & FLAG_Z)
-						next_row(); // .asm_f98
-					// .asm_f93
-					cpu_.b = alu_.dec(cpu_.b);
-				} while (!(cpu_.f & FLAG_Z));
-			}
-		}
-	}
+	GB *gb_;
+	Memory mem_;
 };
+
+// header = the level's maps header, with its bank mapped (rom: the bank
+// before); false after the jump to InvalidLevelData for a level without
+bool LevelLoader::maps(uint8_t &rom, uint16_t &header)
+{
+	uint8_t offset = static_cast<uint8_t>(mem_[wLevel] * 2);
+	bool d = mem_[wLevel] & 0x80; // add a's carry, rl d
+	uint16_t table = static_cast<uint16_t>(ADDR_LevelBlockAndObjectMaps + (d ? 0x100 : 0));
+	uint16_t at = static_cast<uint16_t>(table + offset);
+	rom = mem_[wROMBank];
+	rom_switch(BANK_LevelBlockAndObjectMaps);
+	header = Word(gb_, at);
+	if (header >> 8 != 0xff)
+		return true;
+	// push af saved rl d's z and add hl, de's h and c
+	unsigned de = (d ? 0x100u : 0u) | offset;
+	uint8_t f = static_cast<uint8_t>((d ? 0 : FLAG_Z)
+		| ((ADDR_LevelBlockAndObjectMaps & 0xfff) + (de & 0xfff) > 0xfff ? FLAG_H : 0)
+		| (ADDR_LevelBlockAndObjectMaps + de > 0xffff ? FLAG_C : 0));
+	gb_push16(gb_, static_cast<uint16_t>(rom << 8 | f));
+	gb_->cpu.pc = ADDR_InvalidLevelData;
+	return false;
+}
+
+// the block map's pointer (big-endian) and bank; returns where the object
+// map's header starts (the block map's bank byte is also its bank)
+uint16_t LevelLoader::read_block_map_header(uint16_t header)
+{
+	mem_[wCompressedLevelBlockMapPtr + 1] = mem_[header + 0];
+	mem_[wCompressedLevelBlockMapPtr + 0] = mem_[header + 1];
+	mem_[wTempBank] = mem_[header + 2];
+	return static_cast<uint16_t>(header + 2);
+}
+
+void LevelLoader::load()
+{
+	uint8_t rom;
+	uint16_t header;
+	if (!maps(rom, header))
+		return;
+	header = read_block_map_header(header);
+	Routines(gb_).call(ADDR_DecompressLevelBlockMap);
+	mem_[wTempBank] = mem_[header + 0];
+	mem_[wCompressedLevelBlockMapPtr + 1] = mem_[header + 1];
+	mem_[wCompressedLevelBlockMapPtr + 0] = mem_[header + 2];
+	rom_switch(rom);
+	if (!(mem_[wceef] & 0x3c))
+		Routines(gb_).call(ADDR_DecompressLevelObjectMap);
+	gb_->cpu.pc = gb_pop16(gb_); // ret
+}
+
+void LevelLoader::reload_objects()
+{
+	uint8_t rom;
+	uint16_t header;
+	if (!maps(rom, header))
+		return;
+	read_block_map_header(header);
+	rom_switch(rom);
+	reload_objects_bits();
+	gb_->cpu.pc = gb_pop16(gb_); // ret
+}
+
+// almost identical to DecompressLevelBlockMap, but only ors in the
+// blocks' bit 7 (their objects)
+void LevelLoader::reload_objects_bits()
+{
+	if (mem_[wceef] & 0x3c)
+		return;
+	uint8_t sram = mem_[wSRAMBank];
+	sram_switch(BANK_sLevelBlockObjectMap); // BANK("SRAM1")
+	uint8_t rom = mem_[wROMBank];
+	rom_switch(mem_[wTempBank]);
+	or_objects_bits(static_cast<uint16_t>(mem_[wCompressedLevelBlockMapPtr + 0] << 8
+		| mem_[wCompressedLevelBlockMapPtr + 1]));
+	rom_switch(rom);
+	sram_switch(sram);
+}
+
+void LevelLoader::or_objects_bits(uint16_t src)
+{
+	uint16_t map = sLevelBlockObjectMap;
+	auto put = [&](uint8_t bit) {
+		mem_[map] = static_cast<uint8_t>(mem_[map] | bit);
+		map++;
+		if (static_cast<uint8_t>(map) != LEVEL_WIDTH)
+			return;
+		map = static_cast<uint16_t>((map & 0xff00) + 0x100); // the next row
+		if (map >> 8 == 0xc0) { // past SRAM: the next bank's
+			map = 0xa000; // STARTOF(SRAM)
+			sram_switch(static_cast<uint8_t>(mem_[wSRAMBank] + 1));
+		}
+	};
+	while (uint8_t cmd = mem_[src]) {
+		if (!(cmd & 0x80)) {
+			src++;
+			mem_[wRepeatByte] = mem_[src++] & 0x80;
+			while (cmd--)
+				put(mem_[wRepeatByte]);
+		} else {
+			int n = (cmd & 0x7f) ? (cmd & 0x7f) : 256;
+			src++;
+			while (n--)
+				put(mem_[src++] & 0x80);
+		}
+	}
+}
 
 } // namespace
 
 } // namespace wl3::home
 
-using wl3::home::HomeLoadLevel;
+using wl3::home::LevelLoader;
 
-PORT_EX(InvalidLevelData, HOOK_MANUAL_RET, 0) { HomeLoadLevel(gb).port_InvalidLevelData(); }
-PORT_EX(LoadLevelBlockMapAndObjects, HOOK_MANUAL_RET, 0) { HomeLoadLevel(gb).port_LoadLevelBlockMapAndObjects(); }
-PORT_EX(ReloadLevelObjects, HOOK_MANUAL_RET, 0) { HomeLoadLevel(gb).port_ReloadLevelObjects(); }
-PORT_LOCAL_EX(ReloadLevelObjects, DecompressLevelBlockMap_OnlyHighBit, 0, 0) { HomeLoadLevel(gb).port_ReloadLevelObjects__DecompressLevelBlockMap_OnlyHighBit(); }
-PORT_LOCAL_EX(ReloadLevelObjects, Decompress, 0, 0) { HomeLoadLevel(gb).port_ReloadLevelObjects__Decompress(); }
+PORT_EX(InvalidLevelData, HOOK_MANUAL_RET, ALL_REGISTERS) { gb->cpu.pc = ADDR_Init; }
+PORT_EX(LoadLevelBlockMapAndObjects, HOOK_MANUAL_RET, ALL_REGISTERS) { LevelLoader(gb).load(); }
+PORT_EX(ReloadLevelObjects, HOOK_MANUAL_RET, ALL_REGISTERS) { LevelLoader(gb).reload_objects(); }
+PORT_LOCAL_EX(ReloadLevelObjects, DecompressLevelBlockMap_OnlyHighBit, 0, ALL_REGISTERS)
+{
+	LevelLoader(gb).reload_objects_bits();
+}
+// de = the compressed data
+PORT_LOCAL_EX(ReloadLevelObjects, Decompress, 0, ALL_REGISTERS) { LevelLoader(gb).or_objects_bits(REG_DE(gb)); }

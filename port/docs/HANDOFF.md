@@ -850,9 +850,17 @@ primitives, home/wario.cpp, and the golf objects' animation):
   fuzzer can't settle GameLoop or InitWithoutDemoPowerUpReset (they run
   whole frames), so the traces cover them. HandleSound stays
   register-level: the audio calls take bc, and UpdateAudio reads c.
-- Next: home/load_level.cpp and decompress_level_data.cpp, then
-  overworld/bank26.cpp and the other overworld and home modules (by
-  register sites).
+- load_level.cpp and decompress_level_data.cpp, plain (2026-11-08): the
+  block and object maps' decompression and the objects' reload clobber
+  all registers (StartRoom calls them). home/level_map.hpp has
+  block_ptr (GetBlockPtr) and block_bg_map_address
+  (GetBlockPtrBGMapAddress), whose hooks stay exact for the collisions
+  and spawn_edge (their registers reach ProcessBlock); scroll,
+  start_room and block_queue call the plain ones. block_ptr reads x
+  after writing wBlockPtr's high byte and bank, as the asm does.
+- Next: overworld/bank26.cpp, home/overworld.cpp (plain helpers in
+  ow.hpp for the C++ callers), then the other overworld and home modules
+  (by register sites).
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped

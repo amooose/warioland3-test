@@ -9,6 +9,7 @@
 #include "../native.hpp"
 #include "../routines.hpp"
 #include "../home/object_pos.hpp"
+#include "../home/level_map.hpp"
 
 #include <initializer_list>
 
@@ -182,9 +183,7 @@ bool BlockQueue::queue_changed_block()
 	loc.ptr = static_cast<uint16_t>((loc.ptr & 0xff00) | mem_[static_cast<uint16_t>(entry + 1)]);
 	mem_[wBlockPtrBank] = loc.bank;
 	sram_switch(loc.bank);
-	SET_HL(gb_, loc.ptr);
-	routines_.call(ADDR_GetBlockPtrBGMapAddress); // hl = the block's BG map address
-	uint16_t bg = REG_HL(gb_);
+	uint16_t bg = home::block_bg_map_address(gb_, loc.ptr);
 
 	// each block is 2x2 tiles: top-left, top-right, bottom-left, bottom-right
 	uint8_t at = static_cast<uint8_t>(wBGMapAddressQueue + mem_[wBGMapAddressQueueSize]);
