@@ -1932,10 +1932,10 @@ public:
 
 	void port_Func_21d6f()
 	{
-		cpu_.a = rd8(wInteractionSide);
-		if (alu_.bit(cpu_.a, INTERACTION_UP_F))
+		uint8_t side = rd8(wInteractionSide);
+		if (side & (1 << INTERACTION_UP_F))
 			func_21d7e();
-		else if (alu_.bit(cpu_.a, INTERACTION_DOWN_F))
+		else if (side & (1 << INTERACTION_DOWN_F))
 			port_Func_20670();
 		else
 			port_Func_20e6a();
@@ -1943,16 +1943,12 @@ public:
 
 	void port_Func_21f28()
 	{
-		cpu_.a = rd8(wInteractionSide);
-		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
+		uint8_t side = rd8(wInteractionSide);
+		if (side & (1 << INTERACTION_UP_F))
 			func_21d7e();
-			return;
-		}
-		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
+		else if (side & (1 << INTERACTION_DOWN_F))
 			port_Func_20e6a();
-			return;
-		}
-		if (obj_side(false, true))
+		else if (obj_side(false, true))
 			port_Func_20670();
 		else
 			port_Func_20e6a();
@@ -1960,22 +1956,20 @@ public:
 
 	void port_Func_21dac()
 	{
-		if (ld_and(wInvincibleCounter)) {
+		if (rd8(wInvincibleCounter))
 			return;
-		}
-		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
+		if (rd8(wTransformation) & (1 << TRANSFORMATIONF_PERSISTENT_F)) {
 			port_Func_2022c();
 			return;
 		}
-		cpu_.a = rd8(wObjDirection);
-		wr8(wDirection, cpu_.a);
+		wr8(wDirection, rd8(wObjDirection));
 		FARCALL(SetState_Launched);
 		set_obj_action(OBJACTION_06);
 	}
 
 	void port_Func_21d88()
 	{
-		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
+		if (rd8(wInteractionSide) & (INTERACTION_UP | INTERACTION_DOWN)) {
 			port_Func_20899();
 			return;
 		}
@@ -1987,12 +1981,9 @@ public:
 
 	void port_Func_21ea6()
 	{
-		cpu_.a = rd8(wObjDirection);
-		cpu_.b = cpu_.a;
-		bool right = alu_.and_(cpu_.a, cpu_.a) != 0;
-		if (ld_bit(wInteractionSide, right ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F)) {
-			cpu_.a = alu_.xor_(rd8(wObjDirection), 0x1);
-			wr8(wDirection, cpu_.a);
+		if (obj_side(false, true)) {
+			// facing away from it
+			wr8(wDirection, rd8(wObjDirection) ^ 1);
 			port_Func_20a6f();
 			return;
 		}
@@ -2012,10 +2003,9 @@ public:
 
 	void port_ObjInteraction_MagicalSpiral()
 	{
-		if (ld_and(wInvincibleCounter)) {
+		if (rd8(wInvincibleCounter))
 			return;
-		}
-		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
+		if (rd8(wTransformation) & (1 << TRANSFORMATIONF_PERSISTENT_F)) {
 			port_Func_2022c();
 			return;
 		}
@@ -2027,10 +2017,10 @@ public:
 
 	void port_ObjInteraction_BottomSting()
 	{
-		cpu_.a = rd8(wInteractionSide);
-		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F))
+		uint8_t side = rd8(wInteractionSide);
+		if (side & (1 << INTERACTION_DOWN_F))
 			port_Func_20670();
-		else if (alu_.bit(cpu_.a, INTERACTION_UP_F))
+		else if (side & (1 << INTERACTION_UP_F))
 			port_StepOnObject();
 		else
 			port_Func_2022c();
@@ -2038,7 +2028,7 @@ public:
 
 	void port_ObjInteraction_AnonsterSilk()
 	{
-		if (ld_bit(wInteractionSide, INTERACTION_UP_F))
+		if (rd8(wInteractionSide) & (1 << INTERACTION_UP_F))
 			port_StepOnObject();
 		else
 			port_ObjInteraction_AnonsterWave(); // fallthrough
@@ -2051,14 +2041,9 @@ public:
 
 	void port_ObjInteraction_RoboMouse()
 	{
-		if (ld_bit(wInteractionSide, INTERACTION_UP_F)) {
-			if (ld_and(wIsSmashAttacking))
-				port_Func_20602();
-			else
-				port_Func_20e6a();
-			return;
-		}
-		if (obj_side(false, true))
+		if (rd8(wInteractionSide) & (1 << INTERACTION_UP_F))
+			func_21d7e();
+		else if (obj_side(false, true))
 			port_ObjInteraction_Jamano();
 		else
 			port_Func_20e6a();
@@ -2066,16 +2051,12 @@ public:
 
 	void port_Func_21af1()
 	{
-		cpu_.a = rd8(wInteractionSide);
-		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
+		uint8_t side = rd8(wInteractionSide);
+		if (side & (1 << INTERACTION_UP_F))
 			port_Func_209ca();
-			return;
-		}
-		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
+		else if (side & (1 << INTERACTION_DOWN_F))
 			port_StepOnObject();
-			return;
-		}
-		if (ld_and(wAttackCounter))
+		else if (rd8(wAttackCounter))
 			port_Func_217a9();
 		else
 			port_Func_20a6f();
@@ -2090,7 +2071,7 @@ public:
 	{
 		if (vert_step())
 			return;
-		if (ld_and(wAttackCounter))
+		if (rd8(wAttackCounter))
 			port_AttackObject();
 		else
 			port_Func_21b3a(); // fallthrough
@@ -2098,40 +2079,34 @@ public:
 
 	void port_ObjInteraction_Turtle()
 	{
-		if (ld_bit(wInteractionSide, INTERACTION_UP_F)) {
+		if (rd8(wInteractionSide) & (1 << INTERACTION_UP_F))
 			port_Func_209ca();
+		else if (rd8(wTransformation))
 			return;
-		}
-		if (ld_and(wTransformation)) {
-			return;
-		}
-		if (!ld_and(wWaterInteraction)) {
+		else if (!rd8(wWaterInteraction))
 			port_Func_21b3a();
-			return;
-		}
-		FARCALL(StartDive);
+		else
+			FARCALL(StartDive);
 	}
 
 	void port_ObjInteraction_Shoot()
 	{
-		ld_cp(wTransformation, TRANSFORMATION_BALL);
-		if (ZF) {
+		if (rd8(wTransformation) == TRANSFORMATION_BALL) {
 			port_Func_21e8a();
 			return;
 		}
-		cpu_.a = rd8(wInteractionSide);
-		if (!alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
-			if (alu_.bit(cpu_.a, INTERACTION_UP_F))
+		uint8_t side = rd8(wInteractionSide);
+		if (!(side & (1 << INTERACTION_DOWN_F))) {
+			if (side & (1 << INTERACTION_UP_F))
 				port_StepOnObject();
 			else
 				port_Func_20e63();
 			return;
 		}
 		// .interaction_down
-		if (ld_and(wInvincibleCounter)) { // skip if invincible
+		if (rd8(wInvincibleCounter)) // skip if invincible
 			return;
-		}
-		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
+		if (rd8(wTransformation) & (1 << TRANSFORMATIONF_PERSISTENT_F)) {
 			port_Func_2022c();
 			return;
 		}
@@ -2144,8 +2119,7 @@ public:
 
 	void port_Func_21e9c()
 	{
-		ld_cp(wTransformation, TRANSFORMATION_BALL);
-		if (ZF)
+		if (rd8(wTransformation) == TRANSFORMATION_BALL)
 			port_Func_21e8a();
 		else
 			port_Func_20939();
@@ -2153,71 +2127,68 @@ public:
 
 	void port_ObjInteraction_Richtertoffen()
 	{
-		cpu_.a = rd8(wInteractionSide);
-		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
-			cpu_.a = alu_.dec(rd8(wIsSmashAttacking));
-			if (ZF)
+		uint8_t side = rd8(wInteractionSide);
+		if (side & (1 << INTERACTION_UP_F)) {
+			if (rd8(wIsSmashAttacking) == 1)
 				port_Func_20602();
 			else
 				port_StepOnObject();
 			return;
 		}
-		if (!alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
+		if (!(side & (1 << INTERACTION_DOWN_F))) {
 			port_Func_20932();
 			return;
 		}
 		// .try_flatten_wario
-		if (ld_and(wInvincibleCounter)) {
+		if (rd8(wInvincibleCounter))
 			return;
-		}
-		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
+		if (rd8(wTransformation) & (1 << TRANSFORMATIONF_PERSISTENT_F)) {
 			port_Func_2022c();
 			return;
 		}
-		wr8(wCollisionBoxLeft, (uint8_t)-11);
+		// flattened, with room for the wider box
+		wr8(wCollisionBoxLeft, static_cast<uint8_t>(-11));
 		wr8(wCollisionBoxRight, 11);
-		ld_cp(wLadderInteraction, LADDER_UNDERNEATH);
-		if (!ZF) {
+		if (rd8(wLadderInteraction) != LADDER_UNDERNEATH) {
 			FARCALL(Func_197b1);
-			if (!b_and()) {
+			if (!cpu_.b) {
 				FARCALL(Func_19741);
-				if (!b_and()) {
+				if (!cpu_.b) {
 					set_obj_action(OBJACTION_FLATTEN);
 					FARCALL(SetState_FlatAirborne);
 					return;
 				}
 			}
 		}
-		wr8(wCollisionBoxLeft, (uint8_t)-9);
-		st(wCollisionBoxRight, 9);
+		wr8(wCollisionBoxLeft, static_cast<uint8_t>(-9));
+		wr8(wCollisionBoxRight, 9);
 		port_StepOnObject();
 	}
 
 	void port_ObjInteraction_Omodonmeka()
 	{
-		if (ld_and(wJumpVelTable)) {
+		if (rd8(wJumpVelTable)) {
 			port_Func_2022c();
 			return;
 		}
 		set_obj_action(OBJACTION_0C);
-		ld_cp(wTransformation, TRANSFORMATION_FLAT_WARIO);
-		if (ZF) {
+		uint8_t transformation = rd8(wTransformation);
+		if (transformation == TRANSFORMATION_FLAT_WARIO) {
 			port_SetState_FlatStretching();
 			return;
 		}
-		if (alu_.and_(cpu_.a, cpu_.a)) {
+		if (transformation) {
 			port_Func_2022c();
 			return;
 		}
 		// pick Wario up
 		wr8(wAutoMoveState, 0x01);
-		st(wWarioState, WST_PICKED_UP);
+		wr8(wWarioState, WST_PICKED_UP);
 		collision_box(-1, -27, -9, 9);
 		static const uint16_t zero[] = {wIsSmashAttacking, wAttackCounter, wIsCrouching,
 			wGrabState, wWarioStateCounter, wWarioStateCycles, wFrameDuration, wAnimationFrame, 0};
 		clear(zero);
-		cpu_.a = alu_.inc(cpu_.a);
-		wr8(wJumpVelTable, cpu_.a);
+		wr8(wJumpVelTable, 0x01);
 		wr8(wPickedUpWiggleCounter, NUM_WIGGLES_TO_ESCAPE);
 		load_gfx(BANK_WarioAirborneGfx, ADDR_WarioAirborneGfx);
 		set_oam(BANK_OAM_15955, ADDR_OAM_15955);
@@ -2234,15 +2205,9 @@ public:
 			return;
 		}
 		// .asm_217de
-		if (ld_and(wInvincibleCounter)) {
+		if (rd8(wInvincibleCounter))
 			return;
-		}
-		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			port_Func_2022c();
-			return;
-		}
-		alu_.cp(cpu_.a, TRANSFORMATION_CRAZY_WARIO);
-		if (ZF) {
+		if (persistent_or(TRANSFORMATION_CRAZY_WARIO)) {
 			port_Func_2022c();
 			return;
 		}
@@ -2254,17 +2219,12 @@ public:
 
 	void port_ObjInteraction_Owl()
 	{
-		if (!ld_bit(wInteractionSide, INTERACTION_DOWN_F)) {
+		if (!(rd8(wInteractionSide) & (1 << INTERACTION_DOWN_F))) {
 			port_Func_20939();
 			return;
 		}
-		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
+		if (persistent_or(TRANSFORMATION_OWL_WARIO))
 			return;
-		}
-		alu_.cp(cpu_.a, TRANSFORMATION_OWL_WARIO);
-		if (ZF) {
-			return;
-		}
 		port_Func_20a63();
 		play_sfx(SFX_HANG_GRAB);
 		wr8(wTransformation, TRANSFORMATION_OWL_WARIO);
@@ -2282,8 +2242,7 @@ public:
 		wr8(wAnimationFrame, 0);
 		load_gfx(BANK_WarioHangGfx, ADDR_WarioHangGfx);
 		set_oam(BANK_OAM_1fddb4, ADDR_OAM_1fddb4);
-		cpu_.a = rd8(wObjDirection);
-		wr8(wDirection, cpu_.a);
+		wr8(wDirection, rd8(wObjDirection));
 		set_frameset(ADDR_Frameset_1fed53);
 		anim(OAM2);
 	}

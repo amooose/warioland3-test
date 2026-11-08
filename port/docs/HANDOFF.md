@@ -771,10 +771,23 @@ primitives, home/wario.cpp, and the golf objects' animation):
     .asm_4a6eb writes 0 through hl), and they're the register-level
     callees' arguments (Func_e31, CreateParticleInBlock, CopyHLToDE,
     DoGroundShake).
-- Next: object_interactions.cpp (386 register sites; ProcessInteractions
-  clobbers all registers, so its members can go plain as long as the exact
-  hooks it shares with the block functions, SetState_Stung and the like,
-  keep their exits), then start_room.cpp.
+- Object interactions, plain (2026-11-08, d2a307e to the last
+  object-interactions commit): ProcessInteractions clobbers every register
+  and none of its 84 handlers reads one on entry (entry_reads2.py and
+  entry_reads_af.py over the jumptable's targets), so pi_run returns the
+  handler (the overlaps and sides worked out in plain C++),
+  set_obj_action(action) replaces SetObjAction's b, and the handlers read
+  memory directly (switches over the touch states, plain compares for the
+  sides and positions, home::move_wario_x / _y for the pushes). Left
+  exact on purpose: the five hooks the block functions farcall
+  (SetState_OnFire, _ResetStateCounter, SetState_WaterStung,
+  SetState_Stung, Func_206eb) and the helpers they share (restore_pos_
+  backup, clear, collision_box, load_gfx...), since their register exits
+  reach ProcessBlock's callers. What's left: b for CreateParticle and the
+  collision checks' result in b.
+- Next: start_room.cpp (409 register sites; its room-drawing queues read
+  the asm's return addresses off the stack, and its hooks keep a and f
+  exact), then camera.cpp / scroll.cpp / block_queue.cpp.
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped
