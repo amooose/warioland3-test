@@ -373,14 +373,10 @@ void Cutscenes::move_debris()
 	for (const auto &d : DEBRIS) {
 		if (!mem_[d.flag])
 			continue;
-		SET_DE(gb_, d.path);
-		SET_HL(gb_, d.obj);
-		routines_.call(ADDR_ApplyOWMovement);
-		if (!(gb_->cpu.f & FLAG_Z))
+		if (!home::apply_ow_movement(gb_, d.obj, d.path, false).finished)
 			continue;
-		uint8_t a = gb_->cpu.a;
-		mem_[d.flag] = a;
-		mem_[static_cast<uint16_t>(d.obj + 6)] = a;
+		mem_[d.flag] = 0;
+		mem_[static_cast<uint16_t>(d.obj + 6)] = 0;
 	}
 }
 

@@ -220,10 +220,7 @@ void TempleNotes::update_prologue_objects()
 			break;
 		}
 		case Kind::Move:
-			SET_DE(gb_, s.path);
-			SET_HL(gb_, o.obj);
-			routines_.call(o.mirrored ? ADDR_ApplyOWMovement_Mirrored : ADDR_ApplyOWMovement);
-			if (gb_->cpu.f & FLAG_Z)
+			if (home::apply_ow_movement(gb_, o.obj, s.path, o.mirrored).finished)
 				++step;
 			break;
 		case Kind::Restart:

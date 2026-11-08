@@ -115,11 +115,7 @@ void MapFunctions::load_level_name()
 	uint8_t level = mem_[name];
 	if (side)
 		--level;
-	SET_HL(gb_, name);
-	gb_->cpu.e = index;
-	gb_->cpu.b = side;
-	gb_->cpu.d = level;
-	routines_.call(ADDR_LoadLevelName);
+	home::load_level_name(gb_, side, level);
 	wram_.pal_config1_total_steps() = 0;
 	next_step();
 }
@@ -145,10 +141,7 @@ uint8_t MapFunctions::falling_offset(uint16_t counter)
 
 bool MapFunctions::move(uint16_t obj, uint16_t data)
 {
-	SET_DE(gb_, data);
-	SET_HL(gb_, obj);
-	routines_.call(ADDR_ApplyOWMovement);
-	return !(gb_->cpu.f & FLAG_Z);
+	return !home::apply_ow_movement(gb_, obj, data, false).finished;
 }
 
 void MapFunctions::set_state(uint16_t state, uint8_t value)
@@ -1813,9 +1806,7 @@ void MapFunctions::explosives()
 		return;
 	case 18: wait(10); return; // .Func_b6d97
 	case 19: // .Func_b6d9c
-		gb_->cpu.b = EAST;
-		gb_->cpu.d = OWEAST_THE_COLOSSAL_HOLE;
-		routines_.call(ADDR_LoadLevelName);
+		home::load_level_name(gb_, EAST, OWEAST_THE_COLOSSAL_HOLE);
 		wram_.pal_config1_total_steps() = 0;
 		next_step();
 		return;

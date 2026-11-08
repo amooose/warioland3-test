@@ -183,9 +183,7 @@ void Events::show_missing_treasure_indicators()
 				uint16_t coords = map_level_coords(gb_, mem_[w2dffe]);
 				wram_.owy_coord1() = mem_[coords];
 				wram_.owx_coord1() = mem_[coords + 1];
-				SET_HL(gb_, wOWCoords1);
-				routines_.call(ADDR_GetOWCoordInTilemap);
-				uint16_t tile = REG_HL(gb_);
+				uint16_t tile = home::ow_coord_in_tilemap(gb_, wOWCoords1);
 				mem_[tile] = 0x7b;
 				mem_[static_cast<uint16_t>(tile - 0x300)] = 0x0d; // its attribute
 			}
@@ -252,12 +250,10 @@ uint8_t Events::accessible_map_flags()
 // exit)
 void Events::load_level_name_if_valid()
 {
-	gb_->cpu.b = wram_.next_map_side();
-	gb_->cpu.d = wram_.map_side_level_id();
-	gb_->cpu.a = gb_->cpu.d;
-	if (gb_->cpu.d >= 0x08)
+	uint8_t level = wram_.map_side_level_id();
+	if (level >= 0x08)
 		return;
-	routines_.call(ADDR_LoadLevelName);
+	home::load_level_name(gb_, wram_.next_map_side(), level);
 }
 
 } // namespace wl3::overworld

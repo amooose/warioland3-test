@@ -61,9 +61,9 @@ void TempleScene::init()
 	load_far(ADDR_LoadFarPalsToTempPals1, BANK_Pals_86a4d, ADDR_Pals_86a4d);
 	decompress(BANK_FontGfx, ADDR_FontGfx, v1Tiles0, true);
 	load_far(ADDR_LoadFarTiles, BANK_TempleGfx, ADDR_TempleGfx);
-	load_far(ADDR_LoadFarBGMap, BANK_TempleTilemap, ADDR_TempleTilemap);
+	home::load_far_bg_map(gb_, BANK_TempleTilemap, ADDR_TempleTilemap);
 	mem_[rVBK] = 1;
-	load_far(ADDR_LoadFarBGMap, BANK_TempleAttrmap, ADDR_TempleAttrmap);
+	home::load_far_bg_map(gb_, BANK_TempleAttrmap, ADDR_TempleAttrmap);
 	mem_[rVBK] = 0;
 	SceneCommon(gb_).fill_cleared_text_buffer();
 
@@ -705,9 +705,7 @@ void TempleScene::music_box_hover(int index)
 		return;
 	}
 	case 3: // .MoveCircle
-		SET_HL(gb_, box.obj);
-		SET_DE(gb_, ADDR_Data_ad654);
-		routines_.call(ADDR_ApplyOWMovement);
+		home::apply_ow_movement(gb_, box.obj, ADDR_Data_ad654, false);
 		return;
 	default: // InvalidMusicBoxAction
 		unrealistic();
@@ -927,9 +925,7 @@ void TempleScene::left_hand()
 {
 	if (!mem_[w2d8da])
 		return;
-	SET_HL(gb_, wSceneObj3);
-	SET_DE(gb_, ADDR_Data_ad939);
-	routines_.call(ADDR_ApplyOWMovement);
+	home::apply_ow_movement(gb_, wSceneObj3, ADDR_Data_ad939, false);
 }
 
 // DoHiddenFigureRightHandMovement: and the right one (4), mirrored
@@ -937,9 +933,7 @@ void TempleScene::right_hand()
 {
 	if (!mem_[w2d8dc])
 		return;
-	SET_HL(gb_, wSceneObj4);
-	SET_DE(gb_, ADDR_Data_ad939);
-	routines_.call(ADDR_ApplyOWMovement_Mirrored);
+	home::apply_ow_movement(gb_, wSceneObj4, ADDR_Data_ad939, true);
 }
 
 } // namespace wl3::overworld

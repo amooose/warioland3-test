@@ -669,10 +669,7 @@ void Epilogue::thrown_out()
 void Epilogue::bounce_wario()
 {
 	if (mem_[wPalFade2Colour2GreenUnk1] && (mem_[SUB_FRAMES] & 0x03)) {
-		SET_DE(gb_, ADDR_Data_aed06);
-		SET_HL(gb_, wOWUIObj1YCoord);
-		routines_.call(ADDR_ApplyOWMovement_Mirrored);
-		if (gb_->cpu.f & FLAG_Z)
+		if (home::apply_ow_movement(gb_, wOWUIObj1YCoord, ADDR_Data_aed06, true).finished)
 			mem_[wPalFade2Colour2GreenUnk1] = 0;
 	}
 	Byte action = mem_[w2d892];
@@ -720,10 +717,7 @@ void Epilogue::bounce_wario()
 void Epilogue::bounce_treasure()
 {
 	if (mem_[wPalFade2Colour4GreenSign]) {
-		SET_HL(gb_, wSceneObj9);
-		SET_DE(gb_, ADDR_Data_aed06);
-		routines_.call(ADDR_ApplyOWMovement_Mirrored);
-		if (gb_->cpu.f & FLAG_Z)
+		if (home::apply_ow_movement(gb_, wSceneObj9, ADDR_Data_aed06, true).finished)
 			mem_[wPalFade2Colour4GreenSign] = 0;
 	}
 	Byte action = mem_[wTempleRock5Action];

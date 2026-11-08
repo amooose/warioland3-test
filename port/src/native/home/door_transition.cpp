@@ -1,216 +1,166 @@
-// home/door_transition (src/home/door_transition.asm), converted from the register-level
-// C port by tools/c2cpp.py: the same logic, as a class over AsmModule,
-// keeping the original's registers, flags and return addresses for its
-// callers (see src/native/asm_module.hpp).
-#include "../asm_module.hpp"
+// Door transitions (src/home/door_transition.asm): the tiles around Wario
+// covered step by step, up and left in turn, from the V-Blank function, as
+// the level's sub-state counts the steps.
+//
+// Plain C++ over memory. DoorTransition is called by LevelStateTable,
+// which sets a and f after, and DoTransitionEffect from wVBlankFunc's jp,
+// inside the V-Blank handler's pushes: the hooks clobber all registers.
+#include "../native.hpp"
+#include "memory.hpp"
 
 namespace wl3::home {
 
 namespace {
 
-class HomeDoorTransition : public AsmModule {
+constexpr uint8_t GFX_RAM = 0x03; // the WRAM bank both use
+
+class DoorTransition {
 public:
-	using AsmModule::AsmModule;
+	explicit DoorTransition(GB *gb) : gb_(gb), mem_(gb) {}
 
-	void port_VBlank_DoorTransition()
+	void set_vblank(); // VBlank_DoorTransition
+	void update(); // DoorTransition
+	void effect(); // VBlank_DoorTransition.DoTransitionEffect
+
+private:
+	void copy3(uint16_t src, uint16_t dest)
 	{
-		cpu_.ime = false; // di
-		// back up current VBlank function
-		SET_HL(gb_, wVBlankFunc);
-		SET_DE(gb_, wBackupVBlankFunc);
-		cpu_.b = 3;
-		CALL(CopyHLToDE);
-
-		// then overwrite it
-		SET_HL(gb_, ADDR_VBlank_DoorTransition + 0x19); // .Func
-		SET_DE(gb_, wVBlankFunc);
-		cpu_.b = 3; // .end - .Func
-		CALL(CopyHLToDE);
-		cpu_.ime = true; // ei
-		cpu_.ime_delay = 0;
+		gb_->cpu.ime = false; // di
+		copy(gb_, src, dest, 3);
+		gb_->cpu.ime = true; // ei
+		gb_->cpu.ime_delay = 0;
 	}
+	void prepare_next_step();
+	void cover_tile(uint16_t at);
+	uint16_t fill_upwards(uint16_t at, uint8_t n);
+	uint16_t fill_left(uint16_t at, uint8_t n);
 
-	// DoorTransition.PrepareNextStepInTransitionEffect
-	void prepare_next_step()
-	{
-		cpu_.a = rd8(wDoorTransitionCounter);
-		alu_.cp(cpu_.a, 16);
-		if (!(cpu_.f & FLAG_C))
-			return; // >= 16
-		uint16_t hl = wTransitionEffectStep;
-		cpu_.a = alu_.add(rd8(hl), 2);
-		wr8(hl++, cpu_.a);
-		// wDoorTransitionEffectBGPtr: one row below
-		cpu_.a = alu_.add(rd8(hl), TILEMAP_WIDTH);
-		wr8(hl++, cpu_.a);
-		cpu_.a = alu_.adc(rd8(hl), 0x00);
-		alu_.cp(cpu_.a, (uint8_t)((v0BGMap0 + TILEMAP_WIDTH * TILEMAP_HEIGHT) >> 8));
-		if (!(cpu_.f & FLAG_C))
-			cpu_.a = alu_.sub(cpu_.a, (uint8_t)((TILEMAP_WIDTH * TILEMAP_HEIGHT) >> 8)); // wrap up
-		// .no_wrap_up
-		wr8(hl--, cpu_.a);
-
-		// one column left
-		cpu_.a = alu_.dec(rd8(hl));
-		wr8(hl, cpu_.a);
-		cpu_.a = alu_.and_(cpu_.a, 0x1f);
-		alu_.cp(cpu_.a, 0x1f);
-		if (cpu_.f & FLAG_Z) {
-			// wrap right
-			cpu_.a = alu_.add(rd8(hl), TILEMAP_WIDTH);
-			wr8(hl, cpu_.a);
-		}
-		SET_HL(gb_, hl);
-	}
-
-	void port_DoorTransition()
-	{
-		// push_wram $03
-		cpu_.a = rd8(rWBK);
-		push_af();
-		cpu_.a = 0x03;
-		wr8(rWBK, cpu_.a);
-		cpu_.a = rd8(wDoorTransitionOrientation);
-		cpu_.c = cpu_.a;
-		cpu_.a = alu_.or_(rd8(wDoorTransitionCounter), cpu_.c);
-		if (cpu_.f & FLAG_Z) {
-			cpu_.a = 0x01;
-			wr8(wUnused_c186, 0x01);
-
-			// set VBlank function
-			CALL(VBlank_DoorTransition);
-
-			// toggle wDoorTransitionOrientation
-			cpu_.a = alu_.xor_(rd8(wDoorTransitionOrientation), 0x1);
-			wr8(wDoorTransitionOrientation, cpu_.a);
-
-			cpu_.a = 1;
-			wr8(wTransitionEffectStep, 1);
-			// start wDoorTransitionEffectBGPtr with Wario's current tile
-			cpu_.a = rd8(wWarioTileBGPtr + 0);
-			wr8(wDoorTransitionEffectBGPtr + 0, cpu_.a);
-			cpu_.a = rd8(wWarioTileBGPtr + 1);
-			wr8(wDoorTransitionEffectBGPtr + 1, cpu_.a);
-		} else {
-			// .already_started: toggle wDoorTransitionOrientation
-			cpu_.a = alu_.xor_(rd8(wDoorTransitionOrientation), 0x1);
-			wr8(wDoorTransitionOrientation, cpu_.a);
-			if (!(cpu_.f & FLAG_Z)) {
-				prepare_next_step();
-			} else {
-				// .skip_incr_step
-				SET_HL(gb_, wDoorTransitionCounter);
-				wr8(wDoorTransitionCounter, alu_.inc(rd8(wDoorTransitionCounter)));
-				cpu_.a = rd8(wDoorTransitionCounter);
-				alu_.cp(cpu_.a, 17);
-				if (!(cpu_.f & FLAG_C)) {
-					// restore backed up VBlank function
-					cpu_.ime = false; // di
-					SET_HL(gb_, wBackupVBlankFunc);
-					SET_DE(gb_, wVBlankFunc);
-					cpu_.b = 3;
-					CALL(CopyHLToDE);
-					cpu_.ime = true; // ei
-					cpu_.ime_delay = 0;
-
-					// finish door transition and advance level state
-					cpu_.a = 0;
-					cpu_.f = FLAG_Z; // xor a
-					wr8(wDoorTransitionCounter, 0);
-					wr8(wUnused_c186, 0);
-					wr8(wDoorTransitionOrientation, 0);
-					// stop_music
-					wr8(hMusicID + 0, 0xff);
-					wr8(hMusicID + 1, 0x00);
-					// stop_sfx
-					wr8(hSFXID + 0, 0xff);
-					cpu_.a = 0x00;
-					wr8(hSFXID + 1, 0x00);
-					SET_HL(gb_, wSubState);
-					wr8(wSubState, alu_.inc(rd8(wSubState)));
-				}
-			}
-		}
-		// .done: pop_wram
-		pop_af();
-		wr8(rWBK, cpu_.a);
-	}
-
-	// one tile of the door transition effect: set the attribute's palette to 7
-	// (and $7f / or $0f, in VRAM1), then overwrite the tile with $7f
-	void cover_tile(uint16_t hl)
-	{
-		wr8(rVBK, 1); // BANK("VRAM1")
-		wr8(hl, (uint8_t)((rd8(hl) & 0x7f) | 0x0f));
-		wr8(rVBK, 0); // BANK("VRAM0")
-		wr8(hl, 0x7f);
-	}
-
-	// do b tiles up (add hl, -TILEMAP_WIDTH, wrapping down below v0BGMap0)
-	uint16_t fill_upwards(uint16_t hl, uint8_t b)
-	{
-		do {
-			cover_tile(hl);
-			hl = (uint16_t)(hl - TILEMAP_WIDTH);
-			if ((hl >> 8) < (v0BGMap0 >> 8))
-				hl = (uint16_t)((((hl >> 8) + 0x04) & 0xff) << 8 | (hl & 0xff)); // wrap down
-		} while (--b);
-		return hl;
-	}
-
-	// do b tiles left (ld [hli], wrapping a row back when l reaches a multiple of 32)
-	uint16_t fill_left(uint16_t hl, uint8_t b)
-	{
-		do {
-			cover_tile(hl);
-			hl++;
-			if (!(hl & 0x1f))
-				hl = (uint16_t)(hl - TILEMAP_WIDTH); // wrap left
-		} while (--b);
-		return hl;
-	}
-
-	// reached from wVBlankFunc's jp
-	void port_VBlank_DoorTransition__DoTransitionEffect()
-	{
-		// apply scroll
-		wr8(rSCY, rd8(wSCY));
-		cpu_.a = rd8(wSCX);
-		wr8(rSCX, cpu_.a);
-
-		// push_wram $03
-		cpu_.a = rd8(rWBK);
-		push_af();
-		wr8(rWBK, 0x03);
-		SET_DE(gb_, (uint16_t)-TILEMAP_WIDTH);
-		uint8_t orientation = rd8(wDoorTransitionOrientation);
-		uint8_t step = rd8(wTransitionEffectStep);
-		uint16_t hl = (uint16_t)(rd8(wDoorTransitionEffectBGPtr + 0) |
-			rd8(wDoorTransitionEffectBGPtr + 1) << 8);
-		cpu_.c = step;
-		if (orientation) {
-			// up then left
-			hl = fill_upwards(hl, step);
-			hl = fill_left(hl, (uint8_t)(step + 1));
-		} else {
-			// .left_then_up
-			hl = fill_left(hl, step);
-			hl = fill_upwards(hl, step);
-		}
-		cpu_.b = 0;
-		SET_HL(gb_, hl);
-		// .asm_a8e: pop_wram
-		pop_af();
-		wr8(rWBK, cpu_.a);
-	}
+	GB *gb_;
+	Memory mem_;
 };
+
+// backs up wVBlankFunc and puts .Func's jp to DoTransitionEffect there
+void DoorTransition::set_vblank()
+{
+	gb_->cpu.ime = false; // di
+	copy(gb_, wVBlankFunc, wBackupVBlankFunc, 3);
+	copy(gb_, ADDR_VBlank_DoorTransition + 0x19, wVBlankFunc, 3); // .Func, .end - .Func
+	gb_->cpu.ime = true; // ei
+	gb_->cpu.ime_delay = 0;
+}
+
+// .PrepareNextStepInTransitionEffect: 2 more tiles each way, from one
+// tile down and left (wrapping in the BG map), for 16 steps
+void DoorTransition::prepare_next_step()
+{
+	if (mem_[wDoorTransitionCounter] >= 16)
+		return;
+	mem_[wTransitionEffectStep] = static_cast<uint8_t>(mem_[wTransitionEffectStep] + 2);
+	// wDoorTransitionEffectBGPtr (low byte first): one row below
+	Byte lo = mem_[wDoorTransitionEffectBGPtr + 0];
+	Byte hi = mem_[wDoorTransitionEffectBGPtr + 1];
+	unsigned below = lo + TILEMAP_WIDTH;
+	lo = static_cast<uint8_t>(below);
+	uint8_t row = static_cast<uint8_t>(hi + (below >> 8));
+	if (row >= (v0BGMap0 + TILEMAP_WIDTH * TILEMAP_HEIGHT) >> 8)
+		row = static_cast<uint8_t>(row - ((TILEMAP_WIDTH * TILEMAP_HEIGHT) >> 8)); // wrap up
+	hi = row;
+	// one column left
+	lo = static_cast<uint8_t>(lo - 1);
+	if ((lo & 0x1f) == 0x1f)
+		lo = static_cast<uint8_t>(lo + TILEMAP_WIDTH); // wrap right
+}
+
+// a step of the transition per two frames, the orientation toggling;
+// after 17, the V-Blank function back, the music and SFX stopped and the
+// level's next sub-state
+void DoorTransition::update()
+{
+	uint8_t wbk = mem_[rWBK]; // push_wram $03
+	mem_[rWBK] = GFX_RAM;
+	if (!(mem_[wDoorTransitionCounter] | mem_[wDoorTransitionOrientation])) {
+		mem_[wUnused_c186] = 0x01;
+		set_vblank();
+		mem_[wDoorTransitionOrientation] ^= 1;
+		mem_[wTransitionEffectStep] = 1;
+		// starting with Wario's tile
+		mem_[wDoorTransitionEffectBGPtr + 0] = mem_[wWarioTileBGPtr + 0];
+		mem_[wDoorTransitionEffectBGPtr + 1] = mem_[wWarioTileBGPtr + 1];
+	} else if (mem_[wDoorTransitionOrientation] ^= 1) { // .already_started
+		prepare_next_step();
+	} else if (++mem_[wDoorTransitionCounter] >= 17) { // .skip_incr_step
+		copy3(wBackupVBlankFunc, wVBlankFunc);
+		mem_[wDoorTransitionCounter] = 0;
+		mem_[wUnused_c186] = 0;
+		mem_[wDoorTransitionOrientation] = 0;
+		mem_[hMusicID + 0] = 0xff; // stop_music
+		mem_[hMusicID + 1] = 0x00;
+		mem_[hSFXID + 0] = 0xff; // stop_sfx
+		mem_[hSFXID + 1] = 0x00;
+		++mem_[wSubState];
+	}
+	mem_[rWBK] = wbk; // pop_wram
+}
+
+// one tile: the attribute's palette 7 (and $7f / or $0f, in VRAM1), the
+// tile $7f
+void DoorTransition::cover_tile(uint16_t at)
+{
+	mem_[rVBK] = 1; // BANK("VRAM1")
+	mem_[at] = static_cast<uint8_t>((mem_[at] & 0x7f) | 0x0f);
+	mem_[rVBK] = 0; // BANK("VRAM0")
+	mem_[at] = 0x7f;
+}
+
+// n tiles up (n 0 being 256), wrapping down below v0BGMap0
+uint16_t DoorTransition::fill_upwards(uint16_t at, uint8_t n)
+{
+	do {
+		cover_tile(at);
+		at = static_cast<uint16_t>(at - TILEMAP_WIDTH);
+		if ((at >> 8) < (v0BGMap0 >> 8))
+			at = static_cast<uint16_t>((((at >> 8) + 0x04) & 0xff) << 8 | (at & 0xff)); // wrap down
+	} while (--n);
+	return at;
+}
+
+// n tiles right along the row (ld [hli]), wrapping back at its end
+uint16_t DoorTransition::fill_left(uint16_t at, uint8_t n)
+{
+	do {
+		cover_tile(at);
+		at++;
+		if (!(at & 0x1f))
+			at = static_cast<uint16_t>(at - TILEMAP_WIDTH); // wrap left
+	} while (--n);
+	return at;
+}
+
+// the scroll, then the step's tiles: up then left, or left then up
+void DoorTransition::effect()
+{
+	mem_[rSCY] = mem_[wSCY];
+	mem_[rSCX] = mem_[wSCX];
+	uint8_t wbk = mem_[rWBK]; // push_wram $03
+	mem_[rWBK] = GFX_RAM;
+	uint8_t step = mem_[wTransitionEffectStep];
+	uint16_t at = static_cast<uint16_t>(mem_[wDoorTransitionEffectBGPtr + 0] | mem_[wDoorTransitionEffectBGPtr + 1] << 8);
+	if (mem_[wDoorTransitionOrientation]) {
+		at = fill_upwards(at, step);
+		fill_left(at, static_cast<uint8_t>(step + 1));
+	} else { // .left_then_up
+		at = fill_left(at, step);
+		fill_upwards(at, step);
+	}
+	mem_[rWBK] = wbk; // pop_wram
+}
 
 } // namespace
 
 } // namespace wl3::home
 
-using wl3::home::HomeDoorTransition;
+using wl3::home::DoorTransition;
 
-PORT_EX(VBlank_DoorTransition, 0, 0) { HomeDoorTransition(gb).port_VBlank_DoorTransition(); }
-PORT_EX(DoorTransition, 0, 0) { HomeDoorTransition(gb).port_DoorTransition(); }
-PORT_LOCAL_EX(VBlank_DoorTransition, DoTransitionEffect, 0, 0) { HomeDoorTransition(gb).port_VBlank_DoorTransition__DoTransitionEffect(); }
+PORT_EX(VBlank_DoorTransition, 0, ALL_REGISTERS) { DoorTransition(gb).set_vblank(); }
+PORT_EX(DoorTransition, 0, ALL_REGISTERS) { DoorTransition(gb).update(); }
+PORT_LOCAL_EX(VBlank_DoorTransition, DoTransitionEffect, 0, ALL_REGISTERS) { DoorTransition(gb).effect(); }

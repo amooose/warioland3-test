@@ -336,9 +336,7 @@ void MapWalk::temple_step()
 		break;
 	case 3: { // Func_813b4: the next treasure's level name
 		Events::SideLevel at = Events(gb_).next_treasure_side_level();
-		gb_->cpu.b = at.side;
-		gb_->cpu.d = at.level;
-		routines_.call(ADDR_LoadLevelName);
+		home::load_level_name(gb_, at.side, at.level);
 		break;
 	}
 	case 4: // Func_813ef
@@ -436,7 +434,7 @@ bool MapWalk::go_to_temple()
 		return false;
 	if (wram_.next_treasure() == TREASURES_END && wram_.game_mode_flags().bit(MODE_GAME_CLEARED_F))
 		return false;
-	routines_.call(ADDR_Func_3c76);
+	home::fill(gb_, w2d0c0, 0, 0x10); // Func_3c76
 	set_wario_oam(OWWARIO_UP);
 	play_sfx(mem_, SFX_113);
 	wram_.unk_2d013() = TEMPLE;
@@ -488,9 +486,7 @@ void MapWalk::get_allowed_dpad_input()
 		wram_.ow_allowed_d_pad_input() = PAD_RIGHT | PAD_UP | PAD_DOWN;
 		return;
 	}
-	SET_HL(gb_, w2d069);
-	routines_.call(ADDR_GetOWCoordInTilemap);
-	uint16_t tile = REG_HL(gb_);
+	uint16_t tile = home::ow_coord_in_tilemap(gb_, w2d069);
 	uint8_t allowed = 0;
 	struct {
 		int offset;

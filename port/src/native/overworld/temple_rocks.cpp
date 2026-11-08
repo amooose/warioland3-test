@@ -276,10 +276,7 @@ uint8_t TempleRocks::y_velocity(Byte counter)
 // end (the asm's z)
 bool TempleRocks::move(uint16_t obj, uint16_t data, bool left)
 {
-	SET_DE(gb_, data);
-	SET_HL(gb_, obj);
-	routines_.call(left ? ADDR_ApplyOWMovement : ADDR_ApplyOWMovement_Mirrored);
-	return !(gb_->cpu.f & FLAG_Z);
+	return !home::apply_ow_movement(gb_, obj, data, !left).finished;
 }
 
 } // namespace wl3::overworld

@@ -74,9 +74,7 @@ uint16_t Scenes::map_level_coords(uint8_t level)
 // wOWTilemapPtr)
 uint16_t Scenes::coord_in_tilemap(uint16_t coords)
 {
-	SET_HL(gb_, coords);
-	routines_.call(ADDR_GetOWCoordInTilemap);
-	return REG_HL(gb_);
+	return home::ow_coord_in_tilemap(gb_, coords);
 }
 
 void Scenes::copy_far_bytes(uint8_t bank, uint16_t src, uint16_t dest, uint8_t count)
@@ -492,9 +490,7 @@ bool Scenes::common_step(uint8_t step)
 			wram_.ow_func_counter() = 0;
 			return true;
 		}
-		gb_->cpu.b = wram_.ow_scene_map_side();
-		gb_->cpu.d = level;
-		routines_.call(ADDR_LoadLevelName);
+		home::load_level_name(gb_, wram_.ow_scene_map_side(), level);
 		wram_.pal_config1_total_steps() = 0;
 		next_step();
 		return true;

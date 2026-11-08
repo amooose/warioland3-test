@@ -3,6 +3,7 @@
 // keeping the original's registers, flags and return addresses for its
 // callers (see src/native/asm_module.hpp).
 #include "../asm_module.hpp"
+#include "../home/ow.hpp"
 
 namespace wl3::overworld {
 
@@ -26,45 +27,6 @@ public:
 	{
 		clear_bytes(wTempBGPals, 8 * PAL_SIZE);
 		clear_bytes(wTempOBPals, 8 * PAL_SIZE);
-	}
-
-	// hl = palette config: applies its palettes and clears its register
-	void port_ApplyPalConfig_Bank21()
-	{
-		uint16_t hl = REG_HL(gb_);
-		cpu_.c = rd8(hl);
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(hl++, 0);
-		cpu_.a = rd8(hl++);
-		wr8((uint16_t)(0xff00 | cpu_.c), cpu_.a);
-		cpu_.c = alu_.inc(cpu_.c);
-		cpu_.a = rd8(hl++);
-		cpu_.b = cpu_.a;
-		cpu_.a = rd8(hl++);
-		cpu_.l = rd8(hl);
-		cpu_.h = cpu_.a;
-		hl = REG_HL(gb_);
-		do {
-			for (int i = 0; i < 8; i++) {
-				cpu_.a = rd8(hl++);
-				wr8((uint16_t)(0xff00 | cpu_.c), cpu_.a);
-			}
-			cpu_.b = alu_.dec(cpu_.b);
-		} while (cpu_.b);
-		SET_HL(gb_, hl);
-	}
-
-	void port_ApplyPalConfig1()
-	{
-		SET_HL(gb_, wPalConfig1);
-		JUMP_TO(ADDR_ApplyPalConfig_Bank21); // fallthrough
-	}
-
-	void port_ApplyPalConfig2()
-	{
-		SET_HL(gb_, wPalConfig2);
-		JUMP_TO(ADDR_ApplyPalConfig_Bank21);
 	}
 
 	#define DNT_LOAD_BASE_AND_TARGET_PALS (ADDR_DayNightTransition + 0x2e)
@@ -159,7 +121,21 @@ public:
 using wl3::overworld::OverworldBank21;
 
 PORT_EX(Func_84fd5, 0, 0) { OverworldBank21(gb).port_Func_84fd5(); }
-PORT_EX(ApplyPalConfig_Bank21, 0, 0) { OverworldBank21(gb).port_ApplyPalConfig_Bank21(); }
-PORT_EX(ApplyPalConfig1, HOOK_MANUAL_RET, 0) { OverworldBank21(gb).port_ApplyPalConfig1(); }
-PORT_EX(ApplyPalConfig2, HOOK_MANUAL_RET, 0) { OverworldBank21(gb).port_ApplyPalConfig2(); }
+// hl = palette config: applies its palettes and clears its register
+// (home::apply_pal_config), leaving the asm's registers: a = the last
+// byte, b = 0, c = the data register, hl after the colours, f as the last
+// dec b's (carry clear from the xor a)
+static void apply_pal_config(GB *gb, uint16_t config)
+{
+	wl3::home::PalConfigEnd end = wl3::home::apply_pal_config(gb, config);
+	SET_HL(gb, end.src);
+	gb->cpu.b = 0;
+	gb->cpu.c = end.data_reg;
+	gb->cpu.a = end.last;
+	gb->cpu.f = FLAG_Z | FLAG_N;
+}
+
+PORT(ApplyPalConfig_Bank21) { apply_pal_config(gb, REG_HL(gb)); }
+PORT(ApplyPalConfig1) { apply_pal_config(gb, wPalConfig1); }
+PORT(ApplyPalConfig2) { apply_pal_config(gb, wPalConfig2); }
 PORT_LOCAL_EX(VBlank_OWPalTransition, Func, HOOK_MANUAL_RET, 0) { OverworldBank21(gb).port_VBlank_OWPalTransition__Func(); }
