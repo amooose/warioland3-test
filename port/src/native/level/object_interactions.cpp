@@ -1085,7 +1085,7 @@ public:
 
 	void port_Func_20deb()
 	{
-		if (ld_mask(wInteractionSide, INTERACTION_UP | INTERACTION_DOWN)) {
+		if (rd8(wInteractionSide) & (INTERACTION_UP | INTERACTION_DOWN)) {
 			port_Func_20899();
 			return;
 		}
@@ -1097,26 +1097,20 @@ public:
 
 	void port_ObjInteraction_Haridama()
 	{
-		cpu_.a = rd8(wInteractionSide);
-		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
+		uint8_t side = rd8(wInteractionSide);
+		if (side & (1 << INTERACTION_DOWN_F))
 			port_Func_20899();
-			return;
-		}
-		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
+		else if (side & (1 << INTERACTION_UP_F))
 			port_Func_207ed();
-			return;
-		}
-		if (rd8(wObjDirection) == DIRECTION_RIGHT)
-			sting_or_bump(INTERACTION_LEFT_F);
 		else
-			sting_or_bump(INTERACTION_RIGHT_F);
+			sting_or_bump(rd8(wObjDirection) == DIRECTION_RIGHT ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F);
 	}
 
 	void port_ObjInteraction_Pesce()
 	{
-		ld_cp(wObjDirection, DIRECTION_RIGHT);
-		bool swallow = ld_bit(wInteractionSide, ZF ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F);
-		if (!swallow) {
+		// swallowed from the side it's facing
+		int mouth = rd8(wObjDirection) == DIRECTION_RIGHT ? INTERACTION_LEFT_F : INTERACTION_RIGHT_F;
+		if (!(rd8(wInteractionSide) & (1 << mouth))) {
 			port_Func_207ed();
 			return;
 		}
@@ -1126,36 +1120,29 @@ public:
 
 	void port_ObjInteraction_Scowler()
 	{
-		cpu_.a = rd8(wInteractionSide);
-		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
+		uint8_t side = rd8(wInteractionSide);
+		if (side & (1 << INTERACTION_UP_F))
 			port_Func_20899();
-			return;
-		}
-		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
+		else if (side & (1 << INTERACTION_DOWN_F))
 			port_ObjInteraction_WaterTeleporting();
-			return;
-		}
-		port_Func_208f2();
+		else
+			port_Func_208f2();
 	}
 
 	// the chest interactions: open it with the matching key
 	void obj_treasure(int key, int treasure, uint8_t screen)
 	{
-		if (ld_bit(wInteractionSide, INTERACTION_UP_F)) {
+		if (rd8(wInteractionSide) & (1 << INTERACTION_UP_F)) {
 			port_Func_209ca();
 			return;
 		}
-		if (ld_and(wTransformation)) {
+		uint8_t flags = rd8(wKeyAndTreasureFlags);
+		if (rd8(wTransformation) || !(flags & (1 << key))) {
 			port_Func_20a6f();
 			return;
 		}
-		SET_HL(gb_, wKeyAndTreasureFlags);
-		if (!alu_.bit(rd8(wKeyAndTreasureFlags), key)) {
-			port_Func_20a6f();
-			return;
-		}
-		wr8(wKeyAndTreasureFlags, (uint8_t)(rd8(wKeyAndTreasureFlags) | (1 << treasure)));
-		st(wLevelEndScreen, screen);
+		wr8(wKeyAndTreasureFlags, static_cast<uint8_t>(flags | (1 << treasure)));
+		wr8(wLevelEndScreen, screen);
 		port_GetTreasure();
 	}
 
@@ -1168,14 +1155,14 @@ public:
 	// Returns true if it jumped (false: touched from below).
 	bool solid_side()
 	{
-		cpu_.a = rd8(wInteractionSide);
-		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
+		uint8_t side = rd8(wInteractionSide);
+		if (side & (1 << INTERACTION_UP_F)) {
 			port_Func_209ca();
 			return true;
 		}
-		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F))
+		if (side & (1 << INTERACTION_DOWN_F))
 			return false;
-		if (ld_and(wAttackCounter))
+		if (rd8(wAttackCounter))
 			port_Func_217a9();
 		else
 			port_Func_20a6f();
@@ -1191,11 +1178,8 @@ public:
 
 	void port_ObjInteraction_Omodon()
 	{
-		if (solid_side())
+		if (solid_side() || invincible_or_persistent())
 			return;
-		if (ld_and(wInvincibleCounter) || ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F)) {
-			return;
-		}
 		set_obj_action(OBJACTION_FLATTEN);
 		FARCALL(SetState_FlatAirborne);
 	}
@@ -1208,50 +1192,39 @@ public:
 
 	void port_Func_21f01()
 	{
-		if (!ld_bit(wInteractionSide, INTERACTION_UP_F)) {
+		if (!(rd8(wInteractionSide) & (1 << INTERACTION_UP_F))) {
 			port_Func_20d8c();
 			return;
 		}
-		cpu_.a = alu_.or_(rd8(wInteractionSide), INTERACTION_LEFT);
-		wr8(wInteractionSide, cpu_.a);
+		wr8(wInteractionSide, static_cast<uint8_t>(rd8(wInteractionSide) | INTERACTION_LEFT));
 		wr8(wDirection, DIRECTION_RIGHT);
 		FARCALL(SetState_SwimKnockBack);
 	}
 
 	void port_Func_20602()
 	{
-		cpu_.a = rd8(wTransformation);
-		alu_.cp(cpu_.a, TRANSFORMATION_INVISIBLE_WARIO);
-		if (!ZF && alu_.and_(cpu_.a, cpu_.a)) {
+		uint8_t transformation = rd8(wTransformation);
+		if (transformation && transformation != TRANSFORMATION_INVISIBLE_WARIO) {
 			// has transformation except invisible
 			port_VanishObjectAndKnockBackIfZombie();
 			return;
 		}
-		cpu_.a = alu_.and_(rd8(wGrabState), GRAB_STATE_MASK);
-		alu_.cp(cpu_.a, GRAB_IDLE);
-		if (ZF) {
+		if ((rd8(wGrabState) & GRAB_STATE_MASK) == GRAB_IDLE) {
 			FARCALL(Func_1ede9);
 		} else {
-			xor_a();
 			wr8(wGrabState, 0);
 			FARCALL(StartJump_FromInput);
 		}
 		wr8(wDoFullJump, TRUE);
 		wr8(wJumpVelIndex, 0x0a);
-		if (ld_bit(wJoypadDown, B_PAD_A)) {
-			ld_cp(wPowerUpLevel, HIGH_JUMP_BOOTS);
-			if (!CF) {
-				xor_a();
-				wr8(wJumpVelIndex, 0);
-			}
-		}
+		if ((rd8(wJoypadDown) & (1 << B_PAD_A)) && rd8(wPowerUpLevel) >= HIGH_JUMP_BOOTS)
+			wr8(wJumpVelIndex, 0);
 		set_obj_action(OBJACTION_VANISH_TOUCH); // fallthrough
 	}
 
 	void port_Func_21aac()
 	{
-		cpu_.a = alu_.dec(rd8(wIsSmashAttacking));
-		if (!ZF) {
+		if (rd8(wIsSmashAttacking) != 1) {
 			port_Func_209ca();
 			return;
 		}
@@ -1262,16 +1235,12 @@ public:
 
 	void port_ObjInteraction_Stove()
 	{
-		cpu_.a = rd8(wInteractionSide);
-		if (alu_.bit(cpu_.a, INTERACTION_UP_F)) {
+		uint8_t side = rd8(wInteractionSide);
+		if (side & (1 << INTERACTION_UP_F))
 			port_Func_21aac();
-			return;
-		}
-		if (alu_.bit(cpu_.a, INTERACTION_DOWN_F)) {
+		else if (side & (1 << INTERACTION_DOWN_F))
 			port_Func_2168b();
-			return;
-		}
-		if (ld_and(wAttackCounter))
+		else if (rd8(wAttackCounter))
 			port_Func_21abb();
 		else
 			port_Func_20a6f();
@@ -1280,9 +1249,7 @@ public:
 	void port_ObjInteraction_WaterDrop()
 	{
 		set_obj_action(OBJACTION_06);
-		cpu_.a = rd8(wTransformation);
-		alu_.and_(cpu_.a, cpu_.a);
-		if (cpu_.f & FLAG_Z) {
+		if (!rd8(wTransformation)) {
 			next_obj_ = true;
 			return;
 		}
@@ -1291,40 +1258,26 @@ public:
 
 	// ld a, [wWarioScreenXPos] / ld b, a / ld a, [wObjScreenXPos] / cp b, then
 	// sets INTERACTION_LEFT (object left of Wario) or INTERACTION_RIGHT
-	void side_by_x()
-	{
-		cpu_.b = rd8(wWarioScreenXPos);
-		cpu_.a = rd8(wObjScreenXPos);
-		alu_.cp(cpu_.a, cpu_.b);
-		uint8_t bit = CF ? INTERACTION_LEFT : INTERACTION_RIGHT;
-		cpu_.a = alu_.or_(rd8(wInteractionSide), bit);
-		wr8(wInteractionSide, cpu_.a);
-	}
+	void side_by_x() { wario_side_of_obj(); }
 
 	// Func_2023b.asm_20257
 	void func_2023b_bump()
 	{
-		if (ld_and(wAttackCounter)) {
+		if (rd8(wAttackCounter)) {
 			port_AttackObject();
 			return;
 		}
 		set_obj_action(OBJACTION_BUMP);
-		ld_cp(wInvincibleCounter, 0x01);
-		if (ZF) { // is invincible
+		if (rd8(wInvincibleCounter) == 0x01) // is invincible
 			return;
-		}
-		ld_cp(wTransformation, TRANSFORMATION_FLAT_WARIO);
-		if (ZF) {
+		uint8_t transformation = rd8(wTransformation);
+		if (transformation == TRANSFORMATION_FLAT_WARIO) {
 			port_Func_2028a();
 			return;
 		}
-		if (alu_.and_(cpu_.a, cpu_.a)) {
+		if (transformation)
 			return;
-		}
-		cpu_.b = rd8(wWarioScreenXPos);
-		cpu_.a = rd8(wObjScreenXPos);
-		alu_.cp(cpu_.a, cpu_.b);
-		st(wDirection, CF ? DIRECTION_RIGHT : DIRECTION_LEFT);
+		wr8(wDirection, rd8(wObjScreenXPos) < rd8(wWarioScreenXPos) ? DIRECTION_RIGHT : DIRECTION_LEFT);
 		port_SetState_EnemyBumping();
 	}
 
