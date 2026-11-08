@@ -1,309 +1,303 @@
-// home/overworld (src/home/overworld.asm), converted from the register-level
-// C port by tools/c2cpp.py: the same logic, as a class over AsmModule,
-// keeping the original's registers, flags and return addresses for its
-// callers (see src/native/asm_module.hpp).
-#include "../asm_module.hpp"
+// Home's overworld helpers (src/home/overworld.asm): pointer tables, an
+// OW object's movement, its tile in wTilemap, the level names' and the
+// HDMA's parameters, the BG map and palette configs.
+//
+// Plain functions (ow.hpp) for C++ modules; the hooks wrap them for the
+// asm's callers, leaving the registers and flags the asm leaves.
+#include "ow.hpp"
+
+#include "../flags.hpp"
+#include "memory.hpp"
 
 namespace wl3::home {
 
-namespace {
+uint16_t ow_coord_in_tilemap(GB *gb, uint16_t pos)
+{
+	Memory mem(gb);
+	uint8_t y = mem[pos] & 0xf8;
+	uint8_t rows = static_cast<uint8_t>(y << 2 | y >> 6); // rlca / rlca: y / 8 * 32
+	uint8_t x = mem[pos + 1] & 0xf8;
+	x = static_cast<uint8_t>(x << 1 | x >> 7); // rlca
+	x = static_cast<uint8_t>(x << 4 | x >> 4); // swap: x / 8
+	uint8_t lo = static_cast<uint8_t>(x + (rows & 0xf0));
+	mem[wOWTilemapPtr + 0] = lo;
+	uint8_t hi = static_cast<uint8_t>((rows & 0x0f) + (wTilemap >> 8));
+	mem[wOWTilemapPtr + 1] = hi;
+	return static_cast<uint16_t>(hi << 8 | lo);
+}
 
-class HomeOverworld : public AsmModule {
-public:
-	using AsmModule::AsmModule;
+uint16_t load_level_name(GB *gb, uint8_t side, uint8_t index)
+{
+	Memory mem(gb);
+	mem[wHDMABank] = static_cast<uint8_t>(BANK_LevelNamesJPGfx + mem[wLanguage]);
+	mem[wHDMA] = 0;
+	uint8_t side_hi = static_cast<uint8_t>(side << 4 | side >> 4); // swap: *$10
+	uint16_t src = static_cast<uint16_t>(ADDR_LevelNamesJPGfx + (side_hi << 8)); // aka LevelNamesENGfx
+	src = static_cast<uint16_t>(src + (static_cast<uint8_t>(index * 2) << 8));
+	mem[w2d0b5SourceHi] = static_cast<uint8_t>(src >> 8);
+	mem[w2d0b5SourceLo] = static_cast<uint8_t>(src);
+	mem[w2d0b5DestHi] = 0x15;
+	mem[w2d0b5DestLo] = 0;
+	mem[w2d0b5Mode] = 32 - 1; // 32 dma_tiles
+	return src;
+}
 
-	// returns TRUE in a and carry set if treasure
-	// in input a has already been collected
-	// if not collected returns z set
-	// a = treasure constant
-	void port_IsTreasureCollected()
-	{
-		uint8_t treasure = cpu_.a;
-		uint8_t e = alu_.srl(alu_.srl(alu_.srl(treasure))); // / 8
-		cpu_.d = 0;
-		uint16_t hl = alu_.add16(wTreasuresCollected, e);
+void start_hdma(GB *gb)
+{
+	Memory mem(gb);
+	mem[rVBK] = BANK_v1Tiles0; // BANK("VRAM1")
+	for (int i = 0; i < 5; i++)
+		mem[static_cast<uint16_t>(rVDMA_SRC_HIGH + i)] = mem[static_cast<uint16_t>(w2d0b5 + i)];
+	mem[wHDMABank] = 0;
+}
 
-		// the treasure's bit within its byte
-		e = 1;
-		if (alu_.bit(treasure, 2))
-			e = alu_.swap(e); // = $10
-		uint8_t d = alu_.and_(treasure, 0x03);
-		uint8_t a = e;
-		if (d) {
-			a = alu_.rla(a);
-			d = alu_.dec(d);
-			if (d) {
-				a = alu_.rla(a);
-				d = alu_.dec(d);
-				if (d)
-					a = alu_.rla(a);
-			}
-		}
-		cpu_.e = e;
-		cpu_.d = a;
-		SET_HL(gb_, hl);
-		cpu_.a = alu_.and_(a, rd8(hl));
-		if (!cpu_.a)
-			return; // not obtained
-		cpu_.a = TRUE;
-		cpu_.f = (uint8_t)((cpu_.f & FLAG_Z) | FLAG_C); // scf
+void load_far_bg_map(GB *gb, uint8_t bank, uint16_t src)
+{
+	Memory mem(gb);
+	uint8_t rom = mem[wROMBank];
+	bankswitch(gb, bank, ADDR_LoadFarBGMap);
+	copy(gb, src, v0BGMap0, 18 * TILEMAP_WIDTH);
+	bankswitch(gb, rom, ADDR_LoadFarBGMap);
+}
+
+PalConfigEnd apply_pal_config(GB *gb, uint16_t config)
+{
+	Memory mem(gb);
+	uint8_t reg = mem[config];
+	mem[config] = 0;
+	mem[static_cast<uint16_t>(0xff00 | reg)] = mem[config + 1];
+	uint8_t data = static_cast<uint8_t>(reg + 1);
+	int blocks = mem[config + 2] ? mem[config + 2] : 256;
+	uint16_t src = static_cast<uint16_t>(mem[config + 3] << 8 | mem[config + 4]);
+	uint8_t last = 0;
+	for (int i = 0; i < blocks * 8; i++)
+		mem[static_cast<uint16_t>(0xff00 | data)] = last = mem[src++];
+	return {src, data, last};
+}
+
+OWMovement apply_ow_movement(GB *gb, uint16_t obj, uint16_t table, bool mirrored)
+{
+	Memory mem(gb);
+	// the step counter at obj | 7 indexes the table's (y, x) offsets
+	Byte counter = mem[static_cast<uint16_t>(obj | 7)];
+	uint8_t step = counter;
+	counter = static_cast<uint8_t>(step + 1);
+	uint16_t entry = static_cast<uint16_t>(table + step * 2);
+	uint8_t dy = mem[entry], dx = mem[entry + 1];
+	mem[obj] = static_cast<uint8_t>(mem[obj] + dy);
+	uint16_t x = static_cast<uint16_t>((obj & 0xff00) | static_cast<uint8_t>(obj + 1)); // inc c
+	mem[x] = static_cast<uint8_t>(mirrored ? mem[x] - dx : mem[x] + dx);
+	OWMovement end = {x, static_cast<uint16_t>(entry + 2), static_cast<uint8_t>(dy), static_cast<uint8_t>(dx), 0, false};
+	end.next = mem[end.entry];
+	if (end.next == 0x80) { // the end: reset the counter
+		end.x = static_cast<uint16_t>(x | 7);
+		mem[end.x] = 0;
+		end.finished = true;
 	}
-
-	// hl += a * 2
-	void port_AddOffsetInPointerTable()
-	{
-		cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		cpu_.e = cpu_.a;
-		cpu_.a = alu_.adc(0, 0);
-		cpu_.d = cpu_.a;
-		SET_HL(gb_, alu_.add16(REG_HL(gb_), REG_DE(gb_)));
-	}
-
-	// ld a, [hli] / ld h, [hl] / ld l, a, with the second register pair
-	// written to hi:lo
-	void load_pointer(uint8_t *hi, uint8_t *lo)
-	{
-		uint16_t hl = REG_HL(gb_);
-		cpu_.a = rd8(hl++);
-		*hi = rd8(hl);
-		if (hi != &cpu_.h) {
-			cpu_.h = (uint8_t)(hl >> 8);
-			cpu_.l = (uint8_t)hl;
-		}
-		*lo = cpu_.a;
-	}
-
-	// outputs in hl the pointer corresponding to the index given in register a
-	// from the pointer table given in hl
-	void port_GetPointerFromTableHL()
-	{
-		CALL(AddOffsetInPointerTable);
-		load_pointer(&cpu_.h, &cpu_.l);
-	}
-
-	// same as GetPointerFromTableHL but outputs pointer to de
-	void port_GetPointerFromTableDE()
-	{
-		CALL(AddOffsetInPointerTable);
-		load_pointer(&cpu_.d, &cpu_.e);
-	}
-
-	// outputs in hl the cth word contained in the ath table entry in the
-	// pointer table in hl
-	void port_GetCthWordFromAthTable()
-	{
-		CALL(AddOffsetInPointerTable);
-		load_pointer(&cpu_.h, &cpu_.l);
-		cpu_.a = cpu_.c;
-		CALL(AddOffsetInPointerTable);
-	}
-
-	void port_GetByteFromPointerInHL()
-	{
-		load_pointer(&cpu_.h, &cpu_.l);
-		cpu_.a = rd8(REG_HL(gb_));
-	}
-
-	// hl = y, x in pixels
-	// output: hl = wOWTilemapPtr = their tile in wTilemap
-	void port_GetOWCoordInTilemap()
-	{
-		uint16_t hl = REG_HL(gb_);
-		uint8_t y = alu_.and_(rd8(hl++), 0xf8);
-		uint8_t c = (uint8_t)(y << 2 | y >> 6); // rlca / rlca: y / 8 * 32
-		cpu_.b = alu_.and_(c, 0x0f);
-		cpu_.c = alu_.and_(c, 0xf0);
-		uint8_t x = alu_.and_(rd8(hl), 0xf8);
-		x = (uint8_t)(x << 1 | x >> 7); // rlca
-		x = alu_.swap(x); // x / 8
-		cpu_.a = alu_.add(x, cpu_.c);
-		cpu_.l = cpu_.a;
-		wr8(wOWTilemapPtr + 0, cpu_.a);
-		cpu_.a = alu_.add(cpu_.b, (uint8_t)(wTilemap >> 8));
-		cpu_.h = cpu_.a;
-		wr8(wOWTilemapPtr + 1, cpu_.a);
-	}
-
-	// loads source address of tiles
-	// with the given level's name for HDMA transfer
-	// writes them to v0Tiles2 tile $50
-	// b = map side constant (NORTH, ...)
-	// d = level index within that map side
-	void port_LoadLevelName()
-	{
-		cpu_.a = alu_.add(BANK_LevelNamesJPGfx, rd8(wLanguage));
-		SET_HL(gb_, wLanguage);
-		wr8(wHDMABank, cpu_.a);
-		wr8(wHDMA, 0);
-		cpu_.c = 0x00;
-		cpu_.b = alu_.swap(cpu_.b); // *$10
-		uint16_t hl = alu_.add16(ADDR_LevelNamesJPGfx, REG_BC(gb_)); // aka LevelNamesENGfx
-		cpu_.d = alu_.add(cpu_.d, cpu_.d); // *2
-		cpu_.e = 0x00;
-		hl = alu_.add16(hl, REG_DE(gb_));
-		SET_HL(gb_, hl);
-		wr8(w2d0b5SourceHi, cpu_.h);
-		wr8(w2d0b5SourceLo, cpu_.l);
-		wr8(w2d0b5DestHi, 0x15);
-		wr8(w2d0b5DestLo, 0);
-		cpu_.f = FLAG_Z; // xor a
-		cpu_.a = 32 - 1; // 32 dma_tiles
-		wr8(w2d0b5Mode, cpu_.a);
-	}
-
-	// a = value to write to [bc]
-	// if [hl] is $80, also clears [bc | 7]
-	void port_Func_3c29()
-	{
-		wr8(REG_BC(gb_), cpu_.a);
-		cpu_.a = rd8(REG_HL(gb_));
-		alu_.cp(cpu_.a, 0x80);
-		if (!(cpu_.f & FLAG_Z))
-			return;
-		cpu_.a = alu_.or_(0x07, cpu_.c);
-		cpu_.c = cpu_.a;
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(REG_BC(gb_), 0);
-	}
-
-	// hl = struct, de = table of (add, ?) byte pairs
-	// adds the next table entry (indexed by the counter at [hl | 7]) to [hl]
-	void port_Func_3c35()
-	{
-		cpu_.c = cpu_.l;
-		cpu_.b = cpu_.h;
-		cpu_.a = alu_.or_(0x07, cpu_.l);
-		cpu_.l = cpu_.a;
-		uint16_t hl = REG_HL(gb_);
-		cpu_.a = rd8(hl);
-		wr8(hl, alu_.inc(rd8(hl)));
-		cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		cpu_.l = cpu_.a;
-		cpu_.a = alu_.adc(0x00, 0x00);
-		cpu_.h = cpu_.a;
-		hl = alu_.add16(REG_HL(gb_), REG_DE(gb_));
-		cpu_.a = rd8(hl++);
-		cpu_.d = cpu_.a;
-		cpu_.a = rd8(hl++);
-		cpu_.e = cpu_.a;
-		SET_HL(gb_, hl);
-		cpu_.a = alu_.add(rd8(REG_BC(gb_)), cpu_.d);
-		wr8(REG_BC(gb_), cpu_.a);
-		cpu_.c = alu_.inc(cpu_.c);
-		cpu_.a = rd8(REG_BC(gb_));
-	}
-
-	// starts the HDMA transfer whose parameters are in w2d0b5
-	void port_Func_3c03()
-	{
-		cpu_.a = BANK_v1Tiles0; // BANK("VRAM1")
-		wr8(rVBK, cpu_.a);
-		uint16_t hl = w2d0b5;
-		cpu_.c = (uint8_t)rVDMA_SRC_HIGH;
-		for (int i = 0; i < 5; i++) {
-			cpu_.a = rd8(hl++);
-			if (i)
-				cpu_.c = alu_.inc(cpu_.c);
-			wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
-		}
-		SET_HL(gb_, hl);
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(wHDMABank, 0);
-	}
-
-	// hl = tilemap, b = its bank
-	void port_LoadFarBGMap()
-	{
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = cpu_.b;
-		bankswitch(cpu_.a);
-		SET_BC(gb_, 18 * TILEMAP_WIDTH);
-		SET_DE(gb_, v0BGMap0);
-		CALL(CopyHLToDE_BC);
-		pop_af();
-		bankswitch(cpu_.a);
-	}
-
-	// hl = pal config: register (cleared after reading), index, number of
-	// 8-byte blocks, pointer to the colours (big-endian)
-	void port_ApplyPalConfig()
-	{
-		uint16_t hl = REG_HL(gb_);
-		cpu_.c = rd8(hl);
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(hl++, 0);
-		cpu_.a = rd8(hl++);
-		wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
-		cpu_.c = alu_.inc(cpu_.c);
-		cpu_.a = rd8(hl++);
-		cpu_.b = cpu_.a;
-		cpu_.a = rd8(hl++);
-		cpu_.l = rd8(hl);
-		cpu_.h = cpu_.a;
-		hl = REG_HL(gb_);
-		do {
-			for (int i = 0; i < 8; i++) {
-				cpu_.a = rd8(hl++);
-				wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
-			}
-			cpu_.b = alu_.dec(cpu_.b);
-		} while (cpu_.b);
-		SET_HL(gb_, hl);
-	}
-
-	// same as ApplyOWMovement but the x offsets are mirrored
-	// hl = OW obj
-	// de = relative positions
-	void port_ApplyOWMovement_Mirrored()
-	{
-		CALL(Func_3c35);
-		cpu_.a = alu_.sub(cpu_.a, cpu_.e);
-		JUMP(Func_3c29);
-	}
-
-	// hl = OW obj
-	// de = relative positions
-	// returns z if movement has finished
-	void port_ApplyOWMovement()
-	{
-		CALL(Func_3c35);
-		cpu_.a = alu_.add(cpu_.a, cpu_.e);
-		JUMP(Func_3c29); // fallthrough
-	}
-
-	void port_Func_3c76()
-	{
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		SET_HL(gb_, w2d0c0);
-		SET_BC(gb_, 0x10);
-		CALL(WriteAToHL_BCTimes);
-	}
-};
-
-} // namespace
+	return end;
+}
 
 } // namespace wl3::home
 
-using wl3::home::HomeOverworld;
+using namespace wl3::home;
+namespace flags = wl3::flags;
+using wl3::Memory;
+using wl3::Word;
+using wl3::Byte;
 
-PORT_EX(IsTreasureCollected, 0, 0) { HomeOverworld(gb).port_IsTreasureCollected(); }
-PORT_EX(AddOffsetInPointerTable, 0, 0) { HomeOverworld(gb).port_AddOffsetInPointerTable(); }
-PORT_EX(GetPointerFromTableHL, 0, 0) { HomeOverworld(gb).port_GetPointerFromTableHL(); }
-PORT_EX(GetPointerFromTableDE, 0, 0) { HomeOverworld(gb).port_GetPointerFromTableDE(); }
-PORT_EX(GetCthWordFromAthTable, 0, 0) { HomeOverworld(gb).port_GetCthWordFromAthTable(); }
-PORT_EX(GetByteFromPointerInHL, 0, 0) { HomeOverworld(gb).port_GetByteFromPointerInHL(); }
-PORT_EX(GetOWCoordInTilemap, 0, 0) { HomeOverworld(gb).port_GetOWCoordInTilemap(); }
-PORT_EX(LoadLevelName, 0, 0) { HomeOverworld(gb).port_LoadLevelName(); }
-PORT_EX(Func_3c29, 0, 0) { HomeOverworld(gb).port_Func_3c29(); }
-PORT_EX(Func_3c35, 0, 0) { HomeOverworld(gb).port_Func_3c35(); }
-PORT_EX(Func_3c03, 0, 0) { HomeOverworld(gb).port_Func_3c03(); }
-PORT_EX(LoadFarBGMap, 0, 0) { HomeOverworld(gb).port_LoadFarBGMap(); }
-PORT_EX(ApplyPalConfig, 0, 0) { HomeOverworld(gb).port_ApplyPalConfig(); }
-PORT_EX(ApplyOWMovement_Mirrored, HOOK_MANUAL_RET, 0) { HomeOverworld(gb).port_ApplyOWMovement_Mirrored(); }
-PORT_EX(ApplyOWMovement, HOOK_MANUAL_RET, 0) { HomeOverworld(gb).port_ApplyOWMovement(); }
-PORT_EX(Func_3c76, 0, 0) { HomeOverworld(gb).port_Func_3c76(); }
+// a = the treasure: a = TRUE and carry if collected, else z. Leaves hl at
+// its byte, d = its bit and e = 1 or $10 (bit 2's nybble)
+PORT(IsTreasureCollected)
+{
+	CPU &cpu = gb->cpu;
+	uint8_t treasure = cpu.a;
+	uint16_t at = static_cast<uint16_t>(wTreasuresCollected + (treasure >> 3));
+	cpu.e = (treasure & 4) ? 0x10 : 1;
+	cpu.d = static_cast<uint8_t>(cpu.e << (treasure & 3));
+	SET_HL(gb, at);
+	bool collected = is_treasure_collected(gb, treasure);
+	cpu.a = collected ? TRUE : 0;
+	cpu.f = collected ? FLAG_C : (FLAG_Z | FLAG_H); // scf, or and's
+}
+
+// hl += a * 2: de = a * 2, a = its carry, f as add hl, de's (z from adc)
+static void add_offset(GB *gb, uint8_t index)
+{
+	CPU &cpu = gb->cpu;
+	uint16_t offset = static_cast<uint16_t>(index * 2);
+	uint16_t hl = REG_HL(gb);
+	unsigned sum = hl + offset;
+	SET_DE(gb, offset);
+	cpu.a = static_cast<uint8_t>(offset >> 8);
+	cpu.f = static_cast<uint8_t>(flags::z(cpu.a) | ((hl & 0xfff) + offset > 0xfff ? FLAG_H : 0)
+		| (sum > 0xffff ? FLAG_C : 0));
+	SET_HL(gb, sum);
+}
+
+PORT(AddOffsetInPointerTable) { add_offset(gb, gb->cpu.a); }
+
+// ld a, [hli] / ld h, [hl] / ld l, a (or to de)
+PORT(GetPointerFromTableHL)
+{
+	add_offset(gb, gb->cpu.a);
+	uint16_t ptr = Word(gb, REG_HL(gb));
+	gb->cpu.a = static_cast<uint8_t>(ptr);
+	SET_HL(gb, ptr);
+}
+
+PORT(GetPointerFromTableDE)
+{
+	add_offset(gb, gb->cpu.a);
+	uint16_t entry = REG_HL(gb);
+	uint16_t ptr = Word(gb, entry);
+	gb->cpu.a = static_cast<uint8_t>(ptr);
+	SET_DE(gb, ptr);
+	SET_HL(gb, entry + 1);
+}
+
+PORT(GetCthWordFromAthTable)
+{
+	add_offset(gb, gb->cpu.a);
+	SET_HL(gb, static_cast<uint16_t>(Word(gb, REG_HL(gb))));
+	add_offset(gb, gb->cpu.c);
+}
+
+PORT(GetByteFromPointerInHL)
+{
+	uint16_t ptr = Word(gb, REG_HL(gb));
+	SET_HL(gb, ptr);
+	gb->cpu.a = Memory(gb)[ptr];
+}
+
+// hl = y, x: hl = their tile; b, c = the row's offset, a = h, f as the
+// add of h
+PORT(GetOWCoordInTilemap)
+{
+	uint16_t pos = REG_HL(gb);
+	uint8_t y = Memory(gb)[pos] & 0xf8;
+	uint16_t tile = ow_coord_in_tilemap(gb, pos);
+	uint8_t rows = static_cast<uint8_t>(y << 2 | y >> 6);
+	CPU &cpu = gb->cpu;
+	cpu.b = rows & 0x0f;
+	cpu.c = rows & 0xf0;
+	SET_HL(gb, tile);
+	cpu.a = static_cast<uint8_t>(tile >> 8);
+	cpu.f = flags::add(cpu.b, static_cast<uint8_t>(wTilemap >> 8));
+}
+
+// b = the map side, d = the level's index in it
+PORT(LoadLevelName)
+{
+	CPU &cpu = gb->cpu;
+	uint16_t src = load_level_name(gb, cpu.b, cpu.d);
+	cpu.b = static_cast<uint8_t>(cpu.b << 4 | cpu.b >> 4);
+	cpu.c = 0;
+	cpu.d = static_cast<uint8_t>(cpu.d * 2);
+	cpu.e = 0;
+	SET_HL(gb, src);
+	cpu.a = 32 - 1;
+	cpu.f = FLAG_Z; // xor a
+}
+
+// a = the value for [bc]; if [hl] is $80, also clears [bc | 7]
+PORT(Func_3c29)
+{
+	CPU &cpu = gb->cpu;
+	Memory mem(gb);
+	mem[REG_BC(gb)] = cpu.a;
+	cpu.a = mem[REG_HL(gb)];
+	cpu.f = flags::cp(cpu.a, 0x80);
+	if (cpu.a != 0x80)
+		return;
+	cpu.c |= 0x07;
+	cpu.a = 0;
+	cpu.f = FLAG_Z; // xor a
+	mem[REG_BC(gb)] = 0;
+}
+
+// hl = struct, de = table of (y, x) offsets: adds the y offset of the
+// counter's entry (the counter at [hl | 7]) to [hl]; bc = the x, a = it,
+// de = the offsets, hl = the next entry, f as inc c's
+PORT(Func_3c35)
+{
+	CPU &cpu = gb->cpu;
+	Memory mem(gb);
+	uint16_t obj = REG_HL(gb);
+	Byte counter = mem[static_cast<uint16_t>(obj | 7)];
+	uint8_t step = counter;
+	counter = static_cast<uint8_t>(step + 1);
+	uint16_t entry = static_cast<uint16_t>(REG_DE(gb) + step * 2);
+	cpu.d = mem[entry];
+	cpu.e = mem[entry + 1];
+	SET_HL(gb, entry + 2);
+	uint8_t y = mem[obj];
+	mem[obj] = static_cast<uint8_t>(y + cpu.d);
+	cpu.b = static_cast<uint8_t>(obj >> 8);
+	cpu.f = flags::inc(flags::add(y, cpu.d), static_cast<uint8_t>(obj));
+	cpu.c = static_cast<uint8_t>(obj + 1);
+	cpu.a = mem[REG_BC(gb)];
+}
+
+PORT(Func_3c03)
+{
+	start_hdma(gb);
+	CPU &cpu = gb->cpu;
+	SET_HL(gb, w2d0b5 + 5);
+	cpu.c = static_cast<uint8_t>(rVDMA_SRC_HIGH + 4);
+	cpu.a = 0;
+	cpu.f = FLAG_Z; // xor a
+}
+
+// hl = tilemap, b = its bank: leaves CopyHLToDE_BC's hl, de and bc, and
+// pop af's a and f (the bank it came from, the entry flags)
+PORT(LoadFarBGMap)
+{
+	uint8_t rom = Memory(gb)[wROMBank];
+	uint16_t src = REG_HL(gb);
+	load_far_bg_map(gb, gb->cpu.b, src);
+	SET_HL(gb, src + 18 * TILEMAP_WIDTH);
+	SET_DE(gb, v0BGMap0 + 18 * TILEMAP_WIDTH);
+	SET_BC(gb, 0);
+	gb->cpu.a = rom;
+}
+
+// hl = pal config: a = the last byte, b = 0, c = the data register, f as
+// the last dec b's (carry clear from the xor a)
+PORT(ApplyPalConfig)
+{
+	PalConfigEnd end = apply_pal_config(gb, REG_HL(gb));
+	CPU &cpu = gb->cpu;
+	SET_HL(gb, end.src);
+	cpu.b = 0;
+	cpu.c = end.data_reg;
+	cpu.a = end.last;
+	cpu.f = FLAG_Z | FLAG_N;
+}
+
+// hl = OW obj, de = relative positions: z when the movement has finished
+// (Func_3c35, then Func_3c29's registers)
+static void ow_movement(GB *gb, bool mirrored)
+{
+	OWMovement end = apply_ow_movement(gb, REG_HL(gb), REG_DE(gb), mirrored);
+	CPU &cpu = gb->cpu;
+	SET_BC(gb, end.x);
+	cpu.d = end.dy;
+	cpu.e = end.dx;
+	SET_HL(gb, end.entry);
+	cpu.a = end.finished ? 0 : end.next;
+	cpu.f = end.finished ? static_cast<uint8_t>(FLAG_Z) : flags::cp(end.next, 0x80);
+}
+
+PORT(ApplyOWMovement_Mirrored) { ow_movement(gb, true); }
+PORT(ApplyOWMovement) { ow_movement(gb, false); }
+
+// clears w2d0c0's $10 bytes, leaving WriteAToHL_BCTimes's registers
+PORT(Func_3c76)
+{
+	CPU &cpu = gb->cpu;
+	cpu.a = 0;
+	cpu.f = FLAG_Z; // xor a
+	SET_HL(gb, w2d0c0);
+	SET_BC(gb, 0x10);
+	gb_call(gb, ADDR_WriteAToHL_BCTimes);
+}
