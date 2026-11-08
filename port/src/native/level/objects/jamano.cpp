@@ -143,7 +143,7 @@ void Jamano::starting()
 	if (--state_duration())
 		return;
 	mem_[wBossState] = BOSS_REGULAR;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 	flags() |= 1 << 7;
 	set_update(FIGHTING);
 	state_duration() = 0;
@@ -300,7 +300,7 @@ void Jamano::hammerless()
 		play_sfx(SFX_BUMP);
 		state() = left ? 0x5b : 0x5a;
 	} else {
-		move_by(left ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
+		call_home(left ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
 	}
 	uint8_t y_screen = screen_y();
 	if (!(substate() & (1 << 6))) {
@@ -411,11 +411,11 @@ void Jamano::range_changed(bool more, bool frame, uint16_t pals)
 	gb_->cpu.c = 0;
 	gb_->cpu.b = 8;
 	if (!pals) {
-		routines_.call(ADDR_BlackOutBGPals);
+		call_home(ADDR_BlackOutBGPals);
 		return;
 	}
 	SET_HL(gb_, pals);
-	routines_.call(ADDR_SetBGPals);
+	call_home(ADDR_SetBGPals);
 }
 
 // the hammer by the skulls out (w1d147): longer as they go, shorter as
@@ -478,7 +478,7 @@ void JamanoHat::flying()
 	gb_->cpu.e = 0x06;
 	routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
 	mem_[wBossState] = BOSS_DEFEATED;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 	mem_[wIsBossBattle] = 0;
 }
 
@@ -526,13 +526,12 @@ void HatPlatform::move(bool down)
 {
 	if (flags() & OBJFLAG_STEPPED) {
 		flags() &= ~OBJFLAG_STEPPED;
-		gb_->cpu.b = 0x01;
 		if (down) {
-			routines_.call(ADDR_MoveWarioDown);
-			routines_.call(ADDR_HandleDownwardsFloorTransition);
+			move_wario(ADDR_MoveWarioDown, 0x01);
+			call_home(ADDR_HandleDownwardsFloorTransition);
 		} else {
-			routines_.call(ADDR_MoveWarioUp);
-			routines_.call(ADDR_HandleUpwardsFloorTransition);
+			move_wario(ADDR_MoveWarioUp, 0x01);
+			call_home(ADDR_HandleUpwardsFloorTransition);
 		}
 	}
 	if (down)
@@ -573,7 +572,7 @@ void Skull::spawner_update()
 		routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
 		return;
 	}
-	routines_.call(ADDR_Func_55407);
+	call_home(ADDR_Func_55407);
 	Byte skulls = mem_[wJamanoActiveSkulls];
 	for (int i = 0; i < 4; i++) {
 		if (skulls & (1 << i))
@@ -636,7 +635,7 @@ void Skull::flying_out()
 		++mem_[w1d147];
 		return;
 	}
-	move_by(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
+	call_home(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
 	apply_y_movement((id & 1) ? ADDR_Data_60d00 : ADDR_Data_60ce0);
 }
 
@@ -684,7 +683,7 @@ void Skull::circling()
 void Skull::knocked(uint16_t routine)
 {
 	if (flags() & (1 << OBJFLAG_ON_SCREEN_F)) {
-		routines_.call(routine);
+		call_home(routine);
 		return;
 	}
 	fall();

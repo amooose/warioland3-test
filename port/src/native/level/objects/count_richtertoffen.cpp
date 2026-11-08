@@ -178,7 +178,7 @@ void Count::wario_above()
 void Count::stun(uint16_t routine)
 {
 	if (var2())
-		routines_.call(routine);
+		call_home(routine);
 	else
 		state() = OBJ_INTERACTION_RICHTERTOFFEN; // the asm sets the state to this
 }
@@ -215,7 +215,7 @@ void Count::picked_up(uint8_t s, uint8_t var2_, uint16_t routine)
 	var3() = 0x41;
 	var2() = var2_;
 	var1() = 0x01;
-	routines_.call(routine);
+	call_home(routine);
 }
 
 void Count::grab(uint8_t s)
@@ -231,7 +231,7 @@ void Count::run(uint16_t handler)
 	case VANISH_TOUCH: // pounded: wobbles, unless Wario's strong enough
 		if (!mem_[wCurObjAction] || mem_[wTransformation] || mem_[wEffectivePowerUp] >= SUPER_JUMP_SLAM_OVERALLS
 			|| !(interaction() & INTERACTION_MASK)) {
-			routines_.call(ADDR_VanishObject2);
+			call_home(ADDR_VanishObject2);
 			return;
 		}
 		play_sfx(SFX_014);
@@ -257,7 +257,7 @@ void Count::run(uint16_t handler)
 	case STATE_5A:
 		if (state_duration() == 20) {
 			if (mem_[wAutoMoveState]) {
-				move_by(ADDR_MoveObjectDown_Fast);
+				call_home(ADDR_MoveObjectDown_Fast);
 				return;
 			}
 			wario_above();
@@ -345,7 +345,7 @@ void Count::run(uint16_t handler)
 			return;
 		}
 		if (mem_[wIsInWaterOrSand]) {
-			routines_.call(ADDR_VanishObject2);
+			call_home(ADDR_VanishObject2);
 			return;
 		}
 		apply_y_movement(ADDR_Data_603e0);
@@ -392,7 +392,7 @@ void Count::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_3F:
 		if (--state_duration())
-			routines_.call(ADDR_Func_32ea);
+			call_home(ADDR_Func_32ea);
 		else
 			state() = OBJSTATE_10;
 		return;
@@ -403,7 +403,7 @@ void Count::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_40:
 		if (--state_duration())
-			routines_.call(ADDR_Func_32f9);
+			call_home(ADDR_Func_32f9);
 		else
 			state() = OBJSTATE_00;
 		return;
@@ -414,7 +414,7 @@ void Count::run(uint16_t handler)
 		return;
 	case TURN_AROUND:
 		if (--state_duration())
-			routines_.call(ADDR_Func_3308);
+			call_home(ADDR_Func_3308);
 		else
 			state() = OBJ_INTERACTION_01; // the asm sets the state to this
 		return;
@@ -441,7 +441,7 @@ void Count::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_49: // carried facing the way Wario does
 		if (mem_[wDirection]) {
-			routines_.call(ADDR_Func_3353);
+			call_home(ADDR_Func_3353);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -452,7 +452,7 @@ void Count::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_48:
 		if (!mem_[wDirection]) {
-			routines_.call(ADDR_Func_3362);
+			call_home(ADDR_Func_3362);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -465,7 +465,7 @@ void Count::run(uint16_t handler)
 		set_interaction(OBJ_INTERACTION_00);
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }

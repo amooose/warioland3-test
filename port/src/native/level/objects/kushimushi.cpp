@@ -106,7 +106,7 @@ void Kushimushi::update(bool horizontal)
 		return;
 	}
 	switch (s) {
-	case 0x0a: routines_.call(ADDR_VanishObject2); return;
+	case 0x0a: call_home(ADDR_VanishObject2); return;
 	case 0x28: knocked(ADDR_Func_33f8); return;
 	case 0x29: knocked(ADDR_Func_3407); return;
 	case 0x04: knocked(ADDR_Func_3326); return;

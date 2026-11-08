@@ -167,14 +167,14 @@ bool FireBot::move_on(int edge, int ahead, uint16_t move)
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		return false;
-	move_by(move);
+	call_home(move);
 	return true;
 }
 
 void FireBot::hit_move(uint16_t routine)
 {
 	if (var2())
-		routines_.call(routine);
+		call_home(routine);
 	else
 		state() = 0x0f;
 }
@@ -217,7 +217,7 @@ void FireBot::rolling(uint16_t routine, uint16_t frameset)
 	frame_duration() = 0;
 	mem_[wCurObjFramesetOffset] = 0;
 	if (var2()) {
-		routines_.call(routine);
+		call_home(routine);
 		return;
 	}
 	set_frameset(frameset);
@@ -250,7 +250,7 @@ void FireBot::set_state_then(uint8_t s, uint8_t var2_, uint16_t routine)
 	var3() = 0x41;
 	var2() = var2_;
 	var1() = 0x01;
-	routines_.call(routine);
+	call_home(routine);
 }
 
 void FireBot::run(uint16_t handler)
@@ -286,7 +286,7 @@ void FireBot::run(uint16_t handler)
 	}
 	case STATE_41:
 		if (!state_duration()) {
-			routines_.call(ADDR_ObjState_StandingFall);
+			call_home(ADDR_ObjState_StandingFall);
 			return;
 		}
 		if (!--state_duration())
@@ -339,7 +339,7 @@ void FireBot::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration()) {
-			routines_.call(ADDR_Func_3308);
+			call_home(ADDR_Func_3308);
 			return;
 		}
 		state() = 0x2e;
@@ -413,7 +413,7 @@ void FireBot::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration())
-			routines_.call(ADDR_Func_32ea);
+			call_home(ADDR_Func_32ea);
 		else
 			state() = 0x10;
 		return;
@@ -424,7 +424,7 @@ void FireBot::run(uint16_t handler)
 		[[fallthrough]];
 	case BOUNCING:
 		if (--state_duration())
-			routines_.call(ADDR_Func_32f9);
+			call_home(ADDR_Func_32f9);
 		else
 			state() = 0x00;
 		return;
@@ -444,7 +444,7 @@ void FireBot::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration())
-			routines_.call(ADDR_Func_3308);
+			call_home(ADDR_Func_3308);
 		else
 			state() = 0x01;
 		return;
@@ -470,7 +470,7 @@ void FireBot::run(uint16_t handler)
 		[[fallthrough]];
 	case HELD_49: // carried facing the way Wario does
 		if (mem_[wDirection]) {
-			routines_.call(ADDR_Func_3353);
+			call_home(ADDR_Func_3353);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -481,7 +481,7 @@ void FireBot::run(uint16_t handler)
 		[[fallthrough]];
 	case HELD_48:
 		if (!mem_[wDirection]) {
-			routines_.call(ADDR_Func_3362);
+			call_home(ADDR_Func_3362);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -494,7 +494,7 @@ void FireBot::run(uint16_t handler)
 		set_interaction(OBJ_INTERACTION_00);
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }

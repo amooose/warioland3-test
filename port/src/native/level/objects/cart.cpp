@@ -46,7 +46,7 @@ void Cart::variable()
 	uint8_t wram_bank = mem_[rWBK];
 	mem_[rWBK] = 0x02;
 	gb_->cpu.a = TRUCK_WHEEL;
-	routines_.call(ADDR_IsTreasureCollected);
+	call_home(ADDR_IsTreasureCollected);
 	bool collected = !(gb_->cpu.f & FLAG_Z);
 	mem_[rWBK] = wram_bank;
 	if (collected)
@@ -114,8 +114,7 @@ void Cart::roll(bool right, uint16_t stopped)
 		routines_.farcall(BANK_Func_19713, ADDR_Func_19713);
 	if (gb_->cpu.b)
 		return;
-	gb_->cpu.b = 0x01;
-	routines_.call(right ? ADDR_MoveWarioRight : ADDR_MoveWarioLeft);
+	move_wario(right ? ADDR_MoveWarioRight : ADDR_MoveWarioLeft, 0x01);
 }
 
 } // namespace wl3::level

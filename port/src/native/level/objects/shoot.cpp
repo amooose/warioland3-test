@@ -263,7 +263,7 @@ void Shoot::taunt()
 	set_interaction(OBJ_INTERACTION_SHOOT);
 	mem_[wShootBallState] = 0x01;
 	mem_[wBossState] = BOSS_REGULAR;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 	set_standing();
 }
 
@@ -522,14 +522,12 @@ void Shoot::move_wario_ball_after_kick()
 {
 	if (mem_[wWarioXPos + 1] < 237) { // Wario right
 		kicked_ball_y_offset(ADDR_Data_54010);
-		gb_->cpu.b = 3;
-		routines_.call(ADDR_MoveWarioRight);
+		move_wario(ADDR_MoveWarioRight, 3);
 		return;
 	}
 	// in the net: Wario down to the ground
 	if (mem_[wWarioYPos + 1] < 240) {
-		gb_->cpu.b = 3;
-		routines_.call(ADDR_MoveWarioDown);
+		move_wario(ADDR_MoveWarioDown, 3);
 		return;
 	}
 	mem_[wShootBallState] = SHOOTBALL_WARIO_GOAL;
@@ -537,14 +535,13 @@ void Shoot::move_wario_ball_after_kick()
 
 void Shoot::prekick_x_movement()
 {
-	gb_->cpu.b = var2();
 	if (substate() & OBJSUBFLAG_VDIR) {
 		move_right_by_var2();
-		routines_.call(ADDR_MoveWarioRight);
+	move_wario(ADDR_MoveWarioRight, var2());
 		return;
 	}
 	move_left_by_var2();
-	routines_.call(ADDR_MoveWarioLeft);
+	move_wario(ADDR_MoveWarioLeft, var2());
 }
 
 // moves by var2 along its vertical direction, turning at the pitch's ends
@@ -594,23 +591,20 @@ void Shoot::prekick_y_movement(uint16_t offsets)
 		move_wario_up_by_neg(a);
 		return;
 	}
-	gb_->cpu.b = a;
-	routines_.call(ADDR_MoveWarioDown);
-	routines_.call(ADDR_HandleDownwardsFloorTransition);
+	move_wario(ADDR_MoveWarioDown, a);
+	call_home(ADDR_HandleDownwardsFloorTransition);
 }
 
 void Shoot::kicked_ball_y_offset(uint16_t offsets)
 {
-	gb_->cpu.b = kick_offset(offsets);
-	routines_.call(ADDR_MoveWarioDown);
-	routines_.call(ADDR_HandleDownwardsFloorTransition);
+	move_wario(ADDR_MoveWarioDown, kick_offset(offsets));
+	call_home(ADDR_HandleDownwardsFloorTransition);
 }
 
 void Shoot::move_wario_up_by_neg(uint8_t b)
 {
-	gb_->cpu.b = static_cast<uint8_t>(-b);
-	routines_.call(ADDR_MoveWarioUp);
-	routines_.call(ADDR_HandleUpwardsFloorTransition);
+	move_wario(ADDR_MoveWarioUp, static_cast<uint8_t>(-b));
+	call_home(ADDR_HandleUpwardsFloorTransition);
 }
 
 // --- Shoot, ball form ---
@@ -788,7 +782,7 @@ void Shoot::run_ball(uint16_t handler)
 	case B_56BFF:
 	case B_56C0D:
 		if (var2()) {
-			routines_.call(handler == B_56BFF ? ADDR_Func_32ae : ADDR_Func_32bd);
+			call_home(handler == B_56BFF ? ADDR_Func_32ae : ADDR_Func_32bd);
 			return;
 		}
 		state() = 0x0f;
@@ -873,7 +867,7 @@ void Shoot::run_ball(uint16_t handler)
 		play_sfx(SFX_0A3);
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }
@@ -1088,7 +1082,7 @@ void GKTortoise::run(uint16_t handler)
 		gb_->cpu.e = 0x08;
 		routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
 		mem_[wBossState] = BOSS_DEFEATED;
-		routines_.call(ADDR_UpdateLevelMusic);
+		call_home(ADDR_UpdateLevelMusic);
 		mem_[wIsBossBattle] = 0;
 		return;
 	case GK_DUCKING:
@@ -1280,9 +1274,8 @@ void GKTortoise::platform_move_up_and_down()
 		}
 		if (flags() & OBJFLAG_STEPPED) {
 			flags() &= ~OBJFLAG_STEPPED;
-			gb_->cpu.b = 1;
-			routines_.call(ADDR_MoveWarioDown);
-			routines_.call(ADDR_HandleDownwardsFloorTransition);
+			move_wario(ADDR_MoveWarioDown, 1);
+			call_home(ADDR_HandleDownwardsFloorTransition);
 		}
 		move_down();
 		return;
@@ -1293,9 +1286,8 @@ void GKTortoise::platform_move_up_and_down()
 	}
 	if (flags() & OBJFLAG_STEPPED) {
 		flags() &= ~OBJFLAG_STEPPED;
-		gb_->cpu.b = 1;
-		routines_.call(ADDR_MoveWarioUp);
-		routines_.call(ADDR_HandleUpwardsFloorTransition);
+		move_wario(ADDR_MoveWarioUp, 1);
+		call_home(ADDR_HandleUpwardsFloorTransition);
 	}
 	move_up();
 }

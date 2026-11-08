@@ -196,7 +196,7 @@ void ParaGoom::stun_start(uint8_t s)
 void ParaGoom::var2_move(uint16_t routine, uint8_t s)
 {
 	if (var2())
-		routines_.call(routine);
+		call_home(routine);
 	else
 		state() = s;
 }
@@ -284,7 +284,7 @@ void ParaGoom::run(uint16_t handler)
 		bool left = handler == FULL_THROW_LEFT_START;
 		state() = left ? 0x5e : 0x5f;
 		set_frameset(ADDR_Frameset_684a1);
-		routines_.call(left ? ADDR_ObjState_FullThrowLeft : ADDR_ObjState_FullThrowRight);
+		call_home(left ? ADDR_ObjState_FullThrowLeft : ADDR_ObjState_FullThrowRight);
 		return;
 	}
 	case SETTLE_START: { // the parachute folding
@@ -376,7 +376,7 @@ void ParaGoom::run(uint16_t handler)
 			state() = 0x13;
 			return;
 		}
-		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 		return;
 	}
 	case BUMP_LEFT:
@@ -413,7 +413,7 @@ void ParaGoom::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration())
-			routines_.call(ADDR_Func_32ea);
+			call_home(ADDR_Func_32ea);
 		else
 			state() = 0x10;
 		return;
@@ -448,7 +448,7 @@ void ParaGoom::run(uint16_t handler)
 		set_frameset(ADDR_Frameset_684ba);
 		return;
 	case DROPPING: // drifting down to a floor
-		move_by(ADDR_MoveObjectDown_Slow);
+		call_home(ADDR_MoveObjectDown_Slow);
 		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
 		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
@@ -489,7 +489,7 @@ void ParaGoom::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration()) {
-			routines_.call(ADDR_Func_3308);
+			call_home(ADDR_Func_3308);
 			return;
 		}
 		if (sting_up())
@@ -531,7 +531,7 @@ void ParaGoom::run(uint16_t handler)
 		var3() = 0x41;
 		var2() = left ? 0xc0 : 0xe0;
 		var1() = 0x01;
-		routines_.call(left ? ADDR_Func_3335 : ADDR_Func_3344);
+		call_home(left ? ADDR_Func_3335 : ADDR_Func_3344);
 		return;
 	}
 	case STATE_19:
@@ -539,7 +539,7 @@ void ParaGoom::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_49: // carried, turning with Wario
 		if (mem_[wDirection]) {
-			routines_.call(ADDR_Func_3353);
+			call_home(ADDR_Func_3353);
 			return;
 		}
 		substate() ^= 0x80;
@@ -550,7 +550,7 @@ void ParaGoom::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_48:
 		if (!mem_[wDirection]) {
-			routines_.call(ADDR_Func_3362);
+			call_home(ADDR_Func_3362);
 			return;
 		}
 		substate() ^= 0x80;
@@ -563,7 +563,7 @@ void ParaGoom::run(uint16_t handler)
 		set_top(OBJ_INTERACTION_00, 0xf4);
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }

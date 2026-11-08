@@ -180,7 +180,7 @@ void Anonster::enter()
 	if (--state_duration())
 		return;
 	mem_[wBossState] = BOSS_REGULAR;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 	hide();
 }
 
@@ -342,7 +342,7 @@ void Anonster::climb()
 		return;
 	}
 	if (screen_y() >= 0x08) {
-		move_by(ADDR_MoveObjectUp_Slow);
+		call_home(ADDR_MoveObjectUp_Slow);
 		return;
 	}
 	state_duration() = 0x3c;
@@ -361,7 +361,7 @@ void Anonster::run_to_wario()
 	if ((mem_[wWarioScreenXPos] & 0xfe) != (screen_x() & 0xfe)) {
 		bool right = facing_right();
 		if (!wall_ahead(0x10, 0x11)) {
-			move_by(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+			call_home(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -494,8 +494,7 @@ void Anonster::hit()
 	}
 	set_interaction(OBJ_INTERACTION_0B);
 	play_sfx(SFX_VANISH);
-	SET_HL(gb_, wCurObjId);
-	routines_.call(ADDR_DecrementRemainingBossHits);
+	decrement_boss_hits();
 	set_frameset(facing(ADDR_Frameset_694a7, ADDR_Frameset_694b8));
 	if ((substate() & 0x0f) == 1) { // defeated
 		state_duration() = 0xac;
@@ -666,7 +665,7 @@ void Anonster::defeated()
 	gb_->cpu.e = 0x05;
 	routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
 	mem_[wBossState] = BOSS_DEFEATED;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 	mem_[wIsBossBattle] = 0;
 	set_frameset(facing(ADDR_Frameset_694d7, ADDR_Frameset_694dc));
 	state() = 0x48;
@@ -688,7 +687,7 @@ void Anonster::update_pal()
 	SET_DE(gb_, wTempPals2 + 7 * PAL_SIZE);
 	gb_->cpu.c = 7;
 	gb_->cpu.b = 1;
-	routines_.call(ADDR_CopyAndApplyOBPals);
+	call_home(ADDR_CopyAndApplyOBPals);
 }
 
 // spawns the three silk platforms one after the other
@@ -724,7 +723,7 @@ void AnonsterHelper::platform()
 	if (!state_duration())
 		return;
 	--state_duration();
-	move_by(ADDR_MoveObjectDown_Slow);
+	call_home(ADDR_MoveObjectDown_Slow);
 }
 
 void AnonsterHelper::wave()
@@ -808,7 +807,7 @@ void AnonsterHelper::silk_float(bool right)
 		drift();
 		return;
 	}
-	move_by(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+	call_home(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 	uint16_t y_pos = static_cast<uint16_t>(y() - 4);
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 4) : static_cast<uint16_t>(x() - 5);
 	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
@@ -841,7 +840,7 @@ void AnonsterHelper::knocked(uint8_t s)
 void AnonsterHelper::knocked_low(uint8_t s)
 {
 	if (screen_y() < 0x50) {
-		routines_.call(ADDR_VanishObject2);
+		call_home(ADDR_VanishObject2);
 		return;
 	}
 	knocked(s);
@@ -853,7 +852,7 @@ void AnonsterHelper::thrown(uint8_t s, uint8_t var2_, uint16_t routine)
 	var3() = 0x41;
 	var2() = var2_;
 	var1() = 0x01;
-	routines_.call(routine);
+	call_home(routine);
 }
 
 // grabbed: turns with Wario
@@ -867,7 +866,7 @@ void AnonsterHelper::grab(bool right)
 void AnonsterHelper::hold(bool right)
 {
 	if (right ? mem_[wDirection] != 0 : mem_[wDirection] == 0) {
-		routines_.call(right ? ADDR_Func_3353 : ADDR_Func_3362);
+		call_home(right ? ADDR_Func_3353 : ADDR_Func_3362);
 		return;
 	}
 	substate() ^= OBJSUBFLAG_HDIR;
@@ -925,7 +924,7 @@ void AnonsterHelper::run(uint16_t handler)
 			else
 				flags() &= ~OBJFLAG_INVISIBLE;
 		}
-		routines_.call(ADDR_Func_32ea);
+		call_home(ADDR_Func_32ea);
 		return;
 	case KNOCKED_59:
 		knocked_low(0x59);
@@ -963,7 +962,7 @@ void AnonsterHelper::run(uint16_t handler)
 		var3() = 0;
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }

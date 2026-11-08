@@ -100,7 +100,7 @@ void Haridama::crawl()
 		}
 	}
 	if (!wall(right)) {
-		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 		return;
 	}
 	turn(right ? ADDR_Frameset_692aa : ADDR_Frameset_692a1);
@@ -181,7 +181,7 @@ void Haridama::update()
 	case ROLLING: {
 		bool right = facing_right();
 		if (!wall(right)) {
-			move_by(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+			call_home(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 			return;
 		}
 		turn(right ? ADDR_Frameset_692aa : ADDR_Frameset_692a1);
@@ -212,7 +212,7 @@ void Haridama::floating()
 		mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 		mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
 		if (!hpos_block_unk3()) {
-			move_by(ADDR_MoveObjectUp_Slow);
+			call_home(ADDR_MoveObjectUp_Slow);
 			return;
 		}
 	}

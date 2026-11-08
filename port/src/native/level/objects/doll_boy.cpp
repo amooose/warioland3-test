@@ -140,7 +140,7 @@ void DollBoy::init()
 	mem_[wDollBoyHammerRange] = 0;
 	mem_[wDollBoyActiveBarrels] = DOLLBOY_BARREL1 | DOLLBOY_BARREL2 | DOLLBOY_BARREL3;
 	mem_[wBossState] = BOSS_REGULAR;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 }
 
 void DollBoy::copy_pals(uint16_t pals)
@@ -149,7 +149,7 @@ void DollBoy::copy_pals(uint16_t pals)
 	SET_DE(gb_, wTempPals2 + 4 * PAL_SIZE);
 	gb_->cpu.c = 4;
 	gb_->cpu.b = 2;
-	routines_.call(ADDR_CopyAndApplyOBPals);
+	call_home(ADDR_CopyAndApplyOBPals);
 }
 
 void DollBoy::after_fall()
@@ -361,7 +361,7 @@ void DollBoy::walk()
 	if (mem_[wCurObjFramesetOffset] < 0x06)
 		return;
 	set_interaction(OBJ_INTERACTION_BOUNCY);
-	move_by(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
+	call_home(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
 }
 
 // turning (a hop, the ground shaking), or walking; jumps to Wario's
@@ -439,10 +439,10 @@ void DollBoy::walking_phase()
 		var2() = 0x02;
 		return;
 	case 0x32:
-		routines_.call(ADDR_ObjState_BumpLeft);
+		call_home(ADDR_ObjState_BumpLeft);
 		return;
 	case 0x33:
-		routines_.call(ADDR_ObjState_BumpRight);
+		call_home(ADDR_ObjState_BumpRight);
 		return;
 	case 0x0b:
 		show_stars(ADDR_Frameset_696b9, ADDR_ObjParams_DollBoyHammerStarsLeft);
@@ -522,7 +522,7 @@ void DollBoy::defeated()
 	if (screen_y() >= 0xd0) {
 		flags() = 0;
 		mem_[wBossState] = BOSS_DEFEATED;
-		routines_.call(ADDR_UpdateLevelMusic);
+		call_home(ADDR_UpdateLevelMusic);
 		mem_[wIsBossBattle] = 0;
 		ground_shake();
 		return;
@@ -715,7 +715,7 @@ void DollBoyHelper::hammer_update()
 		return;
 	}
 	if (var1()) {
-		move_by(ADDR_MoveObjectRight_Fast);
+		call_home(ADDR_MoveObjectRight_Fast);
 		return;
 	}
 	apply_y_movement(ADDR_Data_60860);
@@ -731,7 +731,7 @@ void DollBoyHelper::hammer_update()
 
 void DollBoyHelper::hammer_hit(uint16_t move)
 {
-	move_by(move);
+	call_home(move);
 	no_actions();
 	apply_y_movement(ADDR_Data_60040);
 }
@@ -754,15 +754,14 @@ void DollBoyHelper::platform_down()
 		return;
 	}
 	if (!(flags() & OBJFLAG_STEPPED)) {
-		move_by(ADDR_MoveObjectDown_Slow);
+		call_home(ADDR_MoveObjectDown_Slow);
 		return;
 	}
 	flags() &= ~OBJFLAG_STEPPED;
 	if (!(mem_[wGlobalCounter] & 1))
 		return;
-	gb_->cpu.b = 1;
-	routines_.call(ADDR_MoveWarioDown);
-	routines_.call(ADDR_HandleDownwardsFloorTransition);
+	move_wario(ADDR_MoveWarioDown, 1);
+	call_home(ADDR_HandleDownwardsFloorTransition);
 	move_down();
 }
 
@@ -777,15 +776,14 @@ void DollBoyHelper::platform_up()
 		return;
 	}
 	if (!(flags() & OBJFLAG_STEPPED)) {
-		move_by(ADDR_MoveObjectUp_Slow);
+		call_home(ADDR_MoveObjectUp_Slow);
 		return;
 	}
 	flags() &= ~OBJFLAG_STEPPED;
 	if (!(mem_[wGlobalCounter] & 1))
 		return;
-	gb_->cpu.b = 1;
-	routines_.call(ADDR_MoveWarioUp);
-	routines_.call(ADDR_HandleUpwardsFloorTransition);
+	move_wario(ADDR_MoveWarioUp, 1);
+	call_home(ADDR_HandleUpwardsFloorTransition);
 	move_up();
 }
 

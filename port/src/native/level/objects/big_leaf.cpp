@@ -104,7 +104,7 @@ void BigLeaf::falling()
 	one_way_platform();
 	uint8_t s = state();
 	if (s == 0x0a) {
-		routines_.call(ADDR_VanishObject2);
+		call_home(ADDR_VanishObject2);
 		return;
 	}
 	if (s && s < 0x0b) { // .destroy
@@ -126,9 +126,8 @@ void BigLeaf::falling()
 		flags() &= ~OBJFLAG_STEPPED;
 		if (!odd)
 			return;
-		gb_->cpu.b = 0x01;
-		routines_.call(ADDR_MoveWarioDown);
-		routines_.call(ADDR_HandleDownwardsFloorTransition);
+		move_wario(ADDR_MoveWarioDown, 0x01);
+		call_home(ADDR_HandleDownwardsFloorTransition);
 	} else if (!odd) {
 		return;
 	}

@@ -139,7 +139,7 @@ void Hebarii::attached()
 			run(STATE_29);
 			return;
 		case OBJSTATE_VANISH_TOUCH:
-			routines_.call(ADDR_VanishObject2);
+			call_home(ADDR_VanishObject2);
 			return;
 		}
 		state() = 0;
@@ -229,7 +229,7 @@ void Hebarii::wobble(uint8_t s)
 void Hebarii::stun(uint16_t routine)
 {
 	if (var2())
-		routines_.call(routine);
+		call_home(routine);
 	else
 		state() = OBJSTATE_0F;
 }
@@ -241,7 +241,7 @@ void Hebarii::picked_up(uint8_t s, uint8_t var2_, uint16_t routine)
 	var2() = var2_;
 	var1() = 0x01;
 	set_frameset(ADDR_Frameset_683fb);
-	routines_.call(routine);
+	call_home(routine);
 }
 
 void Hebarii::grab(uint8_t s)
@@ -255,13 +255,13 @@ void Hebarii::throw_(uint8_t s, uint16_t frameset, uint16_t routine)
 {
 	state() = s;
 	set_frameset(frameset);
-	routines_.call(routine);
+	call_home(routine);
 }
 
 void Hebarii::run(uint16_t handler)
 {
 	switch (handler) {
-	case VANISH: routines_.call(ADDR_VanishObject2); return;
+	case VANISH: call_home(ADDR_VanishObject2); return;
 	case FALL: // until it lands (lost in water)
 		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
@@ -269,7 +269,7 @@ void Hebarii::run(uint16_t handler)
 		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
 		if (!hpos_block_unk1()) {
 			if (mem_[wIsInWaterOrSand]) {
-				routines_.call(ADDR_VanishObject2);
+				call_home(ADDR_VanishObject2);
 				return;
 			}
 			apply_y_movement(ADDR_FallingYVel_Light);
@@ -331,7 +331,7 @@ void Hebarii::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_49: // carried facing the way Wario does
 		if (mem_[wDirection]) {
-			routines_.call(ADDR_Func_3353);
+			call_home(ADDR_Func_3353);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -342,7 +342,7 @@ void Hebarii::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_48:
 		if (!mem_[wDirection]) {
-			routines_.call(ADDR_Func_3362);
+			call_home(ADDR_Func_3362);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -360,7 +360,7 @@ void Hebarii::run(uint16_t handler)
 	case ATTACKED_RIGHT: knocked(ADDR_Frameset_6842d, ADDR_Func_3317); return;
 	case ATTACKED_LEFT: knocked(ADDR_Frameset_6842a, ADDR_Func_3326); return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }
@@ -387,8 +387,8 @@ void Hebarii::spike()
 void Hebarii::spike_fall(bool lateral)
 {
 	if (lateral)
-		move_by(facing_right() ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
-	move_by(ADDR_MoveObjectDown_Slow);
+		call_home(facing_right() ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+	call_home(ADDR_MoveObjectDown_Slow);
 	if (--state_duration() && !state()) {
 		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
 		mem_[hYPosHi] = mem_[wCurObjYPos + 1];

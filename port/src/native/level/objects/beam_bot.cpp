@@ -167,13 +167,13 @@ void BeamBot::walk()
 		state() = 0x13;
 		return;
 	}
-	move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+	call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 }
 
 void BeamBot::hit_move(uint16_t routine)
 {
 	if (var2())
-		routines_.call(routine);
+		call_home(routine);
 	else
 		state() = 0x0f;
 }
@@ -220,7 +220,7 @@ void BeamBot::set_state_then(uint8_t s, uint8_t var2_, uint16_t routine)
 	var3() = 0x41;
 	var2() = var2_;
 	var1() = 0x01;
-	routines_.call(routine);
+	call_home(routine);
 }
 
 void BeamBot::run(uint16_t handler)
@@ -329,7 +329,7 @@ void BeamBot::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration())
-			routines_.call(ADDR_Func_32ea);
+			call_home(ADDR_Func_32ea);
 		else
 			state() = 0x10;
 		return;
@@ -340,7 +340,7 @@ void BeamBot::run(uint16_t handler)
 		[[fallthrough]];
 	case BOUNCING:
 		if (--state_duration())
-			routines_.call(ADDR_Func_32f9);
+			call_home(ADDR_Func_32f9);
 		else
 			state() = 0x00;
 		return;
@@ -360,7 +360,7 @@ void BeamBot::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration())
-			routines_.call(ADDR_Func_3308);
+			call_home(ADDR_Func_3308);
 		else
 			state() = 0x01;
 		return;
@@ -377,7 +377,7 @@ void BeamBot::run(uint16_t handler)
 		[[fallthrough]];
 	case HELD_49: // carried facing the way Wario does
 		if (mem_[wDirection]) {
-			routines_.call(ADDR_Func_3353);
+			call_home(ADDR_Func_3353);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -388,7 +388,7 @@ void BeamBot::run(uint16_t handler)
 		[[fallthrough]];
 	case HELD_48:
 		if (!mem_[wDirection]) {
-			routines_.call(ADDR_Func_3362);
+			call_home(ADDR_Func_3362);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -401,7 +401,7 @@ void BeamBot::run(uint16_t handler)
 		set_interaction(OBJ_INTERACTION_00);
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }

@@ -103,7 +103,7 @@ public:
 	void aim(); // DoughnutFunc
 	void destroy() { flags() = 0; } // DoughnutFunc_Destroy
 	void fly(uint16_t page); // DoughnutFunc_LeftRight
-	void fly_after(uint16_t move) { move_by(move); fly(wCurObjFlags & 0xff00); } // DoughnutFunc_Left / _Right
+	void fly_after(uint16_t move) { call_home(move); fly(wCurObjFlags & 0xff00); } // DoughnutFunc_Left / _Right
 	void up(); // DoughnutFunc_Up
 	void moving(uint16_t movement); // DoughnutFunc_Up.Update and the rest of DoughnutFunc_LeftRight
 	void at_wario(uint16_t move); // DoughnutFunc.Update_Left / _Right
@@ -145,7 +145,7 @@ bool Doughnuteer::turned()
 		return false;
 	}
 	if (--state_duration()) {
-		routines_.call(ADDR_Func_3308);
+		call_home(ADDR_Func_3308);
 		return false;
 	}
 	return true;
@@ -178,9 +178,9 @@ int Doughnuteer::walk(bool slow)
 	if (hpos_block_unk4())
 		return right ? 2 : 1;
 	if (slow)
-		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	else
-		move_by(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
+		call_home(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
 	return 0;
 }
 
@@ -201,7 +201,7 @@ void Doughnuteer::bump_start(uint8_t s, uint16_t params)
 void Doughnuteer::bumped(bool right)
 {
 	if (var2()) {
-		routines_.call(right ? ADDR_ObjState_BumpRight : ADDR_ObjState_BumpLeft);
+		call_home(right ? ADDR_ObjState_BumpRight : ADDR_ObjState_BumpLeft);
 		return;
 	}
 	if (--state_duration())
@@ -220,7 +220,7 @@ void Doughnuteer::bumped(bool right)
 void Doughnuteer::var2_move(uint16_t routine)
 {
 	if (var2())
-		routines_.call(routine);
+		call_home(routine);
 	else
 		state() = 0x0f;
 }
@@ -277,7 +277,7 @@ void Doughnuteer::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration()) {
-			routines_.call(ADDR_Func_3308);
+			call_home(ADDR_Func_3308);
 			return;
 		}
 		state() = 0x2b;
@@ -312,7 +312,7 @@ void Doughnuteer::run(uint16_t handler)
 		if (shaken(0x1c))
 			return;
 		if (--state_duration()) {
-			routines_.call(ADDR_Func_3308);
+			call_home(ADDR_Func_3308);
 			return;
 		}
 		state() = 0x01;
@@ -404,7 +404,7 @@ void Doughnuteer::run(uint16_t handler)
 		if (shaken(0x1c))
 			return;
 		if (--state_duration())
-			routines_.call(ADDR_Func_32ea);
+			call_home(ADDR_Func_32ea);
 		else
 			state() = 0x10;
 		return;
@@ -415,7 +415,7 @@ void Doughnuteer::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_40:
 		if (--state_duration())
-			routines_.call(ADDR_Func_32f9);
+			call_home(ADDR_Func_32f9);
 		else
 			state() = 0x00;
 		return;
@@ -455,7 +455,7 @@ void Doughnuteer::run(uint16_t handler)
 		var3() = 0x41;
 		var2() = left ? 0xc0 : 0xe0;
 		var1() = 0x01;
-		routines_.call(left ? ADDR_Func_3335 : ADDR_Func_3344);
+		call_home(left ? ADDR_Func_3335 : ADDR_Func_3344);
 		return;
 	}
 	case STATE_19:
@@ -463,7 +463,7 @@ void Doughnuteer::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_49: // carried, turning with Wario
 		if (mem_[wDirection]) {
-			routines_.call(ADDR_Func_3353);
+			call_home(ADDR_Func_3353);
 			return;
 		}
 		substate() ^= 0x80;
@@ -474,7 +474,7 @@ void Doughnuteer::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_48:
 		if (!mem_[wDirection]) {
-			routines_.call(ADDR_Func_3362);
+			call_home(ADDR_Func_3362);
 			return;
 		}
 		substate() ^= 0x80;
@@ -487,7 +487,7 @@ void Doughnuteer::run(uint16_t handler)
 		set_interaction(OBJ_INTERACTION_00);
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }
@@ -529,7 +529,7 @@ void Doughnut::moving(uint16_t movement)
 
 void Doughnut::at_wario(uint16_t move)
 {
-	move_by(move);
+	call_home(move);
 	no_actions();
 	apply_y_movement(ADDR_Data_60040);
 }

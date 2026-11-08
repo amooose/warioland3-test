@@ -134,7 +134,7 @@ void Appleby::hit(uint8_t s, uint16_t state_addr)
 {
 	uint16_t page = state_addr & 0xff00;
 	switch (s) {
-	case 0x0a: routines_.call(ADDR_VanishObject); return;
+	case 0x0a: call_home(ADDR_VanishObject); return;
 	case 0x04: knocked(page, ADDR_Func_3326); return;
 	case 0x05: knocked(page, ADDR_Func_3317); return;
 	case 0x28: knocked(page, ADDR_Func_33f8); return;

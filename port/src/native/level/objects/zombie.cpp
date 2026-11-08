@@ -286,7 +286,7 @@ void Zombie::walk_on()
 		set_turn(right ? ADDR_Frameset_68d2b : ADDR_Frameset_68d24);
 		return;
 	}
-	move_by(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+	call_home(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 }
 
 void Zombie::turning()
@@ -297,7 +297,7 @@ void Zombie::turning()
 		return;
 	}
 	if (--state_duration())
-		routines_.call(ADDR_Func_3308);
+		call_home(ADDR_Func_3308);
 	else
 		set_walking();
 }

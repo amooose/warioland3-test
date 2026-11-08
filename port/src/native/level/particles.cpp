@@ -9,6 +9,7 @@
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
+#include "object.hpp"
 
 namespace wl3::level {
 
@@ -57,24 +58,13 @@ private:
 
 // b = the PARTICLE_* constant: a particle at hYPos / hXPos, in the next
 // of the 4 slots
+// (the hook leaves de the slot's offset, hl past what it wrote, a hXPosLo)
 void Particles::create()
 {
-	uint8_t index = mem_[wCurParticleIndex];
-	uint8_t offset = static_cast<uint8_t>(index * 16);
+	uint8_t offset = static_cast<uint8_t>(mem_[wCurParticleIndex] * 16);
 	SET_DE(gb_, offset);
-	mem_[wCurParticleIndex] = (index + 1) & 0x03;
-	uint16_t slot = static_cast<uint16_t>(wParticles + offset);
-	if (!mem_[slot])
-		++mem_[wNumParticles]; // a free slot: one more particle
-	mem_[slot] = cpu_.b; // PARTICLE_STRUCT_ID
-	uint16_t at = static_cast<uint16_t>((slot & 0xff00) | static_cast<uint8_t>(slot + 1)); // inc l
-	mem_[at++] = FALSE; // PARTICLE_STRUCT_INITIALISED
-	mem_[at++] = mem_[hYPosHi];
-	mem_[at++] = mem_[hYPosLo];
-	mem_[at++] = mem_[hXPosHi];
+	SET_HL(gb_, create_particle(gb_, cpu_.b));
 	cpu_.a = mem_[hXPosLo];
-	mem_[at++] = cpu_.a;
-	SET_HL(gb_, at);
 	cpu_.f = FLAG_Z; // xor a
 }
 
@@ -381,6 +371,25 @@ constexpr ParticleFunc MAGIC_2{Pre::MAGIC, Init::WARIO_POS, ADDR_ParticleAnim_Ma
 constexpr ParticleFunc MAGIC_STOP{Pre::ALWAYS, Init::WARIO_POS, ADDR_ParticleAnim_MagicStop, End::ANIM, 0};
 
 } // namespace
+
+uint16_t create_particle(GB *gb, uint8_t id)
+{
+	Memory mem(gb);
+	uint8_t index = mem[wCurParticleIndex];
+	uint8_t offset = static_cast<uint8_t>(index * 16);
+	mem[wCurParticleIndex] = (index + 1) & 0x03;
+	uint16_t slot = static_cast<uint16_t>(wParticles + offset);
+	if (!mem[slot])
+		++mem[wNumParticles]; // a free slot: one more particle
+	mem[slot] = id; // PARTICLE_STRUCT_ID
+	uint16_t at = static_cast<uint16_t>((slot & 0xff00) | static_cast<uint8_t>(slot + 1)); // inc l
+	mem[at++] = FALSE; // PARTICLE_STRUCT_INITIALISED
+	mem[at++] = mem[hYPosHi];
+	mem[at++] = mem[hYPosLo];
+	mem[at++] = mem[hXPosHi];
+	mem[at++] = mem[hXPosLo];
+	return at;
+}
 
 } // namespace wl3::level
 

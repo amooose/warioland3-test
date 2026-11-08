@@ -85,7 +85,7 @@ void Wormwould::init()
 	var2() = 0x20;
 	move_down_by_var2();
 	mem_[wBossState] = BOSS_REGULAR;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 	mem_[wIsBossBattle] = TRUE;
 	change_side();
 }
@@ -94,7 +94,7 @@ void Wormwould::leave()
 {
 	set_update(DO_NOTHING);
 	mem_[wBossState] = NONE;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 }
 
 // comes up facing Wario, moved to the other side ($70 pixels over) when
@@ -263,8 +263,7 @@ void Wormwould::main()
 		state_duration() = WORMWOULD_HURT_DURATION;
 		set_interaction(OBJ_INTERACTION_0B);
 		mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-16);
-		SET_HL(gb_, wCurObjCollBoxTop);
-		routines_.call(ADDR_DecrementRemainingBossHits);
+		decrement_boss_hits();
 		var3() = 0;
 		play_sfx(SFX_VANISH);
 		return;
@@ -304,7 +303,7 @@ void Wormwould::defeated_raise()
 {
 	no_actions();
 	if (--var3()) {
-		move_by(ADDR_MoveObjectUp_Fast);
+		call_home(ADDR_MoveObjectUp_Fast);
 		return;
 	}
 	set_frameset(facing(ADDR_Frameset_6972f, ADDR_Frameset_696f3));
@@ -332,7 +331,7 @@ void Wormwould::defeated_wait()
 	var3() = 0;
 	flags() |= OBJFLAG_PRIORITY;
 	mem_[wBossState] = BOSS_DEFEATED;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 	mem_[wIsBossBattle] = 0;
 }
 
@@ -340,7 +339,7 @@ void Wormwould::defeated_fall()
 {
 	no_actions();
 	apply_y_movement(ADDR_Data_60180);
-	move_by(facing_right() ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
+	call_home(facing_right() ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
 }
 
 // rolls for its duration, then on (then: .MoveLeft / .MoveRight)
@@ -349,7 +348,7 @@ void WormwouldHelper::rock_rolling(uint16_t then, uint16_t move)
 	no_actions();
 	if (!--state_duration())
 		set_update(then);
-	move_by(move);
+	call_home(move);
 	rock(wCurObjFlags & 0xff00);
 }
 
@@ -382,7 +381,7 @@ void WormwouldHelper::palm_tree()
 	SET_DE(gb_, wTempPals2 + PAL_SIZE * 7);
 	gb_->cpu.c = 7;
 	gb_->cpu.b = 1;
-	routines_.call(ADDR_CopyAndApplyOBPals);
+	call_home(ADDR_CopyAndApplyOBPals);
 }
 
 // rises while var1 counts down, then (var2) opens

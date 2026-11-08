@@ -157,13 +157,13 @@ void BrrrBear::walk()
 		state() = 0x13;
 		return;
 	}
-	move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+	call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 }
 
 void BrrrBear::hit_move(uint16_t routine)
 {
 	if (var2())
-		routines_.call(routine);
+		call_home(routine);
 	else
 		state() = 0x0f;
 }
@@ -207,7 +207,7 @@ void BrrrBear::set_state_then(uint8_t s, uint8_t var2_, uint16_t routine)
 	var3() = 0x41;
 	var2() = var2_;
 	var1() = 0x01;
-	routines_.call(routine);
+	call_home(routine);
 }
 
 void BrrrBear::run(uint16_t handler)
@@ -216,7 +216,7 @@ void BrrrBear::run(uint16_t handler)
 	case VANISH_TOUCH: // pounded: wobbles, unless Wario's strong enough
 		if (!mem_[wCurObjAction] || mem_[wTransformation] || mem_[wEffectivePowerUp] >= 0x06
 			|| !(interaction() & 0x7f)) {
-			routines_.call(ADDR_VanishObject2);
+			call_home(ADDR_VanishObject2);
 			return;
 		}
 		play_sfx(SFX_014);
@@ -321,7 +321,7 @@ void BrrrBear::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration())
-			routines_.call(ADDR_Func_32ea);
+			call_home(ADDR_Func_32ea);
 		else
 			state() = 0x10;
 		return;
@@ -356,7 +356,7 @@ void BrrrBear::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration())
-			routines_.call(ADDR_Func_3308);
+			call_home(ADDR_Func_3308);
 		else
 			state() = 0x01;
 		return;
@@ -383,7 +383,7 @@ void BrrrBear::run(uint16_t handler)
 		[[fallthrough]];
 	case HELD_49: // carried facing the way Wario does
 		if (mem_[wDirection]) {
-			routines_.call(ADDR_Func_3353);
+			call_home(ADDR_Func_3353);
 			return;
 		}
 		substate() ^= 0x80;
@@ -394,7 +394,7 @@ void BrrrBear::run(uint16_t handler)
 		[[fallthrough]];
 	case HELD_48:
 		if (!mem_[wDirection]) {
-			routines_.call(ADDR_Func_3362);
+			call_home(ADDR_Func_3362);
 			return;
 		}
 		substate() ^= 0x80;
@@ -407,7 +407,7 @@ void BrrrBear::run(uint16_t handler)
 		set_interaction(OBJ_INTERACTION_00);
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }

@@ -277,7 +277,7 @@ void Pneumo::inflated()
 	bool right = facing_right();
 	hpos(-4, right ? 7 : -8);
 	if (!hpos_block_unk4()) {
-		move_by(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+		call_home(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 		return;
 	}
 	if (right)
@@ -326,7 +326,7 @@ void Pneumo::rising()
 	hpos(0, 0);
 	if (hpos_block_unk1()) {
 		if (mem_[wc1ca])
-			move_by(ADDR_MoveObjectDown_Slow);
+			call_home(ADDR_MoveObjectDown_Slow);
 		else
 			reset();
 		return;

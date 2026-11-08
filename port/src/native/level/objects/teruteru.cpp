@@ -196,7 +196,7 @@ void Teruteru::knocked(uint8_t s)
 void Teruteru::hit_move(uint16_t routine)
 {
 	if (var2())
-		routines_.call(routine);
+		call_home(routine);
 	else
 		state() = 0x0f;
 }
@@ -205,10 +205,9 @@ void Teruteru::hit_move(uint16_t routine)
 void Teruteru::hit(uint8_t s, uint16_t move)
 {
 	state() = s;
-	SET_HL(gb_, wCurObjSubState); // it takes h (and sets l)
-	routines_.call(ADDR_DecrementRemainingBossHits);
+	decrement_boss_hits();
 	if ((substate() & 0x0f) == 1) {
-		routines_.call(ADDR_VanishObject2);
+		call_home(ADDR_VanishObject2);
 		return;
 	}
 	set_frameset(ADDR_Frameset_68ba5);
@@ -230,7 +229,7 @@ void Teruteru::set_state_then(uint8_t s, uint8_t var2_, uint16_t routine)
 	var3() = 0x41;
 	var2() = var2_;
 	var1() = 0x01;
-	routines_.call(routine);
+	call_home(routine);
 }
 
 void Teruteru::run(uint16_t handler)
@@ -276,7 +275,7 @@ void Teruteru::run(uint16_t handler)
 			else if (ghost != wario)
 				move_left();
 		}
-		move_by(ADDR_MoveObjectDown_Fast);
+		call_home(ADDR_MoveObjectDown_Fast);
 		return;
 	case RISING:
 		if (state_duration() == 0x3c)
@@ -337,7 +336,7 @@ void Teruteru::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration())
-			routines_.call(ADDR_Func_32ea);
+			call_home(ADDR_Func_32ea);
 		else
 			state() = 0x10;
 		return;
@@ -371,7 +370,7 @@ void Teruteru::run(uint16_t handler)
 		return;
 	case HELD_49: // carried facing the way Wario does
 		if (mem_[wDirection]) {
-			routines_.call(ADDR_Func_3353);
+			call_home(ADDR_Func_3353);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -383,7 +382,7 @@ void Teruteru::run(uint16_t handler)
 		return;
 	case HELD_48:
 		if (!mem_[wDirection]) {
-			routines_.call(ADDR_Func_3362);
+			call_home(ADDR_Func_3362);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -396,7 +395,7 @@ void Teruteru::run(uint16_t handler)
 		set_interaction(OBJ_INTERACTION_00);
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }

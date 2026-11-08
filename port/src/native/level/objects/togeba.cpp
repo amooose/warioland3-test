@@ -144,16 +144,15 @@ void Togeba::sink()
 		return;
 	if (flags() & OBJFLAG_STEPPED) {
 		flags() &= ~OBJFLAG_STEPPED;
-		gb_->cpu.b = 0x01;
-		routines_.call(ADDR_MoveWarioDown);
-		routines_.call(ADDR_HandleDownwardsFloorTransition);
+		move_wario(ADDR_MoveWarioDown, 0x01);
+		call_home(ADDR_HandleDownwardsFloorTransition);
 	}
 	move_down();
 }
 
 void Togeba::rising()
 {
-	move_by(ADDR_MoveObjectUp_Fast);
+	call_home(ADDR_MoveObjectUp_Fast);
 	if (--state_duration())
 		return;
 	set_update(SINKING);

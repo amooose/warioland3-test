@@ -119,7 +119,7 @@ void Muddee::hidden()
 	SET_DE(gb_, wTempPals2 + PAL_SIZE * 6);
 	gb_->cpu.c = 6;
 	gb_->cpu.b = 1;
-	routines_.call(ADDR_CopyAndApplyOBPals);
+	call_home(ADDR_CopyAndApplyOBPals);
 }
 
 void Muddee::surfacing()
@@ -148,7 +148,7 @@ void Muddee::lurking()
 	var3() = 0;
 	flags() &= ~OBJFLAG_INVISIBLE;
 	mem_[wBossState] = BOSS_REGULAR;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 	mem_[w1d147] = 0;
 	spawn_stingers();
 }
@@ -216,8 +216,7 @@ void Muddee::fighting()
 		set_frameset(facing_right() ? ADDR_Frameset_69d52 : ADDR_Frameset_69d57);
 	state_duration() = 0x3c;
 	var3() = 0;
-	SET_HL(gb_, wCurObjVar1);
-	routines_.call(ADDR_DecrementRemainingBossHits);
+	decrement_boss_hits();
 }
 
 // hit: sinks to the water (the turtle resurfacing when it's the last hit)
@@ -289,7 +288,7 @@ void Muddee::pos_to_h(int dy, int dx)
 void Muddee::move(uint16_t normal, uint16_t slow)
 {
 	swim_sfx();
-	routines_.call((substate() & 0x0f) == 0x05 ? slow : normal);
+	call_home((substate() & 0x0f) == 0x05 ? slow : normal);
 }
 
 bool Muddee::wario_left() const
@@ -407,7 +406,7 @@ void Muddee::follow()
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		return;
-	move_by(dir > 0 ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+	call_home(dir > 0 ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 }
 
 void Muddee::charge_start()
@@ -460,7 +459,7 @@ void Muddee::charging()
 	bool right = var2() & 1;
 	pos_to_h(0, right ? 0x18 : -0x18);
 	if (!hpos_block_unk4()) {
-		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	} else {
 		var2() ^= 0x01;
 		state_duration() = 0x28;
@@ -468,14 +467,14 @@ void Muddee::charging()
 	if (!(substate() & (1 << 6))) {
 		pos_to_h(-0x1c, 0);
 		if (!hpos_block_unk3()) {
-			move_by(ADDR_MoveObjectUp_Slow);
+			call_home(ADDR_MoveObjectUp_Slow);
 			return;
 		}
 	} else {
 		pos_to_h(0x30, 0);
 		hpos_block_unk1();
 		if (!mem_[wIsInWaterOrSand]) {
-			move_by(ADDR_MoveObjectDown_Slow);
+			call_home(ADDR_MoveObjectDown_Slow);
 			return;
 		}
 	}
@@ -495,7 +494,7 @@ void Muddee::defeated()
 		return;
 	}
 	apply_y_movement(ADDR_Data_60180);
-	move_by(facing_right() ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
+	call_home(facing_right() ? ADDR_MoveObjectLeft : ADDR_MoveObjectRight);
 }
 
 void Muddee::sfx_0c1()
@@ -599,8 +598,7 @@ void Turtle::carry_wario(uint16_t flags_addr)
 	routines_.farcall(BANK_Func_19706, ADDR_Func_19706);
 	if (gb_->cpu.b)
 		return;
-	gb_->cpu.b = 0x01;
-	routines_.call(ADDR_MoveWarioRight);
+	move_wario(ADDR_MoveWarioRight, 0x01);
 }
 
 // out across the pool, then stops
@@ -672,7 +670,7 @@ void Turtle::resurfacing()
 		if (--state_duration())
 			return;
 		mem_[wBossState] = BOSS_DEFEATED;
-		routines_.call(ADDR_UpdateLevelMusic);
+		call_home(ADDR_UpdateLevelMusic);
 		mem_[wIsBossBattle] = 0;
 		return;
 	}

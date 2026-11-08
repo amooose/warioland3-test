@@ -154,14 +154,14 @@ void Wolfenboss::smoke_entrance()
 	mem_[wCurObjFramesetOffset] = 2;
 	set_coll_box(static_cast<uint8_t>(-8), 12, static_cast<uint8_t>(-8), 7);
 	mem_[wBossState] = BOSS_REGULAR;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 }
 
 void Wolfenboss::emerge_from_smoke()
 {
 	no_actions();
 	if (frame()) {
-		move_by(ADDR_MoveObjectUp_Slow);
+		call_home(ADDR_MoveObjectUp_Slow);
 		return;
 	}
 	set_frameset(ADDR_Frameset_69dcb);
@@ -267,7 +267,7 @@ void Wolfenboss::do_movement()
 		}
 		var2() = 0x01;
 	} else if (screen_x() != (right ? 0x98 : 0x18)) {
-		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 		return;
 	}
 	start_turning(right ? ADDR_Frameset_69dde : ADDR_Frameset_69dd5);
@@ -307,7 +307,7 @@ void Wolfenboss::main()
 			}
 			uint8_t duration = state_duration();
 			if (duration < 41)
-				move_by(ADDR_MoveObjectDown_Slow);
+				call_home(ADDR_MoveObjectDown_Slow);
 			else if (duration == 41)
 				play_sfx(SFX_0A9);
 			return;
@@ -353,7 +353,7 @@ void Wolfenboss::main()
 		start_attack(facing_right() ? ADDR_Frameset_69df6 : ADDR_Frameset_69df1);
 		return;
 	case 4: { // after hurt: rises; beaten on the last hit
-		move_by(ADDR_MoveObjectUp_Slow);
+		call_home(ADDR_MoveObjectUp_Slow);
 		uint16_t page = wCurObjFlags & 0xff00; // the asm's hl is in wCurObj either way
 		if (mem_[page | OBJ_FRAMESET_OFFSET] == 0x4 && !mem_[page | OBJ_FRAME_DURATION] && (substate() & 0x0f) == 1) {
 			defeated();
@@ -378,9 +378,9 @@ void Wolfenboss::defeat_fall()
 		return;
 	}
 	mem_[wBossState] = BOSS_DEFEATED;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 	mem_[wIsBossBattle] = 0;
-	routines_.call(ADDR_Func_56326);
+	call_home(ADDR_Func_56326);
 	for (uint8_t obj = static_cast<uint8_t>(wObj1);; obj = static_cast<uint8_t>(obj + OBJ_STRUCT_LENGTH)) {
 		uint16_t base = static_cast<uint16_t>((wObj1 & 0xff00) | obj);
 		if (mem_[base + OBJ_ID] == WOLFENBOSS_PLATFORM && (mem_[base + OBJ_FLAGS] & 1)) {
@@ -519,7 +519,7 @@ void WolfenbossHelper::platform_open()
 void WolfenbossHelper::platform_disappear()
 {
 	if (flags() & (1 << OBJFLAG_ON_SCREEN_F)) {
-		routines_.call(ADDR_Func_3326);
+		call_home(ADDR_Func_3326);
 		return;
 	}
 	platform_done();
@@ -556,7 +556,7 @@ void WolfenbossHelper::kuri()
 void WolfenbossHelper::kuri_vanish()
 {
 	--mem_[wWolfenbossIgaguriOrKuriActive];
-	routines_.call(ADDR_VanishObject2);
+	call_home(ADDR_VanishObject2);
 }
 
 // back and forth over the floor; bumped, it turns; attacked, it's
@@ -622,7 +622,7 @@ void WolfenbossHelper::kuri_launched()
 		kuri_vanish();
 		return;
 	}
-	move_by(ADDR_MoveObjectUp_Fast);
+	call_home(ADDR_MoveObjectUp_Fast);
 	uint16_t flags_addr = wCurObjFlags;
 	if (!(mem_[flags_addr] & (1 << OBJFLAG_ON_SCREEN_F))) {
 		mem_[flags_addr] = 0;

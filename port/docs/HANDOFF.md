@@ -720,11 +720,25 @@ primitives, home/wario.cpp, and the golf objects' animation):
   The home hooks stay register-exact for the register-level callers
   left. (Wolfenboss's MoveObjectUp_Slow site had hl set beforehand for
   the frames the move skips; wCurObj again.)
-- Next: the rest of the objects' home calls the same way (the homejp
-  state wrappers Func_31xx, DecrementRemainingBossHits, the movement
-  tables' wrappers, whose h Anonster and Omodonmeka read on), the b
-  passed to MoveWario* and CreateParticle, then the block functions,
-  passing Muddee, Pesce, Octohon and ZipLine what they read.
+- The objects' state wrappers, boss hits, MoveWario and particles, plain
+  (2026-11-08): the objects call home through Object::call_home(routine)
+  (move_by renamed; every routines_.call in objects/), which runs the
+  moves, DecrementRemainingBossHits (decrement_boss_hits()) and the 45
+  homejp state wrappers plain: object_state() (update_objects.cpp) runs
+  the state's C++ with its bank switched around it as homejp and
+  HomeJumpRet do, home_jump_ret() and thrown()'s jump skipped
+  (ObjectEngine::plain_). Anything else falls through to the call.
+  live.py over every wrapper's and MoveWario*'s call sites: no object
+  reads a register they leave (only the object tables' false positives,
+  HomeJumpRet's a and the uncalled Func_5725b). Object::move_wario(
+  routine, n) passes MoveWario*'s b as a parameter (home::move_wario_x /
+  _y), and Object::particle(id) runs a plain create_particle() (both
+  object sites return straight after). The wrappers' hooks stay for the
+  register-level callers.
+- Next: the palette calls (CopyAndApplyOBPals, SetBGPals, SetOBPals,
+  BlackOut*Pals, which take b with hl / de / c), the movement tables'
+  wrappers (whose h Anonster and Omodonmeka read on), then the block
+  functions, passing Muddee, Pesce, Octohon and ZipLine what they read.
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped

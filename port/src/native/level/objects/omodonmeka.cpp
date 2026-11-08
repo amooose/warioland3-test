@@ -245,9 +245,8 @@ void Omodonmeka::run(uint16_t handler)
 		}
 		if (!(mem_[wGlobalCounter] & 0x07))
 			play_sfx(SFX_087);
-		gb_->cpu.b = 0x01;
-		routines_.call(ADDR_MoveWarioUp);
-		routines_.call(ADDR_HandleUpwardsFloorTransition);
+		move_wario(ADDR_MoveWarioUp, 0x01);
+		call_home(ADDR_HandleUpwardsFloorTransition);
 		move_up();
 		return;
 	}
@@ -356,7 +355,7 @@ void Omodonmeka::with_omodon_start(uint16_t omodon)
 	mem_[wCurObjCollBoxRight] = 0xfd;
 	mem_[wCurObjCollBoxLeft] = 0xf3;
 	mem_[wCurObjCollBoxBottom] = 0xf9;
-	routines_.call(ADDR_Func_3444);
+	call_home(ADDR_Func_3444);
 	if (gb_->cpu.e) {
 		swallow();
 		return;
@@ -471,9 +470,8 @@ void Omodonmeka::run_owo(uint16_t handler)
 			if (mem_[wGlobalCounter] & 1)
 				return;
 			SET_HL(gb_, wCurObjFlags);
-			gb_->cpu.b = 0x01;
-			routines_.call(ADDR_MoveWarioUp);
-			routines_.call(ADDR_HandleUpwardsFloorTransition);
+			move_wario(ADDR_MoveWarioUp, 0x01);
+			call_home(ADDR_HandleUpwardsFloorTransition);
 			page = static_cast<uint16_t>(gb_->cpu.h << 8);
 		}
 		if (dec_at(page | OBJ_STATE_DURATION)) {
@@ -596,7 +594,7 @@ void Omodonmeka::omodon()
 	case 0x5a: // .Func_4286b
 		if (state_duration() == 0x14) {
 			if (mem_[wAutoMoveState]) {
-				move_by(ADDR_MoveObjectDown_Fast);
+				call_home(ADDR_MoveObjectDown_Fast);
 				return;
 			}
 			above_wario();

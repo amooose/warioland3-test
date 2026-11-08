@@ -107,7 +107,7 @@ void Barrel::float_sinking()
 		return;
 	}
 	SET_BC(gb_, ADDR_Data_60a50);
-	routines_.call(ADDR_Func_34fc);
+	call_home(ADDR_Func_34fc);
 }
 
 void Barrel::init()
@@ -139,7 +139,7 @@ void Barrel::set_state_then(uint8_t s, uint8_t var1_, uint8_t var2_, uint8_t var
 	var2() = var2_;
 	var1() = var1_;
 	set_frameset(ADDR_Frameset_68a78);
-	routines_.call(routine);
+	call_home(routine);
 }
 
 // knocked away: routine (Func_33f8 and the like) takes over
@@ -197,7 +197,7 @@ void Barrel::run(uint16_t handler)
 		return;
 	case HELD_49: // carried facing the way Wario does
 		if (mem_[wDirection]) {
-			routines_.call(ADDR_Func_3353);
+			call_home(ADDR_Func_3353);
 			return;
 		}
 		substate() ^= 0x80;
@@ -209,7 +209,7 @@ void Barrel::run(uint16_t handler)
 		return;
 	case HELD_48:
 		if (!mem_[wDirection]) {
-			routines_.call(ADDR_Func_3362);
+			call_home(ADDR_Func_3362);
 			return;
 		}
 		substate() ^= 0x80;
@@ -223,19 +223,19 @@ void Barrel::run(uint16_t handler)
 	case THROW_LEFT:
 		state() = 0x5e;
 		set_frameset(ADDR_Frameset_68a6f);
-		routines_.call(ADDR_ObjState_FullThrowLeft);
+		call_home(ADDR_ObjState_FullThrowLeft);
 		return;
 	case THROW_RIGHT:
 		state() = 0x5f;
 		set_frameset(ADDR_Frameset_68a66);
-		routines_.call(ADDR_ObjState_FullThrowRight);
+		call_home(ADDR_ObjState_FullThrowRight);
 		return;
 	case HIT_33F8: hit(ADDR_Frameset_68a6f, ADDR_Func_33f8); return;
 	case HIT_3407: hit(ADDR_Frameset_68a66, ADDR_Func_3407); return;
 	case HIT_3317: hit(ADDR_Frameset_68a6f, ADDR_Func_3317); return;
 	case HIT_3326: hit(ADDR_Frameset_68a66, ADDR_Func_3326); return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }

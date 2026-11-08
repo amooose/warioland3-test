@@ -142,7 +142,7 @@ void Torch::ember_towards_wario()
 	if (static_cast<uint8_t>(screen_x() + 0x2a) < wario)
 		move_right();
 	else
-		move_by(ADDR_MoveObjectLeft_Slow);
+		call_home(ADDR_MoveObjectLeft_Slow);
 	apply_y_movement(ADDR_Data_60320);
 	ember();
 }

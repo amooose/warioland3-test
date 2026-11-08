@@ -120,7 +120,7 @@ void Scowler::begin()
 {
 	mem_[wIsBossBattle] = TRUE;
 	mem_[wBossState] = BOSS_REGULAR;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 	set_update(WALKING);
 	create_object_here(ADDR_ObjParams_ScrowlerTentacleRight);
 	create_object_here(ADDR_ObjParams_ScrowlerTentacleLeft);
@@ -151,7 +151,7 @@ bool Scowler::walk()
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		return true;
-	move_by(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
+	call_home(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
 	return false;
 }
 
@@ -308,8 +308,7 @@ void Scowler::underwater()
 				state_duration() = 0x1e;
 				set_update(HURT);
 				set_interaction(OBJ_INTERACTION_07);
-				SET_HL(gb_, wCurObjInteractionType - 1);
-				routines_.call(ADDR_DecrementRemainingBossHits);
+				decrement_boss_hits();
 				return;
 			}
 			state() = 0;
@@ -401,7 +400,7 @@ void Scowler::defeated_sinking()
 {
 	no_actions();
 	flashes();
-	move_by(ADDR_MoveObjectDown_Slow);
+	call_home(ADDR_MoveObjectDown_Slow);
 	apply_x_movement(ADDR_Data_60a80);
 	if (--state_duration())
 		return;
@@ -419,7 +418,7 @@ void Scowler::defeated_gone()
 		gb_->cpu.e = 0x05;
 		routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
 		mem_[wBossState] = BOSS_DEFEATED;
-		routines_.call(ADDR_UpdateLevelMusic);
+		call_home(ADDR_UpdateLevelMusic);
 		mem_[wIsBossBattle] = 0;
 		if (mem_[w1d147]) {
 			mem_[w1d147] = 0;
@@ -427,7 +426,7 @@ void Scowler::defeated_gone()
 			bg_pals(ADDR_Pals_54cb7);
 		}
 	}
-	move_by(ADDR_MoveObjectDown_Slow);
+	call_home(ADDR_MoveObjectDown_Slow);
 	apply_x_movement_loop(ADDR_Data_60a90);
 }
 
@@ -454,10 +453,10 @@ void Scowler::flashes()
 		mem_[wDollBoyActiveBarrels] = 0xff;
 		gb_->cpu.c = 5;
 		gb_->cpu.b = 3;
-		routines_.call(ADDR_BlackOutOBPals);
+		call_home(ADDR_BlackOutOBPals);
 		gb_->cpu.c = 0;
 		gb_->cpu.b = 8;
-		routines_.call(ADDR_BlackOutBGPals);
+		call_home(ADDR_BlackOutBGPals);
 		return;
 	}
 	if (t != 0x78)
@@ -473,7 +472,7 @@ void Scowler::ob_pals(uint16_t pals)
 	SET_HL(gb_, pals);
 	gb_->cpu.c = 5;
 	gb_->cpu.b = 3;
-	routines_.call(ADDR_SetOBPals);
+	call_home(ADDR_SetOBPals);
 }
 
 void Scowler::bg_pals(uint16_t pals)
@@ -481,7 +480,7 @@ void Scowler::bg_pals(uint16_t pals)
 	SET_HL(gb_, pals);
 	gb_->cpu.c = 0;
 	gb_->cpu.b = 8;
-	routines_.call(ADDR_SetBGPals);
+	call_home(ADDR_SetBGPals);
 }
 
 // a floating ring after $40 frames
@@ -541,9 +540,8 @@ void ScowlerHelper::ring_up()
 		return;
 	}
 	flags() &= ~OBJFLAG_STEPPED;
-	gb_->cpu.b = 0x01;
-	routines_.call(ADDR_MoveWarioUp);
-	routines_.call(ADDR_HandleUpwardsFloorTransition);
+	move_wario(ADDR_MoveWarioUp, 0x01);
+	call_home(ADDR_HandleUpwardsFloorTransition);
 	move_up();
 }
 
@@ -559,15 +557,14 @@ void ScowlerHelper::ring_down()
 		return;
 	}
 	if (!(flags() & OBJFLAG_STEPPED)) {
-		move_by(ADDR_MoveObjectDown_Slow);
+		call_home(ADDR_MoveObjectDown_Slow);
 		return;
 	}
 	flags() &= ~(1 << 5);
 	if (!(mem_[wGlobalCounter] & 1))
 		return;
-	gb_->cpu.b = 0x01;
-	routines_.call(ADDR_MoveWarioDown);
-	routines_.call(ADDR_HandleDownwardsFloorTransition);
+	move_wario(ADDR_MoveWarioDown, 0x01);
+	call_home(ADDR_HandleDownwardsFloorTransition);
 	move_down();
 }
 
@@ -655,10 +652,10 @@ void ScowlerHelper::ink(bool right)
 {
 	if (state_duration()) {
 		--state_duration();
-		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	} else {
 		bool left_of_wario = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
-		move_by(left_of_wario ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		call_home(left_of_wario ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	}
 	if (state()) {
 		mem_[w1d147] = 0x01;

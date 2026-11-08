@@ -181,7 +181,7 @@ void Spearhead::land(uint8_t interaction, uint8_t s, uint16_t left, uint16_t rig
 void Spearhead::var2_move(uint16_t routine, uint8_t s)
 {
 	if (var2())
-		routines_.call(routine);
+		call_home(routine);
 	else
 		state() = s;
 }
@@ -238,7 +238,7 @@ void Spearhead::run(uint16_t handler)
 		bool left = handler == H_FULL_THROW_LEFT_START;
 		state() = left ? OBJSTATE_FULL_THROW_LEFT : OBJSTATE_FULL_THROW_RIGHT;
 		set_frameset(facing(ADDR_Frameset_68292, ADDR_Frameset_6829b));
-		routines_.call(left ? ADDR_ObjState_FullThrowLeft : ADDR_ObjState_FullThrowRight);
+		call_home(left ? ADDR_ObjState_FullThrowLeft : ADDR_ObjState_FullThrowRight);
 		return;
 	}
 	case H_SLEEP_START:
@@ -340,7 +340,7 @@ void Spearhead::run(uint16_t handler)
 			state() = OBJSTATE_TURN_AROUND_START;
 			return;
 		}
-		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 		return;
 	}
 	case H_BUMP_LEFT_START:
@@ -385,7 +385,7 @@ void Spearhead::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration())
-			routines_.call(ADDR_Func_32ea);
+			call_home(ADDR_Func_32ea);
 		else
 			state() = OBJSTATE_10;
 		return;
@@ -396,7 +396,7 @@ void Spearhead::run(uint16_t handler)
 		[[fallthrough]];
 	case H_STATE40:
 		if (--state_duration()) {
-			routines_.call(ADDR_Func_32f9);
+			call_home(ADDR_Func_32f9);
 			return;
 		}
 		state() = OBJSTATE_00;
@@ -417,11 +417,11 @@ void Spearhead::run(uint16_t handler)
 				set_interaction(OBJ_INTERACTION_01);
 				set_frameset(facing(ADDR_Frameset_6821e, ADDR_Frameset_68229));
 			}
-			routines_.call(ADDR_Func_3308);
+			call_home(ADDR_Func_3308);
 			return;
 		}
 		if (--var1()) {
-			routines_.call(ADDR_Func_3308);
+			call_home(ADDR_Func_3308);
 			return;
 		}
 		state() = OBJSTATE_LAND;
@@ -468,7 +468,7 @@ void Spearhead::run(uint16_t handler)
 		var3() = static_cast<uint8_t>(data >> 8);
 		var2() = static_cast<uint8_t>(data);
 		var1() = 0x01;
-		routines_.call(left ? ADDR_Func_3335 : ADDR_Func_3344);
+		call_home(left ? ADDR_Func_3335 : ADDR_Func_3344);
 		return;
 	}
 	case H_STATE19:
@@ -476,7 +476,7 @@ void Spearhead::run(uint16_t handler)
 		[[fallthrough]];
 	case H_STATE49: // carried, turning with Wario
 		if (mem_[wDirection]) {
-			routines_.call(ADDR_Func_3353);
+			call_home(ADDR_Func_3353);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -487,7 +487,7 @@ void Spearhead::run(uint16_t handler)
 		[[fallthrough]];
 	case H_STATE48:
 		if (!mem_[wDirection]) {
-			routines_.call(ADDR_Func_3362);
+			call_home(ADDR_Func_3362);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -500,7 +500,7 @@ void Spearhead::run(uint16_t handler)
 		set_interaction(OBJ_INTERACTION_00);
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }

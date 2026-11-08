@@ -24,6 +24,13 @@
 
 namespace wl3::level {
 
+// A homejp state wrapper (Func_3173 to Func_3407, ObjState_*) run plain:
+// false if `wrapper` isn't one (update_objects.cpp)
+bool object_state(GB *gb, uint16_t wrapper);
+// CreateParticle: particle `id` at hYPos / hXPos, in the next of the 4
+// slots; returns the address past what it wrote (particles.cpp)
+uint16_t create_particle(GB *gb, uint8_t id);
+
 class Object {
 public:
 	explicit Object(GB *gb) : gb_(gb), mem_(gb), wram_(gb), routines_(gb) {}
@@ -88,10 +95,22 @@ protected:
 	void move_right_by_var2() { home::move_object_x(gb_, var2()); }
 	void move_up_by_var2() { home::move_object_y(gb_, -var2()); }
 	void move_down_by_var2() { home::move_object_y(gb_, var2()); }
-	// home's MoveObject* routines by address (1 pixel, _Fast 2, _Slow 1
-	// every other frame: right and down on even frames, left and up on odd
-	// ones; ByVar2 by var2), plain; anything else is called
-	void move_by(uint16_t routine);
+	// A home routine by address, plain where the objects call it plain:
+	// MoveObject* (1 pixel, _Fast 2, _Slow 1 every other frame: right and
+	// down on even frames, left and up on odd ones; ByVar2 by var2), the
+	// homejp state wrappers (object_state) and DecrementRemainingBossHits.
+	// Anything else is called.
+	void call_home(uint16_t routine);
+	// MoveWarioRight / Left / Down / Up (by address): Wario and the camera
+	// moved n pixels (the asm's b, which no object reads after)
+	void move_wario(uint16_t routine, uint8_t n);
+	// DecrementRemainingBossHits: a boss's hits left (the substate's low
+	// nibble) down one, unless it's the last
+	void decrement_boss_hits()
+	{
+		if ((substate() & 0x0f) != 1)
+			substate() = static_cast<uint8_t>(substate() - 1);
+	}
 	// The block at hPos through ProcessBlock, by the collision points it's
 	// processed with (Func_3513 and the like: homecalls of collisions.asm's
 	// routines): the block function's result, which they leave in a. The
@@ -132,7 +151,12 @@ protected:
 		routines_.call(routine);
 		return gb_->cpu.a;
 	}
-	void vanish() { routines_.call(ADDR_Func_3173); } // puff, then Func_4c860 despawns it
+	// CreateParticle (farcalled): particle `id` at hYPos / hXPos
+	void particle(uint8_t id)
+	{
+		routines_.in_bank(BANK_CreateParticle, ADDR_CreateParticle, [&] { create_particle(gb_, id); });
+	}
+	void vanish() { call_home(ADDR_Func_3173); } // puff, then Func_4c860 despawns it
 	void one_way_platform() { routines_.call(ADDR_SetOneWayPlatformAction); } // SetOneWayPlatformAction
 	void despawn(); // DespawnObject, with hl = wCurObjUnk02
 	void collect(); // Func_bb2d, with hl = wCurObjUnk02

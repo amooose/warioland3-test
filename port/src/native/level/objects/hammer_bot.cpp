@@ -172,14 +172,14 @@ bool HammerBot::move_on(int edge, int ahead, uint16_t move)
 		state() = 0x13;
 		return false;
 	}
-	move_by(move);
+	call_home(move);
 	return true;
 }
 
 void HammerBot::hit_move(uint16_t routine)
 {
 	if (var2())
-		routines_.call(routine);
+		call_home(routine);
 	else
 		state() = 0x0f;
 }
@@ -215,7 +215,7 @@ void HammerBot::stars(uint8_t s, uint16_t params, uint16_t frameset)
 void HammerBot::recoil(uint16_t routine)
 {
 	if (var2()) {
-		routines_.call(routine);
+		call_home(routine);
 		return;
 	}
 	if (!--state_duration())
@@ -252,7 +252,7 @@ void HammerBot::set_state_then(uint8_t s, uint8_t var2_, uint16_t routine)
 	var3() = 0x41;
 	var2() = var2_;
 	var1() = 0x01;
-	routines_.call(routine);
+	call_home(routine);
 }
 
 void HammerBot::run(uint16_t handler)
@@ -261,7 +261,7 @@ void HammerBot::run(uint16_t handler)
 	case VANISH_TOUCH: // pounded: wobbles, unless Wario's strong enough
 		if (!mem_[wCurObjAction] || mem_[wTransformation] || mem_[wEffectivePowerUp] >= SUPER_JUMP_SLAM_OVERALLS
 			|| !(interaction() & INTERACTION_MASK)) {
-			routines_.call(ADDR_VanishObject2);
+			call_home(ADDR_VanishObject2);
 			return;
 		}
 		play_sfx(SFX_014);
@@ -367,7 +367,7 @@ void HammerBot::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration())
-			routines_.call(ADDR_Func_32ea);
+			call_home(ADDR_Func_32ea);
 		else
 			state() = 0x10;
 		return;
@@ -378,7 +378,7 @@ void HammerBot::run(uint16_t handler)
 		[[fallthrough]];
 	case BOUNCING:
 		if (--state_duration())
-			routines_.call(ADDR_Func_32f9);
+			call_home(ADDR_Func_32f9);
 		else
 			state() = 0x00;
 		return;
@@ -399,7 +399,7 @@ void HammerBot::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration())
-			routines_.call(ADDR_Func_3308);
+			call_home(ADDR_Func_3308);
 		else
 			state() = 0x01;
 		return;
@@ -430,7 +430,7 @@ void HammerBot::run(uint16_t handler)
 		[[fallthrough]];
 	case HELD_49: // carried facing the way Wario does
 		if (mem_[wDirection]) {
-			routines_.call(ADDR_Func_3353);
+			call_home(ADDR_Func_3353);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -441,7 +441,7 @@ void HammerBot::run(uint16_t handler)
 		[[fallthrough]];
 	case HELD_48:
 		if (!mem_[wDirection]) {
-			routines_.call(ADDR_Func_3362);
+			call_home(ADDR_Func_3362);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -454,7 +454,7 @@ void HammerBot::run(uint16_t handler)
 		set_interaction(OBJ_INTERACTION_00);
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }

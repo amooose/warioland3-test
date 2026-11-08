@@ -121,9 +121,8 @@ void Futamogu::climb()
 		flags() &= ~OBJFLAG_STEPPED;
 		if (!(mem_[wGlobalCounter] & 1))
 			return;
-		gb_->cpu.b = 1;
-		routines_.call(ADDR_MoveWarioUp);
-		routines_.call(ADDR_HandleUpwardsFloorTransition);
+		move_wario(ADDR_MoveWarioUp, 1);
+		call_home(ADDR_HandleUpwardsFloorTransition);
 		move_up();
 		return;
 	}
@@ -182,7 +181,7 @@ void Futamogu::knocked_out()
 {
 	var2() = 0x08;
 	move_left_by_var2();
-	routines_.call(ADDR_VanishObject);
+	call_home(ADDR_VanishObject);
 }
 
 } // namespace wl3::level

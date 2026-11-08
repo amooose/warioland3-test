@@ -147,7 +147,7 @@ void RoboMouse::break_blocks(bool right, uint8_t dx)
 void RoboMouse::thrown(bool right, uint16_t routine)
 {
 	break_blocks(right, right ? 0x0d : 0x0e);
-	routines_.call(routine);
+	call_home(routine);
 }
 
 void RoboMouse::run(uint16_t handler)
@@ -172,7 +172,7 @@ void RoboMouse::run(uint16_t handler)
 	case THROWN_32DB: thrown(true, ADDR_Func_32db); return;
 	case POUNDED: pounded(); return;
 	case SINKING:
-		move_by(ADDR_MoveObjectDown_Slow);
+		call_home(ADDR_MoveObjectDown_Slow);
 		hpos_offset(0, 0);
 		if (hpos_block_unk1())
 			state() = (interaction() & 0x7f) == OBJ_INTERACTION_0B ? 0x13 : 0x31;
@@ -205,7 +205,7 @@ void RoboMouse::run(uint16_t handler)
 		state() = 0x31;
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }
@@ -230,8 +230,7 @@ void RoboMouse::pounded()
 	if (!(flags() & OBJFLAG_ON_SCREEN))
 		return;
 	hpos_offset(0, 0);
-	gb_->cpu.b = PARTICLE_SPLASH;
-	routines_.farcall(BANK_CreateParticle, ADDR_CreateParticle);
+	particle(PARTICLE_SPLASH);
 	play_sfx(SFX_083);
 }
 
@@ -284,7 +283,7 @@ bool RoboMouse::walk_floor(bool right)
 void RoboMouse::recover()
 {
 	if (--state_duration()) {
-		routines_.call(ADDR_Func_3308);
+		call_home(ADDR_Func_3308);
 		return;
 	}
 	uint16_t wario_x = static_cast<uint16_t>(mem_[wWarioXPos + 0] << 8 | mem_[wWarioXPos + 1]);

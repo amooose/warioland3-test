@@ -132,7 +132,7 @@ void Webber::update()
 	if (s == OBJSTATE_VANISH_TOUCH) { // .set_smash_attacked
 		state() = 0;
 		if (facing_right()) { // already down
-			routines_.call(ADDR_VanishObject);
+			call_home(ADDR_VanishObject);
 			return;
 		}
 		set_mode(SMASHED);
@@ -188,9 +188,8 @@ void Webber::move_vertically(bool up)
 		flags() &= ~OBJFLAG_STEPPED;
 		if (!(mem_[wGlobalCounter] & 1))
 			return;
-		gb_->cpu.b = 1;
-		routines_.call(up ? ADDR_MoveWarioUp : ADDR_MoveWarioDown);
-		routines_.call(up ? ADDR_HandleUpwardsFloorTransition : ADDR_HandleDownwardsFloorTransition);
+		move_wario(up ? ADDR_MoveWarioUp : ADDR_MoveWarioDown, 1);
+		call_home(up ? ADDR_HandleUpwardsFloorTransition : ADDR_HandleDownwardsFloorTransition);
 	} else if (frame_duration()) { // the animation at double speed
 		--frame_duration();
 	}
@@ -269,7 +268,7 @@ void Webber::smashed()
 	if (!landed())
 		return;
 	if (super_jump_slam) {
-		routines_.call(ADDR_VanishObject);
+		call_home(ADDR_VanishObject);
 		return;
 	}
 	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
@@ -321,7 +320,7 @@ void Webber::web()
 {
 	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
 	bool right = static_cast<uint8_t>(screen_x() + 0x2a) < wario;
-	move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+	call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	move_down();
 	flags() |= OBJFLAG_NO_COLLISION;
 	if (!state()) {

@@ -84,7 +84,7 @@ public:
 private:
 	void spawner_frame();
 	void spawner_done(uint8_t e);
-	void move_wario(uint16_t flags_addr, uint16_t routine, uint16_t then);
+	void move_wario_on(uint16_t flags_addr, uint16_t routine, uint16_t then);
 };
 
 } // namespace
@@ -107,7 +107,7 @@ void Pesce::start()
 	move_down_by_var2();
 	var2() = 0x3c;
 	mem_[wBossState] = BOSS_REGULAR;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 	mem_[wIsBossBattle] = TRUE;
 }
 
@@ -236,8 +236,7 @@ void Pesce::sink_wario(uint16_t page)
 	if (!hpos_block_unk1()) {
 		if (mem_[wGlobalCounter] & 0x03)
 			return;
-		gb_->cpu.b = 0x01;
-		routines_.call(ADDR_MoveWarioDown);
+		move_wario(ADDR_MoveWarioDown, 0x01);
 		move_down();
 		return;
 	}
@@ -278,7 +277,7 @@ void Pesce::swim()
 	bool right = facing_right();
 	hpos(wCurObjYPos & 0xff00, -0x04, right ? 0x0f : -0x10);
 	if (!hpos_block_unk4()) {
-		move_by(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
+		call_home(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
 		return;
 	}
 	if (--var2())
@@ -339,7 +338,7 @@ void Pesce::chase()
 	}
 	hpos(wCurObjYPos & 0xff00, -0x04, right ? 0x0f : -0x10);
 	if (!hpos_block_unk4()) {
-		move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+		call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 		return;
 	}
 	if (--var2())
@@ -418,7 +417,7 @@ void Pesce::beaten()
 	case 0:
 		hpos(wCurObjYPos & 0xff00, 0x06, 0);
 		if (!hpos_block_unk1()) {
-			move_by(ADDR_MoveObjectDown_Slow);
+			call_home(ADDR_MoveObjectDown_Slow);
 			return;
 		}
 		if (facing_right()) {
@@ -438,7 +437,7 @@ void Pesce::beaten()
 	case 2:
 		hpos(wCurObjYPos & 0xff00, -0x30, 0);
 		if (!hpos_block_unk4()) {
-			move_by(ADDR_MoveObjectLeft_Slow);
+			call_home(ADDR_MoveObjectLeft_Slow);
 			return;
 		}
 		set_interaction(OBJ_INTERACTION_51);
@@ -523,7 +522,7 @@ void PesceHelper::dragonfly_done()
 	flags() = 0;
 	spawner_done(0x08);
 	mem_[wBossState] = BOSS_DEFEATED;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 	mem_[wIsBossBattle] = 0;
 	mem_[wSwitchStateUpdated] = 0x01;
 	mem_[wSwitchState] = 0x60;
@@ -533,7 +532,7 @@ void PesceHelper::dragonfly1_down()
 {
 	no_actions();
 	if (--state_duration()) {
-		move_by(ADDR_MoveObjectDown_Fast);
+		call_home(ADDR_MoveObjectDown_Fast);
 		return;
 	}
 	state_duration() = 0x70;
@@ -564,19 +563,18 @@ void PesceHelper::dragonfly1_flying()
 		return;
 	}
 	bool right = facing_right();
-	move_by(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
+	call_home(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
 	uint16_t flags_addr = wCurObjFlags;
 	if (!(mem_[flags_addr] & OBJFLAG_STEPPED))
 		return;
 	mem_[flags_addr] &= ~OBJFLAG_STEPPED;
-	gb_->cpu.b = 0x01;
-	routines_.call(right ? ADDR_MoveWarioRight : ADDR_MoveWarioLeft);
+	move_wario(right ? ADDR_MoveWarioRight : ADDR_MoveWarioLeft, 0x01);
 }
 
 void PesceHelper::dragonfly1_off()
 {
 	no_actions();
-	move_by(facing_right() ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+	call_home(facing_right() ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 }
 
 void PesceHelper::dragonfly2()
@@ -605,14 +603,13 @@ void PesceHelper::dragonfly2_wait()
 	flags() &= ~OBJFLAG_INVISIBLE;
 }
 
-void PesceHelper::move_wario(uint16_t flags_addr, uint16_t routine, uint16_t then)
+void PesceHelper::move_wario_on(uint16_t flags_addr, uint16_t routine, uint16_t then)
 {
 	if (!(mem_[flags_addr] & OBJFLAG_STEPPED))
 		return;
 	mem_[flags_addr] &= ~OBJFLAG_STEPPED;
-	gb_->cpu.b = 0x01;
-	routines_.call(routine);
-	routines_.call(then);
+	move_wario(routine, 0x01);
+	call_home(then);
 }
 
 // up and down (var1 1 up), carrying Wario
@@ -630,12 +627,12 @@ void PesceHelper::dragonfly2_flying()
 		var1() = up ? 0 : 1;
 		return;
 	}
-	move_by(up ? ADDR_MoveObjectUp : ADDR_MoveObjectDown);
+	call_home(up ? ADDR_MoveObjectUp : ADDR_MoveObjectDown);
 	uint16_t flags_addr = wCurObjFlags;
 	if (up)
-		move_wario(flags_addr, ADDR_MoveWarioUp, ADDR_HandleUpwardsFloorTransition);
+		move_wario_on(flags_addr, ADDR_MoveWarioUp, ADDR_HandleUpwardsFloorTransition);
 	else
-		move_wario(flags_addr, ADDR_MoveWarioDown, ADDR_HandleDownwardsFloorTransition);
+		move_wario_on(flags_addr, ADDR_MoveWarioDown, ADDR_HandleDownwardsFloorTransition);
 }
 
 void PesceHelper::fly_spawner()
@@ -762,16 +759,15 @@ void PesceHelper::cheese()
 				flags() = 0;
 				return;
 			}
-			move_by(ADDR_MoveObjectDown_Slow);
+			call_home(ADDR_MoveObjectDown_Slow);
 			if (--state_duration())
 				return;
 			state_duration() = 0x18;
-			gb_->cpu.b = PARTICLE_BUBBLES;
-			routines_.farcall(BANK_CreateParticle, ADDR_CreateParticle);
+			particle(PARTICLE_BUBBLES);
 			return;
 		}
 		if (flags() & (1 << OBJFLAG_ON_SCREEN_F)) {
-			move_by(ADDR_MoveObjectDown_Fast);
+			call_home(ADDR_MoveObjectDown_Fast);
 			return;
 		}
 		mem_[wDollBoyActiveBarrels] = 0;

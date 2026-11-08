@@ -8,6 +8,8 @@
 // one or the objects read what it leaves.
 #include "../asm_module.hpp"
 #include "../home/object_mechanics.hpp"
+#include "../home/memory.hpp"
+#include "object.hpp"
 
 namespace wl3::level {
 
@@ -168,7 +170,16 @@ public:
 		return v;
 	}
 
-	void home_jump_ret() { JUMP(HomeJumpRet); }
+	// Called plain (object_state, below), with the bank switched around it,
+	// rather than entered by its homejp wrapper
+	bool plain_ = false;
+
+	// The end of a state entered by homejp; a plain call just returns
+	void home_jump_ret()
+	{
+		if (!plain_)
+			JUMP(HomeJumpRet);
+	}
 
 	// The state at `state` by the y velocity in hffa0: below 2, 3, 4, or
 	// more; then HomeJumpRet.
@@ -264,6 +275,10 @@ public:
 	// asm's jr does (a hook each, so the fuzzer checks each part alone)
 	void thrown(bool left, uint16_t table)
 	{
+		if (plain_) {
+			thrown_object_movement(left, table);
+			return;
+		}
 		SET_BC(gb_, table);
 		JUMP_TO(left ? ADDR_Func_62ec3 : ADDR_Func_62faa);
 	}
@@ -1412,6 +1427,73 @@ public:
 };
 
 } // namespace
+
+// The homejp state wrappers (Func_3173 to Func_3407 in home): the state they
+// jump to, with its bank mapped for it as homejp and HomeJumpRet do. No
+// caller reads the registers these leave.
+bool object_state(GB *gb, uint16_t wrapper)
+{
+	struct Entry { uint16_t wrapper; uint8_t bank; void (ObjectEngine::*fn)(); };
+	static const Entry entries[] = {
+		{ADDR_Func_3173, BANK_Func_62e57, &ObjectEngine::port_Func_62e57},
+		{ADDR_VanishObject2, BANK__VanishObject2, &ObjectEngine::port__VanishObject2},
+		{ADDR_Func_3191, BANK_Func_62e8f, &ObjectEngine::port_Func_62e8f},
+		{ADDR_Func_31a0, BANK_Func_62ea5, &ObjectEngine::port_Func_62ea5},
+		{ADDR_Func_31af, BANK_Func_62f76, &ObjectEngine::port_Func_62f76},
+		{ADDR_Func_31be, BANK_Func_62f8c, &ObjectEngine::port_Func_62f8c},
+		{ADDR_Func_31cd, BANK_Func_62eaa, &ObjectEngine::port_Func_62eaa},
+		{ADDR_Func_31dc, BANK_Func_62ec0, &ObjectEngine::port_Func_62ec0},
+		{ADDR_Func_31eb, BANK_Func_62f91, &ObjectEngine::port_Func_62f91},
+		{ADDR_Func_31fa, BANK_Func_62fa7, &ObjectEngine::port_Func_62fa7},
+		{ADDR_Func_3209, BANK_Func_62e74, &ObjectEngine::port_Func_62e74},
+		{ADDR_Func_3218, BANK_Func_62e8a, &ObjectEngine::port_Func_62e8a},
+		{ADDR_Func_3227, BANK_Func_62f5b, &ObjectEngine::port_Func_62f5b},
+		{ADDR_Func_3236, BANK_Func_62f71, &ObjectEngine::port_Func_62f71},
+		{ADDR_Func_3245, BANK_Func_62c9f, &ObjectEngine::port_Func_62c9f},
+		{ADDR_Func_3254, BANK_Func_62d7d, &ObjectEngine::port_Func_62d7d},
+		{ADDR_Func_3263, BANK_Func_6303f, &ObjectEngine::port_Func_6303f},
+		{ADDR_Func_3272, BANK_Func_63050, &ObjectEngine::port_Func_63050},
+		{ADDR_Func_3281, BANK_Func_6305f, &ObjectEngine::port_Func_6305f},
+		{ADDR_ObjState_Fall, BANK__ObjState_Fall, &ObjectEngine::port__ObjState_Fall},
+		{ADDR_ObjState_StandingFall, BANK__ObjState_StandingFall, &ObjectEngine::port__ObjState_StandingFall},
+		{ADDR_Func_32ae, BANK_Func_62ae5, &ObjectEngine::port_Func_62ae5},
+		{ADDR_Func_32bd, BANK_Func_62bce, &ObjectEngine::port_Func_62bce},
+		{ADDR_Func_32cc, BANK_Func_62ca8, &ObjectEngine::port_Func_62ca8},
+		{ADDR_Func_32db, BANK_Func_62d86, &ObjectEngine::port_Func_62d86},
+		{ADDR_Func_32ea, BANK_Func_628ea, &ObjectEngine::port_Func_628ea},
+		{ADDR_Func_32f9, BANK_Func_629a6, &ObjectEngine::port_Func_629a6},
+		{ADDR_Func_3308, BANK_Func_62908, &ObjectEngine::port_Func_62908},
+		{ADDR_Func_3317, BANK_Func_62898, &ObjectEngine::port_Func_62898},
+		{ADDR_Func_3326, BANK_Func_62840, &ObjectEngine::port_Func_62840},
+		{ADDR_Func_3335, BANK_Func_61f54, &ObjectEngine::port_Func_61f54},
+		{ADDR_Func_3344, BANK_Func_620a6, &ObjectEngine::port_Func_620a6},
+		{ADDR_Func_3353, BANK_Func_621fb, &ObjectEngine::port_Func_621fb},
+		{ADDR_Func_3362, BANK_Func_622bd, &ObjectEngine::port_Func_622bd},
+		{ADDR_Func_3371, BANK_Func_62926, &ObjectEngine::port_Func_62926},
+		{ADDR_Func_3380, BANK_Func_62382, &ObjectEngine::port_Func_62382},
+		{ADDR_Func_338f, BANK_Func_6247b, &ObjectEngine::port_Func_6247b},
+		{ADDR_Func_339e, BANK_Func_62574, &ObjectEngine::port_Func_62574},
+		{ADDR_Func_33ad, BANK_Func_62605, &ObjectEngine::port_Func_62605},
+		{ADDR_ObjState_FullThrowLeft, BANK_Func_626da, &ObjectEngine::port_Func_626da},
+		{ADDR_ObjState_FullThrowRight, BANK_Func_62768, &ObjectEngine::port_Func_62768},
+		{ADDR_ObjState_BumpLeft, BANK__ObjState_BumpLeft, &ObjectEngine::port__ObjState_BumpLeft},
+		{ADDR_ObjState_BumpRight, BANK__ObjState_BumpRight, &ObjectEngine::port__ObjState_BumpRight},
+		{ADDR_Func_33f8, BANK_Func_62892, &ObjectEngine::port_Func_62892},
+		{ADDR_Func_3407, BANK_Func_6283a, &ObjectEngine::port_Func_6283a},
+	};
+	for (const Entry &e : entries) {
+		if (e.wrapper != wrapper)
+			continue;
+		uint8_t bank = Memory(gb)[wROMBank];
+		home::bankswitch(gb, e.bank, wrapper);
+		ObjectEngine engine(gb);
+		engine.plain_ = true;
+		(engine.*e.fn)();
+		home::bankswitch(gb, bank, ADDR_HomeJumpRet);
+		return true;
+	}
+	return false;
+}
 
 } // namespace wl3::level
 

@@ -164,15 +164,14 @@ void ZipLine::at_wall()
 	var1() = AT_END;
 }
 
-// MoveWario* moves him by var2 too (b, which the asm's MoveObject*ByVar2
-// leave it in)
+// Wario moves by var2 too (the asm's MoveObject*ByVar2 leave it in b for
+// MoveWario*)
 void ZipLine::along(bool right)
 {
 	right ? move_right_by_var2() : move_left_by_var2();
 	if (!carrying())
 		return;
-	gb_->cpu.b = var2();
-	routines_.call(right ? ADDR_MoveWarioRight : ADDR_MoveWarioLeft);
+	move_wario(right ? ADDR_MoveWarioRight : ADDR_MoveWarioLeft, var2());
 	if (right)
 		routines_.farcall(BANK_Func_19706, ADDR_Func_19706);
 	else
@@ -188,14 +187,13 @@ void ZipLine::slope(bool up)
 	up ? move_up_by_var2() : move_down_by_var2();
 	if (!carrying())
 		return;
-	gb_->cpu.b = var2();
 	if (up) {
-		routines_.call(ADDR_MoveWarioUp);
-		routines_.call(ADDR_HandleUpwardsFloorTransition);
+	move_wario(ADDR_MoveWarioUp, var2());
+		call_home(ADDR_HandleUpwardsFloorTransition);
 		return;
 	}
-	routines_.call(ADDR_MoveWarioDown);
-	routines_.call(ADDR_HandleDownwardsFloorTransition);
+	move_wario(ADDR_MoveWarioDown, var2());
+	call_home(ADDR_HandleDownwardsFloorTransition);
 	if (mem_[wCurObjId] < ZIP_LINE4)
 		return;
 	if (!(mem_[wGlobalCounter] & 0b111))

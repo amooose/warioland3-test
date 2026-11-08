@@ -119,8 +119,8 @@ void PrinceFroggy::stuck()
 		set_frameset(ADDR_Frameset_68add);
 		state_duration() = 111;
 		return;
-	case 0x1b: routines_.call(ADDR_Func_3272); return;
-	case 0x41: routines_.call(ADDR_ObjState_StandingFall); return;
+	case 0x1b: call_home(ADDR_Func_3272); return;
+	case 0x41: call_home(ADDR_ObjState_StandingFall); return;
 	case 0x13: // knocked loose
 		set_update(SITTING);
 		sit(wCurObjState);
@@ -159,8 +159,8 @@ void PrinceFroggy::sitting()
 	switch (s) {
 	case 0: shaken(); return;
 	case 0x11: falling(); return;
-	case 0x1b: routines_.call(ADDR_Func_3272); return;
-	case 0x41: routines_.call(ADDR_ObjState_StandingFall); return;
+	case 0x1b: call_home(ADDR_Func_3272); return;
+	case 0x41: call_home(ADDR_ObjState_StandingFall); return;
 	case 0x28: hit(page(), ADDR_Func_33f8); return;
 	case 0x29: hit(page(), ADDR_Func_3407); return;
 	case 0x04: hit(page(), ADDR_Func_3326); return;
@@ -199,7 +199,7 @@ void PrinceFroggy::vanishing()
 		return;
 	var2() = 0x08;
 	move_left_by_var2();
-	routines_.call(ADDR_VanishObject2);
+	call_home(ADDR_VanishObject2);
 }
 
 } // namespace wl3::level

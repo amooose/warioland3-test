@@ -103,7 +103,7 @@ public:
 	using Object::Object;
 
 	void fly(uint16_t page); // InvisibilityPotionFunc
-	void fly_after(uint16_t move) { move_by(move); fly(wCurObjFlags & 0xff00); } // InvisibilityPotionFunc_Left / _Right
+	void fly_after(uint16_t move) { call_home(move); fly(wCurObjFlags & 0xff00); } // InvisibilityPotionFunc_Left / _Right
 	void destroy() { routines_.farcall(BANK_VanishObject_NoSFX, ADDR_VanishObject_NoSFX); } // DestroyInvisibilityPotion
 	void land(); // Func_45453
 	void drop(); // InvisibilityPotionFunc_Drop
@@ -146,7 +146,7 @@ bool MadScienstein::turned(uint8_t turn)
 		return false;
 	}
 	if (--state_duration()) {
-		routines_.call(ADDR_Func_3308);
+		call_home(ADDR_Func_3308);
 		return false;
 	}
 	return true;
@@ -178,7 +178,7 @@ int MadScienstein::walk(uint16_t move_left, uint16_t move_right)
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		return right ? 2 : 1;
-	routines_.call(right ? move_right : move_left);
+	call_home(right ? move_right : move_left);
 	return 0;
 }
 
@@ -198,7 +198,7 @@ void MadScienstein::bump_start(uint8_t s, uint16_t params)
 void MadScienstein::bumped(uint16_t bump, uint16_t left, uint8_t left_state, uint16_t right, uint8_t right_state)
 {
 	if (var2()) {
-		routines_.call(bump);
+		call_home(bump);
 		return;
 	}
 	if (--state_duration())
@@ -214,7 +214,7 @@ void MadScienstein::bumped(uint16_t bump, uint16_t left, uint8_t left_state, uin
 void MadScienstein::var2_move(uint16_t routine)
 {
 	if (var2())
-		routines_.call(routine);
+		call_home(routine);
 	else
 		state() = 0x0f;
 }
@@ -273,7 +273,7 @@ void MadScienstein::run(uint16_t handler)
 	case HIT: // vanishes, unless Wario can only bump him
 		if (!mem_[wCurObjAction] || mem_[wTransformation] || mem_[wEffectivePowerUp] >= SUPER_JUMP_SLAM_OVERALLS
 			|| !(interaction() & INTERACTION_MASK)) {
-			routines_.call(ADDR_VanishObject2);
+			call_home(ADDR_VanishObject2);
 			return;
 		}
 		play_sfx(SFX_014);
@@ -291,7 +291,7 @@ void MadScienstein::run(uint16_t handler)
 			return;
 		}
 		if (--state_duration()) {
-			routines_.call(ADDR_Func_3308);
+			call_home(ADDR_Func_3308);
 			return;
 		}
 		state() = 0x2b;
@@ -326,7 +326,7 @@ void MadScienstein::run(uint16_t handler)
 		if (shaken(0x1c))
 			return;
 		if (--state_duration()) {
-			routines_.call(ADDR_Func_3308);
+			call_home(ADDR_Func_3308);
 			return;
 		}
 		state() = 0x01;
@@ -418,7 +418,7 @@ void MadScienstein::run(uint16_t handler)
 		if (shaken(0x1c))
 			return;
 		if (--state_duration())
-			routines_.call(ADDR_Func_32ea);
+			call_home(ADDR_Func_32ea);
 		else
 			state() = 0x10;
 		return;
@@ -429,7 +429,7 @@ void MadScienstein::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_40:
 		if (--state_duration())
-			routines_.call(ADDR_Func_32f9);
+			call_home(ADDR_Func_32f9);
 		else
 			state() = 0x00;
 		return;
@@ -469,7 +469,7 @@ void MadScienstein::run(uint16_t handler)
 		var3() = 0x41;
 		var2() = left ? 0xc0 : 0xe0;
 		var1() = 0x01;
-		routines_.call(left ? ADDR_Func_3335 : ADDR_Func_3344);
+		call_home(left ? ADDR_Func_3335 : ADDR_Func_3344);
 		return;
 	}
 	case STATE_19:
@@ -477,7 +477,7 @@ void MadScienstein::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_49: // carried, turning with Wario
 		if (mem_[wDirection]) {
-			routines_.call(ADDR_Func_3353);
+			call_home(ADDR_Func_3353);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -488,7 +488,7 @@ void MadScienstein::run(uint16_t handler)
 		[[fallthrough]];
 	case STATE_48:
 		if (!mem_[wDirection]) {
-			routines_.call(ADDR_Func_3362);
+			call_home(ADDR_Func_3362);
 			return;
 		}
 		substate() ^= OBJSUBFLAG_HDIR;
@@ -501,7 +501,7 @@ void MadScienstein::run(uint16_t handler)
 		set_interaction(OBJ_INTERACTION_00);
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }

@@ -193,7 +193,7 @@ void HiddenFigure::wait_start()
 	var1() = 0x00;
 	set_update(MAIN);
 	mem_[wBossState] = BOSS_HIDDEN_FIGURE;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 }
 
 void HiddenFigure::main()
@@ -452,7 +452,7 @@ void HiddenFigure::flash_pals()
 	SET_HL(gb_, pals);
 	gb_->cpu.c = 0;
 	gb_->cpu.b = 6;
-	routines_.call(ADDR_SetBGPals);
+	call_home(ADDR_SetBGPals);
 }
 
 void HiddenFigure::set_pals()
@@ -460,7 +460,7 @@ void HiddenFigure::set_pals()
 	SET_HL(gb_, mem_[w1d15a] < 0x02 ? ADDR_Pals_4d01b : ADDR_Pals_4d07b);
 	gb_->cpu.c = 0;
 	gb_->cpu.b = 6;
-	routines_.call(ADDR_SetBGPals);
+	call_home(ADDR_SetBGPals);
 }
 
 // --- the face ---
@@ -904,13 +904,13 @@ void HiddenFigure::carry(bool right)
 		bool dir = mem_[wDirection];
 		if (!right) {
 			if (dir) {
-				routines_.call(ADDR_Func_3353);
+				call_home(ADDR_Func_3353);
 				return;
 			}
 			carried(0x48);
 		} else {
 			if (!dir) {
-				routines_.call(ADDR_Func_3362);
+				call_home(ADDR_Func_3362);
 				return;
 			}
 			carried(0x49);
@@ -926,7 +926,7 @@ void HiddenFigure::thrown(uint8_t s, uint8_t var2_, uint16_t routine)
 	var3() = 0x41;
 	var2() = var2_;
 	var1() = 0x01;
-	routines_.call(routine);
+	call_home(routine);
 }
 
 void HiddenFigure::run_hand(uint16_t handler)
@@ -934,7 +934,7 @@ void HiddenFigure::run_hand(uint16_t handler)
 	switch (handler) {
 	case H_4D73E:
 		if (!state_duration()) {
-			routines_.call(ADDR_ObjState_Fall);
+			call_home(ADDR_ObjState_Fall);
 			return;
 		}
 		--state_duration();
@@ -1007,7 +1007,7 @@ void HiddenFigure::run_hand(uint16_t handler)
 	case H_4D87D:
 	case H_4D88B:
 		if (var2()) {
-			routines_.call(handler == H_4D87D ? ADDR_Func_32ae : ADDR_Func_32bd);
+			call_home(handler == H_4D87D ? ADDR_Func_32ae : ADDR_Func_32bd);
 			return;
 		}
 		state() = 0x0f;
@@ -1033,7 +1033,7 @@ void HiddenFigure::run_hand(uint16_t handler)
 		carry(true);
 		return;
 	default: // a shared object state
-		routines_.call(handler);
+		call_home(handler);
 		return;
 	}
 }

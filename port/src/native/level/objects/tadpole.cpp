@@ -126,7 +126,7 @@ void Tadpole::leaping()
 		if (state_duration()) {
 			--state_duration();
 			apply_y_movement(ADDR_Data_60a20);
-			move_by(ADDR_MoveObjectLeft_Fast);
+			call_home(ADDR_MoveObjectLeft_Fast);
 			return;
 		}
 		var3() = 0;
@@ -141,7 +141,7 @@ void Tadpole::leaping()
 	hpos_block_unk1();
 	if (!mem_[wIsInWaterOrSand]) {
 		apply_y_movement(ADDR_Data_60a40);
-		move_by(ADDR_MoveObjectLeft_Fast);
+		call_home(ADDR_MoveObjectLeft_Fast);
 		return;
 	}
 	set_frameset(ADDR_Frameset_69a26);

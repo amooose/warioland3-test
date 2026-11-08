@@ -1,5 +1,6 @@
 // The levels' objects: the object being updated. See object.hpp.
 #include "object.hpp"
+#include "../home/wario.hpp"
 
 namespace wl3::level {
 
@@ -16,8 +17,10 @@ void Object::set_frameset(uint16_t frameset)
 	home::set_object_frameset_ptr(gb_, frameset);
 }
 
-void Object::move_by(uint16_t routine)
+void Object::call_home(uint16_t routine)
 {
+	if (object_state(gb_, routine))
+		return;
 	bool odd = mem_[wGlobalCounter] & 1;
 	switch (routine) {
 	case ADDR_MoveObjectLeft: move_left(); break;
@@ -36,7 +39,22 @@ void Object::move_by(uint16_t routine)
 	case ADDR_MoveObjectRightByVar2: move_right_by_var2(); break;
 	case ADDR_MoveObjectUpByVar2: move_up_by_var2(); break;
 	case ADDR_MoveObjectDownByVar2: move_down_by_var2(); break;
+	case ADDR_DecrementRemainingBossHits: decrement_boss_hits(); break;
 	default: routines_.call(routine); break;
+	}
+}
+
+void Object::move_wario(uint16_t routine, uint8_t n)
+{
+	switch (routine) {
+	case ADDR_MoveWarioRight: home::move_wario_x(gb_, n); break;
+	case ADDR_MoveWarioLeft: home::move_wario_x(gb_, -n); break;
+	case ADDR_MoveWarioDown: home::move_wario_y(gb_, n); break;
+	case ADDR_MoveWarioUp: home::move_wario_y(gb_, -n); break;
+	default:
+		gb_->cpu.b = n;
+		routines_.call(routine);
+		break;
 	}
 }
 

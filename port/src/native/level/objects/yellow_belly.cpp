@@ -127,7 +127,7 @@ void YellowBelly::copy_pals(uint16_t pals)
 	SET_DE(gb_, wTempPals2 + 4 * PAL_SIZE);
 	gb_->cpu.c = 4;
 	gb_->cpu.b = 3;
-	routines_.call(ADDR_CopyAndApplyOBPals);
+	call_home(ADDR_CopyAndApplyOBPals);
 }
 
 // the palettes fading in
@@ -151,14 +151,14 @@ void YellowBelly::music_start()
 	state_duration() = 0x20;
 	set_update(RISING);
 	mem_[wBossState] = BOSS_REGULAR;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 }
 
 void YellowBelly::rising()
 {
 	no_actions();
 	if (--state_duration()) {
-		move_by(ADDR_MoveObjectUp_Slow);
+		call_home(ADDR_MoveObjectUp_Slow);
 		return;
 	}
 	state_duration() = static_cast<uint8_t>((mem_[rDIV] & 0x01) + 0x03);
@@ -421,8 +421,7 @@ void YellowBelly::hit()
 {
 	mem_[w1d147] = 0;
 	set_update(HURT);
-	SET_HL(gb_, wCurObjSubState);
-	routines_.call(ADDR_DecrementRemainingBossHits);
+	decrement_boss_hits();
 	if ((substate() & 0x0f) != 1) {
 		set_frameset(ADDR_Frameset_697d5);
 		state_duration() = 0x64;
@@ -558,7 +557,7 @@ void YellowBellyHelper::arrow_off(bool right)
 		return;
 	}
 	move_up_by_var2();
-	move_by(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+	call_home(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 }
 
 void YellowBellyHelper::arrow_vanish()
@@ -629,7 +628,7 @@ void YellowBellyHelper::platform_update()
 	state_duration() = 0x5a;
 	set_update(ADDR_Func_51c77);
 	mem_[wBossState] = BOSS_DEFEATED;
-	routines_.call(ADDR_UpdateLevelMusic);
+	call_home(ADDR_UpdateLevelMusic);
 	mem_[wIsBossBattle] = 0;
 	platform_done();
 }
@@ -686,7 +685,7 @@ void YellowBellyHelper::pump_falling()
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		return;
-	move_by(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
+	call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 }
 
 // pushed about ($31); pumped ($0a), it blows the water away; an arrow

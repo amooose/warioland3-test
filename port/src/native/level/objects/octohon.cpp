@@ -181,7 +181,7 @@ void Octohon::big_charge()
 {
 	bool right = facing_right();
 	if (!wall_at(right ? 6 : -6)) {
-		move_by(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
+		call_home(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 		return;
 	}
 	knocked_back(REG_HL(gb_), right ? ADDR_Frameset_69b74 : ADDR_Frameset_69b69);

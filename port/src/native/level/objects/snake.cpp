@@ -126,16 +126,15 @@ void Snake::waiting()
 void Snake::carry_wario(bool up)
 {
 	if (!(flags() & OBJFLAG_STEPPED)) {
-		move_by(up ? ADDR_MoveObjectUp_Slow : ADDR_MoveObjectDown_Slow);
+		call_home(up ? ADDR_MoveObjectUp_Slow : ADDR_MoveObjectDown_Slow);
 		return;
 	}
 	flags() &= ~OBJFLAG_STEPPED;
 	mem_[wCurObjCollBoxBottom] = 0;
 	if (!(mem_[wGlobalCounter] & 1))
 		return;
-	gb_->cpu.b = 1;
-	routines_.call(up ? ADDR_MoveWarioUp : ADDR_MoveWarioDown);
-	routines_.call(up ? ADDR_HandleUpwardsFloorTransition : ADDR_HandleDownwardsFloorTransition);
+	move_wario(up ? ADDR_MoveWarioUp : ADDR_MoveWarioDown, 1);
+	call_home(up ? ADDR_HandleUpwardsFloorTransition : ADDR_HandleDownwardsFloorTransition);
 	up ? move_up() : move_down();
 }
 

@@ -95,7 +95,7 @@ void Small::kobatto()
 void Small::kobatto_update()
 {
 	SET_DE(gb_, ADDR_Data_60ec9);
-	routines_.call(ADDR_ApplyObjSetMovement);
+	call_home(ADDR_ApplyObjSetMovement);
 }
 
 void Small::wall_crack(uint16_t frameset)
@@ -127,7 +127,7 @@ void Small::clear_gate(uint16_t frameset)
 	if (!mem_[wIsMinigameCleared])
 		return;
 	var2() = 32;
-	move_by(ADDR_MoveObjectUpByVar2);
+	call_home(ADDR_MoveObjectUpByVar2);
 }
 
 void Small::water_spark()
