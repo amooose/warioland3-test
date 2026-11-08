@@ -887,6 +887,10 @@ primitives, home/wario.cpp, and the golf objects' animation):
 - Pitfall: scratchpad live.py can run for hours and grow to 6-8 GB; four
   at once left 20 MB free and the quick tier failed with SegFault and
   "Not Run". Check free memory before debugging such a failure.
+- spawn_edge.cpp plain (2026-11-08): the edge drawing farcalls it and
+  reads nothing after; it uses home::block_ptr, obj_map_col and
+  level_block_to_hpos, and only SpawnObject still gets c and de. Full
+  fuzz tier green through 5d57c81 (56/56).
 - Next: home/wario_mechanics1.cpp (116 CALL/JUMP sites in
   wario_states_*.cpp pass b and flags through: give them plain
   functions first), home/load_golf_sprite.cpp, home/sprites.cpp,
