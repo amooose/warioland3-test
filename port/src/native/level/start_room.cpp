@@ -9,6 +9,7 @@
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
+#include "../home/object_pos.hpp"
 
 #include <initializer_list>
 
@@ -106,12 +107,6 @@ private:
 		cpu_.a = mem_[addr];
 		cpu_.f = flags::cp(cpu_.a, v);
 	}
-	void flip_b()
-	{
-		cpu_.a = cpu_.b ^ 0x01;
-		cpu_.f = flags::xor_(cpu_.a);
-		cpu_.b = cpu_.a;
-	}
 	void add_hl(uint16_t v)
 	{
 		uint16_t hl = REG_HL(gb_);
@@ -120,12 +115,21 @@ private:
 			| (sum > 0xffff ? FLAG_C : 0));
 		SET_HL(gb_, sum);
 	}
-	void obj_map_bank(uint16_t addr);
-	void spawn_if_in_range();
-	void scroll_minus(uint16_t scroll, uint16_t pos, uint8_t offset, int border);
-	bool cap_low(uint16_t scroll, uint16_t limit, uint16_t limit_flag);
-	bool cap_high(uint16_t scroll, uint16_t de, uint8_t wide_span, int border, uint16_t limit, uint16_t limit_flag);
-	void set_scroll(uint16_t scroll, uint16_t reg, uint16_t wreg, bool store);
+	void spawn_if_in_range(uint8_t index, home::ObjMapBlock block);
+	home::ObjMapBlock obj_map_at_hpos();
+	void next_obj_map_row(home::ObjMapBlock &block);
+	uint16_t scroll_minus(uint16_t scroll, uint16_t pos, uint8_t offset, int border);
+	bool cap_low(uint16_t scroll, uint16_t v, uint16_t limit, uint16_t limit_flag);
+	bool cap_high(uint16_t scroll, uint8_t span, uint8_t wide_span, int border, uint16_t limit, uint16_t limit_flag);
+	void set_scroll(uint16_t scroll, uint16_t reg, uint16_t wreg, uint8_t v, bool store);
+	// big-endian words (positions, scrolls)
+	uint16_t be(uint16_t addr) const { return static_cast<uint16_t>(mem_[addr] << 8 | mem_[addr + 1]); }
+	void set_be(uint16_t addr, uint16_t v)
+	{
+		mem_[addr] = static_cast<uint8_t>(v >> 8);
+		mem_[addr + 1] = static_cast<uint8_t>(v);
+	}
+	bool cam_border(int bit) const { return mem_[wCameraConfigFlags] & (1 << bit); }
 	void draw_room_column(uint16_t queue);
 	void queue_row_tiles_and_attributes();
 	void call_in_sram1(uint16_t addr, uint16_t ret);
@@ -137,446 +141,250 @@ private:
 	Routines routines_;
 };
 
-// c = 1 / ld a, [addr]: the SRAM bank (c) and page (a) of an object map row
-void RoomStart::obj_map_bank(uint16_t addr)
+// spawns the object (index) at the object map block if the block's in the
+// spawn range (wc0c4-wc0c7: rows and columns, the rows less $20 past the
+// first SRAM bank)
+void RoomStart::spawn_if_in_range(uint8_t index, home::ObjMapBlock block)
 {
-	cpu_.c = 0x01;
-	cpu_.a = mem_[addr];
-	cpu_.f = flags::cp(cpu_.a, 0xc0); // HIGH(STARTOF(SRAM) + SIZEOF(SRAM))
-	for (int i = 0; i < 2 && !cf(); i++) {
-		cpu_.f = flags::inc(cpu_.f, cpu_.c);
-		cpu_.c++;
-		cpu_.f = flags::sub(cpu_.a, 0x20);
-		cpu_.a = static_cast<uint8_t>(cpu_.a - 0x20);
-		if (i == 0)
-			cpu_.f = flags::cp(cpu_.a, 0xc0);
-	}
-}
-
-// a = an object's index: spawns it if its block (hl) is in the spawn range
-void RoomStart::spawn_if_in_range()
-{
-	cpu_.f = flags::cp(cpu_.a, 0x0f);
-	if (!cf())
+	if (index >= 0x0f)
 		return; // Wario's spawn block
-	cpu_.c = cpu_.a; // the object's index
-	uint8_t right = mem_[wc0c7];
-	cpu_.f = flags::dec(cpu_.f, right);
-	cpu_.a = static_cast<uint8_t>(right - 1);
-	cpu_.f = flags::cp(cpu_.a, cpu_.l);
-	if (cf())
+	if (static_cast<uint8_t>(mem_[wc0c7] - 1) < block.col || mem_[wc0c6] > block.col)
 		return;
-	cpu_.a = mem_[wc0c6];
-	cpu_.f = flags::cp(cpu_.a, cpu_.l);
-	if (!zf() && !cf())
-		return;
-	uint8_t bank = mem_[wccec];
-	cpu_.f = flags::dec(cpu_.f, bank);
-	uint8_t sub = zf() ? 0 : 0x20;
-	cpu_.a = mem_[wc0c4];
-	if (sub) {
-		cpu_.f = flags::sub(cpu_.a, sub);
-		cpu_.a = static_cast<uint8_t>(cpu_.a - sub);
-	}
-	cpu_.f = flags::dec(cpu_.f, cpu_.a);
-	cpu_.a--;
-	cpu_.f = flags::cp(cpu_.a, cpu_.h);
-	if (cf())
-		return;
-	cpu_.a = mem_[wc0c5];
-	if (sub) {
-		cpu_.f = flags::sub(cpu_.a, sub);
-		cpu_.a = static_cast<uint8_t>(cpu_.a - sub);
-	}
-	cpu_.f = flags::cp(cpu_.a, cpu_.h);
-	if (!zf() && !cf())
+	uint8_t sub = mem_[wccec] == 1 ? 0 : 0x20;
+	if (static_cast<uint8_t>(mem_[wc0c4] - sub - 1) < block.row || static_cast<uint8_t>(mem_[wc0c5] - sub) > block.row)
 		return;
 
-	// .spawn
-	gb_push16(gb_, REG_DE(gb_));
-	gb_push16(gb_, REG_BC(gb_));
-	routines_.call(ADDR_Func_cf8);
-	gb_push16(gb_, REG_HL(gb_));
-	routines_.call(ADDR_Func_d81);
-	cpu_.d = cpu_.h;
-	cpu_.e = cpu_.l;
+	// .spawn: SpawnObject takes the index in c, the block in de
+	home::obj_map_block_to_hpos(gb_, block);
+	cpu_.c = index;
+	cpu_.d = block.row;
+	cpu_.e = home::level_col(block.col, block.parity);
 	push_wram(BANK_wObjects); // BANK("Level Objects WRAM")
 	routines_.farcall(BANK_SpawnObject, ADDR_SpawnObject);
 	pop_wram();
-	SET_HL(gb_, gb_pop16(gb_));
-	SET_BC(gb_, gb_pop16(gb_));
-	SET_DE(gb_, gb_pop16(gb_));
 }
 
 // spawns the objects in the 16x16 blocks of the object map around
 // wBlockXPos / wObjectSpawnBlockY
 void RoomStart::spawn_objects()
 {
-	// the block position to hPos: ld a, [de] / ld [hld], a / dec de, from
-	// the x position's low byte down
 	for (int i = 0; i < 4; i++)
 		mem_[hXPosLo - i] = mem_[wBlockXPos + 1 - i];
-	cpu_.a = mem_[wBlockXPos + 1 - 3];
-	SET_HL(gb_, hXPosLo - 3);
-	SET_DE(gb_, wBlockXPos + 1 - 3);
-	routines_.call(ADDR_Func_cc0);
-
-	obj_map_bank(wObjectSpawnBlockY);
-	cpu_.h = cpu_.a;
-	cpu_.a = cpu_.c;
-	mem_[wccec] = cpu_.c;
-	sram_switch(cpu_.c);
-	cpu_.a = 1;
+	home::ObjMapBlock block = obj_map_at_hpos();
 	mem_[wUnused_ObjectParity] = 1;
-	cpu_.b = 1;
-	cpu_.d = 0x10;
-	do {
-		cpu_.e = 16 / 2;
-		do {
-			uint8_t pair = mem_[REG_HL(gb_)];
-			cpu_.a = (pair & 0xf0) >> 4; // and $f0 / swap a
-			cpu_.f = flags::z(cpu_.a);
-			if (cpu_.a)
-				spawn_if_in_range();
-			flip_b();
-			cpu_.a = mem_[REG_HL(gb_)] & 0x0f;
-			cpu_.f = flags::and_(cpu_.a);
-			if (cpu_.a)
-				spawn_if_in_range();
-			cpu_.f = flags::inc(cpu_.f, cpu_.l);
-			cpu_.l++;
-			flip_b();
-			cpu_.f = flags::dec(cpu_.f, cpu_.e);
-		} while (--cpu_.e);
-		cpu_.f = flags::sub(cpu_.l, 0x08);
-		cpu_.a = static_cast<uint8_t>(cpu_.l - 0x08);
-		cpu_.l = cpu_.a;
-		cpu_.f = flags::inc(cpu_.f, cpu_.h);
-		cpu_.h++;
-		cpu_.a = cpu_.h;
-		cpu_.f = flags::cp(cpu_.h, 0xc0);
-		if (zf()) {
-			cpu_.h = sLevelBlockObjectMap >> 8;
-			uint8_t bank = mem_[wccec];
-			cpu_.f = flags::inc(cpu_.f, bank);
-			cpu_.a = static_cast<uint8_t>(bank + 1);
-			mem_[wccec] = cpu_.a;
-			sram_switch(cpu_.a);
+	block.parity = 1;
+	for (int rows = 0x10; rows; rows--) {
+		for (int pairs = 16 / 2; pairs; pairs--) {
+			uint16_t at = static_cast<uint16_t>(block.row << 8 | block.col);
+			if (uint8_t index = mem_[at] >> 4)
+				spawn_if_in_range(index, block);
+			block.parity ^= 1;
+			if (uint8_t index = mem_[at] & 0x0f)
+				spawn_if_in_range(index, block);
+			block.col++;
+			block.parity ^= 1;
 		}
-		cpu_.f = flags::dec(cpu_.f, cpu_.d);
-	} while (--cpu_.d);
-}
-
-// hl = pos - offset (big-endian), stored to scroll; - $20 more with the
-// border bit
-void RoomStart::scroll_minus(uint16_t scroll, uint16_t pos, uint8_t offset, int border)
-{
-	uint8_t lo = mem_[pos + 1];
-	cpu_.f = flags::sub(lo, offset);
-	cpu_.a = static_cast<uint8_t>(lo - offset);
-	mem_[scroll + 1] = cpu_.a;
-	cpu_.l = cpu_.a;
-	bool borrow = lo < offset;
-	uint8_t hi = mem_[pos + 0];
-	cpu_.f = flags::sub(hi, 0, borrow);
-	cpu_.a = static_cast<uint8_t>(hi - borrow);
-	mem_[scroll + 0] = cpu_.a;
-	cpu_.h = cpu_.a;
-	if (cam_bit(border)) {
-		SET_DE(gb_, static_cast<uint16_t>(-0x20));
-		add_hl(static_cast<uint16_t>(-0x20));
+		next_obj_map_row(block);
 	}
 }
 
-// caps hl to the low limit: true (and the scroll's at it) if it's below
-bool RoomStart::cap_low(uint16_t scroll, uint16_t limit, uint16_t limit_flag)
+// the object map block at hPos (Func_cc0), its row's SRAM bank (in wccec)
+// switched in: $20 rows a bank
+home::ObjMapBlock RoomStart::obj_map_at_hpos()
 {
-	cpu_.b = mem_[limit];
-	cpu_.a = cpu_.h;
-	cpu_.f = flags::bit(cpu_.f, cpu_.a, 7);
-	bool cap = cpu_.a & 0x80;
-	if (!cap) {
-		cpu_.f = flags::cp(cpu_.a, cpu_.b);
-		if (cf()) {
-			cap = true;
-		} else if (zf()) {
-			cpu_.a = cpu_.l;
-			cpu_.f = flags::and_(cpu_.a);
-			cap = !cpu_.a;
-		}
+	home::ObjMapBlock block = home::obj_map_block(gb_, hYPosHi);
+	uint8_t bank = 0x01;
+	uint8_t row = mem_[wObjectSpawnBlockY];
+	for (int i = 0; i < 2 && row >= 0xc0; i++) {
+		bank++;
+		row = static_cast<uint8_t>(row - 0x20);
 	}
-	if (cap) {
-		cpu_.a = cpu_.b;
-		mem_[scroll + 0] = cpu_.b;
-		st(limit_flag, 1);
-	}
-	return cap;
+	mem_[wccec] = bank;
+	sram_switch(bank);
+	block.row = row;
+	return block;
 }
 
-// caps hl = scroll + de (e = wide_span with the border) to the high limit;
-// true if it's at it
-bool RoomStart::cap_high(uint16_t scroll, uint16_t de, uint8_t wide_span, int border, uint16_t limit, uint16_t limit_flag)
+// back 8 bytes, a row down (on into the next SRAM bank past its end)
+void RoomStart::next_obj_map_row(home::ObjMapBlock &block)
 {
-	cpu_.a = mem_[scroll + 0];
-	cpu_.l = mem_[scroll + 1];
-	cpu_.h = cpu_.a;
-	SET_DE(gb_, de);
-	if (cam_bit(border))
-		cpu_.e = wide_span;
-	add_hl(REG_DE(gb_));
-	cpu_.b = mem_[limit];
-	cpu_.a = cpu_.h;
-	cpu_.f = flags::cp(cpu_.a, cpu_.b);
-	if (cf())
+	block.col = static_cast<uint8_t>(block.col - 0x08);
+	if (++block.row == 0xc0) {
+		block.row = sLevelBlockObjectMap >> 8;
+		mem_[wccec] = static_cast<uint8_t>(mem_[wccec] + 1);
+		sram_switch(mem_[wccec]);
+	}
+}
+
+// scroll = pos - offset (big-endian); returns that, less $20 more with the
+// border bit (the asm's hl)
+uint16_t RoomStart::scroll_minus(uint16_t scroll, uint16_t pos, uint8_t offset, int border)
+{
+	uint16_t v = static_cast<uint16_t>(be(pos) - offset);
+	set_be(scroll, v);
+	return cam_border(border) ? static_cast<uint16_t>(v - 0x20) : v;
+}
+
+// caps the scroll (at v) to the low limit: true (and the scroll's high
+// byte at it) if it's below, or past the top of the map
+bool RoomStart::cap_low(uint16_t scroll, uint16_t v, uint16_t limit, uint16_t limit_flag)
+{
+	uint8_t lim = mem_[limit], hi = static_cast<uint8_t>(v >> 8);
+	if (!((hi & 0x80) || hi < lim || (hi == lim && !(v & 0xff))))
 		return false;
-	cpu_.f = flags::dec(cpu_.f, cpu_.b);
-	cpu_.a = static_cast<uint8_t>(cpu_.b - 1);
-	mem_[scroll + 0] = cpu_.a;
-	st(limit_flag, static_cast<uint8_t>(-1));
+	mem_[scroll + 0] = lim;
+	mem_[limit_flag] = 1;
+	return true;
+}
+
+// caps scroll + span (wide_span with the border) to the high limit: true
+// if it's at it
+bool RoomStart::cap_high(uint16_t scroll, uint8_t span, uint8_t wide_span, int border, uint16_t limit, uint16_t limit_flag)
+{
+	uint16_t v = static_cast<uint16_t>(be(scroll) + (cam_border(border) ? wide_span : span));
+	uint8_t lim = mem_[limit];
+	if ((v >> 8) < lim)
+		return false;
+	mem_[scroll + 0] = static_cast<uint8_t>(lim - 1);
+	mem_[limit_flag] = 0xff;
 	return true;
 }
 
 // the camera scroll for a new room or the level's start
 void RoomStart::set_initial_camera_scroll()
 {
-	xor_a();
 	mem_[wCameraRoomXScrollLimit] = 0;
-	cam_cp(CAM_XSCROLL2 | CAM_TRANSITIONS);
-	if (!zf())
-		cpu_.f = flags::cp(cpu_.a, CAM_YSCROLL);
-	if (zf()) { // the x scroll at Wario's
-		cpu_.a = mem_[wWarioXPos + 0];
-		mem_[wCameraSCX + 0] = cpu_.a;
-		st(wCameraSCX + 1, 0x30);
+	uint8_t mode = mem_[wCameraConfigFlags] & CAM_SCROLLING_MASK;
+	if (mode == (CAM_XSCROLL2 | CAM_TRANSITIONS) || mode == CAM_YSCROLL) { // the x scroll at Wario's
+		mem_[wCameraSCX + 0] = mem_[wWarioXPos + 0];
+		mem_[wCameraSCX + 1] = 0x30;
 	} else {
-		uint8_t dir = mem_[wDirection];
-		cpu_.f = flags::and_(dir);
-		uint8_t spacing = mem_[dir ? wCamRightSpacing : wCamLeftSpacing];
-		cpu_.f = flags::sub(spacing, 8);
-		cpu_.a = static_cast<uint8_t>(spacing - 8);
-		cpu_.b = cpu_.a;
-		scroll_minus(wCameraSCX, wWarioXPos, cpu_.b, CAM_BORDER_LEFT_F);
-		if (!cap_low(wCameraSCX, wRoomLeftXLimit, wCameraRoomXScrollLimit))
+		uint8_t spacing = static_cast<uint8_t>(mem_[mem_[wDirection] ? wCamRightSpacing : wCamLeftSpacing] - 8);
+		uint16_t v = scroll_minus(wCameraSCX, wWarioXPos, spacing, CAM_BORDER_LEFT_F);
+		if (!cap_low(wCameraSCX, v, wRoomLeftXLimit, wCameraRoomXScrollLimit))
 			cap_high(wCameraSCX, sLevelBlockObjectMap >> 8, 0xc0, CAM_BORDER_RIGHT_F, wRoomRightXLimit,
 				wCameraRoomXScrollLimit);
 	}
 
-	// .check_if_saved_level
-	cpu_.a = mem_[wceef] & 0b00111100;
-	cpu_.f = flags::and_(cpu_.a);
-	if (cpu_.a) {
-		cam_cp(CAM_TRANSITIONS);
-		if (!cf())
-			return; // no y scroll to handle
-	}
+	// .check_if_saved_level: no y scroll to handle
+	if ((mem_[wceef] & 0b00111100) && mode >= CAM_TRANSITIONS)
+		return;
 
 	// .handle_cam_y_scroll
-	xor_a();
 	mem_[wCameraRoomYScrollLimit] = 0;
-	scroll_minus(wCameraSCY, wWarioYPos, 0x60, CAM_BORDER_UP_F);
-	if (cap_low(wCameraSCY, wRoomUpperYLimit, wCameraRoomYScrollLimit))
+	uint16_t v = scroll_minus(wCameraSCY, wWarioYPos, 0x60, CAM_BORDER_UP_F);
+	if (cap_low(wCameraSCY, v, wRoomUpperYLimit, wCameraRoomYScrollLimit))
 		return;
 	if (cap_high(wCameraSCY, 0x90, 0xb0, CAM_BORDER_DOWN_F, wRoomLowerYLimit, wCameraRoomYScrollLimit))
 		return;
 
-	// .check_transitions
-	cam_cp(CAM_TRANSITIONS);
-	if (cf())
-		return; // not CAM_TRANSITIONS
-	ld_cp(wWarioYPos + 1, 0x80);
-	if (!cf()) {
-		st(wCameraSCY + 1, 0x68);
+	// .check_transitions: the floor Wario's on
+	if (mode < CAM_TRANSITIONS)
+		return;
+	if (mem_[wWarioYPos + 1] >= 0x80) {
+		mem_[wCameraSCY + 1] = 0x68;
 		return;
 	}
-	cpu_.b = mem_[wRoomUpperYLimit];
-	uint8_t y_hi = mem_[wWarioYPos + 0];
-	cpu_.f = flags::dec(cpu_.f, y_hi);
-	cpu_.a = static_cast<uint8_t>(y_hi - 1);
-	mem_[wCameraSCY + 0] = cpu_.a;
-	cpu_.f = flags::cp(cpu_.a, cpu_.b);
-	if (cf()) { // .cap_up_side
-		cpu_.a = cpu_.b;
-		mem_[wCameraSCY + 0] = cpu_.b;
-		st(wCameraRoomYScrollLimit, 1);
+	uint8_t upper = mem_[wRoomUpperYLimit];
+	uint8_t hi = static_cast<uint8_t>(mem_[wWarioYPos + 0] - 1);
+	mem_[wCameraSCY + 0] = hi;
+	if (hi < upper) { // .cap_up_side
+		mem_[wCameraSCY + 0] = upper;
+		mem_[wCameraRoomYScrollLimit] = 1;
 		return;
 	}
-	cpu_.f = flags::bit(cpu_.f, cpu_.a, 7);
-	if (!(cpu_.a & 0x80)) {
-		st(wCameraSCY + 1, 0xe8);
+	if (!(hi & 0x80)) {
+		mem_[wCameraSCY + 1] = 0xe8;
 		return;
 	}
-	xor_a();
 	mem_[wCameraSCY + 0] = 0;
-	st(wCameraRoomYScrollLimit, 1);
+	mem_[wCameraRoomYScrollLimit] = 1;
 }
 
-// a = the scroll value: to [scroll + 1] (if store), rSC* and wSC*
-void RoomStart::set_scroll(uint16_t scroll, uint16_t reg, uint16_t wreg, bool store)
+// the scroll's low byte to rSC* and wSC* (and to [scroll + 1], if store)
+void RoomStart::set_scroll(uint16_t scroll, uint16_t reg, uint16_t wreg, uint8_t v, bool store)
 {
 	if (store)
-		mem_[scroll + 1] = cpu_.a;
-	mem_[reg] = cpu_.a;
-	mem_[wreg] = cpu_.a;
+		mem_[scroll + 1] = v;
+	mem_[reg] = v;
+	mem_[wreg] = v;
 }
 
 // the camera scroll from SetInitialCameraScroll to rSCY / rSCX, and
 // wBlockPos at the BG map's top left
 void RoomStart::apply_initial_camera_scroll()
 {
-	cpu_.h = mem_[wCameraSCY + 0];
-	cpu_.l = mem_[wCameraSCY + 1];
-	cpu_.a = mem_[wCameraRoomYScrollLimit];
-	cpu_.f = flags::cp(cpu_.a, 1);
-	if (zf()) { // .on_upper_edge
-		cpu_.a = cam_bit(CAM_BORDER_UP_F) ? 0x20 : 0x00;
-		set_scroll(wCameraSCY, rSCY, wSCY, true);
-		mem_[wBlockYPos + 1] = cpu_.a;
-		cpu_.a = cpu_.h;
-		mem_[wBlockYPos + 0] = cpu_.h;
+	uint16_t scy = be(wCameraSCY);
+	uint8_t limit = mem_[wCameraRoomYScrollLimit];
+	if (limit == 1) { // .on_upper_edge
+		uint8_t v = cam_border(CAM_BORDER_UP_F) ? 0x20 : 0x00;
+		set_scroll(wCameraSCY, rSCY, wSCY, v, true);
+		set_be(wBlockYPos, static_cast<uint16_t>((scy & 0xff00) | v));
+	} else if (limit == 0xff) { // .on_lower_edge
+		uint8_t v = cam_border(CAM_BORDER_DOWN_F) ? 0x48 : 0x68;
+		set_scroll(wCameraSCY, rSCY, wSCY, v, true);
+		set_be(wBlockYPos, static_cast<uint16_t>((scy & 0xff00) | static_cast<uint8_t>(v - 0x20)));
 	} else {
-		cpu_.f = flags::cp(cpu_.a, static_cast<uint8_t>(-1));
-		if (zf()) { // .on_lower_edge
-			cpu_.a = cam_bit(CAM_BORDER_DOWN_F) ? 0x48 : 0x68;
-			set_scroll(wCameraSCY, rSCY, wSCY, true);
-			cpu_.f = flags::sub(cpu_.a, 0x20);
-			cpu_.a = static_cast<uint8_t>(cpu_.a - 0x20);
-			mem_[wBlockYPos + 1] = cpu_.a;
-			cpu_.a = cpu_.h;
-			mem_[wBlockYPos + 0] = cpu_.h;
-		} else {
-			cpu_.a = cpu_.l;
-			set_scroll(wCameraSCY, rSCY, wSCY, false);
-			cpu_.f = flags::sub(cpu_.a, 0x18);
-			bool borrow = cpu_.a < 0x18;
-			cpu_.a = static_cast<uint8_t>(cpu_.a - 0x18);
-			mem_[wBlockYPos + 1] = cpu_.a;
-			cpu_.f = flags::sub(cpu_.h, 0, borrow);
-			cpu_.a = static_cast<uint8_t>(cpu_.h - borrow);
-			mem_[wBlockYPos + 0] = cpu_.a;
-		}
+		set_scroll(wCameraSCY, rSCY, wSCY, static_cast<uint8_t>(scy), false);
+		set_be(wBlockYPos, static_cast<uint16_t>(scy - 0x18));
 	}
 
 	// .cam_x_scroll
-	cpu_.h = mem_[wCameraSCX + 0];
-	cpu_.l = mem_[wCameraSCX + 1];
-	cpu_.a = mem_[wCameraRoomXScrollLimit];
-	cpu_.f = flags::cp(cpu_.a, 1);
-	if (zf()) { // .on_left_edge
-		cpu_.a = cam_bit(CAM_BORDER_LEFT_F) ? 0x20 : 0x00;
-		set_scroll(wCameraSCX, rSCX, wSCX, true);
-		mem_[wBlockXPos + 1] = cpu_.a;
-		cpu_.a = cpu_.h;
-		mem_[wBlockXPos + 0] = cpu_.h;
+	uint16_t scx = be(wCameraSCX);
+	limit = mem_[wCameraRoomXScrollLimit];
+	if (limit == 1) { // .on_left_edge
+		uint8_t v = cam_border(CAM_BORDER_LEFT_F) ? 0x20 : 0x00;
+		set_scroll(wCameraSCX, rSCX, wSCX, v, true);
+		set_be(wBlockXPos, static_cast<uint16_t>((scx & 0xff00) | v));
 		return;
 	}
-	cpu_.f = flags::cp(cpu_.a, static_cast<uint8_t>(-1));
-	if (zf()) { // .on_right_edge
-		cpu_.a = cam_bit(CAM_BORDER_RIGHT_F) ? 0x40 : 0x60;
-		set_scroll(wCameraSCX, rSCX, wSCX, true);
-		cpu_.f = flags::sub(cpu_.a, 0x28);
-		cpu_.a = static_cast<uint8_t>(cpu_.a - 0x28);
-		mem_[wBlockXPos + 1] = cpu_.a;
-		cpu_.a = cpu_.h;
-		mem_[wBlockXPos + 0] = cpu_.h;
+	if (limit == 0xff) { // .on_right_edge
+		uint8_t v = cam_border(CAM_BORDER_RIGHT_F) ? 0x40 : 0x60;
+		set_scroll(wCameraSCX, rSCX, wSCX, v, true);
+		set_be(wBlockXPos, static_cast<uint16_t>((scx & 0xff00) | static_cast<uint8_t>(v - 0x28)));
 		return;
 	}
-	cpu_.a = cpu_.l;
-	set_scroll(wCameraSCX, rSCX, wSCX, false);
-	cpu_.f = flags::sub(cpu_.a, 0x10);
-	bool borrow = cpu_.a < 0x10;
-	cpu_.a = static_cast<uint8_t>(cpu_.a - 0x10);
-	mem_[wBlockXPos + 1] = cpu_.a;
-	cpu_.f = flags::sub(cpu_.h, 0, borrow);
-	cpu_.a = static_cast<uint8_t>(cpu_.h - borrow);
-	mem_[wBlockXPos + 0] = cpu_.a;
-	cpu_.f = flags::bit(cpu_.f, cpu_.a, 7);
-	if (!(cpu_.a & 0x80))
-		return;
-	xor_a();
-	mem_[wBlockXPos + 1] = 0;
-	mem_[wBlockXPos + 0] = 0;
+	set_scroll(wCameraSCX, rSCX, wSCX, static_cast<uint8_t>(scx), false);
+	uint16_t x = static_cast<uint16_t>(scx - 0x10);
+	set_be(wBlockXPos, (x & 0x8000) ? 0 : x);
 }
 
 // hPos (and wWarioPos) at the block of wWarioSpawnPos, then exactly at the
 // spawn block ($f) found in the object map there
 void RoomStart::set_wario_position_to_spawn()
 {
-	xor_a();
+	uint8_t spawn = mem_[wWarioSpawnPos];
 	mem_[hXPosLo] = 0;
-	cpu_.a = mem_[wWarioSpawnPos] & 0x0f;
-	mem_[hXPosHi] = cpu_.a;
-	xor_a();
+	mem_[hXPosHi] = spawn & 0x0f;
 	mem_[hYPosLo] = 0;
-	uint8_t row = mem_[wWarioSpawnPos] & 0xf0;
-	cpu_.a = static_cast<uint8_t>(row >> 4); // swap a
-	cpu_.f = flags::z(cpu_.a);
-	mem_[hYPosHi] = cpu_.a;
-	SET_HL(gb_, hYPosHi);
-	routines_.call(ADDR_Func_cc0);
-
-	obj_map_bank(wObjectSpawnBlockY);
-	cpu_.h = cpu_.a;
-	cpu_.a = cpu_.c;
-	mem_[wccec] = cpu_.c;
-	sram_switch(cpu_.c);
-
-	for (;;) {
-		cpu_.e = 16 / 2;
+	mem_[hYPosHi] = spawn >> 4;
+	home::ObjMapBlock block = obj_map_at_hpos();
+	// the spawn block's nybble ($f), on from the parity Func_cc0 gave
+	for (;; next_obj_map_row(block)) {
 		bool found = false;
-		do {
-			uint8_t pair = mem_[REG_HL(gb_)];
-			cpu_.a = (pair & 0xf0) >> 4;
-			cpu_.f = flags::cp(cpu_.a, 0x0f);
-			if (!cf()) {
+		for (int pairs = 16 / 2; pairs && !found; pairs--) {
+			uint16_t at = static_cast<uint16_t>(block.row << 8 | block.col);
+			if ((mem_[at] >> 4) >= 0x0f) {
 				found = true;
 				break;
 			}
-			flip_b();
-			cpu_.a = mem_[REG_HL(gb_)] & 0x0f;
-			cpu_.f = flags::cp(cpu_.a, 0x0f);
-			if (!cf()) {
+			block.parity ^= 1;
+			if ((mem_[at] & 0x0f) >= 0x0f) {
 				found = true;
 				break;
 			}
-			cpu_.f = flags::inc(cpu_.f, cpu_.l);
-			cpu_.l++;
-			flip_b();
-			cpu_.f = flags::dec(cpu_.f, cpu_.e);
-		} while (--cpu_.e);
+			block.col++;
+			block.parity ^= 1;
+		}
 		if (found)
 			break;
-		cpu_.f = flags::sub(cpu_.l, 0x08);
-		cpu_.a = static_cast<uint8_t>(cpu_.l - 0x08);
-		cpu_.l = cpu_.a;
-		cpu_.f = flags::inc(cpu_.f, cpu_.h);
-		cpu_.h++;
-		cpu_.a = cpu_.h;
-		cpu_.f = flags::cp(cpu_.h, 0xc0); // HIGH(STARTOF(SRAM) + SIZEOF(SRAM))
-		if (zf()) {
-			cpu_.h = sLevelBlockObjectMap >> 8;
-			uint8_t bank = mem_[wccec];
-			cpu_.f = flags::inc(cpu_.f, bank);
-			cpu_.a = static_cast<uint8_t>(bank + 1);
-			mem_[wccec] = cpu_.a;
-			sram_switch(cpu_.a);
-		}
 	}
 
 	// .found_spawn_block
-	cpu_.c = cpu_.a;
-	routines_.call(ADDR_Func_cf8);
+	home::obj_map_block_to_hpos(gb_, block);
 	for (int i = 0; i < 4; i++) // update_pos
 		mem_[wWarioPos + i] = mem_[hPos + i];
-	cpu_.a = mem_[hPos + 3];
-	SET_HL(gb_, hPos + 3);
-	SET_DE(gb_, wWarioPos + 3);
-
-	cam_cp(CAM_TRANSITIONS);
-	if (cf())
-		return;
-	cpu_.a = mem_[wceef] & 0x3c;
-	cpu_.f = flags::and_(cpu_.a);
-	if (cpu_.a)
+	if ((mem_[wCameraConfigFlags] & CAM_SCROLLING_MASK) < CAM_TRANSITIONS || (mem_[wceef] & 0x3c))
 		return;
 	routines_.call(ADDR_UpdateFloor);
 }
@@ -1094,14 +902,20 @@ void RoomStart::from_level_start()
 using wl3::level::RoomStart;
 
 // These three end on UpdateObjects / DrawObjects, which leave b to l as
-// they please; only _LevelStateTable (and InitLevel, for the second)
-// reaches them, and nothing after reads b to l (live.py).
-PORT_EX(StartRoom_FromTransition, 0, R_B | R_C | R_D | R_E | R_H | R_L) { RoomStart(gb).from_transition(); }
-PORT_EX(StartRoom_FromLevelStart, 0, R_B | R_C | R_D | R_E | R_H | R_L) { RoomStart(gb).from_level_start(); }
-PORT(Func_896f) { RoomStart(gb).spawn_objects(); }
-PORT(SetInitialCameraScroll) { RoomStart(gb).set_initial_camera_scroll(); }
-PORT(ApplyInitialCameraScroll) { RoomStart(gb).apply_initial_camera_scroll(); }
-PORT(SetWarioPositionToSpawn) { RoomStart(gb).set_wario_position_to_spawn(); }
+// they please; only _LevelStateTable reaches them (InitLevel, for the
+// second, then calls UpdateLevelMusic, which reads no register), and
+// LevelStateTable sets a and f itself after the state: nothing reads any
+// register they leave (live.py, entry_reads2.py / entry_reads_af.py).
+PORT_EX(StartRoom_FromTransition, 0, ALL_REGISTERS) { RoomStart(gb).from_transition(); }
+PORT_EX(StartRoom_FromLevelStart, 0, ALL_REGISTERS) { RoomStart(gb).from_level_start(); }
+// called from StartRoom_* (in SRAM1), which go on to SetWarioScreenPos: it
+// and they read no register this leaves (live.py, entry_reads2.py)
+PORT_EX(Func_896f, 0, ALL_REGISTERS) { RoomStart(gb).spawn_objects(); }
+// called only from StartRoom_*, which read no register these leave (live.py)
+PORT_EX(SetInitialCameraScroll, 0, ALL_REGISTERS) { RoomStart(gb).set_initial_camera_scroll(); }
+PORT_EX(ApplyInitialCameraScroll, 0, ALL_REGISTERS) { RoomStart(gb).apply_initial_camera_scroll(); }
+// no caller reads a register this leaves (live.py, all 11 sites)
+PORT_EX(SetWarioPositionToSpawn, 0, ALL_REGISTERS) { RoomStart(gb).set_wario_position_to_spawn(); }
 PORT(DrawRoom_FromStart) { RoomStart(gb).draw_room(); }
-PORT_EX(ProcessMultiBlock, 0, R_B | R_C | R_D | R_E | R_H | R_L) { RoomStart(gb).process_multi_block(); }
+PORT_EX(ProcessMultiBlock, 0, ALL_REGISTERS) { RoomStart(gb).process_multi_block(); }
 PORT_LOCAL_EX(ProcessMultiBlock, ProcessBlocks, 0, 0) { RoomStart(gb).process_blocks(); }
