@@ -876,9 +876,21 @@ primitives, home/wario.cpp, and the golf objects' animation):
   for LoadObjPals (home::load_obj_pals) to read the palettes after it.
   SpawnObject, CreateObject*, DespawnAllObjects keep their register
   interfaces (objects and the block queue pass them registers).
-- Next: home/wario_mechanics1.cpp, golf/hole_ram.cpp,
-  home/load_golf_sprite.cpp, home/sprites.cpp, home/system.cpp,
-  overworld/bank2b_2.cpp ... (by register sites).
+- The other V-Blank functions plain (2026-11-08): golf holes
+  (hole_ram.cpp), clear and musical coin screens, language selection,
+  save screens, the level's. The V-Blank handler (header.asm) pushes and
+  pops af, bc, de and hl around `call wVBlankFunc`, so a function that
+  calls hTransferVirtualOAM and returns clobbers everything; one that
+  jumps to it keeps a. LevelVBlankFunc stays exact: its jump to the RAM
+  queue code at wVBlankFunc + $10 takes hl and bc, and hTransferVirtualOAM's
+  dec loop keeps the carry of the shake's add (the fuzzer caught it).
+- Pitfall: scratchpad live.py can run for hours and grow to 6-8 GB; four
+  at once left 20 MB free and the quick tier failed with SegFault and
+  "Not Run". Check free memory before debugging such a failure.
+- Next: home/wario_mechanics1.cpp (116 CALL/JUMP sites in
+  wario_states_*.cpp pass b and flags through: give them plain
+  functions first), home/load_golf_sprite.cpp, home/sprites.cpp,
+  home/system.cpp, overworld/bank2b_2.cpp ... (by register sites).
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped
