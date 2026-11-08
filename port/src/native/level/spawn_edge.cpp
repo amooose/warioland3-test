@@ -1,10 +1,12 @@
 // Spawning the objects of the row or column that scrolled into view
-// (src/engine/level/spawn_edge.asm). Called by farcall from the edge
-// drawing (scroll.cpp), whose callers are C: they keep the original's
-// registers, flags and pushes.
-#include "../flags.hpp"
+// (src/engine/level/spawn_edge.asm). Plain C++ over memory: the edge
+// drawing (scroll.cpp) farcalls them and reads no registers after, so the
+// hooks clobber them all. SpawnObject still takes c (the object's entry)
+// and de (its block).
 #include "../native.hpp"
 #include "../routines.hpp"
+#include "../home/level_map.hpp"
+#include "../home/object_pos.hpp"
 
 namespace wl3::level {
 
@@ -12,7 +14,7 @@ namespace {
 
 class EdgeSpawner {
 public:
-	explicit EdgeSpawner(GB *gb) : gb_(gb), cpu_(gb->cpu), mem_(gb), routines_(gb) {}
+	explicit EdgeSpawner(GB *gb) : gb_(gb), mem_(gb), routines_(gb) {}
 
 	void spawn_row(); // SpawnRowEdgeObjects
 	void spawn_column(); // SpawnColEdgeObjects
@@ -23,107 +25,77 @@ private:
 		mem_[wSRAMBank] = bank;
 		mem_[rRAMB + 0x100] = bank;
 	}
-	bool start();
-	void spawn_block_object();
+	int start();
+	void spawn_block_object(uint16_t block);
 
 	GB *gb_;
-	CPU &cpu_;
 	Memory mem_;
 	Routines routines_;
 };
 
-// the level hasn't ended: hl = the block at wBlockPos, its SRAM bank mapped
-bool EdgeSpawner::start()
+// the level hasn't ended: the block at wBlockPos, its SRAM bank mapped
+// (-1 if it has)
+int EdgeSpawner::start()
 {
-	cpu_.a = mem_[wLevelEndScreen];
-	cpu_.f = flags::and_(cpu_.a);
-	if (cpu_.a)
-		return false; // the level ended
-	SET_HL(gb_, wBlockPos);
-	routines_.call(ADDR_GetBlockPtr);
-	cpu_.a = mem_[wBlockPtrBank];
-	sram_switch(cpu_.a);
-	return true;
+	if (mem_[wLevelEndScreen])
+		return -1; // the level ended
+	home::BlockPtr block = home::block_ptr(gb_, wBlockPos);
+	sram_switch(mem_[wBlockPtrBank]);
+	return block.ptr;
 }
 
-// the object of the block at hl (bit 7), if it has one that isn't out
-void EdgeSpawner::spawn_block_object()
+// the object of the block (bit 7), if its object map entry has one
+void EdgeSpawner::spawn_block_object(uint16_t block)
 {
-	uint16_t block = REG_HL(gb_);
-	cpu_.f = flags::bit(cpu_.f, mem_[block], 7);
 	if (!(mem_[block] & 0x80))
 		return;
-	gb_push16(gb_, block);
-	routines_.call(ADDR_Func_d8c);
-	uint8_t v = mem_[REG_HL(gb_)];
-	cpu_.f = flags::bit(cpu_.f, cpu_.b, 0);
-	if (cpu_.b & 1)
+	uint8_t h = static_cast<uint8_t>(block >> 8), l = static_cast<uint8_t>(block);
+	home::ObjMapBlock map = home::obj_map_col(gb_, h, l); // Func_d8c
+	uint8_t v = mem_[static_cast<uint16_t>(map.row << 8 | map.col)];
+	if (map.parity & 1)
 		v = static_cast<uint8_t>(v << 4 | v >> 4);
-	cpu_.a = v & 0x0f;
-	cpu_.f = flags::and_(cpu_.a);
-	cpu_.c = cpu_.a;
-	SET_HL(gb_, gb_pop16(gb_));
-	if (!cpu_.c)
+	uint8_t entry = v & 0x0f;
+	if (!entry)
 		return;
-	gb_push16(gb_, REG_DE(gb_));
-	gb_push16(gb_, REG_BC(gb_));
-	routines_.call(ADDR_Func_d3e);
-	cpu_.d = cpu_.h;
-	cpu_.e = cpu_.l;
-	gb_push16(gb_, REG_HL(gb_));
-	cpu_.a = mem_[rWBK]; // push_wram BANK("Level Objects WRAM")
-	gb_push16(gb_, REG_AF(gb_));
-	cpu_.a = BANK_wObjects;
+	home::level_block_to_hpos(gb_, h, l); // Func_d3e
+	uint8_t wbk = mem_[rWBK]; // push_wram BANK("Level Objects WRAM")
 	mem_[rWBK] = BANK_wObjects;
+	gb_->cpu.c = entry;
+	SET_DE(gb_, block);
 	routines_.farcall(BANK_SpawnObject, ADDR_SpawnObject);
-	uint16_t af = gb_pop16(gb_); // pop_wram
-	cpu_.a = static_cast<uint8_t>(af >> 8);
-	cpu_.f = static_cast<uint8_t>(af & 0xf0);
-	mem_[rWBK] = cpu_.a;
-	SET_HL(gb_, gb_pop16(gb_));
-	SET_BC(gb_, gb_pop16(gb_));
-	SET_DE(gb_, gb_pop16(gb_));
+	mem_[rWBK] = wbk; // pop_wram
 }
 
 // down 12 blocks, into the next SRAM bank at the end of one
 void EdgeSpawner::spawn_row()
 {
-	if (!start())
+	int start_block = start();
+	if (start_block < 0)
 		return;
-	cpu_.e = 0x0c;
-	do {
-		spawn_block_object();
-		cpu_.f = flags::inc(cpu_.f, cpu_.h);
-		cpu_.h++;
-		cpu_.a = cpu_.h;
-		cpu_.f = flags::cp(cpu_.h, 0xc0);
-		if (cpu_.f & FLAG_Z) {
-			cpu_.h = sLevelBlockObjectMap >> 8;
-			uint8_t bank = mem_[wBlockPtrBank];
-			cpu_.f = flags::inc(cpu_.f, bank);
-			cpu_.a = static_cast<uint8_t>(bank + 1);
-			mem_[wBlockPtrBank] = cpu_.a;
-			sram_switch(cpu_.a);
+	uint16_t block = static_cast<uint16_t>(start_block);
+	for (int i = 0; i < 12; i++) {
+		spawn_block_object(block);
+		block = static_cast<uint16_t>(block + 0x100); // inc h
+		if (block >> 8 == 0xc0) {
+			block = static_cast<uint16_t>((sLevelBlockObjectMap & 0xff00) | (block & 0xff));
+			uint8_t bank = static_cast<uint8_t>(mem_[wBlockPtrBank] + 1);
+			mem_[wBlockPtrBank] = bank;
+			sram_switch(bank);
 		}
-		cpu_.f = flags::dec(cpu_.f, cpu_.e);
-	} while (--cpu_.e);
+	}
 }
 
-// across 13 blocks (b's bit 0: which half of the object map byte)
+// across 13 blocks (inc l: within the row)
 void EdgeSpawner::spawn_column()
 {
-	if (!start())
+	int start_block = start();
+	if (start_block < 0)
 		return;
-	cpu_.e = 0x0d;
-	do {
-		spawn_block_object();
-		cpu_.a = cpu_.b ^ 0x01;
-		cpu_.f = flags::xor_(cpu_.a);
-		cpu_.b = cpu_.a;
-		cpu_.f = flags::inc(cpu_.f, cpu_.l);
-		cpu_.l++;
-		cpu_.f = flags::dec(cpu_.f, cpu_.e);
-	} while (--cpu_.e);
+	uint16_t block = static_cast<uint16_t>(start_block);
+	for (int i = 0; i < 13; i++) {
+		spawn_block_object(block);
+		block = static_cast<uint16_t>((block & 0xff00) | static_cast<uint8_t>(block + 1));
+	}
 }
 
 } // namespace
@@ -132,5 +104,5 @@ void EdgeSpawner::spawn_column()
 
 using wl3::level::EdgeSpawner;
 
-PORT(SpawnRowEdgeObjects) { EdgeSpawner(gb).spawn_row(); }
-PORT(SpawnColEdgeObjects) { EdgeSpawner(gb).spawn_column(); }
+PORT_EX(SpawnRowEdgeObjects, 0, ALL_REGISTERS) { EdgeSpawner(gb).spawn_row(); }
+PORT_EX(SpawnColEdgeObjects, 0, ALL_REGISTERS) { EdgeSpawner(gb).spawn_column(); }
