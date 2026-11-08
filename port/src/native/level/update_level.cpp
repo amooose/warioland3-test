@@ -440,4 +440,6 @@ void LevelFrame::update()
 
 } // namespace wl3::level
 
-PORT(UpdateLevel) { wl3::level::LevelFrame(gb).update(); }
+// Only _LevelStateTable's jumptable reaches it, from LevelStateTable,
+// whose callers read none of b to l
+PORT_EX(UpdateLevel, 0, R_B | R_C | R_D | R_E | R_H | R_L) { wl3::level::LevelFrame(gb).update(); }

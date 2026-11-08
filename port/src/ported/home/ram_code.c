@@ -44,6 +44,11 @@ static bool hcall_func(GB *gb)
 	gb->cpu.a = ram_byte(gb, hCallFuncBank);
 	bankswitch(gb, gb->cpu.a);
 	uint16_t func = (uint16_t)(ram_byte(gb, hCallFuncPointer) | ram_byte(gb, hCallFuncPointer + 1) << 8);
+	// Every farcall and object update the game makes calls a label: one
+	// into the middle of a routine comes from a fuzzed pointer (an
+	// object's update function), as for jp hl in the interpreter.
+	if (gb->test.active && func < 0x8000 && !sym_is_rom_label(gb->rom_bank, func))
+		gb->test.unrealistic = true;
 	gb_call_ret(gb, func, (uint16_t)(hCallFunc + 0x0f));
 	pop_af(gb);
 	bankswitch(gb, gb->cpu.a);
