@@ -3,10 +3,9 @@
 // (falling, thrown, bumped, knocked, grabbed, vanishing), object movement
 // tables and their actions.
 //
-// Objects (C++) and register-level C call these. The loop, the shared
-// states and the movement tables are plain C++ (docs/HANDOFF.md); the rest
-// (DoObjectAction, throwing and grabbed objects) still keep the original's
-// registers, flags and return addresses (see asm_module.hpp).
+// Objects (C++) and register-level C call these. It's plain C++
+// (docs/HANDOFF.md); registers are left only where a hook takes an input in
+// one or the objects read what it leaves.
 #include "../asm_module.hpp"
 #include "../home/object_mechanics.hpp"
 
@@ -273,17 +272,22 @@ public:
 	void port_Func_62ec3() { thrown_object_movement(true, REG_BC(gb_)); }
 	void port_Func_62faa() { thrown_object_movement(false, REG_BC(gb_)); }
 
-	// output: e = number of objects with OBJFLAG_ACTIVE and OBJFLAG_TRANSIENT
+	// the number of objects with OBJFLAG_ACTIVE and OBJFLAG_TRANSIENT
+	uint8_t count_active_transient_objects()
+	{
+		uint8_t n = 0;
+		for (int i = 0; i < NUM_OBJECTS; i++)
+			if ((rd8(static_cast<uint16_t>(wObj1Flags + i * OBJ_STRUCT_SIZE)) & (OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT))
+				== (OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT))
+				n++;
+		return n;
+	}
+
+	// output: e (and d the mask, hl untouched: Anonster writes through it on)
 	void port__CountActiveTransientObjects()
 	{
-		cpu_.e = 0;
+		cpu_.e = count_active_transient_objects();
 		cpu_.d = OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT;
-		for (int n = 0; n < NUM_OBJECTS; n++) {
-			cpu_.a = alu_.and_(rd8(wObj1Flags + n * OBJ_STRUCT_SIZE), cpu_.d);
-			alu_.cp(cpu_.a, cpu_.d);
-			if (cpu_.f & FLAG_Z)
-				cpu_.e = alu_.inc(cpu_.e);
-		}
 	}
 
 	// y += the signed v
@@ -851,167 +855,113 @@ public:
 
 	// --- DoObjectAction ---
 
-	// ld [hld], a (OBJ_ACTION = action) / ld a, state / ld [hl], a (OBJ_STATE)
-	void set_action_state(uint8_t action, uint8_t state)
-	{
-		cpu_.a = action;
-		wr8(wCurObjAction, action);
-		cpu_.a = state;
-		wr8(wCurObjState, state);
-		SET_HL(gb_, wCurObjState);
-	}
-
-	// ld hl, wCurObjAction / ld a, action / ld [hld], a / ld a, state / ld [hl], a
-	void action_hl_state(uint8_t action, uint8_t state)
-	{
-		set_action_state(action, state);
-	}
-
-	void obj_flags_res_grabbed(bool set_no_collision)
-	{
-		uint8_t v = (uint8_t)(rd8(wCurObjFlags) & ~(1 << OBJFLAG_GRABBED_F));
-		wr8(wCurObjFlags, v);
-		if (set_no_collision)
-			wr8(wCurObjFlags, (uint8_t)(rd8(wCurObjFlags) | (1 << OBJFLAG_NO_COLLISION_F)));
-	}
-
-	// ld a, [hld] (OBJ_UNK_1D) / and INTERACTION_RIGHT / ld a, no_actions_for 15 /
-	// ld [hld], a / jr z, .right / left or right state
+	// the action and state, by the side Wario touched it from (OBJ_UNK_1D)
 	void action_by_interaction(uint8_t left, uint8_t right)
 	{
-		alu_.and_(rd8(wCurObjUnk1d), INTERACTION_RIGHT);
-		set_action_state(15 | (1 << 7), ZF ? right : left);
+		wr8(wCurObjAction, 15 | (1 << 7));
+		wr8(wCurObjState, (rd8(wCurObjUnk1d) & INTERACTION_RIGHT) ? left : right);
+	}
+
+	void set_action_state(uint8_t action, uint8_t state)
+	{
+		wr8(wCurObjAction, action);
+		wr8(wCurObjState, state);
 	}
 
 	void action_wobble()
 	{
-		obj_flags_res_grabbed(false);
+		res_flag(OBJFLAG_GRABBED_F);
 		action_by_interaction(OBJSTATE_WOBBLE_LEFT_START, OBJSTATE_WOBBLE_RIGHT_START);
 	}
 
-	// .Action06 / .Action12
-	void action_06(uint8_t b)
+	// .Action06 / .Action12: the state by the direction it was hit from
+	// (OBJ_UNK_1D's top bits: down, up, right, else left)
+	void action_06(uint8_t action)
 	{
-		cpu_.b = b;
-		cpu_.a = rd8(wCurObjUnk1d);
-		wr8(wCurObjAction, cpu_.b);
-		cpu_.l = alu_.dec((uint8_t)wCurObjAction);
-		cpu_.h = (uint8_t)(wCurObjAction >> 8);
-		static const uint8_t states[4] = {OBJSTATE_0E, OBJSTATE_0D, OBJSTATE_0B, OBJSTATE_0C};
-		int i;
-		for (i = 0; i < 3; i++) {
-			cpu_.a = alu_.rla(cpu_.a);
-			if (CF)
-				break;
-		}
-		cpu_.a = states[i];
-		wr8(REG_HL(gb_), cpu_.a);
+		uint8_t from = rd8(wCurObjUnk1d);
+		wr8(wCurObjAction, action);
+		wr8(wCurObjState, (from & 0x80) ? OBJSTATE_0E : (from & 0x40) ? OBJSTATE_0D
+			: (from & 0x20) ? OBJSTATE_0B : OBJSTATE_0C);
 	}
 
-	void port_DoObjectAction()
+	// What Wario (or another object) did to the object last frame
+	// (OBJ_ACTION, from the interactions), or a count of frames with none
+	void do_object_action()
 	{
-		cpu_.a = rd8(wCurObjAction);
-		cpu_.a = alu_.and_(cpu_.a, cpu_.a);
-		if (ZF) {
-			RET();
+		uint8_t action = rd8(wCurObjAction);
+		if (!action)
+			return;
+		if (action & (1 << NO_ACTIONS_F)) {
+			action--;
+			wr8(wCurObjAction, action == (1 << NO_ACTIONS_F) ? 0 : action); // no_actions_for 0
 			return;
 		}
-		if (alu_.bit(cpu_.a, NO_ACTIONS_F)) {
-			cpu_.a = alu_.dec(cpu_.a);
-			alu_.cp(cpu_.a, 1 << NO_ACTIONS_F); // no_actions_for 0
-			if (ZF)
-				xor_a();
-			wr8(wCurObjAction, cpu_.a);
-			RET();
-			return;
-		}
-
-		// .jump: rst JumpTable
-		uint8_t idx = cpu_.a;
-		uint16_t table = ADDR_DoObjectAction + 0x14;
-		cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		cpu_.e = cpu_.a;
-		cpu_.d = 0;
-		uint16_t hl = alu_.add16(table, cpu_.e);
-		cpu_.a = rd8(hl);
-		cpu_.h = rd8((uint16_t)(hl + 1));
-		cpu_.l = cpu_.a;
-		uint16_t target = REG_HL(gb_);
-		if (idx >= NUM_OBJ_ACTIONS) {
-			JUMP_TO(target);
-			return;
-		}
-
-		switch (idx) {
+		switch (action) {
 		case OBJACTION_NONE:
 			break;
 		case OBJACTION_BUMP:
-			cpu_.a = alu_.and_(rd8(wCurObjInteractionType), INTERACTION_MASK);
-			if (ZF) {
+			if (!(rd8(wCurObjInteractionType) & INTERACTION_MASK))
 				action_wobble();
-				break;
-			}
-			action_by_interaction(OBJSTATE_BUMP_LEFT_START, OBJSTATE_BUMP_RIGHT_START);
+			else
+				action_by_interaction(OBJSTATE_BUMP_LEFT_START, OBJSTATE_BUMP_RIGHT_START);
 			break;
 		case OBJACTION_ATTACK:
-			obj_flags_res_grabbed(true);
+			wr8(wCurObjFlags, (rd8(wCurObjFlags) & ~(1 << OBJFLAG_GRABBED_F)) | (1 << OBJFLAG_NO_COLLISION_F));
 			action_by_interaction(OBJSTATE_ATTACKED_LEFT_START, OBJSTATE_ATTACKED_RIGHT_START);
 			break;
 		case OBJACTION_PICK_UP:
-			obj_flags_res_grabbed(false);
-			cpu_.a = rd8(wDirection);
-			cpu_.a = alu_.and_(cpu_.a, cpu_.a);
+			res_flag(OBJFLAG_GRABBED_F);
 			set_action_state(15 | (1 << 7),
-				ZF ? OBJSTATE_PICKED_UP_RIGHT_START : OBJSTATE_PICKED_UP_LEFT_START);
+				rd8(wDirection) ? OBJSTATE_PICKED_UP_LEFT_START : OBJSTATE_PICKED_UP_RIGHT_START);
 			break;
 		case OBJACTION_WOBBLE:
 			action_wobble();
 			break;
 		case OBJACTION_VANISH_TOUCH:
-			obj_flags_res_grabbed(true);
+			wr8(wCurObjFlags, (rd8(wCurObjFlags) & ~(1 << OBJFLAG_GRABBED_F)) | (1 << OBJFLAG_NO_COLLISION_F));
 			set_action_state(15 | (1 << 7), OBJSTATE_VANISH_TOUCH);
 			break;
 		case OBJACTION_06:
 			action_06(15 | (1 << 7));
 			break;
 		case OBJACTION_07:
-			xor_a();
 			set_action_state(0, OBJSTATE_18);
 			break;
 		case OBJACTION_VANISH_TREASURE:
-			JUMP_TO(ADDR_VanishObject_NoSFX);
-			return;
+			vanish(false);
+			break;
 		case OBJACTION_STEP_ON:
-			xor_a();
 			wr8(wCurObjAction, 0);
-			SET_HL(gb_, wCurObjFlags);
-			wr8(wCurObjFlags, (uint8_t)(rd8(wCurObjFlags) | (1 << OBJFLAG_STEPPED_F)));
+			wr8(wCurObjFlags, rd8(wCurObjFlags) | (1 << OBJFLAG_STEPPED_F));
 			break;
 		case OBJACTION_0A:
-			cpu_.a = 15 | (1 << 7);
-			wr8(wCurObjAction, cpu_.a);
+			wr8(wCurObjAction, 15 | (1 << 7));
 			break;
 		case OBJACTION_FLATTEN:
 		case OBJACTION_0C:
 		case OBJACTION_0E:
 		case OBJACTION_TELEPORT:
 		case OBJACTION_11:
-			action_hl_state(15 | (1 << 7), OBJSTATE_ACTIVATE);
+			set_action_state(15 | (1 << 7), OBJSTATE_ACTIVATE);
 			break;
 		case OBJACTION_0D:
-			action_hl_state(15 | (1 << 7), OBJSTATE_19);
+			set_action_state(15 | (1 << 7), OBJSTATE_19);
 			break;
 		case OBJACTION_SMASH_ATTACK_WALKABLE:
-			action_hl_state(2 | (1 << 7), OBJSTATE_VANISH_TOUCH);
+			set_action_state(2 | (1 << 7), OBJSTATE_VANISH_TOUCH);
 			break;
 		case OBJACTION_12:
 			action_06(7 | (1 << 7));
 			break;
 		case OBJACTION_13:
-			action_hl_state(15 | (1 << 7), OBJSTATE_SPECIAL_3);
+			set_action_state(15 | (1 << 7), OBJSTATE_SPECIAL_3);
+			break;
+		default:
+			// past the table's end: no action does that
+			if (gb_->test.active)
+				gb_->test.unrealistic = true;
 			break;
 		}
-		RET();
 	}
 
 	void port_Func_62e57()
@@ -1323,10 +1273,8 @@ public:
 	enum { UPD_NORMAL, UPD_TEMPLE, UPD_FLOOR };
 
 	// Return addresses (the bytes after each call, checked against the ROM).
-	#define RET_TEMPLE_ACTION 0x5250 // UpdateObject_Temple: call DoObjectAction
 	#define RET_TEMPLE_HCALL 0x5261  // UpdateObject_Temple: call hCallFunc
 	#define RET_TEMPLE_ANIM 0x5264
-	#define RET_NORMAL_ACTION 0x5461 // UpdateObject: call DoObjectAction
 	#define RET_NORMAL_HCALL 0x5479  // UpdateObject: call hCallFunc
 	#define RET_NORMAL_ANIM 0x547c
 	#define RET_FLOOR_HCALL 0x55b4  // UpdateObjectDuringFloorTransition: call hCallFunc
@@ -1385,13 +1333,13 @@ public:
 
 		switch (kind) {
 		case UPD_NORMAL:
-			gb_call_ret(gb_, ADDR_DoObjectAction, RET_NORMAL_ACTION);
+			do_object_action();
 			call_update_function(0, true, RET_NORMAL_HCALL);
 			gb_call_ret(gb_, ADDR_UpdateObjectAnimation, RET_NORMAL_ANIM);
 			check_object_on_screen();
 			break;
 		case UPD_TEMPLE:
-			gb_call_ret(gb_, ADDR_DoObjectAction, RET_TEMPLE_ACTION);
+			do_object_action();
 			call_update_function(OBJFUNCS4_BANK, false, RET_TEMPLE_HCALL);
 			gb_call_ret(gb_, ADDR_UpdateObjectAnimation, RET_TEMPLE_ANIM);
 			check_object_on_screen();
@@ -1489,13 +1437,14 @@ PORT_COVERED(Func_62d34);
 PORT_COVERED(Func_62e0f);
 PORT_COVERED(ThrowObject_Left);
 PORT_COVERED(ThrowObject_Right);
+PORT_COVERED(DoObjectAction);
 PORT_COVERED(ClearObjects);
 PORT_COVERED(ClearObjDataPointers);
 PORT_EX(DrawObjects_NoPriority, 0, ALL_REGISTERS) { ObjectEngine(gb).port_DrawObjects_NoPriority(); }
 PORT_EX(DrawObjects_WithPriority, 0, ALL_REGISTERS) { ObjectEngine(gb).port_DrawObjects_WithPriority(); }
 PORT_EX(Func_62ec3, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62ec3(); }
 PORT_EX(Func_62faa, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62faa(); }
-PORT_EX(_CountActiveTransientObjects, 0, 0) { ObjectEngine(gb).port__CountActiveTransientObjects(); }
+PORT_EX(_CountActiveTransientObjects, 0, R_A | R_F | R_B | R_C) { ObjectEngine(gb).port__CountActiveTransientObjects(); }
 PORT_EX(Func_628ea, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_628ea(); }
 PORT_EX(Func_62e74, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62e74(); }
 PORT_EX(Func_62e8a, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62e8a(); }
@@ -1540,7 +1489,6 @@ PORT_EX(_ApplyObjXMovement_Loop, 0, R_A | R_F | R_B | R_C) { ObjectEngine(gb).po
 PORT_EX(Func_63209, 0, ALL_REGISTERS) { ObjectEngine(gb).port_Func_63209(); }
 PORT_EX(_ApplyObjSetMovement, 0, ALL_REGISTERS) { ObjectEngine(gb).port__ApplyObjSetMovement(); }
 PORT_EX(Func_632ac, 0, ALL_REGISTERS & ~R_E) { ObjectEngine(gb).port_Func_632ac(); }
-PORT_EX(DoObjectAction, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_DoObjectAction(); }
 PORT_EX(Func_62e57, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62e57(); }
 PORT_EX(_VanishObject2, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port__VanishObject2(); }
 PORT_EX(Func_626da, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_626da(); }
