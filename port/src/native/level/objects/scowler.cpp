@@ -451,12 +451,8 @@ void Scowler::flashes()
 	if (t == 0x3c) {
 		play_sfx(SFX_0B6);
 		mem_[wDollBoyActiveBarrels] = 0xff;
-		gb_->cpu.c = 5;
-		gb_->cpu.b = 3;
-		call_home(ADDR_BlackOutOBPals);
-		gb_->cpu.c = 0;
-		gb_->cpu.b = 8;
-		call_home(ADDR_BlackOutBGPals);
+		black_out_ob_pals(3, 5);
+		black_out_bg_pals(8, 0);
 		return;
 	}
 	if (t != 0x78)
@@ -469,18 +465,12 @@ void Scowler::flashes()
 
 void Scowler::ob_pals(uint16_t pals)
 {
-	SET_HL(gb_, pals);
-	gb_->cpu.c = 5;
-	gb_->cpu.b = 3;
-	call_home(ADDR_SetOBPals);
+	set_ob_pals(pals, 3, 5);
 }
 
 void Scowler::bg_pals(uint16_t pals)
 {
-	SET_HL(gb_, pals);
-	gb_->cpu.c = 0;
-	gb_->cpu.b = 8;
-	call_home(ADDR_SetBGPals);
+	set_bg_pals(pals, 8, 0);
 }
 
 // a floating ring after $40 frames

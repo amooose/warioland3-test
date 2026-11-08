@@ -1,6 +1,7 @@
 // The levels' objects: the object being updated. See object.hpp.
 #include "object.hpp"
 #include "../home/wario.hpp"
+#include "../home/floor_transition.hpp"
 
 namespace wl3::level {
 
@@ -40,6 +41,8 @@ void Object::call_home(uint16_t routine)
 	case ADDR_MoveObjectUpByVar2: move_up_by_var2(); break;
 	case ADDR_MoveObjectDownByVar2: move_down_by_var2(); break;
 	case ADDR_DecrementRemainingBossHits: decrement_boss_hits(); break;
+	case ADDR_HandleUpwardsFloorTransition: home::handle_upwards_floor_transition(gb_); break;
+	case ADDR_HandleDownwardsFloorTransition: home::handle_downwards_floor_transition(gb_); break;
 	default: routines_.call(routine); break;
 	}
 }

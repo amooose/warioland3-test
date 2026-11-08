@@ -1495,6 +1495,17 @@ bool object_state(GB *gb, uint16_t wrapper)
 	return false;
 }
 
+// The movement tables and counts, plain, for the objects (object.hpp)
+void apply_obj_movement(GB *gb, bool x, uint16_t table, bool loop)
+{
+	ObjectEngine(gb).apply_obj_movement(x ? wCurObjVar2 : wCurObjVar3, x ? OBJ_X_POS : OBJ_Y_POS, table, loop);
+}
+
+void apply_obj_set_movement(GB *gb, uint16_t start) { ObjectEngine(gb).apply_obj_set_movement(start); }
+void move_platform_y(GB *gb, uint16_t table) { ObjectEngine(gb).move_platform_y(table); }
+uint8_t count_active_transient_objects(GB *gb) { return ObjectEngine(gb).count_active_transient_objects(); }
+uint8_t count_same_transient_objects(GB *gb) { return ObjectEngine(gb).count_same_transient_objects(); }
+
 } // namespace wl3::level
 
 using wl3::level::ObjectEngine;

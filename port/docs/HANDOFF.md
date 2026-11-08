@@ -735,10 +735,26 @@ primitives, home/wario.cpp, and the golf objects' animation):
   _y), and Object::particle(id) runs a plain create_particle() (both
   object sites return straight after). The wrappers' hooks stay for the
   register-level callers.
-- Next: the palette calls (CopyAndApplyOBPals, SetBGPals, SetOBPals,
-  BlackOut*Pals, which take b with hl / de / c), the movement tables'
-  wrappers (whose h Anonster and Omodonmeka read on), then the block
-  functions, passing Muddee, Pesce, Octohon and ZipLine what they read.
+- The objects' palettes, movement tables and counts, plain (2026-11-08):
+  home::set_pals / black_out_pals (home/pals.cpp; the four hooks wrap
+  them, a the last byte read, so a source in I/O space reads as the asm
+  does) and copy_and_apply_ob_pals back Object::set_bg_pals and the rest.
+  The movement tables (apply_x/y_movement(_loop)), ApplyObjSetMovement,
+  Func_34fc (platform_y_movement) and the transient counts
+  (active_transient_objects, same_transient_objects) call the object
+  engine's plain functions inside Object::homecall (the bank switched
+  around them as homecall does). Their h is always wCurObj's page, so
+  Anonster and Omodonmeka read x() / y(). live.py: the palette routines'
+  only object hits are the object tables' paths and rra's carry into a
+  dead a.
+  The floor transitions are plain too (home/floor_transition.hpp:
+  floor_for_y_pos, handle_up/downwards_floor_transition, run by
+  call_home; checked under temporary ALL_REGISTERS hooks, 603/603 each).
+  They never touch hl, so Omodonmeka's RISE reads wCurObjStateDuration.
+- Next: the block functions. Of the objects' reads after a block check,
+  only Octohon's is left: .asm_4a6eb writes 0 through the hl Func_3513's
+  block function leaves (its big charge into a wall), so a plain block
+  check must return its exit hl.
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped

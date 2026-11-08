@@ -145,11 +145,7 @@ void DollBoy::init()
 
 void DollBoy::copy_pals(uint16_t pals)
 {
-	SET_HL(gb_, pals);
-	SET_DE(gb_, wTempPals2 + 4 * PAL_SIZE);
-	gb_->cpu.c = 4;
-	gb_->cpu.b = 2;
-	call_home(ADDR_CopyAndApplyOBPals);
+	copy_and_apply_ob_pals(pals, wTempPals2 + 4 * PAL_SIZE, 2, 4);
 }
 
 void DollBoy::after_fall()

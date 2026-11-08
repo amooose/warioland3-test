@@ -408,14 +408,11 @@ void Jamano::range_changed(bool more, bool frame, uint16_t pals)
 		--range;
 	if (frame)
 		find_jamano();
-	gb_->cpu.c = 0;
-	gb_->cpu.b = 8;
 	if (!pals) {
-		call_home(ADDR_BlackOutBGPals);
+		black_out_bg_pals(8, 0);
 		return;
 	}
-	SET_HL(gb_, pals);
-	call_home(ADDR_SetBGPals);
+	set_bg_pals(pals, 8, 0);
 }
 
 // the hammer by the skulls out (w1d147): longer as they go, shorter as

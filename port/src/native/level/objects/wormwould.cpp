@@ -377,11 +377,7 @@ void WormwouldHelper::palm_tree_spawner()
 void WormwouldHelper::palm_tree()
 {
 	set_update(PALM_TREE_UPDATE);
-	SET_HL(gb_, ADDR_PalmTreePals);
-	SET_DE(gb_, wTempPals2 + PAL_SIZE * 7);
-	gb_->cpu.c = 7;
-	gb_->cpu.b = 1;
-	call_home(ADDR_CopyAndApplyOBPals);
+	copy_and_apply_ob_pals(ADDR_PalmTreePals, wTempPals2 + PAL_SIZE * 7, 1, 7);
 }
 
 // rises while var1 counts down, then (var2) opens

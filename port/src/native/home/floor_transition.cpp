@@ -3,6 +3,8 @@
 // keeping the original's registers, flags and return addresses for its
 // callers (see src/native/asm_module.hpp).
 #include "../asm_module.hpp"
+#include "../routines.hpp"
+#include "floor_transition.hpp"
 
 namespace wl3::home {
 
@@ -124,6 +126,59 @@ public:
 };
 
 } // namespace
+
+uint8_t floor_for_y_pos(GB *gb)
+{
+	Memory mem(gb);
+	uint8_t hi = mem[wWarioYPos + 0];
+	uint8_t floor = hi == 1 ? 3 : hi == 2 ? 1 : 5;
+	if (mem[wWarioYPos + 1] < 0x80)
+		floor++;
+	return floor;
+}
+
+// StartUpwardsFloorTransition / StartDownwardsFloorTransition: to `floor`
+static void start_floor_transition(GB *gb, uint8_t floor, bool up)
+{
+	Memory mem(gb);
+	mem[wFloor] = floor;
+	uint8_t timer = (!up && floor == 5) ? 0x68 : 0x80;
+	if (!up)
+		mem[wFloorTransitionTimer] = timer;
+	play_sfx(mem, SFX_PIPE_EXIT);
+	mem[wFloorTransitionDir] = up ? FLOOR_TRANSITION_DOWN : FLOOR_TRANSITION_UP;
+	mem[wIsFloorTransition] = TRUE;
+	if (up)
+		mem[wFloorTransitionTimer] = timer;
+	mem[wCameraRoomYScrollLimit] = 0;
+}
+
+// wFloor less Wario's floor, if the camera does transitions
+static bool floor_delta(GB *gb, int &delta, uint8_t &floor)
+{
+	Memory mem(gb);
+	if ((mem[wCameraConfigFlags] & CAM_SCROLLING_MASK) < CAM_TRANSITIONS)
+		return false;
+	floor = floor_for_y_pos(gb);
+	delta = mem[wFloor] - floor;
+	return true;
+}
+
+void handle_upwards_floor_transition(GB *gb)
+{
+	int delta;
+	uint8_t floor;
+	if (floor_delta(gb, delta, floor) && delta < 0)
+		start_floor_transition(gb, floor, true);
+}
+
+void handle_downwards_floor_transition(GB *gb)
+{
+	int delta;
+	uint8_t floor;
+	if (floor_delta(gb, delta, floor) && delta > 0)
+		start_floor_transition(gb, floor, false);
+}
 
 } // namespace wl3::home
 

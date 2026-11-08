@@ -115,11 +115,7 @@ void Muddee::hidden()
 		return;
 	mem_[wIsBossBattle] = TRUE;
 	set_update(SURFACING);
-	SET_HL(gb_, ADDR_Pals_55e46);
-	SET_DE(gb_, wTempPals2 + PAL_SIZE * 6);
-	gb_->cpu.c = 6;
-	gb_->cpu.b = 1;
-	call_home(ADDR_CopyAndApplyOBPals);
+	copy_and_apply_ob_pals(ADDR_Pals_55e46, wTempPals2 + PAL_SIZE * 6, 1, 6);
 }
 
 void Muddee::surfacing()

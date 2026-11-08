@@ -251,8 +251,10 @@ void Anonster::walk()
 		return;
 	}
 	if (var3() == 0x4f && ++var2() >= 2) {
-		routines_.farcall(BANK__CountActiveTransientObjects, ADDR__CountActiveTransientObjects);
-		if (!gb_->cpu.e) {
+		uint8_t n = 0;
+		routines_.in_bank(BANK__CountActiveTransientObjects, ADDR__CountActiveTransientObjects,
+			[&] { n = count_active_transient_objects(gb_); });
+		if (!n) {
 			var2() = 0;
 			var3() = 0;
 			set_update(SILK_TIME);
@@ -678,16 +680,14 @@ void Anonster::defeated()
 void Anonster::update_pal()
 {
 	uint8_t hits = substate() & 0x0f;
+	uint16_t pals;
 	if (hits == 0x03)
-		SET_HL(gb_, ADDR_UpdateAnonsterPal + 0x1e); // .Pals_50ab4
+		pals = ADDR_UpdateAnonsterPal + 0x1e; // .Pals_50ab4
 	else if (hits == 0x02)
-		SET_HL(gb_, ADDR_UpdateAnonsterPal + 0x26); // .Pals_50abc
+		pals = ADDR_UpdateAnonsterPal + 0x26; // .Pals_50abc
 	else
 		return;
-	SET_DE(gb_, wTempPals2 + 7 * PAL_SIZE);
-	gb_->cpu.c = 7;
-	gb_->cpu.b = 1;
-	call_home(ADDR_CopyAndApplyOBPals);
+	copy_and_apply_ob_pals(pals, wTempPals2 + 7 * PAL_SIZE, 1, 7);
 }
 
 // spawns the three silk platforms one after the other
@@ -787,9 +787,7 @@ void AnonsterHelper::drift()
 	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
 	bool right = facing_right();
 	apply_x_movement_loop(right ? ADDR_Data_60800 : ADDR_Data_60830);
-	// the x position through the page in h
-	uint16_t at = static_cast<uint16_t>(gb_->cpu.h << 8 | OBJ_X_POS);
-	uint16_t x_pos = static_cast<uint16_t>(mem_[at] | mem_[at + 1] << 8);
+	uint16_t x_pos = x();
 	x_pos = right ? static_cast<uint16_t>(x_pos - 5) : static_cast<uint16_t>(x_pos + 4);
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);

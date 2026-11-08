@@ -681,64 +681,39 @@ public:
 	void port_Func_358b() { homecall_process_block(BANK_Func_19b9b, ADDR_Func_19b9b); }
 	void port_Func_35a3() { homecall_process_block(BANK_Func_19b8b, ADDR_Func_19b8b); }
 
-	// ld a, c / add a / add a / add a / or autoinc / ldh [index], a /
-	// ld c, LOW(data)
-	void select_pal(uint16_t index_reg, uint8_t autoinc, uint16_t data_reg)
+	// The palette routines, plain (home/pals.cpp), leaving what the asm
+	// does: b 0 from the last dec b (z, n; c clear from the and / or
+	// before), c the data register, hl past the source, a the last byte
+	// (0 for the black outs)
+	void pals_regs(bool bg)
 	{
-		cpu_.a = alu_.add(cpu_.c, cpu_.c);
-		cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		cpu_.a = alu_.add(cpu_.a, cpu_.a); // *8
-		cpu_.a = alu_.or_(cpu_.a, autoinc);
-		wr8(index_reg, cpu_.a);
-		cpu_.c = (uint8_t)data_reg;
+		cpu_.b = 0;
+		cpu_.c = static_cast<uint8_t>(bg ? rBGPD : rOBPD);
+		cpu_.f = FLAG_Z | FLAG_N;
 	}
-
-	// wait_not_hblank / wait_hblank
-	void wait_next_hblank()
+	void set_pals_hook(bool bg)
 	{
-		while (!(cpu_.a = alu_.and_(rd8(rSTAT), STAT_MODE)))
-			idle(32);
-		while ((cpu_.a = alu_.and_(rd8(rSTAT), STAT_MODE)))
-			idle(32);
+		uint8_t last;
+		uint16_t end = home::set_pals(gb_, bg, REG_HL(gb_), cpu_.b, cpu_.c, &last);
+		pals_regs(bg);
+		cpu_.a = last;
+		SET_HL(gb_, end);
 	}
-
-	// copies b palettes from hl, one per H-Blank
-	void set_pals(uint16_t index_reg, uint8_t autoinc, uint16_t data_reg)
+	void black_out_pals_hook(bool bg)
 	{
-		select_pal(index_reg, autoinc, data_reg);
-		uint16_t hl = REG_HL(gb_);
-		do {
-			wait_next_hblank();
-			for (int i = 0; i < PAL_SIZE; i++) {
-				cpu_.a = rd8(hl++);
-				wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
-			}
-			cpu_.b = alu_.dec(cpu_.b);
-		} while (cpu_.b);
-		SET_HL(gb_, hl);
-	}
-
-	// blacks out b palettes, one per H-Blank
-	void black_out_pals(uint16_t index_reg, uint8_t autoinc, uint16_t data_reg)
-	{
-		select_pal(index_reg, autoinc, data_reg);
-		do {
-			wait_next_hblank();
-			cpu_.a = alu_.xor_(cpu_.a, cpu_.a);
-			for (int i = 0; i < PAL_SIZE; i++)
-				wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
-			cpu_.b = alu_.dec(cpu_.b);
-		} while (cpu_.b);
+		home::black_out_pals(gb_, bg, cpu_.b, cpu_.c);
+		pals_regs(bg);
+		cpu_.a = 0;
 	}
 
 	// c = OB pal index, b = num of pals, hl = pals
-	void port_SetOBPals() { set_pals(rOBPI, OBPI_AUTOINC, rOBPD); }
+	void port_SetOBPals() { set_pals_hook(false); }
 	// c = BG pal index, b = num of pals, hl = pals
-	void port_SetBGPals() { set_pals(rBGPI, BGPI_AUTOINC, rBGPD); }
+	void port_SetBGPals() { set_pals_hook(true); }
 	// blacks out b OB palettes starting from OB palette index c
-	void port_BlackOutOBPals() { black_out_pals(rOBPI, OBPI_AUTOINC, rOBPD); }
+	void port_BlackOutOBPals() { black_out_pals_hook(false); }
 	// blacks out b BG palettes starting from BG palette index c
-	void port_BlackOutBGPals() { black_out_pals(rBGPI, BGPI_AUTOINC, rBGPD); }
+	void port_BlackOutBGPals() { black_out_pals_hook(true); }
 };
 
 } // namespace

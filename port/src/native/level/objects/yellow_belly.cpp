@@ -123,11 +123,7 @@ void YellowBelly::start()
 
 void YellowBelly::copy_pals(uint16_t pals)
 {
-	SET_HL(gb_, pals);
-	SET_DE(gb_, wTempPals2 + 4 * PAL_SIZE);
-	gb_->cpu.c = 4;
-	gb_->cpu.b = 3;
-	call_home(ADDR_CopyAndApplyOBPals);
+	copy_and_apply_ob_pals(pals, wTempPals2 + 4 * PAL_SIZE, 3, 4);
 }
 
 // the palettes fading in

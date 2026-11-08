@@ -39,5 +39,12 @@ void load_collected_treasure_pal_level(GB *gb); // LoadCollectedTreasurePal_Leve
 // count OB palettes from src to dest and applied from OB palette `first`,
 // a palette per H-Blank (CopyAndApplyOBPals; a count of 0 is 256)
 void copy_and_apply_ob_pals(GB *gb, uint16_t src, uint16_t dest, uint8_t count, uint8_t first);
+// SetBGPals / SetOBPals: count palettes from src, from palette `first`, a
+// palette per H-Blank (a count of 0 is 256); returns the end of src (and
+// the last byte in *last)
+uint16_t set_pals(GB *gb, bool bg, uint16_t src, uint8_t count, uint8_t first, uint8_t *last = nullptr);
+// BlackOutBGPals / BlackOutOBPals: count palettes from `first` black, a
+// palette per H-Blank
+void black_out_pals(GB *gb, bool bg, uint8_t count, uint8_t first);
 
 } // namespace wl3::home

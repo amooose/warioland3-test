@@ -106,8 +106,7 @@ void Barrel::float_sinking()
 			play_sfx(SFX_086);
 		return;
 	}
-	SET_BC(gb_, ADDR_Data_60a50);
-	call_home(ADDR_Func_34fc);
+	platform_y_movement(ADDR_Data_60a50);
 }
 
 void Barrel::init()

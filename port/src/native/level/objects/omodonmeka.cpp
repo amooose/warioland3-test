@@ -254,9 +254,7 @@ void Omodonmeka::run(uint16_t handler)
 		if (auto_move_over())
 			return;
 		apply_y_movement_loop(ADDR_Data_604c0);
-		// the y position through the page in h
-		uint16_t at = static_cast<uint16_t>(gb_->cpu.h << 8 | OBJ_Y_POS);
-		uint16_t wario_y = static_cast<uint16_t>((mem_[at] | mem_[at + 1] << 8) + 0x1a);
+		uint16_t wario_y = static_cast<uint16_t>(y() + 0x1a);
 		mem_[wWarioYPos + 1] = static_cast<uint8_t>(wario_y);
 		mem_[wWarioYPos + 0] = static_cast<uint8_t>(wario_y >> 8);
 		return;
@@ -355,8 +353,7 @@ void Omodonmeka::with_omodon_start(uint16_t omodon)
 	mem_[wCurObjCollBoxRight] = 0xfd;
 	mem_[wCurObjCollBoxLeft] = 0xf3;
 	mem_[wCurObjCollBoxBottom] = 0xf9;
-	call_home(ADDR_Func_3444);
-	if (gb_->cpu.e) {
+	if (same_transient_objects()) {
 		swallow();
 		return;
 	}
@@ -463,18 +460,13 @@ void Omodonmeka::run_owo(uint16_t handler)
 		return;
 	}
 	case RISE: { // rises, carrying Wario if he's on it
-		// the state duration is reached through the page in h, which
-		// carrying Wario changes
-		uint16_t page = wCurObjFlags & 0xff00;
 		if (flags() & OBJFLAG_STEPPED) {
 			if (mem_[wGlobalCounter] & 1)
 				return;
-			SET_HL(gb_, wCurObjFlags);
 			move_wario(ADDR_MoveWarioUp, 0x01);
 			call_home(ADDR_HandleUpwardsFloorTransition);
-			page = static_cast<uint16_t>(gb_->cpu.h << 8);
 		}
-		if (dec_at(page | OBJ_STATE_DURATION)) {
+		if (dec_at(wCurObjStateDuration)) {
 			move_up();
 			return;
 		}

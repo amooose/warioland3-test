@@ -164,6 +164,40 @@ void load_collected_treasure_pal_level(GB *gb)
 	mem[rWBK] = wram_bank;
 }
 
+// the palette index register at palette `first` (times 8, in a byte),
+// auto-incrementing
+static void select_pal(GB *gb, bool bg, uint8_t first)
+{
+	Memory mem(gb);
+	mem[bg ? rBGPI : rOBPI] = static_cast<uint8_t>((first * 8) | BGPI_AUTOINC);
+}
+
+uint16_t set_pals(GB *gb, bool bg, uint16_t src, uint8_t count, uint8_t first, uint8_t *last)
+{
+	Memory mem(gb);
+	select_pal(gb, bg, first);
+	uint8_t v = 0;
+	for (int i = 0; i < (count ? count : 256); i++) {
+		wait_hblank(gb);
+		for (int j = 0; j < PAL_SIZE; j++)
+			mem[bg ? rBGPD : rOBPD] = v = mem[src++];
+	}
+	if (last)
+		*last = v;
+	return src;
+}
+
+void black_out_pals(GB *gb, bool bg, uint8_t count, uint8_t first)
+{
+	Memory mem(gb);
+	select_pal(gb, bg, first);
+	for (int i = 0; i < (count ? count : 256); i++) {
+		wait_hblank(gb);
+		for (int j = 0; j < PAL_SIZE; j++)
+			mem[bg ? rBGPD : rOBPD] = 0;
+	}
+}
+
 void copy_and_apply_ob_pals(GB *gb, uint16_t src, uint16_t dest, uint8_t count, uint8_t first)
 {
 	Memory mem(gb);

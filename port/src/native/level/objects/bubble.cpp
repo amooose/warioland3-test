@@ -59,9 +59,8 @@ void Bubble::hole_update()
 // Wario in a bubble); else tries again next frame
 void Bubble::spawn()
 {
-	call_home(ADDR_CountActiveTransientObjects);
 	uint8_t limit = mem_[wTransformation] == TRANSFORMATION_BUBBLE ? 1 : 2;
-	if (gb_->cpu.e >= limit) {
+	if (active_transient_objects() >= limit) {
 		state_duration() = 1;
 		return;
 	}

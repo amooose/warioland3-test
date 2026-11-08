@@ -94,8 +94,7 @@ void Small::kobatto()
 
 void Small::kobatto_update()
 {
-	SET_DE(gb_, ADDR_Data_60ec9);
-	call_home(ADDR_ApplyObjSetMovement);
+	apply_set_movement(ADDR_Data_60ec9);
 }
 
 void Small::wall_crack(uint16_t frameset)

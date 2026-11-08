@@ -449,18 +449,12 @@ void HiddenFigure::flash_pals()
 	} else {
 		pals = mem_[w1d15a] < 0x02 ? ADDR_Pals_4d01b : ADDR_Pals_4d07b;
 	}
-	SET_HL(gb_, pals);
-	gb_->cpu.c = 0;
-	gb_->cpu.b = 6;
-	call_home(ADDR_SetBGPals);
+	set_bg_pals(pals, 6, 0);
 }
 
 void HiddenFigure::set_pals()
 {
-	SET_HL(gb_, mem_[w1d15a] < 0x02 ? ADDR_Pals_4d01b : ADDR_Pals_4d07b);
-	gb_->cpu.c = 0;
-	gb_->cpu.b = 6;
-	call_home(ADDR_SetBGPals);
+	set_bg_pals(mem_[w1d15a] < 0x02 ? ADDR_Pals_4d01b : ADDR_Pals_4d07b, 6, 0);
 }
 
 // --- the face ---

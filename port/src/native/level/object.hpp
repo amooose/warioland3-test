@@ -20,6 +20,8 @@
 #include "../ram.hpp"
 #include "../routines.hpp"
 #include "../home/object_mechanics.hpp"
+#include "../home/pals.hpp"
+#include "../home/memory.hpp"
 #include <initializer_list>
 
 namespace wl3::level {
@@ -30,6 +32,16 @@ bool object_state(GB *gb, uint16_t wrapper);
 // CreateParticle: particle `id` at hYPos / hXPos, in the next of the 4
 // slots; returns the address past what it wrote (particles.cpp)
 uint16_t create_particle(GB *gb, uint8_t id);
+// The object engine's movement tables and counts (update_objects.cpp):
+// _ApplyObjX/YMovement(_Loop) (by OBJ_VAR_2 / OBJ_VAR_3), _ApplyObjSet-
+// Movement, Func_63209 (a platform's y movement, carrying Wario),
+// _CountActiveTransientObjects and Func_632ac (the transient objects
+// with the current one's id)
+void apply_obj_movement(GB *gb, bool x, uint16_t table, bool loop);
+void apply_obj_set_movement(GB *gb, uint16_t start);
+void move_platform_y(GB *gb, uint16_t table);
+uint8_t count_active_transient_objects(GB *gb);
+uint8_t count_same_transient_objects(GB *gb);
 
 class Object {
 public:
@@ -98,7 +110,8 @@ protected:
 	// A home routine by address, plain where the objects call it plain:
 	// MoveObject* (1 pixel, _Fast 2, _Slow 1 every other frame: right and
 	// down on even frames, left and up on odd ones; ByVar2 by var2), the
-	// homejp state wrappers (object_state) and DecrementRemainingBossHits.
+	// homejp state wrappers (object_state), DecrementRemainingBossHits and
+	// the floor transitions (which no object reads a or c of).
 	// Anything else is called.
 	void call_home(uint16_t routine);
 	// MoveWarioRight / Left / Down / Up (by address): Wario and the camera
@@ -125,10 +138,51 @@ protected:
 	uint8_t block_beside(bool right) { return call_a(right ? ADDR_ProcessBlockOnRight : ADDR_ProcessBlockOnLeft); }
 	// The movement tables (bc): the next velocity at var3 (y) or var2 (x),
 	// staying on the last entry, or the _Loop ones starting over
-	void apply_y_movement(uint16_t table) { call_bc(ADDR_ApplyObjYMovement, table); }
-	void apply_y_movement_loop(uint16_t table) { call_bc(ADDR_ApplyObjYMovement_Loop, table); }
-	void apply_x_movement(uint16_t table) { call_bc(ADDR_ApplyObjXMovement, table); }
-	void apply_x_movement_loop(uint16_t table) { call_bc(ADDR_ApplyObjXMovement_Loop, table); }
+	// The homecall macro around a plain fn: bank mapped, then the caller's
+	// again (the wrapper's address standing for home code's)
+	template <class F>
+	void homecall(uint8_t bank, uint16_t wrapper, F fn)
+	{
+		uint8_t saved = mem_[wROMBank];
+		home::bankswitch(gb_, bank, wrapper);
+		fn();
+		home::bankswitch(gb_, saved, wrapper);
+	}
+	// ApplyObjY/XMovement(_Loop): the y or x position by the next step of
+	// the movement table (the _Loop ones start over at its end)
+	void apply_movement(uint16_t wrapper, uint8_t bank, bool x, uint16_t table, bool loop)
+	{
+		homecall(bank, wrapper, [&] { level::apply_obj_movement(gb_, x, table, loop); });
+	}
+	void apply_y_movement(uint16_t table) { apply_movement(ADDR_ApplyObjYMovement, BANK__ApplyObjYMovement, false, table, false); }
+	void apply_y_movement_loop(uint16_t table) { apply_movement(ADDR_ApplyObjYMovement_Loop, BANK__ApplyObjYMovement_Loop, false, table, true); }
+	void apply_x_movement(uint16_t table) { apply_movement(ADDR_ApplyObjXMovement, BANK__ApplyObjXMovement, true, table, false); }
+	void apply_x_movement_loop(uint16_t table) { apply_movement(ADDR_ApplyObjXMovement_Loop, BANK__ApplyObjXMovement_Loop, true, table, true); }
+	// ApplyObjSetMovement: the set movement starting at `start`
+	void apply_set_movement(uint16_t start)
+	{
+		homecall(BANK__ApplyObjSetMovement, ADDR_ApplyObjSetMovement, [&] { level::apply_obj_set_movement(gb_, start); });
+	}
+	// Func_34fc: a platform's y movement by the table, carrying Wario
+	void platform_y_movement(uint16_t table)
+	{
+		homecall(BANK_Func_63209, ADDR_Func_34fc, [&] { level::move_platform_y(gb_, table); });
+	}
+	// CountActiveTransientObjects: how many active transient objects
+	uint8_t active_transient_objects()
+	{
+		uint8_t n = 0;
+		homecall(BANK__CountActiveTransientObjects, ADDR_CountActiveTransientObjects,
+			[&] { n = level::count_active_transient_objects(gb_); });
+		return n;
+	}
+	// Func_3444: how many transient objects share this one's id
+	uint8_t same_transient_objects()
+	{
+		uint8_t n = 0;
+		homecall(BANK_Func_632ac, ADDR_Func_3444, [&] { n = level::count_same_transient_objects(gb_); });
+		return n;
+	}
 	// a new object from its creation data (bc), at the data's offset from
 	// this one, or where this one is
 	void create_object_at_offset(uint16_t params) { call_bc(ADDR_CreateObjectAtRelativePos, params); }
@@ -151,6 +205,18 @@ protected:
 		routines_.call(routine);
 		return gb_->cpu.a;
 	}
+	// CopyAndApplyOBPals: count OB palettes from src to dest (wTempPals2's)
+	// and applied from OB palette `first`, one per H-Blank
+	void copy_and_apply_ob_pals(uint16_t src, uint16_t dest, uint8_t count, uint8_t first)
+	{
+		home::copy_and_apply_ob_pals(gb_, src, dest, count, first);
+	}
+	// SetBGPals / SetOBPals, BlackOutBGPals / BlackOutOBPals: count
+	// palettes from palette `first`, from src or black, one per H-Blank
+	void set_bg_pals(uint16_t src, uint8_t count, uint8_t first) { home::set_pals(gb_, true, src, count, first); }
+	void set_ob_pals(uint16_t src, uint8_t count, uint8_t first) { home::set_pals(gb_, false, src, count, first); }
+	void black_out_bg_pals(uint8_t count, uint8_t first) { home::black_out_pals(gb_, true, count, first); }
+	void black_out_ob_pals(uint8_t count, uint8_t first) { home::black_out_pals(gb_, false, count, first); }
 	// CreateParticle (farcalled): particle `id` at hYPos / hXPos
 	void particle(uint8_t id)
 	{
