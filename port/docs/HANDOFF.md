@@ -891,10 +891,33 @@ primitives, home/wario.cpp, and the golf objects' animation):
   reads nothing after; it uses home::block_ptr, obj_map_col and
   level_block_to_hpos, and only SpawnObject still gets c and de. Full
   fuzz tier green through 5d57c81 (56/56).
-- Next: home/wario_mechanics1.cpp (116 CALL/JUMP sites in
-  wario_states_*.cpp pass b and flags through: give them plain
-  functions first), home/load_golf_sprite.cpp, home/sprites.cpp,
-  home/system.cpp, overworld/bank2b_2.cpp ... (by register sites).
+- Wario mechanics plain (2026-11-08): home/wario.hpp has
+  apply_jump_velocity, apply_walk_velocity, trigger_floor_transition,
+  recover_from_transformation, is_on_slippery_ground, release_owl and
+  trigger_room_transition; floor_transition.hpp update_floor,
+  start_floor_transition, handle_floor_transition (Func_1180). The Wario
+  states and object interactions call them (no more CALLs of those), so
+  the velocity, slippery ground, owl and room transition hooks clobber
+  everything (the walk ones keep b). Every asm caller is a hooked C++
+  routine (scratchpad callers.py; it must match farcall/homecall too).
+  Stay exact: the floor transitions (Func_19720 tail-jumps to them) and
+  the recoveries (block functions; SetState_Idling/StartFall read regs).
+- Pitfall: a hook may JUMP_TO only where the asm itself tail-jumps; a
+  jump to an equivalent routine (TriggerDownwardsFloorTransition to
+  HandleDownwardsFloorTransition) fails the fuzzer ("exits somewhere
+  other than the asm"): call it instead.
+- Also plain: return_level (state tables keep a and f: hooks set them),
+  the title raster effects (a and f for TitleStateTable), the musical
+  coin flag, _InitPrologue/InitPrologue, and the credits, title, Action
+  Help and OW palette transition V-Blank functions. object_mechanics'
+  movers, animation, frameset, boss hits and one-way platform hooks
+  clobber everything: the objects call them plain (Object::call_home)
+  and every asm caller is hooked. Left register-level on purpose:
+  header.cpp (interrupts, rst JumpTable), clear_transformation's two
+  unreferenced number routines, object_mechanics' homejp/homecall
+  wrappers, bank2b_1/2b_2 (register arguments from the prologue).
+- Next: block_functions.cpp, load_golf_sprite.cpp, start_room.cpp's
+  helpers, bank2b_2.cpp, sprites/system hook glue (by register sites).
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped
