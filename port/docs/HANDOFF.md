@@ -688,9 +688,21 @@ primitives, home/wario.cpp, and the golf objects' animation):
   UpdateObjSprite, whose plain version leaves another a), and
   UpdateObject flags an update pointer below $4000 (one pointed at
   MoveWarioUp, which reads the b the asm loop leaves).
-- Next: the rest of update_objects.cpp (DoObjectAction and its actions,
-  throwing and grabbed objects, HandleGrabbedObjectCollisions, the
-  movement tables), then home/object_mechanics.cpp's routines as plain
+- Throwing and held objects, plain (2026-11-07): ThrowObject_Left /
+  _Right (now internal: throw_object(right, grab)), the thrown objects
+  moving sideways (Func_626da and the like, going on along Func_627f0's
+  or Func_62690's table natively), and the picked-up, held and
+  charging-throw states (Func_61f54 / 620a6, 621fb / 622bd, 6247b /
+  62382). Func_627f0, Func_62690, Func_62d34 and Func_62e0f lost their
+  hooks (nothing jumps to them by address now). Deep fuzzing
+  (2000 variants) shows one UpdateObjects case on boss.input where the
+  native run takes a V-Blank partway through the Hidden Figure objects
+  and the asm doesn't: native code runs in less emulated time, so it's
+  the timing class above, not a difference in the code; the tier's 200
+  variants pass.
+- Next: DoObjectAction (its exit f reaches the temple's update functions,
+  which UpdateObject_Temple calls with no flag-setting op between, so it
+  needs those flags kept or the temple objects checked), then home/object_mechanics.cpp's routines as plain
   functions with register wrappers for the objects that read what they
   leave (h, mostly: the object's page); then the block functions,
   passing Muddee, Pesce, Octohon and ZipLine what they read.

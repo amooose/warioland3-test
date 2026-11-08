@@ -204,8 +204,6 @@ public:
 		set_state_by_y_vel(wCurObjState, left);
 	}
 
-	void port_Func_62d34() { land_by_slope(true); }
-	void port_Func_62e0f() { land_by_slope(false); }
 
 	// moves the object var2 to the side (home's MoveObject*ByVar2)
 	void move_x_by_var2(bool left)
@@ -448,9 +446,6 @@ public:
 		home_jump_ret();
 	}
 
-	// b = 1 for the first table; h = the object's page
-	void port_Func_627f0() { obj_y_by_table(ADDR_Data_60140, ADDR_Data_600c0, cpu_.b, REG_HL(gb_)); }
-	void port_Func_62690() { obj_y_by_table(ADDR_Data_60100, ADDR_Data_60080, cpu_.b, REG_HL(gb_)); }
 
 	// --- misc states ---
 
@@ -483,66 +478,7 @@ public:
 		home_jump_ret();
 	}
 
-	// --- bumping and knocked-back objects (the register-level helpers are
-	// for the code further down) ---
-
-	// hPos = wCurObjYPos + (-dy, -dx), with the asm's sub / sbc
-	void set_hpos_sub(uint16_t hl, uint8_t dy)
-	{
-		cpu_.a = alu_.sub(rd8(hl++), dy);
-		wr8(hYPosLo, cpu_.a);
-		cpu_.a = alu_.sbc(rd8(hl++), 0);
-		wr8(hYPosHi, cpu_.a);
-		SET_HL(gb_, hl);
-	}
-
-	// ld a, [addr] / cpl / inc a / ld b, a
-	uint8_t neg_into_b(uint16_t addr)
-	{
-		cpu_.a = alu_.inc(alu_.cpl(rd8(addr)));
-		cpu_.b = cpu_.a;
-		return cpu_.b;
-	}
-
-	// res OBJFLAG_GRABBED_F of the flags at the current page (ld l, OBJ_FLAGS)
-	void res_grabbed()
-	{
-		cpu_.l = OBJ_FLAGS;
-		uint16_t hl = REG_HL(gb_);
-		wr8(hl, (uint8_t)(rd8(hl) & ~(1 << OBJFLAG_GRABBED_F)));
-	}
-
-	// ld a, [wCurObjScreenXPos] / add $28 / cp $f0 (left) or $10 (right), and
-	// the object is let go when it goes off screen
-	void check_offscreen_grabbed(bool left)
-	{
-		cpu_.a = alu_.add(rd8(wCurObjScreenXPos), 0x28);
-		alu_.cp(cpu_.a, left ? 0xf0 : 0x10);
-		if (left ? !CF : CF)
-			res_grabbed();
-	}
-
-	// hXPos = the object's left edge (wCurObjXPos - -box left), from hl = wCurObjXPos
-	void hxpos_left_edge(uint16_t hl)
-	{
-		uint8_t b = neg_into_b(wCurObjCollBoxLeft);
-		cpu_.a = alu_.sub(rd8(hl++), b);
-		wr8(hXPosLo, cpu_.a);
-		cpu_.a = alu_.sbc(rd8(hl++), 0);
-		wr8(hXPosHi, cpu_.a);
-		SET_HL(gb_, hl);
-	}
-
-	// hXPos = the object's right edge (box right + wCurObjXPos), from hl = wCurObjXPos
-	void hxpos_right_edge(uint16_t hl)
-	{
-		cpu_.a = alu_.add(rd8(wCurObjCollBoxRight), rd8(hl));
-		wr8(hXPosLo, cpu_.a);
-		hl = (uint16_t)((hl & 0xff00) | (uint8_t)(hl + 1)); // inc l
-		cpu_.a = alu_.adc(rd8(hl), 0);
-		wr8(hXPosHi, cpu_.a);
-		SET_HL(gb_, hl);
-	}
+	// --- bumping and knocked-back objects ---
 
 	// Func_62ae5 (moving left) / Func_62bce (moving right): an object that
 	// bumped into something slides back, slowing down
@@ -1095,437 +1031,250 @@ public:
 
 	// --- throwing a grabbed object ---
 
-	// ThrowObject_Left / ThrowObject_Right: b bit 6 set for a full throw.
-	// OBJ_VAR_2 = the throw strength (1 when holding up), state = the throw
-	// state, action = 31 | (1 << 7).
-	void throw_object(uint8_t state, uint8_t full_state)
+	// ThrowObject_Left / ThrowObject_Right: grab (wGrabState) bit 6 set for
+	// a full throw. OBJ_VAR_2 = the throw strength (1 when holding up),
+	// state = the throw state, action = 31 | (1 << 7).
+	void throw_object(bool right, uint8_t grab)
 	{
 		play_sfx(SFX_THROW);
-		uint16_t hl = wCurObjInteractionType;
-		cpu_.a = alu_.or_(alu_.and_(rd8(hl), HEAVY_OBJ), OBJ_INTERACTION_00);
-		wr8(hl, cpu_.a);
-		cpu_.a = alu_.rla(cpu_.a);
-		hl = (uint16_t)((hl & 0xff00) | OBJ_STATE_DURATION);
-		cpu_.a = 0;
-		wr8(hl++, 0);
-		hl = (uint16_t)((hl & 0xff00) | alu_.inc((uint8_t)hl)); // inc l
-		bool full = alu_.bit(cpu_.b, 6);
-		if (full) {
-			cpu_.b = 0x04;
-		} else {
-			cpu_.b = CF ? 0x02 : 0x03;
-		}
-		cpu_.a = rd8(wJoypadDown);
-		if (alu_.bit(cpu_.a, B_PAD_UP))
-			cpu_.b = 0x01;
-		cpu_.a = cpu_.b;
-		wr8(hl++, cpu_.a); // OBJ_VAR_2
-		xor_a();
-		wr8(hl++, 0); // OBJ_VAR_3
-		hl = (uint16_t)((hl & 0xff00) | alu_.inc((uint8_t)hl)); // inc l
-		cpu_.a = full ? full_state : state;
-		wr8(hl++, cpu_.a); // OBJ_STATE
-		cpu_.a = 31 | (1 << 7);
-		wr8(hl--, cpu_.a); // OBJ_ACTION
-		SET_HL(gb_, hl);
-		JUMP(HomeJumpRet);
+		uint8_t type = static_cast<uint8_t>((rd8(wCurObjInteractionType) & HEAVY_OBJ) | OBJ_INTERACTION_00);
+		wr8(wCurObjInteractionType, type);
+		wr8(wCurObjStateDuration, 0);
+		bool full = grab & (1 << 6);
+		uint8_t strength = full ? 0x04 : (type & HEAVY_OBJ) ? 0x02 : 0x03;
+		if (rd8(wJoypadDown) & (1 << B_PAD_UP))
+			strength = 0x01;
+		wr8(wCurObjVar2, strength);
+		wr8(wCurObjVar3, 0);
+		wr8(wCurObjState, full ? (right ? OBJSTATE_FULL_THROW_RIGHT_START : OBJSTATE_FULL_THROW_LEFT_START)
+			: (right ? OBJSTATE_4F : OBJSTATE_4E));
+		wr8(wCurObjAction, 31 | (1 << 7));
+		home_jump_ret();
 	}
-
-	void port_ThrowObject_Left() { throw_object(OBJSTATE_4E, OBJSTATE_FULL_THROW_LEFT_START); }
-	void port_ThrowObject_Right() { throw_object(OBJSTATE_4F, OBJSTATE_FULL_THROW_RIGHT_START); }
 
 	// Func_626da (moving left) / Func_62768 (moving right): a thrown object
 	// moving sideways. While it's going down (wCurObjStateDuration set) it
 	// checks the floor, and lands on a slope; it vanishes in water or sand, or
 	// when it hits a ceiling or a wall. Otherwise it moves by OBJ_VAR_2 and
-	// goes on to Func_627f0.
+	// goes on along the y table of Func_627f0.
 	// Func_62574 / Func_62605 do the same with other states for a ceiling
-	// (ceil_state) or a wall (wall_state) and go on to Func_62690 without the
-	// offscreen check.
+	// (ceil_state) or a wall (wall_state) and go on to Func_62690's table
+	// without the offscreen check.
 	void thrown_sideways(bool left, uint16_t routine, uint8_t ceil_state,
-		uint8_t wall_state, uint16_t next, uint8_t wall_ret)
+		uint8_t wall_state, bool tables_627f0, uint8_t wall_ret)
 	{
-		uint16_t hl = wCurObjXPos + 1;
-		cpu_.a = rd8(hl--);
-		wr8(hXPosHi, cpu_.a);
-		cpu_.a = rd8(hl--);
-		wr8(hXPosLo, cpu_.a);
-		SET_HL(gb_, hl);
-		if (ld_and(wCurObjStateDuration)) {
-			cpu_.a = rd8(hl--);
-			wr8(hYPosHi, cpu_.a);
-			cpu_.a = rd8(hl);
-			wr8(hYPosLo, cpu_.a);
-			SET_HL(gb_, hl);
-			xor_a();
+		set_hpos_x(obj_x());
+		if (rd8(wCurObjStateDuration)) {
+			set_hpos_y(obj_y());
 			wr8(wc1ca, FALSE);
-			cpu_.a = alu_.inc(cpu_.a);
-			wr8(wBlockFuncSpecialCollision, cpu_.a); // COLLISION_THROWN_OBJ
-			gb_call_ret(gb_, ADDR_Func_352b, (uint16_t)(routine + 0x20));
-			alu_.and_(cpu_.a, cpu_.a);
-			cpu_.a = 0x03;
-			wr8(hffa0, cpu_.a);
-			if (!ZF) {
-				JUMP_TO(left ? ADDR_Func_62d34 : ADDR_Func_62e0f);
+			wr8(wBlockFuncSpecialCollision, COLLISION_THROWN_OBJ);
+			uint8_t floor = block(ADDR_Func_352b, static_cast<uint16_t>(routine + 0x20));
+			wr8(hffa0, 0x03);
+			if (floor) {
+				land_by_slope(left);
 				return;
 			}
-			if (ld_and(wIsInWaterOrSand))
-				goto vanish;
+			if (rd8(wIsInWaterOrSand)) {
+				wr8(wCurObjState, OBJSTATE_VANISH_TOUCH);
+				home_jump_ret();
+				return;
+			}
 		}
 
-		neg_into_b(wCurObjCollBoxTop);
-		set_hpos_sub(wCurObjYPos, cpu_.b);
-		cpu_.a = COLLISION_THROWN_OBJ;
-		wr8(wBlockFuncSpecialCollision, cpu_.a);
-		gb_call_ret(gb_, ADDR_Func_358b, (uint16_t)(routine + 0x50));
-		if (alu_.and_(cpu_.a, cpu_.a)) {
-			st(wCurObjState, ceil_state);
-			JUMP(HomeJumpRet);
+		set_hpos_y(top());
+		wr8(wBlockFuncSpecialCollision, COLLISION_THROWN_OBJ);
+		if (block(ADDR_Func_358b, static_cast<uint16_t>(routine + 0x50))) {
+			wr8(wCurObjState, ceil_state);
+			home_jump_ret();
 			return;
 		}
-		set_hpos_sub(wCurObjYPos, 8);
-		if (left)
-			hxpos_left_edge(REG_HL(gb_));
-		else
-			hxpos_right_edge(REG_HL(gb_));
-		cpu_.a = COLLISION_THROWN_OBJ;
-		wr8(wBlockFuncSpecialCollision, cpu_.a);
-		gb_call_ret(gb_, ADDR_Func_3513, (uint16_t)(routine + wall_ret));
-		if (alu_.and_(cpu_.a, 0x0f)) {
-			st(wCurObjState, wall_state);
-			JUMP(HomeJumpRet);
+		set_hpos_y(static_cast<uint16_t>(obj_y() - 8));
+		set_hpos_x(edge(left));
+		wr8(wBlockFuncSpecialCollision, COLLISION_THROWN_OBJ);
+		if (block(ADDR_Func_3513, static_cast<uint16_t>(routine + wall_ret)) & 0x0f) {
+			wr8(wCurObjState, wall_state);
+			home_jump_ret();
 			return;
 		}
-		if (left)
-			CALL(MoveObjectLeftByVar2);
-		else
-			CALL(MoveObjectRightByVar2);
-		if (next == ADDR_Func_627f0)
-			check_offscreen_grabbed(left);
-		JUMP_TO(next);
-		return;
-
-	vanish:
-		cpu_.a = OBJSTATE_VANISH_TOUCH;
-		wr8(wCurObjState, cpu_.a);
-		JUMP(HomeJumpRet);
+		move_x_by_var2(left);
+		if (tables_627f0) {
+			let_go_off_screen(left);
+			obj_y_by_table(ADDR_Data_60140, ADDR_Data_600c0, rd8(wCurObjVar2), wCurObjVar3);
+		} else {
+			obj_y_by_table(ADDR_Data_60100, ADDR_Data_60080, rd8(wCurObjVar2), wCurObjVar3);
+		}
 	}
 
-	void port_Func_626da()
-	{
-		thrown_sideways(true, ADDR_Func_626da, OBJSTATE_VANISH_TOUCH, OBJSTATE_VANISH_TOUCH,
-			ADDR_Func_627f0, 0x77);
-	}
-	void port_Func_62768()
-	{
-		thrown_sideways(false, ADDR_Func_62768, OBJSTATE_VANISH_TOUCH, OBJSTATE_VANISH_TOUCH,
-			ADDR_Func_627f0, 0x74);
-	}
-	void port_Func_62574()
-	{
-		thrown_sideways(true, ADDR_Func_62574, OBJSTATE_14, OBJSTATE_15,
-			ADDR_Func_62690, 0x77);
-	}
-	void port_Func_62605()
-	{
-		thrown_sideways(false, ADDR_Func_62605, OBJSTATE_15, OBJSTATE_14,
-			ADDR_Func_62690, 0x74);
-	}
+	void port_Func_626da() { thrown_sideways(true, ADDR_Func_626da, OBJSTATE_VANISH_TOUCH, OBJSTATE_VANISH_TOUCH, true, 0x77); }
+	void port_Func_62768() { thrown_sideways(false, ADDR_Func_62768, OBJSTATE_VANISH_TOUCH, OBJSTATE_VANISH_TOUCH, true, 0x74); }
+	void port_Func_62574() { thrown_sideways(true, ADDR_Func_62574, OBJSTATE_14, OBJSTATE_15, false, 0x77); }
+	void port_Func_62605() { thrown_sideways(false, ADDR_Func_62605, OBJSTATE_15, OBJSTATE_14, false, 0x74); }
 
 	// --- an object held by Wario ---
 
 	// a grabbed object let go: it falls off sideways
 	void drop_grabbed(uint8_t state)
 	{
-		xor_a();
 		wr8(wGrabState, 0);
 		play_sfx(SFX_01A);
-		st(wCurObjVar2, 0x02);
-		uint16_t hl = wCurObjAction;
-		cpu_.a = 31 | (1 << 7);
-		wr8(hl--, cpu_.a);
-		cpu_.a = state;
-		wr8(hl--, cpu_.a); // OBJ_STATE
-		SET_HL(gb_, hl);
-		JUMP(HomeJumpRet);
+		wr8(wCurObjVar2, 0x02);
+		wr8(wCurObjAction, 31 | (1 << 7));
+		wr8(wCurObjState, state);
+		home_jump_ret();
 	}
 
-	// hl = the Wario position byte pair after hl's; adds the signed offset v to
-	// it into [hl] / [hl + 1], and returns hl + 2 (inc l).
-	uint16_t picked_up_pos(uint16_t hl, uint8_t v, uint16_t wario)
+	// Wario's position (big-endian)
+	uint16_t wario_y() const { return static_cast<uint16_t>(rd8(wWarioYPos + 0) << 8 | rd8(wWarioYPos + 1)); }
+	uint16_t wario_x() const { return static_cast<uint16_t>(rd8(wWarioXPos + 0) << 8 | rd8(wWarioXPos + 1)); }
+
+	// hPickedUpObjPos (y, x, little-endian)
+	uint16_t picked_y() const { return mem_.word(hPickedUpObjPos); }
+	uint16_t picked_x() const { return mem_.word(hPickedUpObjPos + 2); }
+	void set_picked(uint16_t y, uint16_t x)
 	{
-		cpu_.a = v;
-		alu_.cp(cpu_.a, 0x80);
-		bool negative = !CF;
-		cpu_.a = alu_.add(rd8(wario + 1), v);
-		wr8(hl++, cpu_.a);
-		bool carry = CF;
-		cpu_.a = rd8(wario + 0);
-		if (negative && !carry)
-			cpu_.a = alu_.dec(cpu_.a);
-		else if (!negative && carry)
-			cpu_.a = alu_.inc(cpu_.a);
-		wr8(hl, cpu_.a);
-		return (uint16_t)((hl & 0xff00) | (uint8_t)(hl + 1));
+		mem_.word(hPickedUpObjPos) = y;
+		mem_.word(hPickedUpObjPos + 2) = x;
+	}
+	// the object moves to hPickedUpObjPos
+	void obj_to_picked()
+	{
+		for (int i = 0; i < 4; i++)
+			wr8(static_cast<uint16_t>(wCurObjYPos + i), rd8(static_cast<uint16_t>(hPickedUpObjPos + i)));
 	}
 
-	// Func_61f54 (held to the right) / Func_620a6 (held to the left)
+	// the object at Wario's position, 30 (26 when smash attacking) up and 7
+	// to the right or left
+	void hold_above_wario(bool right)
+	{
+		uint8_t up = static_cast<uint8_t>(30 - rd8(wIsSmashAttacking) * 4);
+		set_obj_y(static_cast<uint16_t>(wario_y() - up));
+		set_obj_x(static_cast<uint16_t>(right ? wario_x() + 7 : wario_x() - 7));
+	}
+
+	// Func_61f54 (held to the right) / Func_620a6 (held to the left): being
+	// picked up (along the steps in OBJ_VAR_2/3, which start over 4 bytes
+	// back at their 0 end; stopped by a wall or ceiling), then held
 	void grabbed_object(bool right)
 	{
 		uint16_t routine = right ? ADDR_Func_61f54 : ADDR_Func_620a6;
 		uint8_t drop_state = right ? OBJSTATE_14 : OBJSTATE_15;
 		uint8_t idle_state = right ? OBJSTATE_19 : OBJSTATE_18;
-		st(wCurObjAction, (1 << NO_ACTIONS_F) | 1);
+		no_actions();
 
-		cpu_.a = alu_.and_(rd8(wGrabState), GRAB_STATE_MASK);
-		alu_.cp(cpu_.a, GRAB_PICK_UP);
-		if (ZF)
-			goto pick_up;
-		alu_.cp(cpu_.a, GRAB_IDLE);
-		if (!ZF) {
-			st(wCurObjState, OBJSTATE_12);
-			JUMP(HomeJumpRet);
+		uint8_t grab = rd8(wGrabState) & GRAB_STATE_MASK;
+		if (grab != GRAB_PICK_UP) {
+			if (grab != GRAB_IDLE) {
+				wr8(wCurObjState, OBJSTATE_12);
+				home_jump_ret();
+				return;
+			}
+			// GrabIdle: held above Wario, until a floor's above him
+			hold_above_wario(right);
+			hpos_at_obj();
+			wr8(wc1ca, FALSE);
+			if (!block(ADDR_Func_352b, static_cast<uint16_t>(routine + 0x55)) || rd8(wc1ca)) {
+				wr8(wCurObjState, idle_state);
+				home_jump_ret();
+				return;
+			}
+			set_obj_y(static_cast<uint16_t>(obj_y() + 16));
+			drop_grabbed(drop_state);
 			return;
 		}
 
-		// GrabIdle: hold the object above Wario
-		cpu_.a = rd8(wIsSmashAttacking);
-		cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		cpu_.a = alu_.add(cpu_.a, cpu_.a); // *4
-		cpu_.e = cpu_.a;
-		cpu_.a = alu_.sub(30, cpu_.e);
-		cpu_.e = cpu_.a;
-		{
-			uint16_t hl = wCurObjYPos;
-			cpu_.a = alu_.sub(rd8(wWarioYPos + 1), cpu_.e);
-			wr8(hl++, cpu_.a);
-			cpu_.a = alu_.sbc(rd8(wWarioYPos + 0), 0);
-			wr8(hl++, cpu_.a);
-			if (right) {
-				cpu_.a = alu_.add(rd8(wWarioXPos + 1), 7);
-				wr8(hl++, cpu_.a);
-				cpu_.a = alu_.adc(rd8(wWarioXPos + 0), 0);
-			} else {
-				cpu_.a = alu_.sub(rd8(wWarioXPos + 1), 7);
-				wr8(hl++, cpu_.a);
-				cpu_.a = alu_.sbc(rd8(wWarioXPos + 0), 0);
-			}
-			wr8(hl, cpu_.a);
-
-			hl = wCurObjYPos;
-			cpu_.a = rd8(hl++);
-			wr8(hYPosLo, cpu_.a);
-			cpu_.a = rd8(hl++);
-			wr8(hYPosHi, cpu_.a);
-			cpu_.a = rd8(hl++);
-			wr8(hXPosLo, cpu_.a);
-			cpu_.a = rd8(hl);
-			wr8(hXPosHi, cpu_.a);
-			SET_HL(gb_, hl);
-		}
-		xor_a();
-		wr8(wc1ca, FALSE);
-		gb_call_ret(gb_, ADDR_Func_352b, (uint16_t)(routine + 0x55));
-		if (!alu_.and_(cpu_.a, cpu_.a) || ld_and(wc1ca)) {
-			st(wCurObjState, idle_state);
-			JUMP(HomeJumpRet);
+		uint8_t d = static_cast<uint8_t>(rd8(wCurObjVar1) - 1);
+		wr8(wCurObjVar1, d);
+		if (d) {
+			home_jump_ret();
 			return;
 		}
-		{
-			uint16_t hl = wCurObjYPos;
-			cpu_.a = alu_.add(rd8(hl), 16);
-			wr8(hl++, cpu_.a);
-			SET_HL(gb_, hl);
-			if (CF)
-				wr8(hl, alu_.inc(rd8(hl)));
+		uint16_t p = static_cast<uint16_t>(rd8(wCurObjVar3) << 8 | rd8(wCurObjVar2));
+		uint8_t duration = rd8(p++);
+		if (!duration) {
+			p = static_cast<uint16_t>((p & 0xff00) | static_cast<uint8_t>(p - 4)); // dec l x4
+			duration = rd8(p++);
 		}
-		drop_grabbed(drop_state);
-		return;
+		wr8(wCurObjVar1, duration);
+		uint8_t dy = rd8(p++);
+		uint8_t dx = rd8(p++);
+		wr8(wCurObjVar2, static_cast<uint8_t>(p));
+		wr8(wCurObjVar3, static_cast<uint8_t>(p >> 8));
+		set_picked(static_cast<uint16_t>(wario_y() + static_cast<int8_t>(dy)),
+			static_cast<uint16_t>(wario_x() + static_cast<int8_t>(dx)));
 
-	pick_up:
-		{
-			uint16_t hl = wCurObjVar1;
-			SET_HL(gb_, hl);
-			wr8(hl, alu_.dec(rd8(hl)));
-			if (!ZF) {
-				JUMP(HomeJumpRet);
+		// the side it's held on, then its top
+		set_hpos_y(static_cast<uint16_t>(picked_y() - 4));
+		set_hpos_x(right ? static_cast<uint16_t>(picked_x() + rd8(wCurObjCollBoxRight))
+			: static_cast<uint16_t>(picked_x() - static_cast<uint8_t>(-rd8(wCurObjCollBoxLeft))));
+		if (!(block(ADDR_Func_3513, static_cast<uint16_t>(routine + (right ? 0x106 : 0x109))) & 0x0f)) {
+			set_hpos_y(static_cast<uint16_t>(picked_y() - static_cast<uint8_t>(-rd8(wCurObjCollBoxTop))));
+			set_hpos_x(picked_x());
+			if (!(block(ADDR_Func_358b, static_cast<uint16_t>(routine + (right ? 0x125 : 0x128))) & 0x0f)) {
+				obj_to_picked();
+				home_jump_ret();
 				return;
 			}
-			hl = (uint16_t)((hl & 0xff00) | alu_.inc((uint8_t)hl)); // inc l
-			cpu_.a = rd8(hl++); // OBJ_VAR_2
-			hl = (uint16_t)(rd8(hl) << 8 | cpu_.a); // OBJ_VAR_3
-			cpu_.a = rd8(hl++);
-			if (!alu_.and_(cpu_.a, cpu_.a)) {
-				uint8_t l = (uint8_t)hl;
-				for (int i = 0; i < 4; i++)
-					l = alu_.dec(l);
-				hl = (uint16_t)((hl & 0xff00) | l);
-				cpu_.a = rd8(hl++);
-			}
-			wr8(wCurObjVar1, cpu_.a);
-			cpu_.c = cpu_.a = rd8(hl++);
-			cpu_.b = cpu_.a = rd8(hl++);
-			cpu_.a = (uint8_t)hl;
-			wr8(wCurObjVar2, cpu_.a);
-			cpu_.a = (uint8_t)(hl >> 8);
-			wr8(wCurObjVar3, cpu_.a);
-
-			hl = picked_up_pos(hPickedUpObjPos, cpu_.c, wWarioYPos);
-			hl = picked_up_pos(hl, cpu_.b, wWarioXPos);
-			SET_HL(gb_, (uint16_t)(hl - 1));
-
-			set_hpos_sub(hPickedUpObjPos, 4);
-			if (right)
-				hxpos_right_edge(REG_HL(gb_));
-			else
-				hxpos_left_edge(REG_HL(gb_));
-			gb_call_ret(gb_, ADDR_Func_3513, (uint16_t)(routine + (right ? 0x106 : 0x109)));
-			if (!alu_.and_(cpu_.a, 0x0f)) {
-				neg_into_b(wCurObjCollBoxTop);
-				set_hpos_sub(hPickedUpObjPos, cpu_.b);
-				hl = REG_HL(gb_);
-				cpu_.a = rd8(hl++);
-				wr8(hXPosLo, cpu_.a);
-				cpu_.a = rd8(hl++);
-				wr8(hXPosHi, cpu_.a);
-				SET_HL(gb_, hl);
-				gb_call_ret(gb_, ADDR_Func_358b, (uint16_t)(routine + (right ? 0x125 : 0x128)));
-				if (!alu_.and_(cpu_.a, 0x0f)) {
-					hl = hPickedUpObjPos;
-					uint16_t de = wCurObjYPos;
-					for (int i = 0; i < 4; i++) {
-						cpu_.a = rd8(hl++);
-						wr8(de, cpu_.a);
-						if (i < 3)
-							de = (uint16_t)((de & 0xff00) | alu_.inc((uint8_t)de)); // inc e
-					}
-					SET_HL(gb_, hl);
-					SET_DE(gb_, de);
-					JUMP(HomeJumpRet);
-					return;
-				}
-			}
-			// hit a wall or a ceiling
-			cpu_.a = alu_.and_(rd8(wCurObjInteractionType), HEAVY_OBJ);
-			if (!ZF) {
-				drop_grabbed(drop_state);
-				return;
-			}
-			cpu_.a = alu_.or_(cpu_.a, GRAB_UNK_02);
-			wr8(wGrabState, cpu_.a);
-			st(wCurObjState, idle_state);
-			JUMP(HomeJumpRet);
 		}
+		// hit a wall or a ceiling
+		if (rd8(wCurObjInteractionType) & HEAVY_OBJ) {
+			drop_grabbed(drop_state);
+			return;
+		}
+		wr8(wGrabState, GRAB_UNK_02);
+		wr8(wCurObjState, idle_state);
+		home_jump_ret();
 	}
 
 	void port_Func_61f54() { grabbed_object(true); }
 	void port_Func_620a6() { grabbed_object(false); }
 
-	// wCurObjYPos/XPos = Wario's position, 30 (26 when smash attacking) up and
-	// 7 to the right or left
-	void hold_above_wario(bool right)
-	{
-		cpu_.a = rd8(wIsSmashAttacking);
-		cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		cpu_.a = alu_.add(cpu_.a, cpu_.a);
-		cpu_.e = cpu_.a;
-		cpu_.a = alu_.sub(30, cpu_.e);
-		cpu_.e = cpu_.a;
-		uint16_t hl = wCurObjYPos;
-		cpu_.a = alu_.sub(rd8(wWarioYPos + 1), cpu_.e);
-		wr8(hl++, cpu_.a);
-		cpu_.a = alu_.sbc(rd8(wWarioYPos + 0), 0);
-		wr8(hl++, cpu_.a);
-		if (right) {
-			cpu_.a = alu_.add(rd8(wWarioXPos + 1), 7);
-			wr8(hl++, cpu_.a);
-			cpu_.a = alu_.adc(rd8(wWarioXPos + 0), 0);
-		} else {
-			cpu_.a = alu_.sub(rd8(wWarioXPos + 1), 7);
-			wr8(hl++, cpu_.a);
-			cpu_.a = alu_.sbc(rd8(wWarioXPos + 0), 0);
-		}
-		wr8(hl, cpu_.a);
-		SET_HL(gb_, hl);
-	}
-
-	void res_grabbed_at(uint16_t hl)
-	{
-		wr8(hl, (uint8_t)(rd8(hl) & ~(1 << OBJFLAG_GRABBED_F)));
-	}
-
 	// Func_621fb (held to the right) / Func_622bd (held to the left)
 	void held_object(bool right)
 	{
 		uint16_t routine = right ? ADDR_Func_621fb : ADDR_Func_622bd;
-		st(wCurObjAction, (1 << NO_ACTIONS_F) | 1);
-		cpu_.a = rd8(wGrabState);
-		cpu_.b = cpu_.a;
-		cpu_.a = alu_.and_(cpu_.a, 0x0f);
-		alu_.cp(cpu_.a, GRAB_IDLE);
-		if (!ZF) {
-			alu_.cp(cpu_.a, GRAB_CHARGE_THROW);
-			if (ZF) {
-				st(wCurObjState, right ? OBJSTATE_4B : OBJSTATE_4A);
-				JUMP(HomeJumpRet);
+		no_actions();
+		uint8_t grab = rd8(wGrabState);
+		uint8_t g = grab & 0x0f;
+		if (g != GRAB_IDLE) {
+			if (g == GRAB_CHARGE_THROW) {
+				wr8(wCurObjState, right ? OBJSTATE_4B : OBJSTATE_4A);
+				home_jump_ret();
 				return;
 			}
-			alu_.cp(cpu_.a, GRAB_THROW);
-			if (ZF) {
-				JUMP_TO(right ? ADDR_ThrowObject_Right : ADDR_ThrowObject_Left);
+			if (g == GRAB_THROW) {
+				throw_object(right, grab);
 				return;
 			}
-			uint16_t hl = wCurObjFlags;
-			res_grabbed_at(hl);
-			hl = (uint16_t)((hl & 0xff00) | OBJ_STATE);
-			SET_HL(gb_, hl);
-			if (ld_and(wIsCrouching)) {
-				st(wCurObjVar2, 0x01);
-				cpu_.a = right ? OBJSTATE_15 : OBJSTATE_14;
+			res_flag(OBJFLAG_GRABBED_F);
+			if (rd8(wIsCrouching)) {
+				wr8(wCurObjVar2, 0x01);
+				wr8(wCurObjState, right ? OBJSTATE_15 : OBJSTATE_14);
 			} else {
-				cpu_.a = OBJSTATE_12;
+				wr8(wCurObjState, OBJSTATE_12);
 			}
-			wr8(hl, cpu_.a);
-			JUMP(HomeJumpRet);
+			home_jump_ret();
 			return;
 		}
 
-		// GrabIdle
+		// GrabIdle: let go when it hits a ceiling, or a wall at its side
 		hold_above_wario(right);
-		neg_into_b(wCurObjCollBoxTop);
-		set_hpos_sub(wCurObjYPos, cpu_.b);
-		uint16_t hl = REG_HL(gb_);
-		cpu_.a = rd8(hl++);
-		wr8(hXPosLo, cpu_.a);
-		cpu_.a = rd8(hl++);
-		wr8(hXPosHi, cpu_.a);
-		SET_HL(gb_, hl);
-		gb_call_ret(gb_, ADDR_Func_358b, (uint16_t)(routine + 0x7d));
-		if (!alu_.and_(cpu_.a, right ? 0x0f : 0xff)) {
-			set_hpos_sub(wCurObjYPos, 8);
-			if (right)
-				hxpos_right_edge(REG_HL(gb_));
-			else
-				hxpos_left_edge(REG_HL(gb_));
-			gb_call_ret(gb_, ADDR_Func_3513, (uint16_t)(routine + (right ? 0x9d : 0x9f)));
-			if (!alu_.and_(cpu_.a, right ? 0xff : 0x0f)) {
-				JUMP(HomeJumpRet);
+		set_hpos_y(top());
+		set_hpos_x(obj_x());
+		if (!(block(ADDR_Func_358b, static_cast<uint16_t>(routine + 0x7d)) & (right ? 0x0f : 0xff))) {
+			set_hpos_y(static_cast<uint16_t>(obj_y() - 8));
+			set_hpos_x(edge(!right));
+			if (!(block(ADDR_Func_3513, static_cast<uint16_t>(routine + (right ? 0x9d : 0x9f))) & (right ? 0xff : 0x0f))) {
+				home_jump_ret();
 				return;
 			}
 		}
-		xor_a();
 		wr8(wGrabState, 0);
 		play_sfx(SFX_01A);
-		st(wCurObjVar2, 0x02);
-		hl = wCurObjAction;
-		cpu_.a = 31 | (1 << 7);
-		wr8(hl--, cpu_.a);
-		cpu_.a = right ? OBJSTATE_14 : OBJSTATE_15;
-		wr8(hl, cpu_.a); // OBJ_STATE
-		hl = (uint16_t)((hl & 0xff00) | OBJ_FLAGS);
-		SET_HL(gb_, hl);
-		res_grabbed_at(hl);
-		JUMP(HomeJumpRet);
+		wr8(wCurObjVar2, 0x02);
+		wr8(wCurObjAction, 31 | (1 << 7));
+		wr8(wCurObjState, right ? OBJSTATE_14 : OBJSTATE_15);
+		res_flag(OBJFLAG_GRABBED_F);
+		home_jump_ret();
 	}
 
 	void port_Func_621fb() { held_object(true); }
@@ -1535,74 +1284,34 @@ public:
 	void charging_throw(bool right)
 	{
 		uint16_t routine = right ? ADDR_Func_6247b : ADDR_Func_62382;
-		st(wCurObjAction, (1 << NO_ACTIONS_F) | 1);
-		cpu_.a = rd8(wGrabState);
-		cpu_.b = cpu_.a;
-		cpu_.a = alu_.and_(cpu_.a, 0x0f);
-		alu_.cp(cpu_.a, GRAB_CHARGE_THROW);
-		bool charge = ZF;
-		if (!charge) {
-			alu_.cp(cpu_.a, GRAB_THROW_FULLY_CHARGED);
-			charge = ZF;
-		}
-		if (charge) {
+		no_actions();
+		uint8_t grab = rd8(wGrabState);
+		uint8_t g = grab & 0x0f;
+		if (g == GRAB_CHARGE_THROW || g == GRAB_THROW_FULLY_CHARGED) {
 			hold_above_wario(right);
-			JUMP(HomeJumpRet);
+			home_jump_ret();
 			return;
 		}
-		alu_.cp(cpu_.a, GRAB_HOLD_FULL_CHARGE);
-		if (ZF) {
-			uint16_t hl = hPickedUpObjPos;
-			cpu_.a = alu_.sub(rd8(wWarioYPos + 1), 30);
-			wr8(hl++, cpu_.a);
-			cpu_.a = alu_.sbc(rd8(wWarioYPos + 0), 0);
-			wr8(hl++, cpu_.a);
-			if (right) {
-				cpu_.a = alu_.sub(rd8(wWarioXPos + 1), 5);
-				wr8(hl++, cpu_.a);
-				cpu_.a = alu_.sbc(rd8(wWarioXPos + 0), 0);
-			} else {
-				cpu_.a = alu_.add(rd8(wWarioXPos + 1), 5);
-				wr8(hl++, cpu_.a);
-				cpu_.a = alu_.adc(rd8(wWarioXPos + 0), 0);
-			}
-			wr8(hl++, cpu_.a);
-			set_hpos_sub(hPickedUpObjPos, 4);
-			hl = REG_HL(gb_);
-			cpu_.a = rd8(hl++);
-			wr8(hXPosLo, cpu_.a);
-			cpu_.a = rd8(hl++);
-			wr8(hXPosHi, cpu_.a);
-			SET_HL(gb_, hl);
-			gb_call_ret(gb_, ADDR_Func_3513, (uint16_t)(routine + 0x81));
-			if (!alu_.and_(cpu_.a, 0x0f)) {
-				hl = hPickedUpObjPos;
-				uint16_t de = wCurObjYPos;
-				for (int i = 0; i < 4; i++) {
-					cpu_.a = rd8(hl++);
-					wr8(de, cpu_.a);
-					if (i < 3)
-						de = (uint16_t)((de & 0xff00) | alu_.inc((uint8_t)de)); // inc e
-				}
-				SET_HL(gb_, hl);
-				SET_DE(gb_, de);
-				JUMP(HomeJumpRet);
+		if (g == GRAB_HOLD_FULL_CHARGE) {
+			// held behind Wario, unless there's a wall there
+			set_picked(static_cast<uint16_t>(wario_y() - 30),
+				static_cast<uint16_t>(right ? wario_x() - 5 : wario_x() + 5));
+			set_hpos_y(static_cast<uint16_t>(picked_y() - 4));
+			set_hpos_x(picked_x());
+			if (!(block(ADDR_Func_3513, static_cast<uint16_t>(routine + 0x81)) & 0x0f)) {
+				obj_to_picked();
+				home_jump_ret();
 				return;
 			}
-			xor_a();
 			wr8(wGrabState, 0);
 			play_sfx(SFX_01A);
-		} else {
-			alu_.cp(cpu_.a, GRAB_THROW);
-			if (ZF) {
-				JUMP_TO(right ? ADDR_ThrowObject_Right : ADDR_ThrowObject_Left);
-				return;
-			}
+		} else if (g == GRAB_THROW) {
+			throw_object(right, grab);
+			return;
 		}
-		SET_HL(gb_, wCurObjFlags);
-		res_grabbed_at(wCurObjFlags);
-		st(wCurObjState, OBJSTATE_12);
-		JUMP(HomeJumpRet);
+		res_flag(OBJFLAG_GRABBED_F);
+		wr8(wCurObjState, OBJSTATE_12);
+		home_jump_ret();
 	}
 
 	void port_Func_6247b() { charging_throw(true); }
@@ -1774,12 +1483,16 @@ PORT_COVERED(UpdateObject);
 PORT_COVERED(UpdateObject_Temple);
 PORT_COVERED(UpdateObjectDuringFloorTransition);
 PORT_COVERED(UpdateObjects_Temple);
+PORT_COVERED(Func_627f0);
+PORT_COVERED(Func_62690);
+PORT_COVERED(Func_62d34);
+PORT_COVERED(Func_62e0f);
+PORT_COVERED(ThrowObject_Left);
+PORT_COVERED(ThrowObject_Right);
 PORT_COVERED(ClearObjects);
 PORT_COVERED(ClearObjDataPointers);
 PORT_EX(DrawObjects_NoPriority, 0, ALL_REGISTERS) { ObjectEngine(gb).port_DrawObjects_NoPriority(); }
 PORT_EX(DrawObjects_WithPriority, 0, ALL_REGISTERS) { ObjectEngine(gb).port_DrawObjects_WithPriority(); }
-PORT_EX(Func_62d34, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62d34(); }
-PORT_EX(Func_62e0f, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62e0f(); }
 PORT_EX(Func_62ec3, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62ec3(); }
 PORT_EX(Func_62faa, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62faa(); }
 PORT_EX(_CountActiveTransientObjects, 0, 0) { ObjectEngine(gb).port__CountActiveTransientObjects(); }
@@ -1805,8 +1518,6 @@ PORT_EX(Func_62926, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func
 PORT_EX(Func_629a6, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_629a6(); }
 PORT_EX(_ObjState_StandingFall, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port__ObjState_StandingFall(); }
 PORT_EX(_ObjState_Fall, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port__ObjState_Fall(); }
-PORT_EX(Func_627f0, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_627f0(); }
-PORT_EX(Func_62690, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62690(); }
 PORT_EX(Func_6303f, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_6303f(); }
 PORT_EX(Func_63050, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_63050(); }
 PORT_EX(Func_6305f, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_6305f(); }
@@ -1832,16 +1543,14 @@ PORT_EX(Func_632ac, 0, ALL_REGISTERS & ~R_E) { ObjectEngine(gb).port_Func_632ac(
 PORT_EX(DoObjectAction, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_DoObjectAction(); }
 PORT_EX(Func_62e57, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62e57(); }
 PORT_EX(_VanishObject2, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port__VanishObject2(); }
-PORT_EX(ThrowObject_Left, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_ThrowObject_Left(); }
-PORT_EX(ThrowObject_Right, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_ThrowObject_Right(); }
-PORT_EX(Func_626da, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_626da(); }
-PORT_EX(Func_62768, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62768(); }
-PORT_EX(Func_62574, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62574(); }
-PORT_EX(Func_62605, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62605(); }
-PORT_EX(Func_61f54, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_61f54(); }
-PORT_EX(Func_620a6, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_620a6(); }
-PORT_EX(Func_621fb, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_621fb(); }
-PORT_EX(Func_622bd, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_622bd(); }
-PORT_EX(Func_6247b, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_6247b(); }
-PORT_EX(Func_62382, HOOK_MANUAL_RET, 0) { ObjectEngine(gb).port_Func_62382(); }
+PORT_EX(Func_626da, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_626da(); }
+PORT_EX(Func_62768, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62768(); }
+PORT_EX(Func_62574, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62574(); }
+PORT_EX(Func_62605, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62605(); }
+PORT_EX(Func_61f54, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_61f54(); }
+PORT_EX(Func_620a6, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_620a6(); }
+PORT_EX(Func_621fb, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_621fb(); }
+PORT_EX(Func_622bd, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_622bd(); }
+PORT_EX(Func_6247b, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_6247b(); }
+PORT_EX(Func_62382, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62382(); }
 PORT_EX(UpdateObjects, 0, ALL_REGISTERS) { ObjectEngine(gb).port_UpdateObjects(); }
