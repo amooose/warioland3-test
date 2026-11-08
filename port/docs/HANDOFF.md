@@ -800,8 +800,19 @@ primitives, home/wario.cpp, and the golf objects' animation):
   pushes, since the queue overrun reads the stack. Registers are left
   only as callee arguments (GetNextLevelRoomID's hl, CopyHLToDE*'s hl /
   de / b, SpawnObject's c / de, the queue routines' hl).
-- Next: camera.cpp / scroll.cpp / block_queue.cpp (scroll.cpp also feeds
-  the queues, so the same stack care), then the overworld modules.
+- block_queue.cpp, plain (2026-11-08): DespawnObject, Func_ba42, Func_bb2d
+  and Func_bb85 over memory (map_loc, home::obj_map_col /
+  level_block_to_hpos). DespawnObject's hook leaves the asm's hl / de / c
+  and a / f, as DespawnAllObjects walks on with h. Func_bb85 keeps b
+  exact: in ProcessMultiBlock's loop it goes on through ProcessBlock to
+  the multi-block functions that jump straight to the replace
+  (Func_18f32 and the like), whose replace_block writes b as the new
+  block (SRAM1 when nothing was queued, 0 after a block, the caller's
+  with a DMA pending). The fuzzer found it (ProcessMultiBlock,
+  yellowbelly, variant 124) when the hook clobbered b: a register read
+  that crosses three routines, which live.py missed.
+- Next: camera.cpp / scroll.cpp (scroll.cpp also feeds the queues, so the
+  same stack care), then the overworld modules.
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped
