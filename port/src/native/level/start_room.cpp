@@ -508,112 +508,49 @@ void RoomStart::process_multi_block()
 void RoomStart::process_blocks()
 {
 	uint8_t param = static_cast<uint8_t>((mem_[wMultiBlockParam] & 0x0f) + 0x10);
-	cpu_.f = flags::add(static_cast<uint8_t>(param - 0x10), 0x10);
 	mem_[wMultiBlockParam] = param;
-	cpu_.a = param & 0x08;
-	cpu_.f = flags::and_(cpu_.a);
-	mem_[wcede] = cpu_.a;
+	mem_[wcede] = param & 0x08;
 
 	for (;;) {
-		uint8_t dir = mem_[wMultiBlockParam] & 0x07;
-		// dec a until z: 1 right, 2 left, 3 down, else up
-		uint8_t a = dir;
-		cpu_.f = flags::and_(a);
-		int which = 0;
-		for (int i = 1; i <= 3; i++) {
-			cpu_.f = flags::dec(cpu_.f, a);
-			a--;
-			if (!a) {
-				which = i;
-				break;
+		// the next block from wcedb:wcedc (the map's rows run on into the
+		// next SRAM bank)
+		uint8_t bank = mem_[wcedb], row = mem_[wcedc + 0], column = mem_[wcedc + 1];
+		switch (mem_[wMultiBlockParam] & 0x07) {
+		case 1: // the block on the right
+			column++;
+			break;
+		case 2: // the block on the left
+			column--;
+			break;
+		case 3: // the block below
+			if (--row == 0x9f) { // HIGH(STARTOF(SRAM)) - 1
+				row = 0xbf; // HIGH(STARTOF(SRAM) + SIZEOF(SRAM)) - 1
+				bank--;
 			}
-		}
-		cpu_.a = a;
-		switch (which) {
-		case 0: { // the block above
-			uint8_t row = mem_[wcedc + 0];
-			cpu_.f = flags::inc(cpu_.f, row);
-			cpu_.a = static_cast<uint8_t>(row + 1);
-			cpu_.h = cpu_.a;
-			mem_[wBlockPtr + 0] = cpu_.a;
-			cpu_.f = flags::cp(cpu_.a, 0xc0); // HIGH(STARTOF(SRAM) + SIZEOF(SRAM))
-			cpu_.a = mem_[wcedb];
-			if (zf()) {
-				cpu_.h = sLevelBlockObjectMap >> 8;
-				mem_[wBlockPtr + 0] = cpu_.h;
-				uint8_t bank = mem_[wcedb];
-				cpu_.f = flags::inc(cpu_.f, bank);
-				cpu_.a = static_cast<uint8_t>(bank + 1);
+			break;
+		default: // the block above
+			if (++row == 0xc0) { // HIGH(STARTOF(SRAM) + SIZEOF(SRAM))
+				row = sLevelBlockObjectMap >> 8;
+				bank++;
 			}
-			mem_[wBlockPtrBank] = cpu_.a;
-			cpu_.a = mem_[wcedc + 1];
-			cpu_.l = cpu_.a;
-			mem_[wBlockPtr + 1] = cpu_.a;
 			break;
 		}
-		case 1: { // the block on the right
-			mem_[wBlockPtrBank] = mem_[wcedb];
-			cpu_.h = mem_[wcedc + 0];
-			mem_[wBlockPtr + 0] = cpu_.h;
-			uint8_t column = mem_[wcedc + 1];
-			cpu_.f = flags::inc(cpu_.f, column);
-			cpu_.a = static_cast<uint8_t>(column + 1);
-			cpu_.l = cpu_.a;
-			mem_[wBlockPtr + 1] = cpu_.a;
-			break;
-		}
-		case 2: { // the block on the left
-			mem_[wBlockPtrBank] = mem_[wcedb];
-			uint8_t column = mem_[wcedc + 1];
-			cpu_.f = flags::dec(cpu_.f, column);
-			cpu_.l = static_cast<uint8_t>(column - 1);
-			mem_[wBlockPtr + 1] = cpu_.l;
-			cpu_.a = mem_[wcedc + 0];
-			cpu_.h = cpu_.a;
-			mem_[wBlockPtr + 0] = cpu_.a;
-			break;
-		}
-		default: { // the block below
-			uint8_t row = mem_[wcedc + 0];
-			cpu_.f = flags::dec(cpu_.f, row);
-			cpu_.a = static_cast<uint8_t>(row - 1);
-			cpu_.h = cpu_.a;
-			mem_[wBlockPtr + 0] = cpu_.a;
-			cpu_.f = flags::cp(cpu_.a, 0x9f); // HIGH(STARTOF(SRAM)) - 1
-			cpu_.a = mem_[wcedb];
-			if (zf()) {
-				cpu_.h = 0xbf; // HIGH(STARTOF(SRAM) + SIZEOF(SRAM)) - 1
-				mem_[wBlockPtr + 0] = 0xbf;
-				uint8_t bank = mem_[wcedb];
-				cpu_.f = flags::dec(cpu_.f, bank);
-				cpu_.a = static_cast<uint8_t>(bank - 1);
-			}
-			mem_[wBlockPtrBank] = cpu_.a;
-			cpu_.a = mem_[wcedc + 1];
-			cpu_.l = cpu_.a;
-			mem_[wBlockPtr + 1] = cpu_.a;
-			break;
-		}
-		}
+		mem_[wBlockPtrBank] = bank;
+		mem_[wBlockPtr + 0] = row;
+		mem_[wBlockPtr + 1] = column;
 
 		// .process_block
-		cpu_.a = mem_[wMultiBlockParam] & (0xff ^ 0x07);
-		cpu_.f = flags::and_(cpu_.a);
-		mem_[wMultiBlockParam] = cpu_.a;
+		mem_[wMultiBlockParam] = mem_[wMultiBlockParam] & (0xff ^ 0x07);
 		routines_.farcall_ret(BANK_ProcessBlock, ADDR_ProcessBlock, ADDR_ProcessMultiBlock + 0x10d);
-		cpu_.a = mem_[wMultiBlockParam] & 0x07;
-		cpu_.f = flags::and_(cpu_.a);
-		if (!cpu_.a)
+		if (!(mem_[wMultiBlockParam] & 0x07))
 			break;
 		routines_.call_ret(ADDR_Func_bb85, ADDR_ProcessMultiBlock + 0x11a);
 	}
 
 	// .break
-	xor_a();
 	mem_[wMultiBlockParam] = 0;
 	mem_[wIsFloorTransition] = 0;
-	cpu_.a = mem_[wPendingSubState];
-	mem_[wSubState] = cpu_.a;
+	mem_[wSubState] = mem_[wPendingSubState];
 }
 
 // ld a, [wSRAMBank] / push af / ld a, BANK("SRAM1") / sramswitch /
@@ -891,4 +828,5 @@ PORT_EX(SetWarioPositionToSpawn, 0, ALL_REGISTERS) { RoomStart(gb).set_wario_pos
 // called only from StartRoom_*, which read no register it leaves (live.py)
 PORT_EX(DrawRoom_FromStart, 0, ALL_REGISTERS) { RoomStart(gb).draw_room(); }
 PORT_EX(ProcessMultiBlock, 0, ALL_REGISTERS) { RoomStart(gb).process_multi_block(); }
-PORT_LOCAL_EX(ProcessMultiBlock, ProcessBlocks, 0, 0) { RoomStart(gb).process_blocks(); }
+// ProcessMultiBlock calls it, then UpdateParticles, which reads no register
+PORT_LOCAL_EX(ProcessMultiBlock, ProcessBlocks, 0, ALL_REGISTERS) { RoomStart(gb).process_blocks(); }
