@@ -816,8 +816,18 @@ primitives, home/wario.cpp, and the golf objects' animation):
   callers (update_level.cpp, start_room.cpp) go on to ProcessInteractions,
   Func_8ed9 and Func_bb85, none of which reads a register on entry, and
   live.py finds no read after any call site.
-- Next: scroll.cpp (it feeds the queues too, so the same stack care), then
-  update_level.cpp and the overworld modules.
+- particles.cpp's update, plain (2026-11-08): UpdateParticles dispatches
+  natively (particle_func(id), animate(anim, at)); run(), the animation
+  and LoadParticleSprite work on the slot's address, LoadSprite still
+  taking hl. All their hooks clobber every register (only each other and
+  plain callers reach them; UpdateParticles' loop reloads hl). The fields
+  step with the asm's inc c, in the particle's page: the fuzzer enters
+  with bc anywhere (ccfe), and 16-bit offsets failed every shard.
+  CreateParticle, Func_ce3e and CreateParticleInBlock stay exact (BreakBlock
+  calls the last inside the block function chain).
+- Next: scroll.cpp (it feeds the queues: its pushes and the af it pushes
+  are what the overrun reads, so keep every push and the flags behind it),
+  then update_level.cpp and the overworld modules.
 - The fuzzer used to abort when native code made a `CALL`/`JUMP` into
   ROMX with another bank mapped (a fuzzed state can map any bank); under
   test that's now an unrealistic check and the call is skipped

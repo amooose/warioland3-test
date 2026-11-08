@@ -31,6 +31,8 @@ struct ParticleFunc {
 	uint16_t sfx;
 };
 
+const ParticleFunc *particle_func(uint8_t id);
+
 class Particles {
 public:
 	explicit Particles(GB *gb) : gb_(gb), cpu_(gb->cpu), mem_(gb), routines_(gb) {}
@@ -38,17 +40,17 @@ public:
 	void create(); // CreateParticle
 	void block_pos(); // Func_ce3e
 	void update(); // UpdateParticles
-	void run(const ParticleFunc &f);
-	void update_animation(); // UpdateParticleAnimation
-	void anim(uint16_t frameset, uint16_t y_dest, uint16_t oam); // ParticleAnim_*
-	uint16_t by_direction(uint16_t left, uint16_t right);
-	void load_sprite(); // LoadParticleSprite
+	void run(const ParticleFunc &f, uint16_t particle);
+	// UpdateParticleAnimation: at = the particle's frame duration (then its
+	// frameset offset and frame); returns at + 2
+	uint16_t update_animation(uint16_t at, uint16_t frameset);
+	void animate(uint16_t anim, uint16_t at); // ParticleAnim_*, at = the frame duration
+	void load_sprite(uint16_t oam); // LoadParticleSprite
 
 private:
-	void inc_c(int n = 1);
-	void deinit();
-	void hpos_to_particle();
-	void ld_cp(uint16_t addr, uint8_t v);
+	uint16_t by_direction(uint16_t left, uint16_t right) const { return mem_[wDirection] ? right : left; }
+	void anim(uint16_t frameset, uint16_t y_dest, uint16_t oam, uint16_t at);
+	void deinit(uint16_t particle);
 
 	GB *gb_;
 	CPU &cpu_;
@@ -87,123 +89,62 @@ void Particles::block_pos()
 	mem_[hXPosHi] = cpu_.a;
 }
 
-// runs the function of every slot in use
+// runs the function of every slot in use (UpdateParticles' jumptable, by
+// the particle's id)
 void Particles::update()
 {
-	uint8_t count = mem_[wNumParticles];
-	cpu_.a = count;
-	cpu_.f = flags::and_(count);
-	if (!count)
+	if (!mem_[wNumParticles])
 		return;
 	for (int n = 0; n < MAX_NUM_PARTICLES; n++) {
 		uint16_t slot = static_cast<uint16_t>(wParticle0 + n * (wParticle1 - wParticle0));
-		SET_HL(gb_, slot);
 		uint8_t id = mem_[slot];
-		cpu_.a = id;
-		cpu_.f = flags::and_(id);
 		if (!id)
 			continue;
-		// .DoParticleFunc: bc = the particle, then the jumptable's
-		// registers: de = 2 * id, hl and a the function's address
-		SET_BC(gb_, slot);
 		if (id >= NUM_PARTICLES) {
 			if (gb_->test.active)
 				gb_->test.unrealistic = true;
 			return;
 		}
-		uint8_t twice = static_cast<uint8_t>(id * 2);
-		SET_DE(gb_, twice);
-		unsigned sum = FUNC_TABLE + twice;
-		cpu_.f = static_cast<uint8_t>(flags::z(twice) | ((FUNC_TABLE & 0xfff) + twice > 0xfff ? FLAG_H : 0)
-			| (sum > 0xffff ? FLAG_C : 0));
-		uint16_t func = Word(gb_, static_cast<uint16_t>(sum));
-		SET_HL(gb_, func);
-		cpu_.a = static_cast<uint8_t>(func);
-		routines_.call(func);
+		if (const ParticleFunc *f = particle_func(id))
+			run(*f, slot);
 	}
 }
 
-void Particles::inc_c(int n)
+// the slot cleared, one particle fewer
+void Particles::deinit(uint16_t particle)
 {
-	while (n--) {
-		cpu_.f = flags::inc(cpu_.f, cpu_.c);
-		cpu_.c++;
+	mem_[particle] = 0;
+	mem_[wNumParticles] = static_cast<uint8_t>(mem_[wNumParticles] - 1);
+}
+
+// starts the particle (or moves it along), animates it, and ends it when
+// it's done
+void Particles::run(const ParticleFunc &f, uint16_t particle)
+{
+	uint8_t state = mem_[wWarioState];
+	if ((f.pre == Pre::BOUNCY && state != WST_BOUNCY_AIRBORNE) || (f.pre == Pre::MAGIC && state == WST_MAGIC_STOPPING)) {
+		deinit(particle);
+		return;
 	}
-}
-
-// ld a, [addr] / cp v
-void Particles::ld_cp(uint16_t addr, uint8_t v)
-{
-	cpu_.a = mem_[addr];
-	cpu_.f = flags::cp(cpu_.a, v);
-}
-
-// xor a / ld [bc], a / ld hl, wNumParticles / dec [hl]
-void Particles::deinit()
-{
-	mem_[REG_BC(gb_)] = 0;
-	cpu_.a = 0;
-	SET_HL(gb_, wNumParticles);
-	Byte count = mem_[wNumParticles];
-	cpu_.f = flags::dec(FLAG_Z, count);
-	--count;
-}
-
-// inc c / ldh a, [hPos + i] / ld [bc], a for the 4 bytes of hPos, inc c
-void Particles::hpos_to_particle()
-{
-	for (int i = 0; i < 4; i++) {
-		inc_c();
-		cpu_.a = mem_[hYPosHi + i];
-		mem_[REG_BC(gb_)] = cpu_.a;
-	}
-	inc_c();
-}
-
-// bc = the particle: starts it (or moves it along), animates it, and ends
-// it when it's done
-void Particles::run(const ParticleFunc &f)
-{
-	if (f.pre != Pre::ALWAYS) {
-		ld_cp(wWarioState, f.pre == Pre::BOUNCY ? WST_BOUNCY_AIRBORNE : WST_MAGIC_STOPPING);
-		bool equal = cpu_.f & FLAG_Z;
-		if (f.pre == Pre::BOUNCY ? !equal : equal) {
-			deinit();
-			return;
-		}
-	}
-	uint16_t particle = REG_BC(gb_);
-	inc_c();
-	cpu_.a = mem_[REG_BC(gb_)]; // PARTICLE_STRUCT_INITIALISED
-	cpu_.f = flags::and_(cpu_.a);
-	if (!cpu_.a) {
-		cpu_.f = flags::inc(cpu_.f, 0);
-		cpu_.a = 1;
-		mem_[REG_BC(gb_)] = 1;
-		inc_c(5);
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z;
-		mem_[REG_BC(gb_)] = 0; // PARTICLE_STRUCT_DURATION
-		inc_c();
-		mem_[REG_BC(gb_)] = 0; // PARTICLE_STRUCT_FRAMESET_OFFSET
-		if (f.sfx) {
+	// the particle's fields (the asm steps through them with inc c, in its
+	// page)
+	auto field = [particle](int n) { return static_cast<uint16_t>((particle & 0xff00) | static_cast<uint8_t>(particle + n)); };
+	uint16_t init = field(PARTICLE_STRUCT_INITIALISED);
+	if (!mem_[init]) {
+		mem_[init] = 1;
+		mem_[field(PARTICLE_STRUCT_DURATION)] = 0;
+		mem_[field(PARTICLE_STRUCT_DURATION + 1)] = 0; // PARTICLE_STRUCT_FRAMESET_OFFSET
+		if (f.sfx)
 			play_sfx(mem_, f.sfx);
-			cpu_.a = static_cast<uint8_t>(f.sfx);
-		}
-		cpu_.f = flags::dec(cpu_.f, cpu_.c);
-		cpu_.c--;
 	} else {
 		switch (f.init) {
 		case Init::IN_PLACE:
-			inc_c(5);
 			break;
 		case Init::WARIO_POS:
 			for (int i = 0; i < 4; i++)
 				mem_[hYPosHi + i] = mem_[wWarioPos + i];
-			cpu_.a = mem_[wWarioPos + 3];
-			SET_HL(gb_, wWarioPos + 3);
-			SET_DE(gb_, hYPosHi + 3);
-			hpos_to_particle();
+			for (int i = 0; i < 4; i++)
+				mem_[field(2 + i)] = mem_[hYPosHi + i];
 			break;
 		case Init::SLIDE_RIGHT:
 		case Init::SLIDE_LEFT: {
@@ -211,143 +152,119 @@ void Particles::run(const ParticleFunc &f)
 			bool right = f.init == Init::SLIDE_RIGHT;
 			uint16_t x = static_cast<uint16_t>(mem_[wWarioXPos + 0] << 8 | mem_[wWarioXPos + 1]);
 			x = static_cast<uint16_t>(right ? x - 0x0c : x + 0x0c);
-			mem_[hXPosLo] = static_cast<uint8_t>(x);
-			mem_[hXPosHi] = static_cast<uint8_t>(x >> 8);
 			uint16_t y = static_cast<uint16_t>((mem_[wWarioYPos + 0] << 8 | mem_[wWarioYPos + 1]) - 0x0c);
-			mem_[hYPosLo] = static_cast<uint8_t>(y);
 			mem_[hYPosHi] = static_cast<uint8_t>(y >> 8);
-			cpu_.a = static_cast<uint8_t>(y >> 8);
-			SET_HL(gb_, wWarioXPos + 1 - 3); // after three ld a, [hld]
-			SET_DE(gb_, hXPosLo - 3);
-			hpos_to_particle();
+			mem_[hYPosLo] = static_cast<uint8_t>(y);
+			mem_[hXPosHi] = static_cast<uint8_t>(x >> 8);
+			mem_[hXPosLo] = static_cast<uint8_t>(x);
+			for (int i = 0; i < 4; i++)
+				mem_[field(2 + i)] = mem_[hYPosHi + i];
 			break;
 		}
 		case Init::DRIFT_UP: { // drifts up 2 pixels
-			inc_c(2);
-			uint16_t lo = REG_BC(gb_);
-			uint8_t y_lo = mem_[lo];
-			mem_[lo] = static_cast<uint8_t>(y_lo - 2);
-			cpu_.f = flags::dec(cpu_.f, cpu_.c);
-			cpu_.c--;
-			uint16_t hi = REG_BC(gb_);
-			cpu_.a = static_cast<uint8_t>(mem_[hi] - (y_lo < 2));
-			mem_[hi] = cpu_.a;
-			inc_c(4);
+			uint16_t y = static_cast<uint16_t>((mem_[field(2)] << 8 | mem_[field(3)]) - 2);
+			mem_[field(3)] = static_cast<uint8_t>(y);
+			mem_[field(2)] = static_cast<uint8_t>(y >> 8);
 			break;
 		}
 		}
 	}
-	routines_.call(f.anim);
-	SET_BC(gb_, particle);
+	animate(f.anim, field(PARTICLE_STRUCT_DURATION));
 	switch (f.end) {
 	case End::NEVER:
 		return;
 	case End::ANIM:
-		cpu_.a = mem_[wCurParticleAnimEnded];
-		cpu_.f = flags::and_(cpu_.a);
-		if (!cpu_.a)
+		if (!mem_[wCurParticleAnimEnded])
 			return;
 		break;
 	case End::SLIDING:
-		ld_cp(wWarioState, WST_SLIDING);
-		if (cpu_.f & FLAG_Z)
+		if (mem_[wWarioState] == WST_SLIDING)
 			return;
 		break;
 	case End::OFF_SCREEN: // until off the bottom of the screen
-		ld_cp(wCurSpriteYCoord, 0xc0);
-		if (cpu_.f & FLAG_C)
+		if (mem_[wCurSpriteYCoord] < 0xc0)
 			return;
 		break;
 	}
-	deinit();
+	deinit(particle);
 }
 
-// hl = the particle's frame duration, then its frameset offset and frame;
-// de = its frameset
-void Particles::update_animation()
+uint16_t Particles::update_animation(uint16_t at, uint16_t frameset)
 {
 	mem_[wCurParticleAnimEnded] = FALSE;
-	uint16_t at = REG_HL(gb_);
 	uint8_t duration = mem_[at];
-	cpu_.a = static_cast<uint8_t>(duration - 1);
-	cpu_.f = flags::sub(duration, 1);
-	mem_[at] = cpu_.a;
-	SET_HL(gb_, at + 2);
+	mem_[at] = static_cast<uint8_t>(duration - 1);
 	if (duration) // .no_new_frame
-		return;
+		return static_cast<uint16_t>(at + 2);
 
-	uint8_t offset = mem_[at + 1];
-	unsigned entry = offset + cpu_.e;
-	cpu_.c = static_cast<uint8_t>(entry);
-	cpu_.b = static_cast<uint8_t>(cpu_.d + (entry > 0xff));
-	uint8_t frame = mem_[REG_BC(gb_)];
+	uint16_t entry = static_cast<uint16_t>(frameset + mem_[static_cast<uint16_t>(at + 1)]);
+	uint8_t frame = mem_[entry];
 	if (frame == 0xff) { // .reset_anim
-		mem_[at + 1] = 0; // frameset offset
+		mem_[static_cast<uint16_t>(at + 1)] = 0; // frameset offset
 		mem_[at] = 0; // duration
 		mem_[wCurParticleAnimEnded] = TRUE;
-		cpu_.a = TRUE;
-		cpu_.f = FLAG_Z;
-		return;
+		return static_cast<uint16_t>(at + 2);
 	}
-	mem_[at + 2] = frame;
+	mem_[static_cast<uint16_t>(at + 2)] = frame;
 	// the offset is read again after the frame's written (they can alias)
-	uint8_t again = mem_[at + 1];
-	cpu_.f = flags::add(again, 2);
-	mem_[at + 1] = static_cast<uint8_t>(again + 2);
-	SET_BC(gb_, REG_BC(gb_) + 1);
-	cpu_.a = mem_[REG_BC(gb_)];
-	mem_[at] = cpu_.a; // duration
+	mem_[static_cast<uint16_t>(at + 1)] = static_cast<uint8_t>(mem_[static_cast<uint16_t>(at + 1)] + 2);
+	mem_[at] = mem_[static_cast<uint16_t>(entry + 1)]; // duration
+	return static_cast<uint16_t>(at + 2);
 }
 
-// the frameset for Wario's direction (and a's flags)
-uint16_t Particles::by_direction(uint16_t left, uint16_t right)
-{
-	cpu_.a = mem_[wDirection];
-	cpu_.f = flags::and_(cpu_.a);
-	return cpu_.a ? right : left;
-}
-
-// bc = the particle's frame duration: animates it with the frameset and
+// animates the particle (at its frame duration) with the frameset and
 // draws it with the OAM data
-void Particles::anim(uint16_t frameset, uint16_t y_dest, uint16_t oam)
+void Particles::anim(uint16_t frameset, uint16_t y_dest, uint16_t oam, uint16_t at)
 {
-	SET_HL(gb_, REG_BC(gb_));
-	SET_DE(gb_, frameset);
-	update_animation();
+	uint16_t hl = update_animation(at, frameset);
 	// ld a, [hld] (the frame) / dec l / dec l / ld a, [hld] (x) / dec l /
 	// ld a, [hld] (y): hld is 16-bit, dec l 8-bit
-	auto dec_l = [](uint16_t hl) { return static_cast<uint16_t>((hl & 0xff00) | static_cast<uint8_t>(hl - 1)); };
-	uint16_t hl = REG_HL(gb_);
+	auto dec_l = [](uint16_t v) { return static_cast<uint16_t>((v & 0xff00) | static_cast<uint8_t>(v - 1)); };
 	mem_[wCurParticleFrame] = mem_[hl--];
 	hl = dec_l(dec_l(hl));
 	mem_[wCurParticleXCoord] = mem_[hl--];
 	hl = dec_l(hl);
 	mem_[y_dest] = mem_[hl];
 	mem_[wCurParticleAttributes] = 0;
-	cpu_.a = 0;
-	cpu_.f = FLAG_Z;
-	SET_HL(gb_, oam);
-	load_sprite();
+	load_sprite(oam);
 }
 
-// the particle's sprite to virtual OAM, relative to the camera; hl = the
-// OAM data
-void Particles::load_sprite()
+void Particles::animate(uint16_t anim_func, uint16_t at)
+{
+	switch (anim_func) {
+	case ADDR_ParticleAnim_Bubbles: anim(by_direction(ADDR_Frameset_d502, ADDR_Frameset_d50b), wCurParticleYCoord, ADDR_OAM_d20e, at); break;
+	case ADDR_ParticleAnim_Magic1: anim(ADDR_Frameset_d8e7, wCurParticle, ADDR_OAM_d80d, at); break;
+	case ADDR_ParticleAnim_Magic2: anim(ADDR_Frameset_d8f4, wCurParticle, ADDR_OAM_d80d, at); break;
+	case ADDR_ParticleAnim_MagicStop: anim(ADDR_Frameset_d901, wCurParticle, ADDR_OAM_d80d, at); break;
+	case ADDR_ParticleAnim_Owl: anim(ADDR_Frameset_d7b4, wCurParticleYCoord, ADDR_OAM_d763, at); break;
+	case ADDR_ParticleAnim_TreasureGlow: anim(ADDR_Frameset_d75a, wCurParticleYCoord, ADDR_OAM_d716, at); break;
+	case ADDR_ParticleAnim_BubbleBurst: anim(ADDR_Frameset_d622, wCurParticleYCoord, ADDR_OAM_d5ae, at); break;
+	case ADDR_ParticleAnim_BouncyJump: anim(ADDR_Frameset_d591, wCurParticleYCoord, ADDR_OAM_d532, at); break;
+	case ADDR_ParticleAnim_Snow: anim(ADDR_Frameset_d806, wCurParticle, ADDR_OAM_d7bd, at); break;
+	case ADDR_ParticleAnim_Ice: anim(by_direction(ADDR_Frameset_d6fd, ADDR_Frameset_d6e4), wCurParticleYCoord, ADDR_OAM_d62b, at); break;
+	case ADDR_ParticleAnim_Dust: anim(ADDR_Frameset_d4c5, wCurParticleYCoord, ADDR_OAM_d20e, at); break;
+	case ADDR_ParticleAnim_Debris: anim(ADDR_Frameset_d49a, wCurParticleYCoord, ADDR_OAM_d20e, at); break;
+	case ADDR_ParticleAnim_Stars: anim(ADDR_Frameset_d525, wCurParticleYCoord, ADDR_OAM_d20e, at); break;
+	case ADDR_ParticleAnim_SmokeLarge: anim(ADDR_Frameset_d4f3, wCurParticleYCoord, ADDR_OAM_d20e, at); break;
+	case ADDR_ParticleAnim_SmokeSmall: anim(ADDR_Frameset_d4ea, wCurParticleYCoord, ADDR_OAM_d20e, at); break;
+	case ADDR_ParticleAnim_Splash: anim(ADDR_Frameset_d4ba, wCurParticleYCoord, ADDR_OAM_d20e, at); break;
+	}
+}
+
+// the particle's sprite to virtual OAM, relative to the camera (LoadSprite
+// takes the OAM data in hl)
+void Particles::load_sprite(uint16_t oam)
 {
 	uint16_t scy = wSCY, scx = wSCX;
 	if (mem_[wCameraConfigFlags] == (CAM_XSCROLL2 | CAM_TRANSITIONS | CAM_BORDER_RIGHT | CAM_BORDER_LEFT)) {
 		scy = wCameraSCY + 1;
 		scx = wCameraSCX + 1;
 	}
-	uint8_t y = static_cast<uint8_t>(mem_[wCurParticleYCoord] + OAM_Y_OFS);
-	mem_[wCurSpriteYCoord] = static_cast<uint8_t>(y - mem_[scy]);
-	cpu_.b = mem_[scx];
-	uint8_t x = static_cast<uint8_t>(mem_[wCurParticleXCoord] + OAM_X_OFS);
-	cpu_.f = flags::sub(x, cpu_.b);
-	mem_[wCurSpriteXCoord] = static_cast<uint8_t>(x - cpu_.b);
+	mem_[wCurSpriteYCoord] = static_cast<uint8_t>(mem_[wCurParticleYCoord] + OAM_Y_OFS - mem_[scy]);
+	mem_[wCurSpriteXCoord] = static_cast<uint8_t>(mem_[wCurParticleXCoord] + OAM_X_OFS - mem_[scx]);
 	mem_[wCurSpriteFrame] = mem_[wCurParticleFrame];
-	cpu_.a = mem_[wCurParticleAttributes];
-	mem_[wCurSpriteAttributes] = cpu_.a;
+	mem_[wCurSpriteAttributes] = mem_[wCurParticleAttributes];
+	SET_HL(gb_, oam);
 	routines_.call(ADDR_LoadSprite);
 }
 
@@ -369,6 +286,15 @@ constexpr ParticleFunc SNOW{Pre::ALWAYS, Init::IN_PLACE, ADDR_ParticleAnim_Snow,
 constexpr ParticleFunc MAGIC_1{Pre::MAGIC, Init::WARIO_POS, ADDR_ParticleAnim_Magic1, End::NEVER, 0};
 constexpr ParticleFunc MAGIC_2{Pre::MAGIC, Init::WARIO_POS, ADDR_ParticleAnim_Magic2, End::NEVER, 0};
 constexpr ParticleFunc MAGIC_STOP{Pre::ALWAYS, Init::WARIO_POS, ADDR_ParticleAnim_MagicStop, End::ANIM, 0};
+
+// UpdateParticles' jumptable, by id (PARTICLE_NONE's function does nothing)
+const ParticleFunc *particle_func(uint8_t id)
+{
+	static const ParticleFunc *const funcs[] = {nullptr, &DEBRIS, &STARS, &SPLASH, &DUST, &SLIDE_DUST_RIGHT,
+		&SLIDE_DUST_LEFT, &SMOKE_LARGE, &SMOKE_SMALL, &BUBBLES, &BOUNCY_JUMP, &BUBBLE_BURST, &ICE,
+		&TREASURE_GLOW, &OWL_PARTICLE, &SNOW, &MAGIC_1, &MAGIC_2, &MAGIC_STOP};
+	return id < sizeof funcs / sizeof funcs[0] ? funcs[id] : nullptr;
+}
 
 } // namespace
 
@@ -406,53 +332,51 @@ PORT(CreateParticleInBlock)
 	particles.create();
 }
 
-PORT(UpdateParticles) { Particles(gb).update(); }
-PORT(UpdateParticleAnimation) { Particles(gb).update_animation(); }
-PORT(LoadParticleSprite) { Particles(gb).load_sprite(); }
+// The particles' update, plain: UpdateParticles runs the functions and
+// animations itself. Their only callers are each other and the level's
+// frame and room start (plain C++), and UpdateParticles' own loop reloads
+// hl for each slot, so the hooks clobber every register.
+PORT_EX(UpdateParticles, 0, ALL_REGISTERS) { Particles(gb).update(); }
+// hl = the frame duration, de = the frameset
+PORT_EX(UpdateParticleAnimation, 0, ALL_REGISTERS) { Particles(gb).update_animation(REG_HL(gb), REG_DE(gb)); }
+// hl = the OAM data
+PORT_EX(LoadParticleSprite, 0, ALL_REGISTERS) { Particles(gb).load_sprite(REG_HL(gb)); }
 
-PORT(ParticleFunc_None) {}
-PORT(ParticleFunc_Debris) { Particles(gb).run(wl3::level::DEBRIS); }
-PORT(ParticleFunc_Stars) { Particles(gb).run(wl3::level::STARS); }
-PORT(ParticleFunc_Splash) { Particles(gb).run(wl3::level::SPLASH); }
-PORT(ParticleFunc_Dust) { Particles(gb).run(wl3::level::DUST); }
-PORT(ParticleFunc_SlideDustRight) { Particles(gb).run(wl3::level::SLIDE_DUST_RIGHT); }
-PORT(ParticleFunc_SlideDustLeft) { Particles(gb).run(wl3::level::SLIDE_DUST_LEFT); }
-PORT(ParticleFunc_SmokeLarge) { Particles(gb).run(wl3::level::SMOKE_LARGE); }
-PORT(ParticleFunc_SmokeSmall) { Particles(gb).run(wl3::level::SMOKE_SMALL); }
-PORT(ParticleFunc_Bubbles) { Particles(gb).run(wl3::level::BUBBLES); }
-PORT(ParticleFunc_BouncyJump) { Particles(gb).run(wl3::level::BOUNCY_JUMP); }
-PORT(ParticleFunc_BubbleBurst) { Particles(gb).run(wl3::level::BUBBLE_BURST); }
-PORT(ParticleFunc_Ice) { Particles(gb).run(wl3::level::ICE); }
-PORT(ParticleFunc_TreasureGlow) { Particles(gb).run(wl3::level::TREASURE_GLOW); }
-PORT(ParticleFunc_Owl) { Particles(gb).run(wl3::level::OWL_PARTICLE); }
-PORT(ParticleFunc_Snow) { Particles(gb).run(wl3::level::SNOW); }
-PORT(ParticleFunc_Magic1) { Particles(gb).run(wl3::level::MAGIC_1); }
-PORT(ParticleFunc_Magic2) { Particles(gb).run(wl3::level::MAGIC_2); }
-PORT(ParticleFunc_MagicStop) { Particles(gb).run(wl3::level::MAGIC_STOP); }
+// bc = the particle
+PORT_EX(ParticleFunc_None, 0, ALL_REGISTERS) {}
+PORT_EX(ParticleFunc_Debris, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::DEBRIS, REG_BC(gb)); }
+PORT_EX(ParticleFunc_Stars, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::STARS, REG_BC(gb)); }
+PORT_EX(ParticleFunc_Splash, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::SPLASH, REG_BC(gb)); }
+PORT_EX(ParticleFunc_Dust, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::DUST, REG_BC(gb)); }
+PORT_EX(ParticleFunc_SlideDustRight, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::SLIDE_DUST_RIGHT, REG_BC(gb)); }
+PORT_EX(ParticleFunc_SlideDustLeft, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::SLIDE_DUST_LEFT, REG_BC(gb)); }
+PORT_EX(ParticleFunc_SmokeLarge, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::SMOKE_LARGE, REG_BC(gb)); }
+PORT_EX(ParticleFunc_SmokeSmall, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::SMOKE_SMALL, REG_BC(gb)); }
+PORT_EX(ParticleFunc_Bubbles, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::BUBBLES, REG_BC(gb)); }
+PORT_EX(ParticleFunc_BouncyJump, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::BOUNCY_JUMP, REG_BC(gb)); }
+PORT_EX(ParticleFunc_BubbleBurst, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::BUBBLE_BURST, REG_BC(gb)); }
+PORT_EX(ParticleFunc_Ice, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::ICE, REG_BC(gb)); }
+PORT_EX(ParticleFunc_TreasureGlow, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::TREASURE_GLOW, REG_BC(gb)); }
+PORT_EX(ParticleFunc_Owl, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::OWL_PARTICLE, REG_BC(gb)); }
+PORT_EX(ParticleFunc_Snow, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::SNOW, REG_BC(gb)); }
+PORT_EX(ParticleFunc_Magic1, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::MAGIC_1, REG_BC(gb)); }
+PORT_EX(ParticleFunc_Magic2, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::MAGIC_2, REG_BC(gb)); }
+PORT_EX(ParticleFunc_MagicStop, 0, ALL_REGISTERS) { Particles(gb).run(wl3::level::MAGIC_STOP, REG_BC(gb)); }
 
-// bc = the particle's frame duration; they end in LoadParticleSprite's
-// LoadSprite
-PORT(ParticleAnim_Bubbles)
-{
-	Particles p(gb);
-	p.anim(p.by_direction(ADDR_Frameset_d502, ADDR_Frameset_d50b), wCurParticleYCoord, ADDR_OAM_d20e);
-}
-PORT(ParticleAnim_Magic1) { Particles(gb).anim(ADDR_Frameset_d8e7, wCurParticle, ADDR_OAM_d80d); }
-PORT(ParticleAnim_Magic2) { Particles(gb).anim(ADDR_Frameset_d8f4, wCurParticle, ADDR_OAM_d80d); }
-PORT(ParticleAnim_MagicStop) { Particles(gb).anim(ADDR_Frameset_d901, wCurParticle, ADDR_OAM_d80d); }
-PORT(ParticleAnim_Owl) { Particles(gb).anim(ADDR_Frameset_d7b4, wCurParticleYCoord, ADDR_OAM_d763); }
-PORT(ParticleAnim_TreasureGlow) { Particles(gb).anim(ADDR_Frameset_d75a, wCurParticleYCoord, ADDR_OAM_d716); }
-PORT(ParticleAnim_BubbleBurst) { Particles(gb).anim(ADDR_Frameset_d622, wCurParticleYCoord, ADDR_OAM_d5ae); }
-PORT(ParticleAnim_BouncyJump) { Particles(gb).anim(ADDR_Frameset_d591, wCurParticleYCoord, ADDR_OAM_d532); }
-PORT(ParticleAnim_Snow) { Particles(gb).anim(ADDR_Frameset_d806, wCurParticle, ADDR_OAM_d7bd); }
-PORT(ParticleAnim_Ice)
-{
-	Particles p(gb);
-	p.anim(p.by_direction(ADDR_Frameset_d6fd, ADDR_Frameset_d6e4), wCurParticleYCoord, ADDR_OAM_d62b);
-}
-PORT(ParticleAnim_Dust) { Particles(gb).anim(ADDR_Frameset_d4c5, wCurParticleYCoord, ADDR_OAM_d20e); }
-PORT(ParticleAnim_Debris) { Particles(gb).anim(ADDR_Frameset_d49a, wCurParticleYCoord, ADDR_OAM_d20e); }
-PORT(ParticleAnim_Stars) { Particles(gb).anim(ADDR_Frameset_d525, wCurParticleYCoord, ADDR_OAM_d20e); }
-PORT(ParticleAnim_SmokeLarge) { Particles(gb).anim(ADDR_Frameset_d4f3, wCurParticleYCoord, ADDR_OAM_d20e); }
-PORT(ParticleAnim_SmokeSmall) { Particles(gb).anim(ADDR_Frameset_d4ea, wCurParticleYCoord, ADDR_OAM_d20e); }
-PORT(ParticleAnim_Splash) { Particles(gb).anim(ADDR_Frameset_d4ba, wCurParticleYCoord, ADDR_OAM_d20e); }
+// bc = the particle's frame duration
+PORT_EX(ParticleAnim_Bubbles, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_Bubbles, REG_BC(gb)); }
+PORT_EX(ParticleAnim_Magic1, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_Magic1, REG_BC(gb)); }
+PORT_EX(ParticleAnim_Magic2, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_Magic2, REG_BC(gb)); }
+PORT_EX(ParticleAnim_MagicStop, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_MagicStop, REG_BC(gb)); }
+PORT_EX(ParticleAnim_Owl, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_Owl, REG_BC(gb)); }
+PORT_EX(ParticleAnim_TreasureGlow, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_TreasureGlow, REG_BC(gb)); }
+PORT_EX(ParticleAnim_BubbleBurst, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_BubbleBurst, REG_BC(gb)); }
+PORT_EX(ParticleAnim_BouncyJump, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_BouncyJump, REG_BC(gb)); }
+PORT_EX(ParticleAnim_Snow, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_Snow, REG_BC(gb)); }
+PORT_EX(ParticleAnim_Ice, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_Ice, REG_BC(gb)); }
+PORT_EX(ParticleAnim_Dust, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_Dust, REG_BC(gb)); }
+PORT_EX(ParticleAnim_Debris, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_Debris, REG_BC(gb)); }
+PORT_EX(ParticleAnim_Stars, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_Stars, REG_BC(gb)); }
+PORT_EX(ParticleAnim_SmokeLarge, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_SmokeLarge, REG_BC(gb)); }
+PORT_EX(ParticleAnim_SmokeSmall, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_SmokeSmall, REG_BC(gb)); }
+PORT_EX(ParticleAnim_Splash, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_Splash, REG_BC(gb)); }
