@@ -1,10 +1,11 @@
 // overworld/bank26 (src/engine/overworld/bank26.asm): the level's
 // treasures for the map's bottom bar and the levels (their IDs, palettes
 // and tiles), and the treasure collection screen's V-Blank function.
-// Plain C++ over memory, but for CheckLevelMusicalCoinFlag (a in, z out)
-// and the V-Blank function (a for hTransferVirtualOAM).
+// Plain C++ over memory, but for the V-Blank function (a for
+// hTransferVirtualOAM).
 #include "../asm_module.hpp"
 #include "../home/memory.hpp"
+#include "../home/system.hpp"
 
 namespace wl3::overworld {
 
@@ -76,9 +77,7 @@ public:
 	void func_9aaf4()
 	{
 		Memory mem(gb_);
-		cpu_.a = mem[wOWLevel]; // CheckLevelMusicalCoinFlag takes a, returns z
-		CALL(CheckLevelMusicalCoinFlag);
-		if (cpu_.f & FLAG_Z)
+		if (!home::level_musical_coins_collected(gb_))
 			return;
 		mem[wBottomBarFlags] |= 1 << 6;
 		mem[wCompassObjState + 0] = 0;

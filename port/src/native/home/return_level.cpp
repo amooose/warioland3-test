@@ -1,80 +1,77 @@
-// home/return_level (src/home/return_level.asm), converted from the register-level
-// C port by tools/c2cpp.py: the same logic, as a class over AsmModule,
-// keeping the original's registers, flags and return addresses for its
-// callers (see src/native/asm_module.hpp).
-#include "../asm_module.hpp"
+// home/return_level (src/home/return_level.asm) as plain C++. The callers
+// are the golf and pause state tables (C++, by address), whose hooks leave
+// b to l as they please but a and f as the asm does: these leave a and f
+// too.
+#include "../flags.hpp"
+#include "../native.hpp"
+#include "../routines.hpp"
+#include "memory.hpp"
+#include "sprites.hpp"
 
 namespace wl3::home {
 
 namespace {
 
-class HomeReturnLevel : public AsmModule {
-public:
-	using AsmModule::AsmModule;
+// ReturnToPendingLevelState: back to the level's pending sub-state
+uint8_t return_to_pending_level_state(Memory mem)
+{
+	mem[wState] = ST_LEVEL;
+	uint8_t sub_state = mem[wPendingSubState];
+	mem[wSubState] = sub_state;
+	return sub_state;
+}
 
-	void port_ReturnToPendingLevelState()
-	{
-		SET_HL(gb_, wState);
-		wr8(wState, ST_LEVEL);
-		cpu_.a = rd8(wPendingSubState);
-		wr8(wSubState, cpu_.a);
-	}
+// ReturnToMap: the overworld, by its "return to map" transition (a and f
+// as the farcall leaves them)
+void return_to_map(GB *gb)
+{
+	Memory mem(gb);
+	mem[wTransitionParam] = TRANSITION_RETURN_TO_MAP;
+	Routines(gb).farcall(BANK_StartOverworldState, ADDR_StartOverworldState);
+}
 
-	void port_ReturnToMap()
-	{
-		cpu_.a = TRANSITION_RETURN_TO_MAP;
-		wr8(wTransitionParam, TRANSITION_RETURN_TO_MAP);
-		FARCALL(StartOverworldState);
-	}
-
-	void port_ReturnToMapFromLevel()
-	{
-		SET_HL(gb_, wDayNight);
-		wr8(wDayNight, (uint8_t)(rd8(wDayNight) | 0x80));
-		JUMP(ReturnToMap); // fallthrough
-	}
-
-	void port_ReturnToLevelFromGolf()
-	{
-		CALL(DisableLCD);
-		// push_wram $03
-		cpu_.a = rd8(rWBK);
-		push_af();
-		cpu_.a = 0x03;
-		wr8(rWBK, cpu_.a);
-		cpu_.a = rd8(wTempAnimatedTilesFrameDuration);
-		wr8(wAnimatedTilesFrameDuration, cpu_.a);
-		cpu_.a = rd8(wTempAnimatedTilesGroup);
-		wr8(wAnimatedTilesGfx, cpu_.a);
-		// pop_wram
-		pop_af();
-		wr8(rWBK, cpu_.a);
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(wAnimatedTilesFrameCount, 0);
-		wr8(wAnimatedTilesFrame, 0);
-		cpu_.a = TRUE;
-		wr8(wRoomAnimatedTilesEnabled, TRUE);
-		CALL(LoadBackupVRAM);
-		cpu_.a = alu_.and_(rd8(wRoomTransitionParam), ROOMTRANSITION_FLAGS_MASK);
-		cpu_.a = alu_.or_(cpu_.a, ROOMTRANSITION_DOOR);
-		wr8(wRoomTransitionParam, cpu_.a);
-		FARCALL(DrawLevelObjectsAfterLevelReturn);
-		cpu_.a = LCDC_DEFAULT;
-		wr8(rLCDC, cpu_.a);
-		JUMP(ReturnToPendingLevelState); // fallthrough
-	}
-};
+// ReturnToLevelFromGolf: the level's animated tiles and VRAM back, Wario
+// out of the door
+void return_to_level_from_golf(GB *gb)
+{
+	Memory mem(gb);
+	disable_lcd(gb);
+	uint8_t wbk = mem[rWBK]; // push_wram $03
+	mem[rWBK] = 0x03;
+	mem[wAnimatedTilesFrameDuration] = mem[wTempAnimatedTilesFrameDuration];
+	mem[wAnimatedTilesGfx] = mem[wTempAnimatedTilesGroup];
+	mem[rWBK] = wbk;
+	mem[wAnimatedTilesFrameCount] = 0;
+	mem[wAnimatedTilesFrame] = 0;
+	mem[wRoomAnimatedTilesEnabled] = TRUE;
+	load_backup_vram(gb);
+	uint8_t param = (mem[wRoomTransitionParam] & ROOMTRANSITION_FLAGS_MASK) | ROOMTRANSITION_DOOR;
+	mem[wRoomTransitionParam] = param;
+	gb->cpu.f = flags::or_(param); // the or's flags survive the farcall, for the state table
+	Routines(gb).farcall(BANK_DrawLevelObjectsAfterLevelReturn, ADDR_DrawLevelObjectsAfterLevelReturn);
+	mem[rLCDC] = LCDC_DEFAULT;
+}
 
 } // namespace
 
 } // namespace wl3::home
 
-using wl3::home::HomeReturnLevel;
+using namespace wl3::home;
 
-PORT_EX(ReturnToPendingLevelState, 0, 0) { HomeReturnLevel(gb).port_ReturnToPendingLevelState(); }
-PORT_EX(ReturnToMap, 0, 0) { HomeReturnLevel(gb).port_ReturnToMap(); }
-PORT_EX(ReturnToMapFromLevel, HOOK_MANUAL_RET, 0) { HomeReturnLevel(gb).port_ReturnToMapFromLevel(); }
-// ends on DrawLevelObjectsAfterLevelReturn (b to l as it leaves them); only
-// _GolfStateTable reaches it, and nothing reads b to l after (live.py)
-PORT_EX(ReturnToLevelFromGolf, HOOK_MANUAL_RET, R_B | R_C | R_D | R_E | R_H | R_L) { HomeReturnLevel(gb).port_ReturnToLevelFromGolf(); }
+PORT_EX(ReturnToPendingLevelState, 0, ALL_REGISTERS & ~(R_A | R_F))
+{
+	gb->cpu.a = return_to_pending_level_state(wl3::Memory(gb));
+}
+PORT_EX(ReturnToMap, 0, ALL_REGISTERS & ~(R_A | R_F)) { return_to_map(gb); }
+PORT_EX(ReturnToMapFromLevel, 0, ALL_REGISTERS & ~(R_A | R_F))
+{
+	wl3::Memory mem(gb);
+	mem[wDayNight] = mem[wDayNight] | 0x80;
+	return_to_map(gb);
+}
+// f from the or before the farcall
+PORT_EX(ReturnToLevelFromGolf, 0, ALL_REGISTERS & ~(R_A | R_F))
+{
+	return_to_level_from_golf(gb);
+	gb->cpu.a = return_to_pending_level_state(wl3::Memory(gb));
+}

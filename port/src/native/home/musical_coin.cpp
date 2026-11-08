@@ -1,42 +1,37 @@
-// home/musical_coin (src/home/musical_coin.asm), converted from the register-level
-// C port by tools/c2cpp.py: the same logic, as a class over AsmModule,
-// keeping the original's registers, flags and return addresses for its
-// callers (see src/native/asm_module.hpp).
-#include "../asm_module.hpp"
+// home/musical_coin (src/home/musical_coin.asm) as plain C++, but for
+// ResumeNormalVolume's audio mod (register arguments).
+#include "../flags.hpp"
+#include "../routines.hpp"
+#include "memory.hpp"
+#include "system.hpp"
 
 namespace wl3::home {
 
-namespace {
-
-class HomeMusicalCoin : public AsmModule {
-public:
-	using AsmModule::AsmModule;
-
-	// return nz if level has had all its
-	// Musical Coins collected already
-	void port_CheckLevelMusicalCoinFlag()
-	{
-		FARCALL(_CheckLevelMusicalCoinFlag);
-		cpu_.a = alu_.and_(cpu_.b, cpu_.b);
-	}
-
-	void port_ResumeNormalVolume()
-	{
-		// resume normal volume level
-		cpu_.a = AUDIOMOD_VOLUME;
-		cpu_.b = 0x40; // 1.0q6, volume modifier
-		cpu_.d = SFX_CHANNELS;
-		cpu_.e = MUSIC_CHANNELS >> 4;
-		CALL(ExecuteAudioMod);
-		CALL(UpdateAudio);
-	}
-};
-
-} // namespace
+bool level_musical_coins_collected(GB *gb)
+{
+	bool collected = false;
+	farcall(gb, BANK__CheckLevelMusicalCoinFlag, ADDR__CheckLevelMusicalCoinFlag,
+		[&] { collected = level_musical_coin_flag(gb); });
+	return collected;
+}
 
 } // namespace wl3::home
 
-using wl3::home::HomeMusicalCoin;
+// nz if collected (Func_9aaf4, C++, reads nothing else)
+PORT_EX(CheckLevelMusicalCoinFlag, 0, ALL_REGISTERS & ~(R_A | R_F))
+{
+	gb->cpu.a = wl3::home::level_musical_coins_collected(gb);
+	gb->cpu.f = wl3::flags::and_(gb->cpu.a);
+}
 
-PORT_EX(CheckLevelMusicalCoinFlag, 0, 0) { HomeMusicalCoin(gb).port_CheckLevelMusicalCoinFlag(); }
-PORT_EX(ResumeNormalVolume, 0, 0) { HomeMusicalCoin(gb).port_ResumeNormalVolume(); }
+PORT_EX(ResumeNormalVolume, 0, 0)
+{
+	// resume normal volume level
+	gb->cpu.a = AUDIOMOD_VOLUME;
+	gb->cpu.b = 0x40; // 1.0q6, volume modifier
+	gb->cpu.d = SFX_CHANNELS;
+	gb->cpu.e = MUSIC_CHANNELS >> 4;
+	wl3::Routines r(gb);
+	r.call(ADDR_ExecuteAudioMod);
+	r.call(ADDR_UpdateAudio);
+}

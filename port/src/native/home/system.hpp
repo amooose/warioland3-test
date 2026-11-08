@@ -39,4 +39,10 @@ void save_game_or_enter_perfect_screen(GB *gb);
 // CheckHasAllMusicalCoinFlags: every level's flag (25 bits)
 bool has_all_musical_coin_flags(GB *gb);
 
+// CheckLevelMusicalCoinFlag (musical_coin.cpp): whether wOWLevel's musical
+// coins were all collected; _CheckLevelMusicalCoinFlag
+// (clear/musical_coin_flags.cpp) without the farcall
+bool level_musical_coins_collected(GB *gb);
+bool level_musical_coin_flag(GB *gb);
+
 } // namespace wl3::home
