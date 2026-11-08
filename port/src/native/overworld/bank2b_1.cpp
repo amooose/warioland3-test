@@ -3,6 +3,7 @@
 // keeping the original's registers, flags and return addresses for its
 // callers (see src/native/asm_module.hpp).
 #include "../asm_module.hpp"
+#include "../home/ow.hpp"
 
 namespace wl3::overworld {
 
@@ -98,168 +99,72 @@ public:
 		JUMP_TO(ADDR_Func_ad016);
 	}
 
-	// ld [$ff00+c], a
-	void vbf_ldh_c()
+	// The V-Blank functions, as copied to wVBlankFunc (see ram_code.c),
+	// plain over memory. They end in hTransferVirtualOAM, which takes a
+	// (wVirtualOAM's page).
+	void transfer_oam()
 	{
-		wr8((uint16_t)(0xff00 + cpu_.c), cpu_.a);
+		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
+		JUMP_TO(hTransferVirtualOAM);
 	}
 
-	// ld a, [hli]
-	void vbf_ld_a_hli()
+	// the HDMA in wHDMA, from wHDMABank (cleared): to the VRAM bank given
+	// (or the one mapped)
+	void hdma(int vram_bank)
 	{
-		uint16_t hl = REG_HL(gb_);
-		cpu_.a = rd8(hl);
-		SET_HL(gb_, (uint16_t)(hl + 1));
-	}
-
-	// ld a, [wROMBank] / push af / ld a, b / bankswitch
-	void vbf_push_bank_switch()
-	{
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = cpu_.b;
-		bankswitch(cpu_.a);
-	}
-
-	// pop af / bankswitch
-	void vbf_pop_bank()
-	{
-		pop_af();
-		bankswitch(cpu_.a);
-	}
-
-	// ld a, [wLCDCFlagsToFlip] / and a / jr z, .skip / ld hl, rLCDC / xor [hl] /
-	// ld [hl], a / xor a / ld [wLCDCFlagsToFlip], a
-	void vbf_flip_lcdc()
-	{
-		cpu_.a = rd8(wLCDCFlagsToFlip);
-		cpu_.a = alu_.and_(cpu_.a, cpu_.a);
-		if (!cpu_.a)
+		Memory mem(gb_);
+		uint8_t bank = mem[wHDMABank];
+		if (!bank)
 			return;
-		SET_HL(gb_, rLCDC);
-		cpu_.a = alu_.xor_(cpu_.a, rd8(rLCDC));
-		wr8(rLCDC, cpu_.a);
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(wLCDCFlagsToFlip, 0);
+		mem[wHDMABank] = 0;
+		uint8_t rom = mem[wROMBank];
+		bankswitch(bank);
+		if (vram_bank >= 0)
+			mem[rVBK] = mem[static_cast<uint16_t>(vram_bank)];
+		for (int i = 0; i < 5; i++)
+			mem[static_cast<uint16_t>(rVDMA_SRC_HIGH + i)] = mem[static_cast<uint16_t>(wHDMA + i)];
+		bankswitch(rom);
 	}
 
-	// ld a, $02 / ldh [rWBK], a / apply wSCY and wSCX
-	void vbf_wram2_scroll()
+	// VBlank_PrologueEpilogue.Func: the scroll, the HDMA, a pending
+	// character (tile and attribute), the palette configs, the LCDC flags
+	// to flip
+	void prologue_epilogue_vblank()
 	{
-		cpu_.a = 0x02; // BANK("WRAM2")
-		wr8(rWBK, cpu_.a);
-		wr8(rSCY, rd8(wSCY));
-		cpu_.a = rd8(wSCX);
-		wr8(rSCX, cpu_.a);
+		Memory mem(gb_);
+		mem[rWBK] = 0x02; // BANK("WRAM2")
+		mem[rSCY] = mem[wSCY];
+		mem[rSCX] = mem[wSCX];
+		hdma(wHDMADestVRAMBank);
+		if (uint8_t lo = mem[wPendingCharDest]) {
+			mem[wPendingCharDest] = 0;
+			uint16_t dest = static_cast<uint16_t>(mem[wPendingCharDest + 1] << 8 | lo);
+			mem[dest] = mem[wPendingCharDest + 2]; // wPendingCharTile
+			mem[rVBK] = 0x01; // BANK("VRAM1")
+			mem[dest] = mem[wPendingCharDest + 3]; // wPendingCharAttr
+		}
+		mem[rVBK] = 0;
+		if (mem[wPalConfig1])
+			home::apply_pal_config(gb_, wPalConfig1);
+		if (mem[wPalConfig2])
+			home::apply_pal_config(gb_, wPalConfig2);
+		if (uint8_t flip = mem[wLCDCFlagsToFlip]) {
+			mem[rLCDC] = static_cast<uint8_t>(mem[rLCDC] ^ flip);
+			mem[wLCDCFlagsToFlip] = 0;
+		}
+		transfer_oam();
 	}
 
-	// VBlank_PrologueEpilogue.Func, as copied to wVBlankFunc (see ram_code.c).
-	// Its calls return to base + n, the block's start wherever it runs from.
-	void port_VBlank_PrologueEpilogue__Func()
+	// _GolfBuilding.func: the scroll and the HDMA
+	void golf_building_vblank()
 	{
-		uint16_t base = cpu_.pc;
-		vbf_wram2_scroll();
-
-		cpu_.a = alu_.and_(rd8(wHDMABank), rd8(wHDMABank));
-		if (cpu_.a) {
-			cpu_.b = cpu_.a;
-			cpu_.a = 0;
-			cpu_.f = FLAG_Z; // xor a
-			wr8(wHDMABank, 0);
-			vbf_push_bank_switch();
-			cpu_.a = rd8(wHDMADestVRAMBank);
-			wr8(rVBK, cpu_.a);
-			SET_HL(gb_, wHDMA);
-			vbf_ld_a_hli();
-			cpu_.c = (uint8_t)rVDMA_SRC_HIGH;
-			vbf_ldh_c();
-			for (int i = 0; i < 4; i++) {
-				vbf_ld_a_hli();
-				cpu_.c = alu_.inc(cpu_.c);
-				vbf_ldh_c();
-			}
-			vbf_pop_bank();
-		}
-
-		// .skip_hdma_config
-		SET_HL(gb_, wPendingCharDest);
-		cpu_.a = alu_.and_(rd8(wPendingCharDest), rd8(wPendingCharDest));
-		if (cpu_.a) {
-			cpu_.e = cpu_.a;
-			cpu_.a = 0;
-			cpu_.f = FLAG_Z; // xor a
-			wr8(wPendingCharDest, 0);
-			SET_HL(gb_, wPendingCharDest + 1);
-			vbf_ld_a_hli();
-			cpu_.d = cpu_.a;
-			vbf_ld_a_hli();
-			wr8(REG_DE(gb_), cpu_.a); // wPendingCharTile
-			cpu_.a = 0x01; // BANK("VRAM1")
-			wr8(rVBK, cpu_.a);
-			cpu_.a = rd8(REG_HL(gb_)); // wPendingCharAttr
-			wr8(REG_DE(gb_), cpu_.a);
-		}
-
-		// .skip_char
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(rVBK, 0);
-		SET_HL(gb_, wPalConfig1);
-		cpu_.a = alu_.and_(rd8(wPalConfig1), rd8(wPalConfig1));
-		if (cpu_.a)
-			gb_call_ret(gb_, ADDR_ApplyPalConfig, (uint16_t)(base + 0x62));
-
-		SET_HL(gb_, wPalConfig2);
-		cpu_.a = alu_.and_(rd8(wPalConfig2), rd8(wPalConfig2));
-		if (cpu_.a)
-			gb_call_ret(gb_, ADDR_ApplyPalConfig, (uint16_t)(base + 0x6a));
-
-		vbf_flip_lcdc();
-
-		// .dma_transfer
-		cpu_.a = (uint8_t)(wVirtualOAM >> 8);
-		JUMP_TO(hTransferVirtualOAM);
-	}
-
-	// _GolfBuilding.func, as copied to wVBlankFunc (see ram_code.c): starts the
-	// HDMA transfer in wHDMA, if there's one
-	void port__GolfBuilding__func()
-	{
-		cpu_.a = 2; // BANK("WRAM2")
-		wr8(rWBK, cpu_.a);
-		cpu_.a = rd8(wSCY);
-		wr8(rSCY, cpu_.a);
-		cpu_.a = rd8(wSCX);
-		wr8(rSCX, cpu_.a);
-		cpu_.a = rd8(wHDMABank);
-		if (alu_.and_(cpu_.a, cpu_.a)) {
-			cpu_.b = cpu_.a;
-			cpu_.a = 0;
-			cpu_.f = FLAG_Z; // xor a
-			wr8(wHDMABank, 0);
-			cpu_.a = rd8(wROMBank);
-			push_af();
-			cpu_.a = cpu_.b;
-			bankswitch(cpu_.a);
-			uint16_t hl = wHDMA;
-			cpu_.c = (uint8_t)rVDMA_SRC_HIGH;
-			for (int i = 0; i < 5; i++) {
-				if (i)
-					cpu_.c = alu_.inc(cpu_.c);
-				cpu_.a = rd8(hl++);
-				wr8((uint16_t)(0xff00 | cpu_.c), cpu_.a);
-			}
-			SET_HL(gb_, hl);
-			pop_af();
-			bankswitch(cpu_.a);
-		}
-		// .done
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(rVBK, 0);
-		cpu_.a = (uint8_t)(wVirtualOAM >> 8);
-		JUMP_TO(hTransferVirtualOAM);
+		Memory mem(gb_);
+		mem[rWBK] = 2; // BANK("WRAM2")
+		mem[rSCY] = mem[wSCY];
+		mem[rSCX] = mem[wSCX];
+		hdma(-1);
+		mem[rVBK] = 0;
+		transfer_oam();
 	}
 };
 
@@ -278,5 +183,5 @@ PORT_EX(Func_aca68, 0, 0) { OverworldBank2b1(gb).port_Func_aca68(); }
 PORT_EX(DebugSceneWario, HOOK_MANUAL_RET, 0) { OverworldBank2b1(gb).port_DebugSceneWario(); }
 PORT_EX(Func_ad329, HOOK_MANUAL_RET, 0) { OverworldBank2b1(gb).port_Func_ad329(); }
 PORT_EX(Func_ad33c, HOOK_MANUAL_RET, 0) { OverworldBank2b1(gb).port_Func_ad33c(); }
-PORT_LOCAL_EX(VBlank_PrologueEpilogue, Func, HOOK_MANUAL_RET, 0) { OverworldBank2b1(gb).port_VBlank_PrologueEpilogue__Func(); }
-PORT_LOCAL_EX(_GolfBuilding, func, HOOK_MANUAL_RET, 0) { OverworldBank2b1(gb).port__GolfBuilding__func(); }
+PORT_LOCAL_EX(VBlank_PrologueEpilogue, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { OverworldBank2b1(gb).prologue_epilogue_vblank(); }
+PORT_LOCAL_EX(_GolfBuilding, func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { OverworldBank2b1(gb).golf_building_vblank(); }
