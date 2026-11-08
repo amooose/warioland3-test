@@ -393,25 +393,13 @@ void RoomStart::set_wario_position_to_spawn()
 // TILEMAP_HEIGHT tiles: ld a, [hli] / ld [de], a
 void RoomStart::draw_room_column(uint16_t queue)
 {
-	cpu_.d = mem_[wBGPtr + 0];
-	cpu_.e = mem_[wBGPtr + 1];
-	cpu_.a = cpu_.e;
-	uint16_t src = queue;
-	cpu_.b = TILEMAP_HEIGHT;
-	do {
-		cpu_.a = mem_[src++];
-		mem_[REG_DE(gb_)] = cpu_.a;
-		unsigned lo = cpu_.e + TILEMAP_WIDTH;
-		cpu_.e = static_cast<uint8_t>(lo);
-		cpu_.f = flags::add(cpu_.d, 0, lo > 0xff);
-		cpu_.a = static_cast<uint8_t>(cpu_.d + (lo > 0xff));
-		cpu_.d = cpu_.a;
-		cpu_.f = flags::cp(cpu_.a, v0BGMap1 >> 8);
-		if (zf())
-			cpu_.d = v0BGMap0 >> 8;
-		cpu_.f = flags::dec(cpu_.f, cpu_.b);
-	} while (--cpu_.b);
-	SET_HL(gb_, src);
+	uint16_t dest = be(wBGPtr);
+	for (int i = 0; i < TILEMAP_HEIGHT; i++) {
+		mem_[dest] = mem_[queue++];
+		dest = static_cast<uint16_t>(dest + TILEMAP_WIDTH);
+		if ((dest >> 8) == (v0BGMap1 >> 8))
+			dest = static_cast<uint16_t>((v0BGMap0 & 0xff00) | (dest & 0xff));
+	}
 }
 
 // DrawRoom_FromStart.QueueRowTilesAndAttributes: the BG map addresses down
@@ -471,36 +459,20 @@ void RoomStart::draw_room()
 {
 	for (int i = 0; i < 4; i++)
 		mem_[wBackupBlockPos + i] = mem_[wBlockPos + i];
-	cpu_.a = mem_[wBlockPos + 3];
-	SET_HL(gb_, wBlockPos + 3);
-	SET_DE(gb_, wBackupBlockPos + 3);
-
-	st(wDrawRoomWidthLoopVar, TILEMAP_WIDTH);
+	mem_[wDrawRoomWidthLoopVar] = TILEMAP_WIDTH;
 	do {
 		queue_row_tiles_and_attributes();
 		draw_room_column(wBGMapTileVRAM0Queue);
-		st(rVBK, 1); // BANK("VRAM1")
+		mem_[rVBK] = 1; // BANK("VRAM1")
 		draw_room_column(wBGMapTileVRAM1Queue);
-		xor_a();
 		mem_[rVBK] = 0;
 		mem_[wBGMapAddressQueueSize] = 0;
 		mem_[wBGMapTileQueueSize] = 0;
-		uint8_t lo = mem_[wBlockXPos + 1];
-		bool carry = lo + 0x08 > 0xff;
-		mem_[wBlockXPos + 1] = static_cast<uint8_t>(lo + 0x08);
-		uint8_t hi = mem_[wBlockXPos + 0];
-		mem_[wBlockXPos + 0] = static_cast<uint8_t>(hi + carry);
-		uint8_t left = mem_[wDrawRoomWidthLoopVar];
-		cpu_.f = flags::dec(flags::add(hi, 0, carry), left);
-		cpu_.a = static_cast<uint8_t>(left - 1);
-		mem_[wDrawRoomWidthLoopVar] = cpu_.a;
-	} while (cpu_.a);
-
+		set_be(wBlockXPos, static_cast<uint16_t>(be(wBlockXPos) + 0x08));
+		mem_[wDrawRoomWidthLoopVar] = static_cast<uint8_t>(mem_[wDrawRoomWidthLoopVar] - 1);
+	} while (mem_[wDrawRoomWidthLoopVar]);
 	for (int i = 0; i < 4; i++)
 		mem_[wBlockYPos + i] = mem_[wBackupBlockPos + i];
-	cpu_.a = mem_[wBackupBlockPos + 3];
-	SET_HL(gb_, wBackupBlockPos + 3);
-	SET_DE(gb_, wBlockYPos + 3);
 }
 
 // push_wram BANK("Level Objects WRAM") / farcall / pop_wram
@@ -916,6 +888,7 @@ PORT_EX(SetInitialCameraScroll, 0, ALL_REGISTERS) { RoomStart(gb).set_initial_ca
 PORT_EX(ApplyInitialCameraScroll, 0, ALL_REGISTERS) { RoomStart(gb).apply_initial_camera_scroll(); }
 // no caller reads a register this leaves (live.py, all 11 sites)
 PORT_EX(SetWarioPositionToSpawn, 0, ALL_REGISTERS) { RoomStart(gb).set_wario_position_to_spawn(); }
-PORT(DrawRoom_FromStart) { RoomStart(gb).draw_room(); }
+// called only from StartRoom_*, which read no register it leaves (live.py)
+PORT_EX(DrawRoom_FromStart, 0, ALL_REGISTERS) { RoomStart(gb).draw_room(); }
 PORT_EX(ProcessMultiBlock, 0, ALL_REGISTERS) { RoomStart(gb).process_multi_block(); }
 PORT_LOCAL_EX(ProcessMultiBlock, ProcessBlocks, 0, 0) { RoomStart(gb).process_blocks(); }
