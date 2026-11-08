@@ -7,6 +7,7 @@
 // Called by the level's frame and register-level C, so these keep the
 // original's registers, flags and return addresses (see asm_module.hpp).
 #include "../asm_module.hpp"
+#include "../home/system.hpp"
 #include "../home/wario.hpp"
 
 namespace wl3::level {
@@ -413,7 +414,7 @@ public:
 		if (rd8(wJumpVelTable))
 			wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
 		play_sfx(SFX_03A);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		wr8(wWarioState, WST_FAT_EATING);
 		collision_box(-1, -27, -9, 9);
 		reset_anim();
@@ -439,7 +440,7 @@ public:
 		collision_box(-1, -27, -9, 9);
 		wr8(wTransformation, TRANSFORMATION_ELECTRIC);
 		touch_states(TOUCH_VANISH, 0x01);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		SET_HL(gb_, ADDR_WarioElectricPal);
 		CALL(SetWarioPal);
@@ -662,7 +663,7 @@ public:
 			wJumpVelIndex, 0};
 		clear(zero);
 		wr8(wAutoMoveState, 0x01);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		load_gfx(BANK_WarioHangGfx, ADDR_WarioHangGfx);
 		set_oam(BANK_OAM_1fee05, ADDR_OAM_1fee05);
@@ -772,9 +773,9 @@ public:
 	{
 		ld_cp(wTransformation, TRANSFORMATION_OWL_WARIO);
 		if (ZF)
-			CALL(ReleaseOwl);
-		CALL(ClearTransformationValues);
-		CALL(UpdateLevelMusic);
+			home::release_owl(gb_);
+		home::clear_transformation_values(gb_);
+		home::update_level_music(gb_);
 		port_SetState_Stung(); // fallthrough
 	}
 
@@ -919,7 +920,7 @@ public:
 			next_obj_ = true;
 			return;
 		}
-		CALL(TriggerFloorTransition_SkipUpdateYPos);
+		home::trigger_floor_transition(gb_, false);
 		if (rd8(wInvincibleCounter) == 0x01) {
 			next_obj_ = true;
 			return;
@@ -1253,7 +1254,7 @@ public:
 			next_obj_ = true;
 			return;
 		}
-		CALL(RecoverFromTransformation);
+		home::recover_from_transformation(gb_);
 	}
 
 	// ld a, [wWarioScreenXPos] / ld b, a / ld a, [wObjScreenXPos] / cp b, then
@@ -1666,7 +1667,7 @@ public:
 		touch_states(TOUCH_BUMP, 0x02);
 		wr8(wTransformationDuration + 0, (uint8_t)(HOT_WARIO_DURATION >> 8));
 		wr8(wTransformationDuration + 1, (uint8_t)HOT_WARIO_DURATION);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		port_SetState_OnFire_ResetStateCounter(); // fallthrough
 	}
 
@@ -1694,7 +1695,7 @@ public:
 		wr8(wTransformation, TRANSFORMATION_BALL_O_STRING_WARIO);
 		wr8(wTransformationProgress, 0);
 		touch_states(TOUCH_ATTACK, 0x01);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		wr8(wWarioState, WST_GETTING_WRAPPED_IN_STRING);
 		static const uint16_t zero[] = {wWarioStateCounter, wWarioStateCycles, wGrabState,
 			wAttackCounter, wJumpVelIndex, wJumpVelTable, wIsCrouching, wIsRolling,
@@ -1815,7 +1816,7 @@ public:
 			return;
 		}
 		if (rd8(wTransformation) == TRANSFORMATION_OWL_WARIO)
-			CALL(ReleaseOwl);
+			home::release_owl(gb_);
 		set_obj_action(OBJACTION_06);
 		FARCALL(SetState_PuffyInflating);
 	}
@@ -2237,7 +2238,7 @@ public:
 			wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking, wJumpVelTable,
 			wJumpVelIndex, 0};
 		clear(zero);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
 		load_gfx(BANK_WarioHangGfx, ADDR_WarioHangGfx);

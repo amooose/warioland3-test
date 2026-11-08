@@ -1,74 +1,43 @@
-// home/room_transition (src/home/room_transition.asm), converted from the register-level
-// C port by tools/c2cpp.py: the same logic, as a class over AsmModule,
-// keeping the original's registers, flags and return addresses for its
-// callers (see src/native/asm_module.hpp).
-#include "../asm_module.hpp"
+// home/room_transition (src/home/room_transition.asm) as plain C++. The
+// callers are the Wario states (C++), which read no register after it.
+#include "../level/room_gfx.hpp"
+#include "../native.hpp"
+#include "../routines.hpp"
+#include "wario.hpp"
+
+#include <initializer_list>
 
 namespace wl3::home {
 
-namespace {
+void trigger_room_transition(GB *gb)
+{
+	Memory mem(gb);
+	for (uint16_t at : {wGrabState, wRoomPalCycleDuration, wRoomAnimatedPalsEnabled, wWaterCurrent,
+			wLastWaterCurrent, wCurWaterCurrent, wBossState, wIsBossBattle})
+		mem[at] = 0;
+	mem[wIsIntangible] = TRUE;
 
-class HomeRoomTransition : public AsmModule {
-public:
-	using AsmModule::AsmModule;
-
-	void port_TriggerRoomTransition()
-	{
-		cpu_.a = 0;
-		wr8(wGrabState, 0);
-		wr8(wRoomPalCycleDuration, 0);
-		wr8(wRoomAnimatedPalsEnabled, 0);
-		wr8(wWaterCurrent, 0);
-		wr8(wLastWaterCurrent, 0);
-		wr8(wCurWaterCurrent, 0);
-		wr8(wBossState, 0);
-		wr8(wIsBossBattle, 0);
-		cpu_.a = TRUE;
-		cpu_.f = 0; // xor a / inc a
-		wr8(wIsIntangible, cpu_.a);
-
-		cpu_.a = rd8(wRoomTransitionParam);
-		if (alu_.bit(cpu_.a, ROOMTRANSITIONF_DELAY_F))
-			return; // delayed, don't transition for now
-
-		uint16_t hl = wSubState;
-		SET_HL(gb_, hl);
-		cpu_.a = rd8(wRoomTransitionParam);
-		if (alu_.bit(cpu_.a, ROOMTRANSITIONF_DOOR_F)) {
-			wr8(hl, alu_.inc(rd8(hl))); // door transition
-			FARCALL(GetWarioBGPtr);
-			// push_wram $03
-			cpu_.a = rd8(rWBK);
-			push_af();
-			cpu_.a = 0x03;
-			wr8(rWBK, cpu_.a);
-			cpu_.a = cpu_.h;
-			wr8(wWarioTileBGPtr + 1, cpu_.a);
-			cpu_.a = cpu_.l;
-			wr8(wWarioTileBGPtr + 0, cpu_.a);
-			// pop_wram
-			pop_af();
-			wr8(rWBK, cpu_.a);
-			return;
-		}
-
-		// .not_door
-		wr8(hl, alu_.inc(rd8(hl)));
-		wr8(hl, alu_.inc(rd8(hl)));
-		// stop_music
-		wr8(hMusicID + 0, 0xff);
-		wr8(hMusicID + 1, 0x00);
-		// stop_sfx
-		wr8(hSFXID + 0, 0xff);
-		cpu_.a = 0x00;
-		wr8(hSFXID + 1, 0x00);
+	uint8_t param = mem[wRoomTransitionParam];
+	if (param >> ROOMTRANSITIONF_DELAY_F & 1)
+		return; // delayed, don't transition for now
+	if (param >> ROOMTRANSITIONF_DOOR_F & 1) {
+		mem[wSubState] = static_cast<uint8_t>(mem[wSubState] + 1);
+		uint16_t ptr = 0;
+		Routines(gb).in_bank(BANK_GetWarioBGPtr, ADDR_GetWarioBGPtr, [&] { ptr = level::wario_bg_ptr(gb); });
+		uint8_t wbk = mem[rWBK]; // push_wram $03
+		mem[rWBK] = 0x03;
+		mem[wWarioTileBGPtr + 1] = static_cast<uint8_t>(ptr >> 8);
+		mem[wWarioTileBGPtr + 0] = static_cast<uint8_t>(ptr);
+		mem[rWBK] = wbk;
+		return;
 	}
-};
-
-} // namespace
+	mem[wSubState] = static_cast<uint8_t>(mem[wSubState] + 2);
+	mem[hMusicID + 0] = 0xff; // stop_music
+	mem[hMusicID + 1] = 0x00;
+	mem[hSFXID + 0] = 0xff; // stop_sfx
+	mem[hSFXID + 1] = 0x00;
+}
 
 } // namespace wl3::home
 
-using wl3::home::HomeRoomTransition;
-
-PORT_EX(TriggerRoomTransition, 0, 0) { HomeRoomTransition(gb).port_TriggerRoomTransition(); }
+PORT_EX(TriggerRoomTransition, 0, ALL_REGISTERS) { wl3::home::trigger_room_transition(gb); }

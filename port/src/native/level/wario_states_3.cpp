@@ -146,7 +146,7 @@ public:
 		touch_states(TOUCH_VANISH, 0x02);
 		clear({wWarioStateCounter, wWarioStateCycles, wInvisibleFrame, wGrabState, wAttackCounter, wJumpVelIndex,
 			wJumpVelTable, wIsCrouching, wIsRolling, wIsSmashAttacking});
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		set_pal(ADDR_WarioZombiePal);
 		load_gfx(BANK_WarioZombieGfx, ADDR_WarioZombieGfx);
@@ -460,9 +460,9 @@ public:
 
 	void port_Func_2ade4()
 	{
-		CALL(ClearTransformationValues);
+		home::clear_transformation_values(gb_);
 		wr8(wInvincibleCounter, 0x10);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		particle_on_row(PARTICLE_SMOKE_LARGE);
 		play_sfx(SFX_SPLASH);
 		FARCALL(DiveFromSurface_SkipSplash);
@@ -529,7 +529,7 @@ public:
 		collision_box(-1, -27, -9, 9);
 		clear({wSFXLoopCounter, wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching, wIsRolling,
 			wIsSmashAttacking, wJumpVelTable, wJumpVelIndex});
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		set_pal(ADDR_WarioBubblePal);
 		load_gfx(BANK_WarioBubbleGfx, ADDR_WarioBubbleGfx);
@@ -549,7 +549,7 @@ public:
 		collision_box(-1, -27, -9, 9);
 		clear({wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching, wIsRolling,
 			wIsSmashAttacking, wJumpVelTable, wJumpVelIndex});
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		set_pal(ADDR_WarioVampirePal);
 		load_gfx(BANK_WarioBatGfx, ADDR_WarioBatGfx);
@@ -973,12 +973,12 @@ public:
 			return;
 		}
 		if (ld_and(wJumpVelTable)) {
-			CALL(ApplyJumpVelocity);
+			home::apply_jump_velocity(gb_);
 			if (!airborne_collision()) {
-				CALL(TriggerDownwardsFloorTransition);
+				home::handle_downwards_floor_transition(gb_);
 				return;
 			}
-			CALL(TriggerFloorTransition);
+			home::trigger_floor_transition(gb_);
 			wr8(wJumpVelTable, 0);
 			wr8(wJumpVelIndex, 0);
 		}
@@ -1008,9 +1008,9 @@ public:
 
 	void port_Func_2ad6a()
 	{
-		CALL(ClearTransformationValues);
+		home::clear_transformation_values(gb_);
 		wr8(wInvincibleCounter, 0x10);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		FARCALL(SetState_Submerged);
 		reset_anim();
 		wr8(wWarioStateCycles, 1);
@@ -1019,7 +1019,7 @@ public:
 		set_oam(BANK_OAM_15254, ADDR_OAM_15254);
 		frameset_by_dir(ADDR_Frameset_155a6, ADDR_Frameset_155ab);
 		anim(OAM1);
-		CALL(PlayRecoverySFX);
+		play_sfx(SFX_RECOVERY);
 	}
 
 	void port_SetState_Crazy()
@@ -1046,7 +1046,7 @@ public:
 			wIsSmashAttacking});
 		if (rd8(wJumpVelTable))
 			wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		load_gfx(BANK_WarioIdleGfx, ADDR_WarioIdleGfx);
 		set_oam(BANK_OAM_14a82, ADDR_OAM_14a82);
@@ -1068,7 +1068,7 @@ public:
 		clear({wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter, wJumpVelIndex, wJumpVelTable,
 			wIsCrouching, wIsRolling, wIsSmashAttacking, wSwimVelIndex, wWaterSurfaceFloatingCounter, wWaterCurrent,
 			wLastWaterCurrent, wCurWaterCurrent});
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		load_gfx(BANK_WarioPuffyGfx, ADDR_WarioPuffyGfx);
 		set_oam(BANK_OAM_1dc93f, ADDR_OAM_1dc93f);
@@ -1086,10 +1086,10 @@ public:
 		}
 		move_y(2);
 		if (!airborne_collision()) {
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		wr8(wWarioState, WST_GETTING_FLAT);
 		clear({wWalkVelIndex, wFrameDuration, wAnimationFrame, wWarioStateCycles, wJumpVelIndex, wJumpVelTable,
 			wAutoMoveState});
@@ -1104,7 +1104,7 @@ public:
 		if (ld_bit(wTransformation, TRANSFORMATIONF_PERSISTENT_F))
 			return;
 		if (rd8(wTransformation) == TRANSFORMATION_OWL_WARIO)
-			CALL(ReleaseOwl);
+			home::release_owl(gb_);
 		// push_wram BANK("Level Objects WRAM"): Wario lands at the object's x
 		// (8 to its left, but for Richtertoffen)
 		uint8_t wbk = rd8(rWBK);
@@ -1123,7 +1123,7 @@ public:
 		wr8(rWBK, wbk);
 		wr8(wTransformation, TRANSFORMATION_FLAT_WARIO);
 		play_sfx(SFX_01B);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		wr8(wTouchState, TOUCH_BUMP);
 		wr8(wStingTouchState, TOUCH_BUMP);
 		wr8(wca94, 0x02);
@@ -1241,7 +1241,7 @@ public:
 		collision_box(-1, -29, -9, 9);
 		clear({wInvisibleFrame, wWalkVelIndex, wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter,
 			wIsCrouching, wIsRolling, wIsSmashAttacking});
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		set_pal(ADDR_WarioBouncyPal);
 		load_gfx(BANK_WarioBouncyGfx, ADDR_WarioBouncyGfx);
@@ -1258,7 +1258,7 @@ public:
 			return;
 		wr8(wIsIntangible, 0);
 		wr8(wTransformation, TRANSFORMATION_INVISIBLE_WARIO);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		FARCALL(SetState_Idling);
 	}
 
@@ -1574,7 +1574,7 @@ public:
 
 	void port_Func_2af9c()
 	{
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		port_HandleWalk();
 		cap_walk(0x14, 0x10);
 		if (!front_collision())
@@ -1585,7 +1585,7 @@ public:
 
 	void port_Func_2b2a4()
 	{
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		port_Func_2b17a();
 		cap_walk(0x08, 0x04);
 		if (rd8(wJumpVelIndex) == FALLING_JUMP_VEL_INDEX)
@@ -1604,7 +1604,7 @@ public:
 
 	void port_Func_2b3dd()
 	{
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		if (count_down(wWarioStateCycles))
 			return;
 		port_Func_2b17a();
@@ -1679,7 +1679,7 @@ public:
 	{
 		if (room_transition_check())
 			return;
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		port_Func_2b17a();
 		home::cap_walk_vel(gb_); // Func_1762
 		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX && !up_collision())
@@ -1717,11 +1717,11 @@ public:
 				// .asm_288b8
 				move_y(rd8(static_cast<uint16_t>(ADDR_Data_2b664 + step)));
 				if (!airborne_collision()) {
-					CALL(TriggerDownwardsFloorTransition);
+					home::handle_downwards_floor_transition(gb_);
 					return;
 				}
 				play_sfx(SFX_020);
-				CALL(TriggerFloorTransition);
+				home::trigger_floor_transition(gb_);
 				port_SetState_FlatIdling();
 				return;
 			}
@@ -1808,7 +1808,7 @@ public:
 
 	void port_Func_2b027()
 	{
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		if (count_down(wWarioStateCounter))
 			return;
 		port_Func_2b17a();
@@ -1855,7 +1855,7 @@ public:
 
 	void port_Func_2b55c()
 	{
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		port_Func_2b17a();
 		cap_walk(0x10, 0x0c);
 	}
@@ -1899,10 +1899,10 @@ public:
 		}
 		if (!airborne_collision()) {
 			if (still_in(WST_ON_FIRE_AIRBORNE))
-				CALL(TriggerDownwardsFloorTransition);
+				home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		if (still_in(WST_ON_FIRE_AIRBORNE))
 			FARCALL(SetState_OnFire);
 	}
@@ -1928,10 +1928,10 @@ public:
 		// .falling
 		if (!airborne_collision()) {
 			if (still_in(WST_HOT_AIRBORNE))
-				CALL(TriggerDownwardsFloorTransition);
+				home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		if (still_in(WST_HOT_AIRBORNE))
 			port_SetState_Hot();
 	}
@@ -2001,10 +2001,10 @@ public:
 			return;
 		}
 		if (!airborne_collision()) {
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		land_shake();
 		if (!ld_and(wFloorTransitionDir))
 			play_sfx(SFX_024);
@@ -2015,7 +2015,7 @@ public:
 	void anim_then_recover(uint8_t bank)
 	{
 		if (anim_and_ended(bank))
-			CALL(RecoverFromTransformation);
+			home::recover_from_transformation(gb_);
 	}
 
 	void port_UpdateState_FatRecovering() { anim_then_recover(OAM1); }
@@ -2031,7 +2031,7 @@ public:
 		if (!anim_and_ended(OAM1))
 			return;
 		wr8(wAutoMoveState, 0);
-		CALL(RecoverFromTransformation);
+		home::recover_from_transformation(gb_);
 	}
 
 	void port_UpdateState_ZombieRecovering()
@@ -2046,7 +2046,7 @@ public:
 			step = count;
 			wr8(wWarioStateCounter + 1, step);
 		} else if (count == 0x0b) {
-			CALL(RecoverFromTransformation);
+			home::recover_from_transformation(gb_);
 			return;
 		} else {
 			step = static_cast<uint8_t>(rd8(wWarioStateCounter + 1) - 1);
@@ -2064,14 +2064,14 @@ public:
 			port_Func_28bd5();
 			return;
 		}
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		port_HandleWalk();
 		cap_walk(0x18, 0x14);
 		if (!airborne_collision()) {
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		port_SetState_BallOString();
 	}
 
@@ -2079,17 +2079,17 @@ public:
 	{
 		if (transition_or_water())
 			return;
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		port_HandleWalk();
 		cap_walk(0x08, 0x04);
 		if (!still_in(WST_BOUNCY_START))
 			return;
 		if (!airborne_collision()) {
 			if (still_in(WST_BOUNCY_START))
-				CALL(TriggerDownwardsFloorTransition);
+				home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		if (still_in(WST_BOUNCY_START))
 			port_SetState_BouncyFloor(); // fallthrough
 	}
@@ -2098,12 +2098,12 @@ public:
 	{
 		if (transition_or_water())
 			return;
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		if (!airborne_collision()) {
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		if (!still_in(WST_BOUNCY_UPSIDE_DOWN))
 			return;
 		wr8(wWarioState, WST_BOUNCY_UPSIDE_DOWN_LANDING);
@@ -2118,7 +2118,7 @@ public:
 			return;
 		if (!anim_ended())
 			anim(OAM2);
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		port_HandleWalk();
 		cap_walk(0x08, 0x04);
 		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
@@ -2127,12 +2127,12 @@ public:
 			return;
 		}
 		if (!airborne_collision()) {
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		if (still_in(WST_BOUNCY_LAST_BOUNCE))
-			CALL(RecoverFromTransformation);
+			home::recover_from_transformation(gb_);
 	}
 
 	void port_UpdateState_BallOStringKnockBack()
@@ -2144,11 +2144,11 @@ public:
 		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX)
 			return;
 		if (!airborne_collision()) {
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
 		flip_dir();
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		play_sfx(SFX_03C);
 		wr8(wWarioState, WST_GETTING_UNWRAPPED_IN_STRING);
 		collision_box(-1, -27, -9, 9);
@@ -2169,10 +2169,10 @@ public:
 			return;
 		if (!airborne_collision()) {
 			if (still_in(WST_ZOMBIE_SLIPPING_THROUGH_FLOOR))
-				CALL(TriggerDownwardsFloorTransition);
+				home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		if (!still_in(WST_ZOMBIE_SLIPPING_THROUGH_FLOOR))
 			return;
 		port_SetState_ZombieLanding();
@@ -2191,7 +2191,7 @@ public:
 			if (!up_collision())
 				return;
 			particle_at_wario(PARTICLE_BUBBLE_BURST);
-			CALL(RecoverFromTransformation);
+			home::recover_from_transformation(gb_);
 			return;
 		}
 		uint8_t pad = rd8(wJoypadDown);
@@ -2243,10 +2243,10 @@ public:
 			return;
 		}
 		if (!airborne_collision()) {
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		if (still_in(WST_ZOMBIE_AIRBORNE))
 			port_SetState_ZombieLanding(); // fallthrough
 	}
@@ -2265,7 +2265,7 @@ public:
 			return;
 		}
 		port_Func_2ae3b();
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		port_Func_2b17a();
 		cap_walk(0x08, 0x04);
 		if (!still_in(WST_BOUNCY_AIRBORNE))
@@ -2282,10 +2282,10 @@ public:
 		}
 		if (!airborne_collision()) {
 			if (still_in(WST_BOUNCY_AIRBORNE))
-				CALL(TriggerDownwardsFloorTransition);
+				home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		if (still_in(WST_BOUNCY_AIRBORNE))
 			port_SetState_BouncyFloor();
 	}
@@ -2377,10 +2377,10 @@ public:
 		}
 
 		if (!airborne_collision()) {
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		{
 			// three bounces, then dizzy
 			uint8_t bounce = static_cast<uint8_t>(rd8(wJumpVelTable) + 1);
@@ -2427,7 +2427,7 @@ public:
 			set_frameset(facing_right() ? ADDR_Frameset_1dcd31 : ADDR_Frameset_1dcd01);
 		}
 		if (anim_and_ended(rd8(wWarioOAMBank)))
-			CALL(RecoverFromTransformation);
+			home::recover_from_transformation(gb_);
 	}
 
 	void port_UpdateState_CrazyAirborne()
@@ -2435,7 +2435,7 @@ public:
 		if (transition_or_water())
 			return;
 		anim(OAM2);
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		port_HandleWalk();
 		cap_walk(0x10, 0x0c);
 		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
@@ -2444,10 +2444,10 @@ public:
 			return;
 		}
 		if (!airborne_collision()) {
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		port_SetState_Crazy();
 	}
 
@@ -2462,7 +2462,7 @@ public:
 			port_SetState_BatFlying();
 			return;
 		}
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		port_Func_2b17a();
 		cap_walk(0x08, 0x04);
 		if (ld_and(wIsTurning))
@@ -2491,10 +2491,10 @@ public:
 			return;
 		}
 		if (!airborne_collision()) {
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		if (still_in(WST_VAMPIRE_AIRBORNE))
 			port_SetState_VampireIdling();
 	}
@@ -2528,12 +2528,12 @@ public:
 		if (transition_or_water())
 			return;
 		if (ld_and(wJumpVelTable)) {
-			CALL(ApplyJumpVelocity);
+			home::apply_jump_velocity(gb_);
 			if (!airborne_collision()) {
-				CALL(TriggerDownwardsFloorTransition);
+				home::handle_downwards_floor_transition(gb_);
 				return;
 			}
-			CALL(TriggerFloorTransition);
+			home::trigger_floor_transition(gb_);
 			wr8(wJumpVelTable, 0);
 			wr8(wJumpVelIndex, 0);
 		}
@@ -2556,7 +2556,7 @@ public:
 		if (!ld_and(wWaterInteraction)) {
 			// .asm_2ad45
 			particle_at_wario(PARTICLE_BUBBLE_BURST);
-			CALL(RecoverFromTransformation);
+			home::recover_from_transformation(gb_);
 			return;
 		}
 		sfx_loop(0x0e, SFX_023);

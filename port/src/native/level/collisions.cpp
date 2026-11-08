@@ -329,6 +329,7 @@ uint8_t check_centre_collision(GB *gb) { return Collisions(gb).centre(); }
 uint8_t check_front_collision(GB *gb) { return Collisions(gb).front(); }
 uint8_t check_up_collision(GB *gb) { return Collisions(gb).up(); }
 uint8_t check_airborne_collision(GB *gb) { return Collisions(gb).airborne(); }
+uint8_t check_block_below(GB *gb) { return Collisions(gb).block(COLLISION_DOWN); }
 
 void asm_centre_collision(GB *gb)
 {

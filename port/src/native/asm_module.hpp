@@ -231,17 +231,6 @@ protected:
 	void frameset_by_dir(uint16_t left, uint16_t right) { set_frameset(ld_and(wDirection) ? right : left); }
 	bool room_transition() { return ld_and(wRoomTransitionParam); }
 	bool anim_ended() { return ld_and(wWarioAnimationEnded); }
-	// the camera / floor check after moving down: true to transition down
-	bool down_floor_check()
-	{
-		cpu_.a = alu_.and_(rd8(wCameraConfigFlags), CAM_SCROLLING_MASK);
-		alu_.cp(cpu_.a, CAM_TRANSITIONS);
-		if (CF)
-			return false;
-		CALL(GetFloorForYPos);
-		cpu_.a = alu_.sub(rd8(wFloor), cpu_.c);
-		return !(cpu_.f & (FLAG_Z | FLAG_C));
-	}
 	void move_by_dir()
 	{
 		if (ld_and(wDirection))

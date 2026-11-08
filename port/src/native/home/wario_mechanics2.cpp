@@ -1,84 +1,65 @@
-// home/wario_mechanics2 (src/home/wario_mechanics2.asm), converted from the register-level
-// C port by tools/c2cpp.py: the same logic, as a class over AsmModule,
-// keeping the original's registers, flags and return addresses for its
-// callers (see src/native/asm_module.hpp).
-#include "../asm_module.hpp"
+// home/wario_mechanics2 (src/home/wario_mechanics2.asm) as plain C++; see
+// wario.hpp. The callers are C++ (the Wario states, the object
+// interactions) and read no register after these.
+#include "wario.hpp"
+
+#include "../level/collisions.hpp"
+#include "../level/object.hpp"
+#include "../routines.hpp"
+#include "memory.hpp"
 
 namespace wl3::home {
 
 namespace {
 
-class HomeWarioMechanics2 : public AsmModule {
-public:
-	using AsmModule::AsmModule;
+// hPos = Wario's position, x at the collision box's left or right edge, 3
+// pixels in
+void pos_at_box_edge(Memory mem, bool left)
+{
+	uint16_t x = static_cast<uint16_t>(mem[wWarioXPos] << 8 | mem[wWarioXPos + 1]);
+	if (left)
+		x = static_cast<uint16_t>(x - static_cast<uint8_t>(-mem[wCollisionBoxLeft] - 3));
+	else
+		x = static_cast<uint16_t>(x + static_cast<uint8_t>(mem[wCollisionBoxRight] - 3));
+	mem[hXPosLo] = static_cast<uint8_t>(x);
+	mem[hXPosLo - 1] = static_cast<uint8_t>(x >> 8);
+	mem[hXPosLo - 2] = mem[wWarioYPos + 1];
+	mem[hXPosLo - 3] = mem[wWarioYPos];
+}
 
-	// Copies wWarioPos to hPos with x moved to the left or right edge of the
-	// collision box, 3 pixels in, as the asm does it: from wWarioXPos + 1 down.
-	void get_pos_at_box_edge(bool left)
-	{
-		if (left) {
-			cpu_.a = (uint8_t)(~rd8(wCollisionBoxLeft) + 1);
-			cpu_.c = alu_.sub(cpu_.a, 3);
-			cpu_.a = alu_.sub(rd8(wWarioXPos + 1), cpu_.c);
-			wr8(hXPosLo, cpu_.a);
-			cpu_.a = alu_.sbc(rd8(wWarioXPos), 0x00);
-		} else {
-			cpu_.c = alu_.sub(rd8(wCollisionBoxRight), 3);
-			cpu_.a = alu_.add(rd8(wWarioXPos + 1), cpu_.c);
-			wr8(hXPosLo, cpu_.a);
-			cpu_.a = alu_.adc(rd8(wWarioXPos), 0x00);
-		}
-		wr8(hXPosLo - 1, cpu_.a);
-		wr8(hXPosLo - 2, rd8(wWarioYPos + 1));
-		cpu_.a = rd8(wWarioYPos);
-		wr8(hXPosLo - 3, cpu_.a);
-		SET_HL(gb_, wWarioYPos);
-		SET_DE(gb_, hXPosLo - 3);
-	}
-
-	// returns nz if standing on slippery ground
-	void port_IsOnSlipperyGround()
-	{
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(wIsOnSlipperyGround, 0);
-
-		get_pos_at_box_edge(true);
-		FARCALL(Func_19b51);
-		cpu_.a = rd8(wIsOnSlipperyGround);
-		alu_.and_(cpu_.a, cpu_.a);
-		if (!(cpu_.f & FLAG_Z))
-			return;
-
-		get_pos_at_box_edge(false);
-		FARCALL(Func_19b51);
-		cpu_.a = rd8(wIsOnSlipperyGround);
-		alu_.and_(cpu_.a, cpu_.a);
-	}
-
-	void port_ReleaseOwl()
-	{
-		// hPos = wWarioPos + (-$18, 0)
-		cpu_.a = rd8(wWarioXPos + 1);
-		wr8(hXPosLo, cpu_.a);
-		cpu_.a = rd8(wWarioXPos + 0);
-		wr8(hXPosLo - 1, cpu_.a);
-		cpu_.a = alu_.sub(rd8(wWarioXPos - 1), 0x18);
-		wr8(hXPosLo - 2, cpu_.a);
-		cpu_.a = alu_.sbc(rd8(wWarioXPos - 2), 0x00);
-		wr8(hXPosLo - 3, cpu_.a);
-		SET_HL(gb_, wWarioXPos - 2);
-		SET_DE(gb_, hXPosLo - 3);
-		cpu_.b = PARTICLE_OWL;
-		FARCALL(CreateParticle);
-	}
-};
+void block_below(GB *gb)
+{
+	Routines(gb).in_bank(BANK_Func_19b51, ADDR_Func_19b51, [&] { level::check_block_below(gb); });
+}
 
 } // namespace
 
+bool is_on_slippery_ground(GB *gb)
+{
+	Memory mem(gb);
+	mem[wIsOnSlipperyGround] = 0;
+	pos_at_box_edge(mem, true);
+	block_below(gb);
+	if (mem[wIsOnSlipperyGround])
+		return true;
+	pos_at_box_edge(mem, false);
+	block_below(gb);
+	return mem[wIsOnSlipperyGround] != 0;
+}
+
+void release_owl(GB *gb)
+{
+	Memory mem(gb);
+	// hPos = wWarioPos + (-$18, 0)
+	mem[hXPosLo] = mem[wWarioXPos + 1];
+	mem[hXPosLo - 1] = mem[wWarioXPos];
+	uint16_t y = static_cast<uint16_t>((mem[wWarioYPos] << 8 | mem[wWarioYPos + 1]) - 0x18);
+	mem[hXPosLo - 2] = static_cast<uint8_t>(y);
+	mem[hXPosLo - 3] = static_cast<uint8_t>(y >> 8);
+	Routines(gb).in_bank(BANK_CreateParticle, ADDR_CreateParticle, [&] { level::create_particle(gb, PARTICLE_OWL); });
+}
+
 } // namespace wl3::home
 
-using wl3::home::HomeWarioMechanics2;
-
-PORT_EX(IsOnSlipperyGround, 0, 0) { HomeWarioMechanics2(gb).port_IsOnSlipperyGround(); }
-PORT_EX(ReleaseOwl, 0, 0) { HomeWarioMechanics2(gb).port_ReleaseOwl(); }
+PORT_EX(IsOnSlipperyGround, 0, ALL_REGISTERS) { wl3::home::is_on_slippery_ground(gb); }
+PORT_EX(ReleaseOwl, 0, ALL_REGISTERS) { wl3::home::release_owl(gb); }

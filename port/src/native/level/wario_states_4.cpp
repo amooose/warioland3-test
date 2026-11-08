@@ -14,7 +14,7 @@ public:
 
 	void port_SetState_Splitting()
 	{
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		wr8(wWarioState, WST_SPLITTING);
 		wr8(wJumpVelTable, 0);
 		wr8(wJumpVelIndex, 0);
@@ -37,7 +37,7 @@ public:
 		clear({wSFXLoopCounter, wWalkVelIndex, wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter,
 			wIsCrouching, wIsRolling, wIsSmashAttacking, wJumpVelTable, wJumpVelIndex, wInvisibleFrame});
 		collision_box(-1, -27, -9, 9);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		set_pal(ADDR_WarioDefaultPal);
 		load_gfx(BANK_WarioIdleGfx, ADDR_WarioIdleGfx);
@@ -73,8 +73,8 @@ public:
 	// back to normal Wario, with his palette, then on to `next`
 	void untransform()
 	{
-		CALL(ClearTransformationValues);
-		CALL(UpdateLevelMusic);
+		home::clear_transformation_values(gb_);
+		home::update_level_music(gb_);
 		set_pal(ADDR_WarioDefaultPal);
 	}
 
@@ -336,7 +336,7 @@ public:
 	void port_Func_1ec64d()
 	{
 		wr8(wWarioState, WST_RELEASING_OWL);
-		CALL(ReleaseOwl);
+		home::release_owl(gb_);
 		wr8(wWarioStateCounter, 0);
 		wr8(wWarioStateCycles, 0);
 		reset_anim();
@@ -404,7 +404,7 @@ public:
 		clear({wSFXLoopCounter, wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching,
 			wIsRolling, wIsSmashAttacking, wJumpVelIndex});
 		wr8(wJumpVelTable, 1);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		load_gfx(BANK_WarioFanGfx, ADDR_WarioFanGfx);
 		set_oam(BANK_OAM_1dc000, ADDR_OAM_1dc000);
@@ -418,7 +418,7 @@ public:
 		collision_box(-1, -27, -9, 9);
 		clear({wInvisibleFrame, wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching,
 			wIsRolling, wIsSmashAttacking, wJumpVelTable, wJumpVelIndex});
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		set_pal(ADDR_WarioIceSkatinPal);
 		load_gfx(BANK_WarioBubbleGfx, ADDR_WarioBubbleGfx);
@@ -464,7 +464,7 @@ public:
 			wIsSmashAttacking});
 		wr8(wJumpVelTable, 0x01);
 		wr8(wJumpVelIndex, 0x0e);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		set_pal(ADDR_WarioSplitPal);
 		load_gfx(BANK_WarioSnowballGfx, ADDR_WarioSnowballGfx);
@@ -483,7 +483,7 @@ public:
 			wIsSmashAttacking, wJumpVelIndex});
 		if (rd8(wJumpVelTable))
 			wr8(wJumpVelIndex, 0x18);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		set_pal(ADDR_WarioSnowmanPal);
 		load_gfx(BANK_WarioSnowmanGfx, ADDR_WarioSnowmanGfx);
@@ -518,7 +518,7 @@ public:
 		clear({wSFXLoopCounter, wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching,
 			wIsRolling, wIsSmashAttacking, wJumpVelIndex});
 		wr8(wJumpVelTable, 1);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		set_pal(ADDR_WarioMagicPal);
 		load_gfx(BANK_WarioMagicGfx, ADDR_WarioMagicGfx);
@@ -639,7 +639,7 @@ public:
 	{
 		if (inc_counter() < 0x20)
 			return;
-		CALL(RecoverFromTransformation); // fallthrough to UpdateState_MagicRecovering
+		home::recover_from_transformation(gb_); // fallthrough to UpdateState_MagicRecovering
 	}
 
 	void port_UpdateState_SnowmanBumped()
@@ -667,7 +667,7 @@ public:
 
 	void port_UpdateState_BallStart()
 	{
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		if (!airborne_collision())
 			return;
 		update_pos_y();
@@ -710,7 +710,7 @@ public:
 			wr8(wJumpVelTable, JUMP_VEL_NORMAL);
 			return;
 		}
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		if (airborne_collision()) {
 			update_pos_y();
 			clear({wIsIntangible, wJumpVelIndex, wJumpVelTable});
@@ -739,7 +739,7 @@ public:
 	{
 		FARCALL(Func_19b25);
 		if (room_transition()) {
-			CALL(TriggerRoomTransition);
+			home::trigger_room_transition(gb_);
 			return;
 		}
 		sfx_loop(0x86, SFX_04C);
@@ -758,7 +758,7 @@ public:
 	void port_UpdateState_BallThrown()
 	{
 		anim(OAM3);
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
 			move_x(-3);
 			return;
@@ -788,7 +788,7 @@ public:
 
 	void port_SetState_BallStart()
 	{
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		collision_box(-1, -20, -9, 9);
 		clear({wGrabState, wAttackCounter, wIsCrouching, wIsRolling, wIsSmashAttacking});
 		set_pal(ADDR_WarioBallPal);
@@ -808,14 +808,14 @@ public:
 
 	void port_Func_1ee00f()
 	{
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		FARCALL(Func_2b17a);
 		cap_walk(0x10, 0x0c);
 	}
 
 	void port_Func_1ee02e()
 	{
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		FARCALL(HandleWalk);
 		cap_walk(0x08, 0x04);
 	}
@@ -854,17 +854,17 @@ public:
 			return;
 		}
 		anim(OAM2);
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		FARCALL(HandleWalk);
 		cap_walk(0x14, 0x10);
 		if (!still_in(WST_ICE_SKATIN_AIRBORNE))
 			return;
 		if (!airborne_collision()) {
 			if (still_in(WST_ICE_SKATIN_AIRBORNE))
-				CALL(TriggerDownwardsFloorTransition);
+				home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		if (!still_in(WST_ICE_SKATIN_AIRBORNE))
 			return;
 		wr8(wWalkVelIndex, 0x10);
@@ -1080,7 +1080,7 @@ public:
 
 	void port_Func_1edf01()
 	{
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		FARCALL(Func_2b17a);
 		cap_walk(0x08, 0x04);
 		if (rd8(wJumpVelIndex) == 0x18)
@@ -1102,16 +1102,16 @@ public:
 	void port_Func_1ed09b()
 	{
 		flip_dir();
-		CALL(RecoverFromTransformation);
+		home::recover_from_transformation(gb_);
 	}
 
-	void port_UpdateState_MagicRecovering() { CALL(RecoverFromTransformation); }
+	void port_UpdateState_MagicRecovering() { home::recover_from_transformation(gb_); }
 
 	void port_UpdateStart_FanRecovering()
 	{
 		anim(OAM3);
 		if (anim_ended())
-			CALL(RecoverFromTransformation_WithoutInvincibility);
+			home::recover_from_transformation(gb_, false);
 	}
 
 	void port_UpdateState_IceSkatinCrash()
@@ -1120,18 +1120,18 @@ public:
 		if (!anim_ended())
 			return;
 		particle_at_wario(PARTICLE_ICE);
-		CALL(RecoverFromTransformation);
+		home::recover_from_transformation(gb_);
 	}
 
 	void port_UpdateState_SplitKnockedBack()
 	{
 		if (transition_or_water())
 			return;
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		if (!airborne_collision()) {
 			FARCALL(HandleWalk);
 			home::cap_walk_vel(gb_); // Func_1762
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
 		play_sfx(SFX_044);
@@ -1171,7 +1171,7 @@ public:
 		if (!anim_ended())
 			return;
 		particle_at_wario(PARTICLE_SNOW);
-		CALL(RecoverFromTransformation);
+		home::recover_from_transformation(gb_);
 	}
 
 	void port_UpdateState_SnowmanStart()
@@ -1179,12 +1179,12 @@ public:
 		if (transition_or_water())
 			return;
 		if (ld_and(wJumpVelTable)) {
-			CALL(ApplyJumpVelocity);
+			home::apply_jump_velocity(gb_);
 			if (!airborne_collision()) {
-				CALL(TriggerDownwardsFloorTransition);
+				home::handle_downwards_floor_transition(gb_);
 				return;
 			}
-			CALL(TriggerFloorTransition);
+			home::trigger_floor_transition(gb_);
 			wr8(wJumpVelTable, 0);
 			wr8(wJumpVelIndex, 0);
 		}
@@ -1197,13 +1197,13 @@ public:
 	{
 		if (transition_or_water())
 			return;
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		FARCALL(Func_2b17a);
 		cap_walk(0x08, 0x04);
 		if (!airborne_collision())
 			return;
 		update_pos_y();
-		CALL(RecoverFromTransformation);
+		home::recover_from_transformation(gb_);
 	}
 
 	void port_UpdateState_HangingRail()
@@ -1216,7 +1216,7 @@ public:
 		anim(OAM2);
 		uint8_t pressed = rd8(wJoypadPressed);
 		if (pressed & PAD_B) {
-			CALL(RecoverFromTransformation_WithoutInvincibility);
+			home::recover_from_transformation(gb_, false);
 			return;
 		}
 		if (pressed & PAD_A) {
@@ -1236,14 +1236,14 @@ public:
 			port_SetState_SnowballCrash();
 			return;
 		}
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		FARCALL(HandleWalk);
 		cap_walk(0x18, 0x14);
 		if (!airborne_collision()) {
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		port_SetState_SnowballRolling();
 	}
 
@@ -1267,10 +1267,10 @@ public:
 			return;
 		}
 		if (!airborne_collision()) {
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		centre_collision();
 		if (ld_and(wWarioSlopeInteraction)) {
 			port_TurnIntoSmallSnowball();
@@ -1311,12 +1311,12 @@ public:
 			port_Func_1ed09b();
 			return;
 		}
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		if (airborne_collision()) {
 			port_SetState_Splitting();
 			return;
 		}
-		CALL(TriggerDownwardsFloorTransition);
+		home::handle_downwards_floor_transition(gb_);
 	}
 
 	// ld a, [wWarioState] / sub $b0 / rst JumpTable (table after the rst)
@@ -1421,7 +1421,7 @@ public:
 			if (!still_in(WST_BLIND_AIRBORNE))
 				return;
 			if (hit) {
-				CALL(RecoverFromTransformation);
+				home::recover_from_transformation(gb_);
 				return;
 			}
 		}
@@ -1434,10 +1434,10 @@ public:
 			return;
 		}
 		if (!airborne_collision()) {
-			CALL(TriggerDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 			return;
 		}
-		CALL(TriggerFloorTransition);
+		home::trigger_floor_transition(gb_);
 		port_SetState_BlindIdling();
 	}
 
@@ -1461,7 +1461,7 @@ public:
 			if (!still_in(WST_BLIND_WALKING))
 				return;
 			if (hit) {
-				CALL(RecoverFromTransformation);
+				home::recover_from_transformation(gb_);
 				return;
 			}
 		}

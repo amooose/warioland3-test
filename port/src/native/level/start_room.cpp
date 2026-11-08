@@ -10,6 +10,7 @@
 #include "../native.hpp"
 #include "../routines.hpp"
 #include "../home/object_pos.hpp"
+#include "../home/floor_transition.hpp"
 #include "../home/level_map.hpp"
 
 #include <initializer_list>
@@ -387,7 +388,7 @@ void RoomStart::set_wario_position_to_spawn()
 		mem_[wWarioPos + i] = mem_[hPos + i];
 	if ((mem_[wCameraConfigFlags] & CAM_SCROLLING_MASK) < CAM_TRANSITIONS || (mem_[wceef] & 0x3c))
 		return;
-	routines_.call(ADDR_UpdateFloor);
+	home::update_floor(gb_);
 }
 
 // the queue down a BG map column (wrapping from v0BGMap1 back to v0BGMap0),

@@ -99,7 +99,7 @@ public:
 	{
 		FARCALL(Func_19b25);
 		if (room_transition()) {
-			CALL(TriggerRoomTransition);
+			home::trigger_room_transition(gb_);
 			return;
 		}
 
@@ -196,7 +196,7 @@ public:
 	{
 		FARCALL(Func_19b25);
 		if (room_transition()) {
-			CALL(TriggerRoomTransition);
+			home::trigger_room_transition(gb_);
 			return;
 		}
 		if (ld_bit(wJoypadPressed, B_PAD_A)) {
@@ -274,7 +274,7 @@ public:
 		wr8(wWarioState, next_state);
 		wr8(wInvincibleCounter, 0x01);
 		wr8(wRoomTransitionParam, rd8(wRoomTransitionParam) & static_cast<uint8_t>(~(1 << ROOMTRANSITIONF_DELAY_F)));
-		CALL(TriggerRoomTransition);
+		home::trigger_room_transition(gb_);
 	}
 
 	void port_UpdateState_Teleporting() { teleporting(0x01, WST_STUNG); }
@@ -342,7 +342,7 @@ public:
 			FARCALL(StartJump_FromSand);
 			return;
 		}
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		FARCALL(Func_2b17a);
 		clamp_walk_vel();
 		if (ld_and(wIsTurning))
@@ -388,7 +388,7 @@ public:
 			return;
 		FARCALL(Func_19b25);
 		if (room_transition()) {
-			CALL(TriggerRoomTransition);
+			home::trigger_room_transition(gb_);
 			return;
 		}
 		if (!centre_collision())
@@ -440,7 +440,7 @@ public:
 	{
 		FARCALL(Func_19b25);
 		if (room_transition()) {
-			CALL(TriggerRoomTransition);
+			home::trigger_room_transition(gb_);
 			return;
 		}
 		sfx_loop(32, SFX_CLIMB);
@@ -467,7 +467,7 @@ public:
 	{
 		FARCALL(Func_19b25);
 		if (room_transition()) {
-			CALL(TriggerRoomTransition);
+			home::trigger_room_transition(gb_);
 			return;
 		}
 		if (!ld_and(wLadderInteraction)) {
@@ -482,7 +482,7 @@ public:
 	{
 		FARCALL(Func_19b25);
 		if (room_transition()) {
-			CALL(TriggerRoomTransition);
+			home::trigger_room_transition(gb_);
 			return;
 		}
 		if (!ld_and(wLadderInteraction)) {
@@ -544,7 +544,7 @@ public:
 	{
 		FARCALL(Func_19b25);
 		if (room_transition()) {
-			CALL(TriggerRoomTransition);
+			home::trigger_room_transition(gb_);
 			return;
 		}
 		if (!rd8(fence ? wIsNearFence : wLadderInteraction)) {
@@ -592,7 +592,7 @@ public:
 	{
 		FARCALL(Func_19b25);
 		if (room_transition()) {
-			CALL(TriggerRoomTransition);
+			home::trigger_room_transition(gb_);
 			return;
 		}
 		if (!ld_and(wGrabState)) {
@@ -633,7 +633,7 @@ public:
 	{
 		anim(OAM1);
 		if (ld_and(wJumpVelTable)) {
-			CALL(ApplyJumpVelocity);
+			home::apply_jump_velocity(gb_);
 			if (!airborne_collision())
 				return;
 			wr8(wWarioPos + 0, rd8(hYPosHi));
@@ -860,7 +860,7 @@ public:
 		}
 		if (!ld_and(wJumpVelTable))
 			return;
-		CALL(ApplyJumpVelocity);
+		home::apply_jump_velocity(gb_);
 		if (!airborne_collision())
 			return;
 		update_pos_y();
@@ -1109,8 +1109,7 @@ public:
 			if ((rd8(wCameraConfigFlags) & CAM_SCROLLING_MASK) >= CAM_TRANSITIONS) {
 				uint8_t floor = floor_for_y_pos();
 				if (rd8(wFloor) > floor) {
-					cpu_.c = floor;
-					CALL(StartDownwardsFloorTransition);
+					home::start_floor_transition(gb_, floor, false);
 					return;
 				}
 			}

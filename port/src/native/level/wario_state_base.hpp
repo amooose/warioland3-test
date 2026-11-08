@@ -10,9 +10,11 @@
 #pragma once
 
 #include "../asm_module.hpp"
+#include "../home/floor_transition.hpp"
 #include "../home/memory.hpp"
 #include "../home/pals.hpp"
 #include "../home/sprites.hpp"
+#include "../home/system.hpp"
 #include "../home/wario.hpp"
 
 namespace wl3::level {
@@ -148,7 +150,7 @@ protected:
 	{
 		FARCALL(Func_19b25);
 		if (room_transition()) {
-			CALL(TriggerRoomTransition);
+			home::trigger_room_transition(gb_);
 			return true;
 		}
 		return false;
@@ -221,59 +223,22 @@ protected:
 	bool anim_ended() const { return ld_and(wWarioAnimationEnded); }
 	bool facing_right() const { return ld_and(wDirection); }
 
-	// GetFloorForYPos: the floor Wario's y is on
-	uint8_t floor_for_y_pos() const
-	{
-		uint8_t hi = rd8(wWarioYPos + 0);
-		uint8_t floor = hi == 1 ? 3 : hi == 2 ? 1 : 5;
-		if (rd8(wWarioYPos + 1) < 0x80)
-			floor++;
-		return floor;
-	}
+	uint8_t floor_for_y_pos() const { return home::floor_for_y_pos(gb_); } // GetFloorForYPos
 	// after moving down, the floor transition down if the camera does
-	// transitions and Wario went past his floor (c = the new floor for
-	// StartDownwardsFloorTransition)
-	void down_floor_transition()
-	{
-		if ((rd8(wCameraConfigFlags) & CAM_SCROLLING_MASK) < CAM_TRANSITIONS)
-			return;
-		uint8_t floor = floor_for_y_pos();
-		if (rd8(wFloor) <= floor)
-			return;
-		cpu_.c = floor;
-		CALL(StartDownwardsFloorTransition);
-	}
+	// transitions and Wario went past his floor
+	void down_floor_transition() { home::handle_downwards_floor_transition(gb_); }
 	// after moving up, the floor transition up (true if it started)
-	bool up_floor_transition()
-	{
-		if ((rd8(wCameraConfigFlags) & CAM_SCROLLING_MASK) < CAM_TRANSITIONS)
-			return false;
-		uint8_t floor = floor_for_y_pos();
-		if (rd8(wFloor) >= floor)
-			return false;
-		cpu_.c = floor;
-		CALL(StartUpwardsFloorTransition);
-		return true;
-	}
-	// ApplyWalkVelocity_Right / Left, then MoveWarioRight / Left by the b
-	// it leaves: how far Wario moved
+	bool up_floor_transition() { return home::handle_upwards_floor_transition(gb_); }
+	// ApplyWalkVelocity_Right / Left, then MoveWarioRight / Left by it: how
+	// far Wario moved
 	uint8_t walk_with_velocity(bool right)
 	{
-		if (right) {
-			CALL(ApplyWalkVelocity_Right);
-			CALL(MoveWarioRight);
-		} else {
-			CALL(ApplyWalkVelocity_Left);
-			CALL(MoveWarioLeft);
-		}
-		return cpu_.b;
+		uint8_t vel = home::apply_walk_velocity(gb_, right);
+		move_x(right ? vel : -vel);
+		return vel;
 	}
 	// IsOnSlipperyGround: true if either foot is on slippery ground
-	bool on_slippery_ground()
-	{
-		CALL(IsOnSlipperyGround);
-		return ld_and(wIsOnSlipperyGround);
-	}
+	bool on_slippery_ground() { return home::is_on_slippery_ground(gb_); }
 
 	void move_x(int delta) { home::move_wario_x(gb_, delta); }
 	void move_y(int delta) { home::move_wario_y(gb_, delta); }

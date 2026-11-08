@@ -10,6 +10,7 @@
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
+#include "room_gfx.hpp"
 
 namespace wl3::level {
 
@@ -202,6 +203,19 @@ void RoomGfx::wario_bg_ptr()
 }
 
 } // namespace
+
+uint16_t wario_bg_ptr(GB *gb)
+{
+	Memory mem(gb);
+	uint16_t y = static_cast<uint16_t>((mem[wWarioYPos + 0] << 8 | mem[wWarioYPos + 1]) - 0x18);
+	uint16_t x = static_cast<uint16_t>(mem[wWarioXPos + 0] << 8 | mem[wWarioXPos + 1]);
+	uint16_t row = static_cast<uint16_t>((y >> 3) << 5);
+	uint16_t offset = static_cast<uint16_t>((row & 0x00ff) | (row & ((TILEMAP_WIDTH * TILEMAP_HEIGHT - 1) & 0xff00)));
+	auto ptr = static_cast<uint16_t>((v0BGMap0 & 0xff00) + ((x >> 3) & (TILEMAP_WIDTH - 1)) + offset);
+	mem[wBGPtr + 0] = static_cast<uint8_t>(ptr >> 8);
+	mem[wBGPtr + 1] = static_cast<uint8_t>(ptr);
+	return ptr;
+}
 
 } // namespace wl3::level
 

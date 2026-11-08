@@ -1,132 +1,21 @@
-// home/floor_transition (src/home/floor_transition.asm), converted from the register-level
-// C port by tools/c2cpp.py: the same logic, as a class over AsmModule,
-// keeping the original's registers, flags and return addresses for its
-// callers (see src/native/asm_module.hpp).
-#include "../asm_module.hpp"
-#include "../routines.hpp"
+// Home's floor transitions (src/home/floor_transition.asm) as plain C++;
+// see floor_transition.hpp. The hooks leave the registers the asm leaves
+// (Func_19720 jumps to them, and its callers are register-level).
 #include "floor_transition.hpp"
+
+#include "../flags.hpp"
+#include "../routines.hpp"
+#include "memory.hpp"
 
 namespace wl3::home {
 
-namespace {
-
-class HomeFloorTransition : public AsmModule {
-public:
-	using AsmModule::AsmModule;
-
-	// returns in c:
-	// 6 if   $0 <= ypos <  $80
-	// 5 if  $80 <= ypos < $100
-	// 4 if $100 <= ypos < $180
-	// 3 if $180 <= ypos < $200
-	// 2 if $200 <= ypos < $280
-	// 1 if $280 <= ypos < $300
-	void port_GetFloorForYPos()
-	{
-		uint8_t hi = alu_.dec(rd8(wWarioYPos + 0));
-		if (!hi)
-			cpu_.c = 3;
-		else if (!alu_.dec(hi))
-			cpu_.c = 1;
-		else
-			cpu_.c = 5;
-
-		cpu_.a = rd8(wWarioYPos + 1);
-		alu_.cp(cpu_.a, 0x80);
-		if (cpu_.f & FLAG_C)
-			cpu_.c = alu_.inc(cpu_.c); // < $80
-	}
-
-	void port_UpdateFloor()
-	{
-		CALL(GetFloorForYPos);
-		cpu_.a = cpu_.c;
-		wr8(wFloor, cpu_.a);
-	}
-
-	// sets off the floor transition, after wFloor and wFloorTransitionTimer
-	void start_floor_transition(uint8_t dir)
-	{
-		play_sfx(SFX_PIPE_EXIT);
-		cpu_.a = dir;
-		wr8(wFloorTransitionDir, dir);
-		cpu_.a = TRUE;
-		wr8(wIsFloorTransition, TRUE);
-	}
-
-	// c = new floor
-	void port_StartDownwardsFloorTransition()
-	{
-		cpu_.a = cpu_.c;
-		wr8(wFloor, cpu_.a);
-		alu_.cp(cpu_.a, 5);
-		cpu_.a = (cpu_.f & FLAG_Z) ? 0x68 : 0x80;
-		wr8(wFloorTransitionTimer, cpu_.a);
-		start_floor_transition(FLOOR_TRANSITION_UP);
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(wCameraRoomYScrollLimit, 0);
-	}
-
-	// c = new floor
-	void port_StartUpwardsFloorTransition()
-	{
-		cpu_.a = cpu_.c;
-		wr8(wFloor, cpu_.a);
-		start_floor_transition(FLOOR_TRANSITION_DOWN);
-		cpu_.a = 0x80;
-		wr8(wFloorTransitionTimer, 0x80);
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z; // xor a
-		wr8(wCameraRoomYScrollLimit, 0);
-	}
-
-	// The floor check: CAM_TRANSITIONS and Wario on another floor; a = wFloor - c
-	bool floor_changed()
-	{
-		cpu_.a = alu_.and_(rd8(wCameraConfigFlags), CAM_SCROLLING_MASK);
-		alu_.cp(cpu_.a, CAM_TRANSITIONS);
-		if (cpu_.f & FLAG_C)
-			return false;
-		CALL(GetFloorForYPos);
-		cpu_.a = alu_.sub(rd8(wFloor), cpu_.c);
-		return true;
-	}
-
-	void port_HandleDownwardsFloorTransition()
-	{
-		if (floor_changed() && !(cpu_.f & (FLAG_Z | FLAG_C))) {
-			JUMP(StartDownwardsFloorTransition);
-			return;
-		}
-		RET();
-	}
-
-	// unreferenced?
-	void port_Func_1180()
-	{
-		if (floor_changed() && !(cpu_.f & FLAG_Z)) {
-			if (cpu_.f & FLAG_C)
-				JUMP(StartUpwardsFloorTransition);
-			else
-				JUMP(StartDownwardsFloorTransition);
-			return;
-		}
-		RET();
-	}
-
-	void port_HandleUpwardsFloorTransition()
-	{
-		if (floor_changed() && (cpu_.f & FLAG_C)) {
-			JUMP(StartUpwardsFloorTransition);
-			return;
-		}
-		RET();
-	}
-};
-
-} // namespace
-
+// returns:
+// 6 if   $0 <= ypos <  $80
+// 5 if  $80 <= ypos < $100
+// 4 if $100 <= ypos < $180
+// 3 if $180 <= ypos < $200
+// 2 if $200 <= ypos < $280
+// 1 if $280 <= ypos < $300
 uint8_t floor_for_y_pos(GB *gb)
 {
 	Memory mem(gb);
@@ -137,8 +26,13 @@ uint8_t floor_for_y_pos(GB *gb)
 	return floor;
 }
 
-// StartUpwardsFloorTransition / StartDownwardsFloorTransition: to `floor`
-static void start_floor_transition(GB *gb, uint8_t floor, bool up)
+void update_floor(GB *gb)
+{
+	Memory mem(gb);
+	mem[wFloor] = floor_for_y_pos(gb);
+}
+
+void start_floor_transition(GB *gb, uint8_t floor, bool up)
 {
 	Memory mem(gb);
 	mem[wFloor] = floor;
@@ -153,8 +47,10 @@ static void start_floor_transition(GB *gb, uint8_t floor, bool up)
 	mem[wCameraRoomYScrollLimit] = 0;
 }
 
+namespace {
+
 // wFloor less Wario's floor, if the camera does transitions
-static bool floor_delta(GB *gb, int &delta, uint8_t &floor)
+bool floor_delta(GB *gb, int &delta, uint8_t &floor)
 {
 	Memory mem(gb);
 	if ((mem[wCameraConfigFlags] & CAM_SCROLLING_MASK) < CAM_TRANSITIONS)
@@ -164,12 +60,16 @@ static bool floor_delta(GB *gb, int &delta, uint8_t &floor)
 	return true;
 }
 
-void handle_upwards_floor_transition(GB *gb)
+} // namespace
+
+bool handle_upwards_floor_transition(GB *gb)
 {
 	int delta;
 	uint8_t floor;
-	if (floor_delta(gb, delta, floor) && delta < 0)
-		start_floor_transition(gb, floor, true);
+	if (!floor_delta(gb, delta, floor) || delta >= 0)
+		return false;
+	start_floor_transition(gb, floor, true);
+	return true;
 }
 
 void handle_downwards_floor_transition(GB *gb)
@@ -180,14 +80,84 @@ void handle_downwards_floor_transition(GB *gb)
 		start_floor_transition(gb, floor, false);
 }
 
+void handle_floor_transition(GB *gb)
+{
+	int delta;
+	uint8_t floor;
+	if (floor_delta(gb, delta, floor) && delta)
+		start_floor_transition(gb, floor, delta < 0);
+}
+
 } // namespace wl3::home
 
-using wl3::home::HomeFloorTransition;
+using namespace wl3::home;
+namespace flags = wl3::flags;
 
-PORT_EX(GetFloorForYPos, 0, 0) { HomeFloorTransition(gb).port_GetFloorForYPos(); }
-PORT_EX(UpdateFloor, 0, 0) { HomeFloorTransition(gb).port_UpdateFloor(); }
-PORT_EX(StartDownwardsFloorTransition, 0, 0) { HomeFloorTransition(gb).port_StartDownwardsFloorTransition(); }
-PORT_EX(StartUpwardsFloorTransition, 0, 0) { HomeFloorTransition(gb).port_StartUpwardsFloorTransition(); }
-PORT_EX(HandleDownwardsFloorTransition, HOOK_MANUAL_RET, 0) { HomeFloorTransition(gb).port_HandleDownwardsFloorTransition(); }
-PORT_EX(Func_1180, HOOK_MANUAL_RET, 0) { HomeFloorTransition(gb).port_Func_1180(); }
-PORT_EX(HandleUpwardsFloorTransition, HOOK_MANUAL_RET, 0) { HomeFloorTransition(gb).port_HandleUpwardsFloorTransition(); }
+namespace {
+
+// GetFloorForYPos's registers: c = the floor, a and f from the cp $80 (and
+// the inc c after it)
+void floor_regs(GB *gb)
+{
+	wl3::Memory mem(gb);
+	uint8_t floor = floor_for_y_pos(gb);
+	uint8_t lo = mem[wWarioYPos + 1];
+	gb->cpu.a = lo;
+	gb->cpu.f = flags::cp(lo, 0x80);
+	if (lo < 0x80)
+		gb->cpu.f = flags::inc(gb->cpu.f, static_cast<uint8_t>(floor - 1));
+	gb->cpu.c = floor;
+}
+
+// The camera and floor check: false (with carry) without CAM_TRANSITIONS,
+// else a = wFloor - c and its flags
+bool check_regs(GB *gb)
+{
+	wl3::Memory mem(gb);
+	uint8_t a = mem[wCameraConfigFlags] & CAM_SCROLLING_MASK;
+	gb->cpu.a = a;
+	gb->cpu.f = flags::cp(a, CAM_TRANSITIONS);
+	if (a < CAM_TRANSITIONS)
+		return false;
+	floor_regs(gb);
+	uint8_t floor = mem[wFloor];
+	gb->cpu.a = static_cast<uint8_t>(floor - gb->cpu.c);
+	gb->cpu.f = flags::sub(floor, gb->cpu.c);
+	return true;
+}
+
+// StartUpwards / DownwardsFloorTransition (c = the new floor), ending on xor a
+void start_regs(GB *gb, bool up)
+{
+	start_floor_transition(gb, gb->cpu.c, up);
+	gb->cpu.a = 0;
+	gb->cpu.f = FLAG_Z;
+}
+
+} // namespace
+
+PORT_EX(GetFloorForYPos, 0, 0) { floor_regs(gb); }
+PORT_EX(UpdateFloor, 0, 0)
+{
+	floor_regs(gb);
+	gb->cpu.a = gb->cpu.c;
+	update_floor(gb);
+}
+PORT_EX(StartDownwardsFloorTransition, 0, 0) { start_regs(gb, false); }
+PORT_EX(StartUpwardsFloorTransition, 0, 0) { start_regs(gb, true); }
+PORT_EX(HandleDownwardsFloorTransition, 0, 0)
+{
+	if (check_regs(gb) && !(gb->cpu.f & (FLAG_Z | FLAG_C)))
+		start_regs(gb, false);
+}
+// unreferenced?
+PORT_EX(Func_1180, 0, 0)
+{
+	if (check_regs(gb) && !(gb->cpu.f & FLAG_Z))
+		start_regs(gb, gb->cpu.f & FLAG_C);
+}
+PORT_EX(HandleUpwardsFloorTransition, 0, 0)
+{
+	if (check_regs(gb) && (gb->cpu.f & FLAG_C))
+		start_regs(gb, true);
+}
