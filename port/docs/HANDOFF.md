@@ -1350,6 +1350,14 @@ and the particle creators. Left for stage 3: a as the block result
 (ProcessBlock is still called by address). The hooks that were exact only
 for the block functions (SetState_OnFire and friends, the recoveries, the
 floor transitions) now clobber every register and their bodies are plain.
+Stage 3 (2026-11-09): a call by address is fine if nothing passes through
+registers, so the work is the calls passing arguments in registers: 173
+down to about 20, nearly all boot and audio (stage 4). Still needed: the
+return addresses and pushes in start_room and update_level. Removing them
+passed every tier, but QueueBlockAttributesAlongRow_OddColumn's half first
+block can read those stack bytes (block about $5e to $71) and none of the
+14 recordings reach that read, so passing proves nothing; they went back.
+To drop them, model the bytes that read would see.
 To find what reads a register: poison it, relax the contracts, run the
 full tier. Stop if the build fails: ctest happily runs the old binary.
 Routines nothing references and whose callers' hooks have their own copies
