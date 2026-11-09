@@ -317,14 +317,8 @@ void PathPreview::draw_arrows()
 		// ld a, [hld] / dec l: the duration, two bytes before the state
 		uint16_t duration = static_cast<uint16_t>(state - 1);
 		duration = static_cast<uint16_t>((duration & 0xff00) | static_cast<uint8_t>(duration - 1));
-		SET_DE(gb_, frameset);
-		SET_HL(gb_, duration);
-		gb_->cpu.b = OW_ANIMATION_BANK;
-		routines_.call(ADDR_UpdateOWAnimation);
-		gb_->cpu.l &= 0xf8; // the object's start
-		SET_DE(gb_, ADDR_OAM_aa0cf);
-		gb_->cpu.b = BANK_OAM_aa0cf;
-		routines_.call(ADDR_LoadOWSpriteWithScroll);
+		int frame = home::update_ow_animation(gb_, OW_ANIMATION_BANK, duration, frameset);
+		home::load_ow_sprite_with_scroll(gb_, BANK_OAM_aa0cf, ADDR_OAM_aa0cf, home::ow_anim_object(duration, frame));
 	}
 }
 

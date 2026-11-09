@@ -29,8 +29,7 @@ void SceneInit::place(uint16_t obj, Place place)
 // Func_b586d: a block of the map's tiles (Func_854ee's data)
 void SceneInit::tiles(uint16_t data)
 {
-	SET_HL(gb_, data);
-	routines_.farcall(BANK_Func_854ee, ADDR_Func_854ee);
+	routines_.in_bank(BANK_Func_854ee, ADDR_Func_854ee, [&] { Palettes(gb_).update_tiles(data); });
 }
 
 // SetBGMapBytesPriority
@@ -47,9 +46,7 @@ void SceneInit::decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vram1
 	if (vram1)
 		mem_[rVBK] = 1;
 	wram_.temp_bank() = bank;
-	SET_HL(gb_, src);
-	SET_BC(gb_, dest);
-	routines_.farcall(bank, ADDR_Decompress);
+	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, src, dest); });
 	if (vram1)
 		mem_[rVBK] = 0;
 }
@@ -458,11 +455,7 @@ void SceneInit::east(uint8_t param, uint8_t c)
 		} else if (c == DONE) { // the frozen sea
 			mem_[w2d03e] = 0;
 			mem_[w2d046] = 0;
-			SET_HL(gb_, ADDR_OWSceneFreezeSeaTilemap + 10 * TILEMAP_WIDTH + 15);
-			SET_DE(gb_, wTilemap + 10 * TILEMAP_WIDTH + 15);
-			gb_->cpu.c = 0x91;
-			gb_->cpu.b = BANK_OWSceneFreezeSeaTilemap;
-			routines_.call(ADDR_CopyFarBytes);
+			home::copy_far_bytes(gb_, BANK_OWSceneFreezeSeaTilemap, ADDR_OWSceneFreezeSeaTilemap + 10 * TILEMAP_WIDTH + 15, wTilemap + 10 * TILEMAP_WIDTH + 15, 0x91);
 			home::copy_far_bytes(gb_, BANK_OWSceneFreezeSeaAttrmap, ADDR_OWSceneFreezeSeaAttrmap + 15, wAttrmap + 10 * TILEMAP_WIDTH + 15, 0x91);
 		}
 		return;

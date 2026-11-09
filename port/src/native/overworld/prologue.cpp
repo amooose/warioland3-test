@@ -11,8 +11,7 @@ void Prologue::unrealistic()
 
 void Prologue::wario_state(uint8_t state)
 {
-	gb_->cpu.a = state;
-	routines_.call(ADDR_SetSceneWarioState);
+	SceneWario(gb_).set_state(state);
 }
 
 void Prologue::set_state(uint16_t state, uint8_t value)

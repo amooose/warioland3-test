@@ -16,6 +16,8 @@ namespace wl3::home {
 // pairs, ended by $ff, which sets wOWAnimationFinished and starts over.
 // Returns the new frame, or -1 while the duration lasts.
 int update_ow_animation(GB *gb, uint8_t bank, uint16_t duration, uint16_t frameset);
+// the object UpdateOWAnimation worked on (its hl, l & $f8), from the result
+uint16_t ow_anim_object(uint16_t duration, int frame);
 
 // CopyFarBytes: count bytes (0 is 256) from bank:src; CopyFarBytes_Long:
 // count * $100 bytes (0 is $10000)

@@ -58,9 +58,7 @@ void TreasureCollection::set_scene_obj_state(uint16_t state, uint8_t value)
 void TreasureCollection::decompress(uint8_t bank, uint16_t src, uint16_t dest)
 {
 	wram_.temp_bank() = bank;
-	SET_HL(gb_, src);
-	SET_BC(gb_, dest);
-	routines_.farcall(bank, ADDR_Decompress);
+	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, src, dest); });
 }
 
 void TreasureCollection::init()
@@ -132,10 +130,7 @@ void TreasureCollection::init()
 
 void TreasureCollection::clear(uint16_t addr, uint16_t size)
 {
-	SET_HL(gb_, addr);
-	SET_BC(gb_, size);
-	gb_->cpu.a = 0;
-	routines_.call(ADDR_WriteAToHL_BCTimes);
+	home::fill(gb_, addr, 0, size ? size : 0x10000);
 }
 
 // the page's treasures, and the 101st's
@@ -327,12 +322,8 @@ void TreasureCollection::process_link_state()
 			advance_link_state();
 		break;
 	case 2: { // the linked cells
-		SET_HL(gb_, ADDR_CollectionLinkTable);
-		gb_->cpu.a = wram_.collection_page();
-		routines_.call(ADDR_GetPointerFromTableHL);
-		gb_->cpu.a = wram_.collection_cell();
-		routines_.call(ADDR_GetPointerFromTableHL);
-		uint16_t links = REG_HL(gb_);
+		uint16_t page = mem_.word(static_cast<uint16_t>(ADDR_CollectionLinkTable + wram_.collection_page() * 2));
+		uint16_t links = mem_.word(static_cast<uint16_t>(page + wram_.collection_cell() * 2));
 		if (mem_[links] == NO_LINK) {
 			advance_link_state();
 			break;
@@ -402,16 +393,9 @@ void TreasureCollection::animate()
 			continue;
 		}
 		// Func_9a9ec, then Func_9aa59
-		SET_BC(gb_, state);
-		gb_->cpu.h = gb_->cpu.b;
-		gb_->cpu.l = static_cast<uint8_t>(gb_->cpu.c & ~(1 << 1));
-		gb_->cpu.b = COLLECTION_BANK;
-		SET_DE(gb_, FRAMESETS[s - 1]);
-		routines_.call(ADDR_UpdateOWAnimation);
-		gb_->cpu.a = mem_[REG_BC(gb_)];
-		SET_DE(gb_, ADDR_OAM_9ac5d);
-		gb_->cpu.b = COLLECTION_BANK;
-		routines_.call(ADDR_LoadOWSpriteWithScroll);
+		auto duration = static_cast<uint16_t>(state & ~(1 << 1));
+		int frame = home::update_ow_animation(gb_, COLLECTION_BANK, duration, FRAMESETS[s - 1]);
+		home::load_ow_sprite_with_scroll(gb_, COLLECTION_BANK, ADDR_OAM_9ac5d, home::ow_anim_object(duration, frame));
 	}
 }
 

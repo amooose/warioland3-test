@@ -113,10 +113,7 @@ void LevelState::init()
 // the levels' common tiles to v0Tiles1, and the treasures
 void LevelState::load_common_gfx()
 {
-	SET_HL(gb_, ADDR_LevelsCommonGfx);
-	SET_DE(gb_, v0Tiles1);
-	SET_BC(gb_, ADDR_LevelsCommonGfxEnd - ADDR_LevelsCommonGfx);
-	routines_.call(ADDR_CopyHLToDE_BC);
+	home::copy(gb_, ADDR_LevelsCommonGfx, v0Tiles1, ADDR_LevelsCommonGfxEnd - ADDR_LevelsCommonGfx ? ADDR_LevelsCommonGfxEnd - ADDR_LevelsCommonGfx : 0x10000);
 	routines_.farcall(BANK_LoadLevelTreasureData, ADDR_LoadLevelTreasureData);
 }
 

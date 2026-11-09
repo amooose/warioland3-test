@@ -800,8 +800,7 @@ void MapFunctions::shake_steps()
 void MapFunctions::tile_update(uint16_t data)
 {
 	mem_[wOWPendingTileUpdate] = TRUE;
-	SET_HL(gb_, data);
-	routines_.farcall(BANK_Func_854ee, ADDR_Func_854ee);
+	routines_.in_bank(BANK_Func_854ee, ADDR_Func_854ee, [&] { Palettes(gb_).update_tiles(data); });
 }
 
 // WOWFunc_Rain: lightning flashes, the clouds rain and the pool fills

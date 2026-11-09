@@ -22,8 +22,7 @@ void Epilogue::unrealistic()
 
 void Epilogue::wario_state(uint8_t state)
 {
-	gb_->cpu.a = state;
-	routines_.call(ADDR_SetSceneWarioState);
+	SceneWario(gb_).set_state(state);
 }
 
 void Epilogue::set_state(uint16_t state, uint8_t value)
@@ -42,9 +41,7 @@ void Epilogue::decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vram1)
 	if (vram1)
 		mem_[rVBK] = 1;
 	wram_.temp_bank() = bank;
-	SET_HL(gb_, src);
-	SET_BC(gb_, dest);
-	routines_.farcall(bank, ADDR_Decompress);
+	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, src, dest); });
 	if (vram1)
 		mem_[rVBK] = 0;
 }
@@ -66,20 +63,13 @@ void Epilogue::init()
 	SceneCommon(gb_).clear_scene_ram();
 	SceneCommon(gb_).clear_scene_objs();
 	for (uint16_t pals : {wTempPals1, wTempPals2}) {
-		gb_->cpu.a = 0;
-		SET_HL(gb_, pals);
-		SET_BC(gb_, 8 * PAL_SIZE);
-		routines_.call(ADDR_WriteAToHL_BCTimes);
+		home::fill(gb_, pals, 0, 8 * PAL_SIZE);
 	}
 	decompress(BANK_EpilogueGfx, ADDR_EpilogueGfx, v0Tiles0, false);
 	decompress(BANK_FontGfx, ADDR_FontGfx, v1Tiles0, true);
 	mem_[rVBK] = 1;
 	routines_.copy_bc(v0Tiles1, wAttrmap, 0x50 * TILE_SIZE);
-	SET_HL(gb_, ADDR_EpilogueStarGfx);
-	SET_DE(gb_, v1Tiles1 + 0x40 * TILE_SIZE);
-	gb_->cpu.c = 0x00; // 0x100 bytes
-	gb_->cpu.b = BANK_EpilogueStarGfx;
-	routines_.call(ADDR_CopyFarBytes);
+	home::copy_far_bytes(gb_, BANK_EpilogueStarGfx, ADDR_EpilogueStarGfx, v1Tiles1 + 0x40 * TILE_SIZE, 0x00);
 	mem_[rVBK] = 0;
 	decompress(BANK_SpearheadGfx, ADDR_SpearheadGfx, v1Tiles0, true);
 	decompress(BANK_HammerBotGfx, ADDR_HammerBotGfx, v1Tiles0 + 0x40 * TILE_SIZE, true);

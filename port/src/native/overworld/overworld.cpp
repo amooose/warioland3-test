@@ -375,7 +375,7 @@ void Overworld::init_east_map_side()
 		wram_.unk_2d011() = 0x01;
 		wram_.day_night() = static_cast<uint8_t>((wram_.day_night() | 0x01) & ~0x80);
 	}
-	if (wram_.transition_param() == KEY_CARD_BLUE && call_z(ADDR_IsTreasureCollected, KEY_CARD_RED))
+	if (wram_.transition_param() == KEY_CARD_BLUE && !home::is_treasure_collected(gb_, KEY_CARD_RED))
 		set_stored_transition_param_as_return_to_map();
 	init_map_side_gfx(3);
 	load_east_maps();
@@ -574,11 +574,7 @@ void Overworld::finish_scene_map_side()
 
 void Overworld::copy_level_name_gfx(uint16_t dest)
 {
-	gb_->cpu.b = static_cast<uint8_t>(wram_.language() + 0x24); // the bank
-	gb_->cpu.c = 0x00; // $10 tiles
-	SET_HL(gb_, ADDR_LevelNamesNorthJPGfx + (7 * 0x20 * TILE_SIZE));
-	SET_DE(gb_, dest);
-	routines_.call(ADDR_CopyFarBytes);
+	home::copy_far_bytes(gb_, static_cast<uint8_t>(wram_.language() + 0x24), ADDR_LevelNamesNorthJPGfx + (7 * 0x20 * TILE_SIZE), dest, 0x00);
 }
 
 // ---------------------------------------------------------------------------
@@ -589,9 +585,7 @@ void Overworld::decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vram1
 	if (vram1)
 		set_vram1(true);
 	wram_.temp_bank() = bank;
-	SET_HL(gb_, src);
-	SET_BC(gb_, dest);
-	routines_.farcall(bank, ADDR_Decompress);
+	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, src, dest); });
 	if (vram1)
 		set_vram1(false);
 }
@@ -616,10 +610,7 @@ void Overworld::load_glow_gfx()
 
 void Overworld::clear_ow_wram()
 {
-	SET_HL(gb_, OW_WRAM);
-	SET_BC(gb_, OW_WRAM_SIZE);
-	gb_->cpu.a = 0;
-	routines_.call(ADDR_WriteAToHL_BCTimes);
+	home::fill(gb_, OW_WRAM, 0, OW_WRAM_SIZE);
 }
 
 void Overworld::set_stored_transition_param_as_return_to_map()
@@ -644,11 +635,9 @@ void Overworld::load_pals_for_scene()
 {
 	wram_.ow_exit_unlocked() = 0;
 	if (wram_.ow_scene_action() == UNLOCK_LEVEL) {
-		gb_->cpu.a = wram_.ow_scene_map_side();
-		gb_->cpu.c = mem_[wOWSceneMapSide + 1]; // wOWSceneActionParam
-		SET_HL(gb_, ADDR_UnlockableConnections);
-		routines_.call(ADDR_GetCthWordFromAthTable);
-		if (mem_[REG_HL(gb_)] >= OW_EXITS)
+		uint16_t side = mem_.word(static_cast<uint16_t>(ADDR_UnlockableConnections + wram_.ow_scene_map_side() * 2));
+		uint8_t action = mem_[wOWSceneMapSide + 1]; // wOWSceneActionParam
+		if (mem_[static_cast<uint16_t>(side + action * 2)] >= OW_EXITS)
 			wram_.ow_exit_unlocked() = TRUE;
 	}
 	routines_.in_bank(BANK__LoadPalsForOWScene, ADDR__LoadPalsForOWScene, [&] { load_map_side_pals(true); });
@@ -690,8 +679,7 @@ void Overworld::load_south_maps()
 		BANK_OverworldSouthAttrmap, ADDR_OverworldSouthAttrmap);
 	if (!Events(gb_).unlocked_before(EVENT_REVEAL_CASTLE))
 		return;
-	SET_HL(gb_, ADDR_Data_8561f);
-	routines_.farcall(BANK_Func_854ee, ADDR_Func_854ee);
+	routines_.in_bank(BANK_Func_854ee, ADDR_Func_854ee, [&] { Palettes(gb_).update_tiles(ADDR_Data_8561f); });
 }
 
 void Overworld::load_east_maps()

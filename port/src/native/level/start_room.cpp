@@ -680,28 +680,16 @@ void RoomStart::from_level_start()
 		routines_.farcall_ret(BANK_SetState_Idling, ADDR_SetState_Idling, SRL(0xd2));
 		set_be(wWarioPalsPtr, ADDR_WarioDefaultPal);
 		// CopyHLToDE_Short takes hl, de and b
-		SET_HL(gb_, ADDR_WarioDefaultPal);
-		SET_DE(gb_, wTempPals2);
-		cpu_.b = 2 * PAL_SIZE; // 2 palettes
-		routines_.farcall_ret(BANK_WarioDefaultPal, ADDR_CopyHLToDE_Short, SRL(0xf1));
+		routines_.in_bank(BANK_WarioDefaultPal, ADDR_CopyHLToDE_Short, [&] { home::copy_short(gb_, ADDR_WarioDefaultPal, wTempPals2, 2 * PAL_SIZE); });
 	} else {
 		// .asm_883a
-		SET_HL(gb_, be(wWarioPalsPtr));
-		SET_DE(gb_, wTempPals2);
-		cpu_.b = 2 * PAL_SIZE; // 2 palettes
-		routines_.farcall_ret(BANK_WarioDefaultPal, ADDR_CopyHLToDE_Short, SRL(0x10f));
+		routines_.in_bank(BANK_WarioDefaultPal, ADDR_CopyHLToDE_Short, [&] { home::copy_short(gb_, be(wWarioPalsPtr), wTempPals2, 2 * PAL_SIZE); });
 
-		SET_HL(gb_, wcaa1);
-		SET_DE(gb_, wTempPals2 + 4 * PAL_SIZE);
-		cpu_.b = 4 * PAL_SIZE; // 4 palettes
-		routines_.call_ret(ADDR_CopyHLToDE, SRL(0x11a));
+		home::copy(gb_, wcaa1, wTempPals2 + 4 * PAL_SIZE, 4 * PAL_SIZE);
 	}
 
 	// .asm_8861
-	SET_HL(gb_, ADDR_Pals_d1fe);
-	SET_DE(gb_, wTempPals2 + 2 * PAL_SIZE);
-	cpu_.b = 1 * PAL_SIZE; // 1 palette
-	routines_.farcall_ret(BANK_Pals_d1fe, ADDR_CopyHLToDE_Short, SRL(0x131));
+	routines_.in_bank(BANK_Pals_d1fe, ADDR_CopyHLToDE_Short, [&] { home::copy_short(gb_, ADDR_Pals_d1fe, wTempPals2 + 2 * PAL_SIZE, 1 * PAL_SIZE); });
 
 	routines_.call_ret(ADDR_SetInitialCameraScroll, SRL(0x134));
 	routines_.call_ret(ADDR_ApplyInitialCameraScroll, SRL(0x137));

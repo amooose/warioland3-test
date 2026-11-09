@@ -1,4 +1,5 @@
 // The level clear screens; see clear.hpp.
+#include "../home/ow.hpp"
 #include "../engine/font_counts.hpp"
 #include "clear.hpp"
 
@@ -197,9 +198,9 @@ void ClearScreen::count_music_boxes()
 	mem_[rWBK] = BANK_wTreasuresCollected;
 	uint8_t param = wram_.transition_param();
 	if (param != TRANSITION_RETURN_TO_MAP) {
-		gb_->cpu.a = param;
-		routines_.call(ADDR_IsTreasureCollected);
-		mem_[REG_HL(gb_)] |= gb_->cpu.d;
+		// its bit in wTreasuresCollected
+		uint16_t at = static_cast<uint16_t>(wTreasuresCollected + (param >> 3));
+		mem_[at] |= static_cast<uint8_t>(((param & 4) ? 0x10 : 1) << (param & 3));
 	}
 	uint8_t collected = wram_.treasures_collected();
 	uint8_t boxes = 0;
@@ -275,9 +276,7 @@ void ClearScreen::update_num_collected_treasures()
 	low = 0;
 	high = 0;
 	for (uint8_t treasure = NUM_TREASURES - 1; treasure; treasure--) {
-		gb_->cpu.a = treasure;
-		routines_.call(ADDR_IsTreasureCollected);
-		if (!gb_->cpu.a)
+		if (!home::is_treasure_collected(gb_, treasure))
 			continue;
 		bool carry = false;
 		low = add_daa(low, 1, carry);

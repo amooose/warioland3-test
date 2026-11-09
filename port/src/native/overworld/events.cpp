@@ -11,9 +11,7 @@ void Events::unrealistic()
 
 bool Events::collected(uint8_t treasure)
 {
-	gb_->cpu.a = treasure;
-	routines_.call(ADDR_IsTreasureCollected);
-	return !(gb_->cpu.f & FLAG_Z);
+	return home::is_treasure_collected(gb_, treasure);
 }
 
 // GetEventWithTreasure: the event (of EventTreasures' threes) with the

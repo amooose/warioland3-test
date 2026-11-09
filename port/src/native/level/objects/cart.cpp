@@ -1,6 +1,7 @@
 // The carts (cart.asm): platforms that roll off once Wario's on them,
 // carrying him, until they hit a wall. The variable ones only roll with
 // the truck wheel collected. See object.hpp.
+#include "../../home/ow.hpp"
 #include "../object.hpp"
 
 namespace wl3::level {
@@ -45,9 +46,7 @@ void Cart::variable()
 {
 	uint8_t wram_bank = mem_[rWBK];
 	mem_[rWBK] = 0x02;
-	gb_->cpu.a = TRUCK_WHEEL;
-	call_home(ADDR_IsTreasureCollected);
-	bool collected = !(gb_->cpu.f & FLAG_Z);
+	bool collected = home::is_treasure_collected(gb_, TRUCK_WHEEL);
 	mem_[rWBK] = wram_bank;
 	if (collected)
 		set_up(VARIABLE_WAITING, ADDR_Frameset_691bf);

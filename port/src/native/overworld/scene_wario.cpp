@@ -158,10 +158,13 @@ void SceneWario::update()
 		gb_->cpu.f = FLAG_Z | FLAG_H;
 		return;
 	}
-	SET_DE(gb_, mem_.word(wSceneWarioOAMPtr));
-	gb_->cpu.b = mem_[wSceneWarioOAMBank];
-	SET_HL(gb_, wSceneWario);
-	routines_.call(mem_[wSceneWarioIgnoreScroll] ? ADDR_LoadOWSprite : ADDR_LoadOWSpriteWithScroll);
+	bool scroll = !mem_[wSceneWarioIgnoreScroll];
+	uint8_t oam_bank = mem_[wSceneWarioOAMBank];
+	uint16_t oam = mem_.word(wSceneWarioOAMPtr);
+	if (scroll)
+		home::load_ow_sprite_with_scroll(gb_, oam_bank, oam, wSceneWario);
+	else
+		home::load_ow_sprite(gb_, oam_bank, oam, wSceneWario);
 }
 
 // UpdateSceneWario.DoAnimation: a frame of the state's animation, on to

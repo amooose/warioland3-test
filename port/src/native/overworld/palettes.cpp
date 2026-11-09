@@ -686,10 +686,7 @@ void Palettes::prologue_fade()
 		routines_.copy(wTempPals2, wTempOBPals, 8 * PAL_SIZE);
 	};
 	auto zero = [this](uint16_t dest, uint16_t count) { // WriteAToHL_BCTimes
-		gb_->cpu.a = 0;
-		SET_HL(gb_, dest);
-		SET_BC(gb_, count);
-		routines_.call(ADDR_WriteAToHL_BCTimes);
+		home::fill(gb_, dest, 0, count ? count : 0x10000);
 	};
 	switch (mem_[w2d880]) {
 	case 0: // .zero: to black
@@ -717,11 +714,7 @@ void Palettes::prologue_fade()
 		break;
 	case 4: // .four
 		from_current();
-		SET_HL(gb_, ADDR_Pals_db000);
-		SET_DE(gb_, wTempPals1);
-		gb_->cpu.c = 8 * PAL_SIZE;
-		gb_->cpu.b = BANK_Pals_db000;
-		routines_.call(ADDR_CopyFarBytes);
+		home::copy_far_bytes(gb_, BANK_Pals_db000, ADDR_Pals_db000, wTempPals1, 8 * PAL_SIZE);
 		home::copy_far_bytes(gb_, BANK_Pals_db040, ADDR_Pals_db040, wTempPals2 + 3 * PAL_SIZE, 5 * PAL_SIZE);
 		break;
 	case 5: // .five

@@ -20,8 +20,7 @@ void GolfBuilding::unrealistic()
 
 void GolfBuilding::wario_state(uint8_t state)
 {
-	gb_->cpu.a = state;
-	routines_.call(ADDR_SetSceneWarioState);
+	SceneWario(gb_).set_state(state);
 }
 
 // ApplySceneWarioMovementLeft / Right: Wario's x after the step
@@ -48,11 +47,7 @@ void GolfBuilding::init()
 	SceneCommon(gb_).clear_scene_ram();
 	SceneCommon(gb_).clear_scene_objs();
 	fill_bg_pals();
-	SET_HL(gb_, ADDR_Pals_84900);
-	SET_DE(gb_, wTempPals2);
-	gb_->cpu.b = BANK_Pals_84900;
-	gb_->cpu.c = 8 * PAL_SIZE;
-	routines_.call(ADDR_CopyFarBytes);
+	home::copy_far_bytes(gb_, BANK_Pals_84900, ADDR_Pals_84900, wTempPals2, 8 * PAL_SIZE);
 	home::load_far_tiles(gb_, BANK_PrologueBackgroundGfx, ADDR_PrologueBackgroundGfx);
 	decompress(BANK_GolfBuildingAttrmap, ADDR_GolfBuildingAttrmap, v1BGMap0, true);
 	decompress(BANK_GolfBuildingTilemap, ADDR_GolfBuildingTilemap, v0BGMap0, false);
@@ -68,9 +63,7 @@ void GolfBuilding::decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vr
 	if (vram1)
 		mem_[rVBK] = 1;
 	wram_.temp_bank() = bank;
-	SET_HL(gb_, src);
-	SET_BC(gb_, dest);
-	routines_.farcall(bank, ADDR_Decompress);
+	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, src, dest); });
 	if (vram1)
 		mem_[rVBK] = 0;
 }

@@ -64,6 +64,6 @@ public:
 
 using wl3::overworld::OverworldBank27;
 
-PORT_EX(PrologueFunc, 0, 0) { OverworldBank27(gb).port_PrologueFunc(); }
+PORT_EX(PrologueFunc, 0, ALL_REGISTERS) { OverworldBank27(gb).port_PrologueFunc(); }
 PORT_EX(VBlank_Cutscene, 0, 0) { OverworldBank27(gb).port_VBlank_Cutscene(); }
 PORT_LOCAL_EX(VBlank_Cutscene, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { OverworldBank27(gb).vblank_func(); }

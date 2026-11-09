@@ -141,15 +141,11 @@ void SceneSprites::run(const void *machine_ptr, uint16_t state_addr)
 	}
 	const ObjAnim &anim = machine.anims[state];
 	// Func_ac000 and the like: the animation (hl the object's duration)
-	SET_HL(gb_, static_cast<uint16_t>(state_addr & ~(1 << 1)));
-	gb_->cpu.b = anim.anim_bank;
-	SET_DE(gb_, anim.frameset);
-	routines_.call(ADDR_UpdateOWAnimation);
-	SET_BC(gb_, state_addr);
-	gb_->cpu.a = mem_[state_addr];
+	auto anim_duration = static_cast<uint16_t>(state_addr & ~(1 << 1));
+	int anim_frame = home::update_ow_animation(gb_, anim.anim_bank, anim_duration, anim.frameset);
 	// as the asm finds them: the object by UpdateOWAnimation's hl, its
 	// counter by inc c
-	uint16_t obj = REG_HL(gb_);
+	uint16_t obj = home::ow_anim_object(anim_duration, anim_frame);
 	uint16_t unk7_addr = static_cast<uint16_t>((state_addr & 0xff00) | static_cast<uint8_t>(state_addr + 1));
 
 	Byte unk7 = mem_[unk7_addr];
@@ -191,9 +187,10 @@ void SceneSprites::run(const void *machine_ptr, uint16_t state_addr)
 		return;
 	}
 	// the sprite (hl still the object, from UpdateOWAnimation)
-	SET_DE(gb_, anim.oam);
-	gb_->cpu.b = anim.oam_bank;
-	routines_.call(anim.scroll ? ADDR_LoadOWSpriteWithScroll : ADDR_LoadOWSprite);
+	if (anim.scroll)
+		home::load_ow_sprite_with_scroll(gb_, anim.oam_bank, anim.oam, obj);
+	else
+		home::load_ow_sprite(gb_, anim.oam_bank, anim.oam, obj);
 	if (mem_[wOWAnimationFinished] == 0xff) {
 		if (anim.special == Special::SFX_0F3_AT_END)
 			play_sfx(mem_, SFX_0F3);

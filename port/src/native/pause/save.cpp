@@ -157,10 +157,7 @@ void SaveScreen::save_level_data(uint16_t dest)
 	dest = copy_treasures(dest);
 	uint8_t wram_bank = mem_[rWBK];
 	mem_[rWBK] = LEVEL_OBJECTS_WRAM_BANK;
-	SET_HL(gb_, LEVEL_OBJECTS_WRAM);
-	SET_DE(gb_, dest);
-	SET_BC(gb_, LEVEL_OBJECTS_WRAM_SIZE);
-	routines_.call(ADDR_CopyHLToDE_BC);
+	home::copy(gb_, LEVEL_OBJECTS_WRAM, dest, LEVEL_OBJECTS_WRAM_SIZE);
 	mem_[rWBK] = wram_bank;
 }
 

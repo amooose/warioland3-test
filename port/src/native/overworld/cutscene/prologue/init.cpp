@@ -1,6 +1,7 @@
 // overworld/cutscene/prologue/init (src/engine/overworld/cutscene/prologue/init.asm)
 // as plain C++. InitPrologue farcalls it from the cutscene's init table
 // (C++), which reads no register after.
+#include "../../overworld.hpp"
 #include "../../../home/memory.hpp"
 #include "../../../home/ow.hpp"
 #include "../../../native.hpp"
@@ -61,8 +62,7 @@ void init_prologue(GB *gb)
 	mem[wSceneWarioYCoord + 0] = 96; // y
 	mem[wSceneWarioYCoord + 1] = 96; // x
 	mem[wSceneWarioStateGroup] = SCENEWARIO_GROUP_NONE;
-	gb->cpu.a = SCENEWARIO_NONE;
-	routines.call(ADDR_SetSceneWarioState);
+	overworld::SceneWario(gb).set_state(SCENEWARIO_NONE);
 
 	mem[wLCDCFlagsToFlip] = LCDC_BG_MAP;
 }

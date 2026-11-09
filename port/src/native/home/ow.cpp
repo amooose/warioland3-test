@@ -131,6 +131,12 @@ void play_overworld_music(GB *gb)
 	mem[hMusicIDBackup + 1] = mem[hMusicID + 1] = static_cast<uint8_t>(music);
 }
 
+uint16_t ow_anim_object(uint16_t duration, int frame)
+{
+	uint16_t hl = frame < 0 ? static_cast<uint16_t>(duration + 1) : ow_frame_addr(duration);
+	return static_cast<uint16_t>(hl & 0xfff8);
+}
+
 } // namespace wl3::home
 
 using namespace wl3::home;

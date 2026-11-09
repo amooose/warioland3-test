@@ -47,10 +47,7 @@ void BestTimes::init()
 	wram_.scy() = scy;
 	mem_[rWBK] = 2;
 	routines_.copy(VBLANK_FUNC, wVBlankFunc, VBLANK_FUNC_SIZE);
-	gb_->cpu.a = 0;
-	SET_HL(gb_, wCollectionRow);
-	SET_BC(gb_, SCREEN_WRAM_SIZE);
-	routines_.call(ADDR_WriteAToHL_BCTimes);
+	home::fill(gb_, wCollectionRow, 0, SCREEN_WRAM_SIZE);
 	routines_.load_pals_to_temp_pals1(ADDR_Pals_158b63);
 
 	decompress(BANK_BestTimeListGfx, ADDR_BestTimeListGfx, v0Tiles1 + 0x20 * TILE_SIZE);
@@ -68,9 +65,7 @@ void BestTimes::init()
 void BestTimes::decompress(uint8_t bank, uint16_t src, uint16_t dest)
 {
 	wram_.temp_bank() = bank;
-	SET_HL(gb_, src);
-	SET_BC(gb_, dest);
-	routines_.farcall(bank, ADDR_Decompress);
+	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, src, dest); });
 }
 
 // PrintBestTimes: each level's, as mm:ss

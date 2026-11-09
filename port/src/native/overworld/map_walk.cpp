@@ -705,10 +705,7 @@ void MapWalk::draw_wario()
 {
 	if (!wram_.unk_2d106())
 		return;
-	SET_DE(gb_, mem_.word(w2d109));
-	SET_HL(gb_, w2d104);
-	gb_->cpu.b = OW_ANIMATION_BANK;
-	routines_.call(ADDR_UpdateOWAnimation);
+	home::update_ow_animation(gb_, OW_ANIMATION_BANK, w2d104, mem_.word(w2d109));
 	home::load_ow_sprite_with_scroll(gb_, OW_ANIMATION_BANK, mem_.word(w2d107), w2d100);
 }
 
