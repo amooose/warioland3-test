@@ -103,9 +103,7 @@ void SceneInit::north(uint8_t param, uint8_t c)
 			place(wSceneObj10, {0x40, 0x80, 0x03});
 		return;
 	case NOWFUNC_GARLIC: // Func_b409c
-		gb_->cpu.a = GREEN_MUSIC_BOX;
-		routines_.call(ADDR_IsTreasureCollected);
-		if (!(gb_->cpu.f & FLAG_Z))
+		if (home::is_treasure_collected(gb_, GREEN_MUSIC_BOX))
 			return;
 		if (!wram_.cur_event() && !wram_.next_map_side()
 			&& wram_.map_side_level_id() == OWNORTH_SEA_TURTLE_ROCKS)

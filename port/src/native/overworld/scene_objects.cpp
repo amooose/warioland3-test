@@ -304,10 +304,10 @@ void SceneObjects::run_state(uint8_t side, uint16_t state, uint8_t s)
 			return;
 		}
 		// LoadCurSceneObjSprite(WithScroll)
-		SET_HL(gb_, wram_.cur_scene_obj_ptr().word());
-		SET_DE(gb_, anim.oam);
-		gb_->cpu.b = OW_OBJ_BANK;
-		routines_.call(anim.scroll ? ADDR_LoadOWSpriteWithScroll : ADDR_LoadOWSprite);
+		if (anim.scroll)
+			home::load_ow_sprite_with_scroll(gb_, OW_OBJ_BANK, anim.oam, wram_.cur_scene_obj_ptr().word());
+		else
+			home::load_ow_sprite(gb_, OW_OBJ_BANK, anim.oam, wram_.cur_scene_obj_ptr().word());
 		after(static_cast<uint8_t>(anim.special));
 		return;
 	}

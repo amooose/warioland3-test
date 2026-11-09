@@ -231,8 +231,7 @@ void Particles::load_sprite(uint16_t oam)
 	mem_[wCurSpriteXCoord] = static_cast<uint8_t>(mem_[wCurParticleXCoord] + OAM_X_OFS - mem_[scx]);
 	mem_[wCurSpriteFrame] = mem_[wCurParticleFrame];
 	mem_[wCurSpriteAttributes] = mem_[wCurParticleAttributes];
-	SET_HL(gb_, oam);
-	routines_.call(ADDR_LoadSprite);
+	home::load_sprite(gb_, oam);
 }
 
 constexpr ParticleFunc DEBRIS{Pre::ALWAYS, Init::IN_PLACE, ADDR_ParticleAnim_Debris, End::ANIM, SFX_BLOCK_BREAK};

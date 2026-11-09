@@ -935,10 +935,10 @@ public:
 			port_SetState_BatFalling();
 			return;
 		}
-		// de = the jump velocity index
-		cpu_.d = 0x00;
-		cpu_.e = index;
-		FARCALL(Func_1f863);
+		// Func_1f863: up by the table's entry at the jump velocity index
+		routines_.in_bank(BANK_Func_1f863, ADDR_Func_1f863, [&] {
+			home::move_wario_y(gb_, -rd8(static_cast<uint16_t>(ADDR_SwimStraightVelTable + index)));
+		});
 	}
 
 	void port_Func_2b34e()

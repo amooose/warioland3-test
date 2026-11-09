@@ -13,6 +13,7 @@
 // two are set where the asm sets them, and after a check the CPU holds the
 // registers of its last ProcessBlock, as in the asm.
 #include "collisions.hpp"
+#include "../home/wario.hpp"
 
 #include "../flags.hpp"
 #include "../routines.hpp"
@@ -200,9 +201,7 @@ uint8_t Collisions::slide_under()
 					return r;
 			uint8_t pad = mem_[wJoypadDown];
 			bool right = (pad & PAD_RIGHT) || (!(pad & PAD_LEFT) && mem_[wDirection]);
-			// register-level callees: b is MoveWario*'s argument
-			cpu_.b = 2;
-			routines_.call(right ? ADDR_MoveWarioRight : ADDR_MoveWarioLeft);
+			home::move_wario_x(gb_, right ? 2 : -2);
 			routines_.farcall(BANK_CrouchOrSlide, ADDR_CrouchOrSlide);
 		}
 	}

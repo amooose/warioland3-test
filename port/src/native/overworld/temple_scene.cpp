@@ -12,8 +12,7 @@ void TempleScene::unrealistic()
 
 void TempleScene::wario_state(uint8_t state)
 {
-	gb_->cpu.a = state;
-	routines_.call(ADDR_SetSceneWarioState);
+	SceneWario(gb_).set_state(state);
 }
 
 void TempleScene::set_state(uint16_t state, uint8_t value)
@@ -65,10 +64,8 @@ void TempleScene::init()
 	mem_[rVBK] = 0;
 	SceneCommon(gb_).fill_cleared_text_buffer();
 
-	gb_->cpu.a = GOLD_MUSIC_BOX;
-	routines_.call(ADDR_IsTreasureCollected);
 	bool reveal = false;
-	if (!(gb_->cpu.f & FLAG_Z)) {
+	if (home::is_treasure_collected(gb_, GOLD_MUSIC_BOX)) {
 		uint8_t flags = wram_.game_mode_flags();
 		reveal = !(flags & (1 << MODE_GAME_CLEARED_F)) || (flags & (1 << MODE_TIME_ATTACK_F));
 	}

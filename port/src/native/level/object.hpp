@@ -25,6 +25,7 @@
 #include "../home/floor_transition.hpp"
 #include "../home/sprites.hpp"
 #include "../home/system.hpp"
+#include "../home/wario.hpp"
 #include <initializer_list>
 
 namespace wl3::level {
@@ -204,8 +205,7 @@ protected:
 	// DoGroundShake: the ground shakes for `frames` (b), unless it already does
 	void ground_shake(uint8_t frames)
 	{
-		gb_->cpu.b = frames;
-		routines_.call(ADDR_DoGroundShake);
+		home::do_ground_shake(gb_, frames);
 	}
 	// a home routine that takes bc
 	void call_bc(uint16_t routine, uint16_t bc)

@@ -725,8 +725,7 @@ public:
 		if (!(rd8(wCurObjFlags) & (1 << OBJFLAG_STEPPED_F)))
 			return;
 		wr8(wCurObjFlags, rd8(wCurObjFlags) & ~(1 << OBJFLAG_STEPPED_F));
-		cpu_.b = v;
-		CALL(MoveWarioDown);
+		home::move_wario_y(gb_, static_cast<uint8_t>(v));
 		FARCALL(Func_19720);
 	}
 

@@ -653,9 +653,7 @@ void Scenes::highlight_level()
 		if (event == EVENT_GOLD_MUSIC_BOX) {
 			wram_.ow_scene_action_param() = 0x07;
 		} else if (event == EVENT_SUPER_GRAB_GLOVES && side == EAST && param == 0x07) {
-			gb_->cpu.a = MYSTERY_HANDLE;
-			routines_.call(ADDR_IsTreasureCollected);
-			if (gb_->cpu.f & FLAG_Z) { // not collected: nothing to show
+			if (!home::is_treasure_collected(gb_, MYSTERY_HANDLE)) { // nothing to show
 				finish_action();
 				return;
 			}
