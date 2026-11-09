@@ -1,6 +1,7 @@
 // The treasure collection (bank26.asm): pages of treasures, the ones found
 // in their colours, a cursor, and links between treasures that go together.
 // See overworld.hpp.
+#include "../home/ow.hpp"
 #include "../engine/font_counts.hpp"
 #include "overworld.hpp"
 #include "../home/system.hpp"
@@ -184,9 +185,7 @@ void TreasureCollection::apply_page_pals()
 
 bool TreasureCollection::routines_treasure_collected(uint8_t treasure)
 {
-	gb_->cpu.a = treasure;
-	routines_.call(ADDR_IsTreasureCollected);
-	return !(gb_->cpu.f & FLAG_Z);
+	return home::is_treasure_collected(gb_, treasure);
 }
 
 // a cell's row and column, at dest and dest + 1 (stepping in its page)

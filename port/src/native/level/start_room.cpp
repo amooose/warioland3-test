@@ -582,8 +582,7 @@ void RoomStart::from_transition()
 	mem_[wUnused_ca6c] = static_cast<uint8_t>(mem_[wWarioXPos + 0] | (y_hi << 4 | y_hi >> 4));
 
 	// the next room's ID from Wario's position
-	SET_HL(gb_, wWarioPos);
-	routines_.call(ADDR_GetNextLevelRoomID);
+	mem_[wLevelRoomID] = static_cast<uint8_t>(mem_[wWarioPos + 2] + 10 * mem_[wWarioPos]); // GetNextLevelRoomID
 
 	clear({wFloorTransitionDir, wFloorTransitionTimer, wCameraYDelta, wCameraXDelta, wScrollUpEdge,
 		wScrollDownEdge, wGroundShakeCounter, wSCYShake});

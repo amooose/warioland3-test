@@ -14,6 +14,7 @@
 // registers of its last ProcessBlock, as in the asm.
 #include "collisions.hpp"
 #include "../home/wario.hpp"
+#include "../home/level_map.hpp"
 
 #include "../flags.hpp"
 #include "../routines.hpp"
@@ -103,8 +104,7 @@ uint8_t Collisions::process_block()
 
 uint8_t Collisions::block(uint8_t points)
 {
-	SET_HL(gb_, hPos);
-	routines_.call(ADDR_GetBlockPtr);
+	home::block_ptr(gb_, hPos);
 	mem_[wCollisionPoints] = points;
 	return process_block();
 }

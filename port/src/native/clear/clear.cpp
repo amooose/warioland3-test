@@ -1,4 +1,5 @@
 // The level clear screens; see clear.hpp.
+#include "../pause/pause.hpp"
 #include "../home/ow.hpp"
 #include "../engine/font_counts.hpp"
 #include "clear.hpp"
@@ -491,8 +492,8 @@ void ClearScreen::init_musical_coins()
 	MenuObject box = object(wMenuObj3);
 	box.init(0x38, 0x40, ADDR_Frameset_1f1cd4);
 	box.animate(PAUSE_OBJECTS_BANK);
-	SET_HL(gb_, wMenuObj3);
-	routines_.farcall(BANK_LoadPauseMenuSprite, ADDR_LoadPauseMenuSprite);
+	routines_.in_bank(BANK_LoadPauseMenuSprite, ADDR_LoadPauseMenuSprite,
+		[&] { pause::PauseMenu(gb_).draw(object(wMenuObj3)); });
 
 	wram_.animated_tiles_frame_duration() = 8;
 	wram_.animated_tiles_gfx() = ANIMATED_TILES_GFX_15;
@@ -508,8 +509,8 @@ void ClearScreen::init_musical_coins()
 void ClearScreen::update_coin_box()
 {
 	object(wMenuObj3).animate(PAUSE_OBJECTS_BANK);
-	SET_HL(gb_, wMenuObj3);
-	routines_.farcall(BANK_LoadPauseMenuSprite, ADDR_LoadPauseMenuSprite);
+	routines_.in_bank(BANK_LoadPauseMenuSprite, ADDR_LoadPauseMenuSprite,
+		[&] { pause::PauseMenu(gb_).draw(object(wMenuObj3)); });
 	routines_.clear_unused_virtual_oam();
 }
 
