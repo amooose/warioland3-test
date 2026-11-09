@@ -288,8 +288,7 @@ public:
 		collision_box(-1, -27, -9, 9);
 		if (ld_and(wWarioStateCounter))
 			return;
-		SET_HL(gb_, ADDR_WarioOnFirePal);
-		CALL(SetWarioPal);
+		home::set_wario_pal(gb_, ADDR_WarioOnFirePal);
 		load_gfx(BANK_WarioHotGfx, ADDR_WarioHotGfx);
 		set_oam(BANK_OAM_1673c, ADDR_OAM_1673c);
 		xor_a();
@@ -452,8 +451,7 @@ public:
 		touch_states(TOUCH_VANISH, 0x01);
 		home::update_level_music(gb_);
 		reset_anim();
-		SET_HL(gb_, ADDR_WarioElectricPal);
-		CALL(SetWarioPal);
+		home::set_wario_pal(gb_, ADDR_WarioElectricPal);
 		load_gfx(BANK_WarioElectricGfx, ADDR_WarioElectricGfx);
 		set_oam(BANK_OAM_1790e, ADDR_OAM_1790e);
 		frameset_by_dir(ADDR_Frameset_17b79, ADDR_Frameset_17b76);
@@ -703,8 +701,7 @@ public:
 		wr8(wAutoMoveState, 0x01);
 		if (rd8(wJumpVelTable))
 			wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
-		SET_HL(gb_, ADDR_WarioDefaultPal);
-		CALL(SetWarioPal);
+		home::set_wario_pal(gb_, ADDR_WarioDefaultPal);
 		load_gfx(BANK_WarioIdleGfx, ADDR_WarioIdleGfx);
 		set_oam(BANK_OAM_14000, ADDR_OAM_14000);
 		// out of the treasure, facing it
@@ -1702,8 +1699,7 @@ public:
 		collision_box(-1, -27, -9, 9);
 		wr8(wFrameDuration, 0);
 		wr8(wAnimationFrame, 0);
-		SET_HL(gb_, ADDR_WarioStringPal);
-		CALL(SetWarioPal);
+		home::set_wario_pal(gb_, ADDR_WarioStringPal);
 		load_gfx(BANK_WarioStringGfx, ADDR_WarioStringGfx);
 		set_oam(BANK_OAM_171c0, ADDR_OAM_171c0);
 		set_frameset(ADDR_Frameset_17414);

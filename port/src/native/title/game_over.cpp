@@ -49,8 +49,7 @@ void GameOver::init()
 	w.var() = 0;
 	wram_.sfx_timer() = 0;
 	w.animate(BANK_Frameset_aaccb);
-	SET_HL(gb_, wGameOverWario);
-	routines_.call(ADDR_LoadGameOverSprite);
+	home::load_game_over_sprite(gb_, wGameOverWario);
 
 	MenuObject text = object(wMenuObj1);
 	text.init(0x18, 0x18, ADDR_Frameset_dbbf5);
@@ -121,8 +120,7 @@ bool GameOver::update_sprites(uint8_t bank, bool snore)
 	w.animation_ended() = ended;
 	if (snore && ended)
 		play_sfx(mem_, SFX_SNORE);
-	SET_HL(gb_, wGameOverWario);
-	routines_.call(ADDR_LoadGameOverSprite);
+	home::load_game_over_sprite(gb_, wGameOverWario);
 	MenuObject text = object(wMenuObj1);
 	text.animate();
 	text.load_sprite(ADDR_OAM_dbbd2);

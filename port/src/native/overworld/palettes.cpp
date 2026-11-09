@@ -651,11 +651,7 @@ void Palettes::load_grey()
 	uint8_t side = wram_.cur_map_side();
 	uint16_t entry = static_cast<uint16_t>(ADDR_Data_84e39 + static_cast<uint8_t>(side * 2));
 	if (side == EAST) { // .GetEastMapNoIcePalette
-		auto collected = [this](uint8_t treasure) {
-			gb_->cpu.a = treasure;
-			routines_.call(ADDR_IsTreasureCollected);
-			return !(gb_->cpu.f & FLAG_Z);
-		};
+		auto collected = [this](uint8_t treasure) { return home::is_treasure_collected(gb_, treasure); };
 		if (!collected(BLUE_BOOK) || !collected(MAGIC_WAND))
 			entry += 2;
 	}

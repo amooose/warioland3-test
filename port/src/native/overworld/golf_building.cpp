@@ -123,8 +123,7 @@ void GolfBuilding::fill_bg_pals()
 		{CRAYON_PINK_F, PINK, 1},
 	};
 
-	SET_HL(gb_, ADDR_Pals_addc9);
-	routines_.call(ADDR_LoadPalsToTempPals1);
+	home::load_pals_to_temp_pals1(gb_, ADDR_Pals_addc9);
 	routines_.copy(wTempPals1, wTempBGPals, 8 * PAL_SIZE);
 	for (const Crayon &crayon : CRAYONS) {
 		if (!(wram_.crayon_flags() & (1 << crayon.bit)))

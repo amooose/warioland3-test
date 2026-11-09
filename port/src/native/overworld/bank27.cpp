@@ -24,10 +24,7 @@ public:
 	// called by register-level code too (cutscene/init.cpp)
 	void port_VBlank_Cutscene()
 	{
-		SET_HL(gb_, ADDR_VBlank_Cutscene + 0x0c); // .Func
-		SET_DE(gb_, wVBlankFunc);
-		cpu_.b = 0x51; // .end - .Func
-		CALL(CopyHLToDE);
+		home::copy(gb_, ADDR_VBlank_Cutscene + 0x0c, wVBlankFunc, 0x51); // .Func, .end - .Func
 	}
 
 	// VBlank_Cutscene.Func, as copied to wVBlankFunc (see ram_code.c): the
@@ -65,5 +62,5 @@ public:
 using wl3::overworld::OverworldBank27;
 
 PORT_EX(PrologueFunc, 0, ALL_REGISTERS) { OverworldBank27(gb).port_PrologueFunc(); }
-PORT_EX(VBlank_Cutscene, 0, 0) { OverworldBank27(gb).port_VBlank_Cutscene(); }
+PORT_EX(VBlank_Cutscene, 0, ALL_REGISTERS) { OverworldBank27(gb).port_VBlank_Cutscene(); }
 PORT_LOCAL_EX(VBlank_Cutscene, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { OverworldBank27(gb).vblank_func(); }

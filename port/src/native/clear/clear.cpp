@@ -292,10 +292,7 @@ void ClearScreen::load_gfx()
 	mem_[rVBK] = 0;
 	routines_.decompress(ADDR_ClearScreen1Gfx, v0Tiles1);
 	wram_.temp_bank() = BANK_WarioClearGfx;
-	SET_HL(gb_, ADDR_WarioClearGfx);
-	SET_DE(gb_, v0Tiles0);
-	SET_BC(gb_, 0x80 * TILE_SIZE);
-	routines_.call(ADDR_FarCopyHLToDE_BC);
+	routines_.far_copy(ADDR_WarioClearGfx, v0Tiles0, 0x80 * TILE_SIZE);
 }
 
 // the power-up, Wario, the treasure and the music boxes

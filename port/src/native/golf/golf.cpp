@@ -532,9 +532,7 @@ void Golf::draw_course_menu()
 	// (in the ROM bank load_course left in wTempBank)
 	uint16_t tilemap = wram_.has_all_musical_coin_flags() ? ADDR_GolfBuildingCoursesUnlockedTilemap :
 		ADDR_GolfBuildingCoursesLockedTilemap;
-	SET_HL(gb_, tilemap);
-	SET_BC(gb_, v0BGMap0);
-	routines_.call(ADDR_FarDecompress);
+	home::far_decompress(gb_, tilemap, v0BGMap0);
 
 	// Each score is a sign (none for 0) and two big digits, 2 tiles high,
 	// in a row starting at (2, 13). Only the low byte of the position

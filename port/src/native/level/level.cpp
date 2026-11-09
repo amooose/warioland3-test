@@ -286,12 +286,9 @@ PORT(SetTileQueueProcessingFunctions) { LevelState(gb).set_tile_queue_functions(
 
 // copies .Func (jp LevelVBlankFunc) to wVBlankFunc, with CopyHLToDE's
 // registers
-PORT(VBlank_Level)
+PORT_EX(VBlank_Level, 0, ALL_REGISTERS)
 {
-	SET_HL(gb, ADDR_VBlank_Level + 0x0c); // .Func
-	SET_DE(gb, wVBlankFunc);
-	gb->cpu.b = 0x03; // .end - .Func
-	wl3::Routines(gb).call(ADDR_CopyHLToDE);
+	wl3::home::copy(gb, ADDR_VBlank_Level + 0x0c, wVBlankFunc, 0x03); // .Func, .end - .Func
 }
 
 // The routines implemented inside this module (they have no hooks).

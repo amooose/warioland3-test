@@ -320,9 +320,7 @@ void Cutscenes::draw_func_9f3ee()
 // InitCutscene27, Func_9d64b
 void Cutscenes::init_cart_wheels()
 {
-	gb_->cpu.b = BANK_LevelMainTiles14;
-	SET_HL(gb_, ADDR_LevelMainTiles14);
-	routines_.call(ADDR_LoadFarTiles);
+	home::load_far_tiles(gb_, BANK_LevelMainTiles14, ADDR_LevelMainTiles14);
 	mem_[rVBK] = 1;
 	home::load_far_tiles(gb_, BANK_SpecialTiles1, ADDR_SpecialTiles1);
 	mem_[rVBK] = 0;

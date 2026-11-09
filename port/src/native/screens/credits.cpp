@@ -121,8 +121,7 @@ void Credits::animate_music_box()
 
 void Credits::draw_music_box()
 {
-	SET_HL(gb_, wCreditsMusicBox);
-	routines_.call(ADDR_LoadCreditsMusicBoxSprite);
+	home::load_credits_music_box_sprite(gb_, wCreditsMusicBox);
 }
 
 // The names scroll up a pixel a frame (every other frame but on the first
