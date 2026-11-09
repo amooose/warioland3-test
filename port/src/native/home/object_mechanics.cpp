@@ -623,8 +623,8 @@ PORT_EX(ObjState_BumpLeft, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Ob
 PORT_EX(ObjState_BumpRight, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_ObjState_BumpRight(); }
 PORT_EX(Func_33f8, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_33f8(); }
 PORT_EX(Func_3407, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3407(); }
-PORT_EX(CreateObjectAtRelativePos, 0, 0) { HomeObjectMechanics(gb).port_CreateObjectAtRelativePos(); }
-PORT_EX(CreateObjectFromCurObjPos, 0, 0) { HomeObjectMechanics(gb).port_CreateObjectFromCurObjPos(); }
+PORT_EX(CreateObjectAtRelativePos, 0, ALL_REGISTERS) { HomeObjectMechanics(gb).port_CreateObjectAtRelativePos(); }
+PORT_EX(CreateObjectFromCurObjPos, 0, ALL_REGISTERS) { HomeObjectMechanics(gb).port_CreateObjectFromCurObjPos(); }
 PORT_EX(Func_3444, 0, ALL_REGISTERS & ~R_E) { HomeObjectMechanics(gb).port_Func_3444(); }
 PORT_EX(CountActiveTransientObjects, 0, 0) { HomeObjectMechanics(gb).port_CountActiveTransientObjects(); }
 // The movement wrappers homecall update_objects.cpp's plain movement code,

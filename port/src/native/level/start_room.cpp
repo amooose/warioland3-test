@@ -9,6 +9,7 @@
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
+#include "object.hpp"
 #include "../home/object_pos.hpp"
 #include "../home/floor_transition.hpp"
 #include "../home/level_map.hpp"
@@ -156,13 +157,11 @@ void RoomStart::spawn_if_in_range(uint8_t index, home::ObjMapBlock block)
 	if (static_cast<uint8_t>(mem_[wc0c4] - sub - 1) < block.row || static_cast<uint8_t>(mem_[wc0c5] - sub) > block.row)
 		return;
 
-	// .spawn: SpawnObject takes the index in c, the block in de
+	// .spawn
 	home::obj_map_block_to_hpos(gb_, block);
-	cpu_.c = index;
-	cpu_.d = block.row;
-	cpu_.e = home::level_col(block.col, block.parity);
+	uint16_t at = static_cast<uint16_t>(block.row << 8 | home::level_col(block.col, block.parity));
 	push_wram(BANK_wObjects); // BANK("Level Objects WRAM")
-	routines_.farcall(BANK_SpawnObject, ADDR_SpawnObject);
+	routines_.in_bank(BANK_SpawnObject, ADDR_SpawnObject, [&] { spawn_object(gb_, index, at); });
 	pop_wram();
 }
 

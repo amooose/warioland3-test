@@ -1,10 +1,10 @@
 // Spawning the objects of the row or column that scrolled into view
 // (src/engine/level/spawn_edge.asm). Plain C++ over memory: the edge
 // drawing (scroll.cpp) farcalls them and reads no registers after, so the
-// hooks clobber them all. SpawnObject still takes c (the object's entry)
-// and de (its block).
+// hooks clobber them all.
 #include "../native.hpp"
 #include "../routines.hpp"
+#include "object.hpp"
 #include "../home/level_map.hpp"
 #include "../home/object_pos.hpp"
 
@@ -60,9 +60,7 @@ void EdgeSpawner::spawn_block_object(uint16_t block)
 	home::level_block_to_hpos(gb_, h, l); // Func_d3e
 	uint8_t wbk = mem_[rWBK]; // push_wram BANK("Level Objects WRAM")
 	mem_[rWBK] = BANK_wObjects;
-	gb_->cpu.c = entry;
-	SET_DE(gb_, block);
-	routines_.farcall(BANK_SpawnObject, ADDR_SpawnObject);
+	routines_.in_bank(BANK_SpawnObject, ADDR_SpawnObject, [&] { spawn_object(gb_, entry, block); });
 	mem_[rWBK] = wbk; // pop_wram
 }
 

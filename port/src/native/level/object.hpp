@@ -36,6 +36,8 @@ uint16_t create_particle(GB *gb, uint8_t id);
 void create_particle_in_block(GB *gb, uint16_t block, uint8_t id);
 // _CreateObjectFromCurObjPos: an object from its creation data, at wCurObj's position
 void create_object_from_cur_obj_pos(GB *gb, uint16_t params);
+// SpawnObject: index = its wObjDataPointers entry, at = its object map entry
+void spawn_object(GB *gb, uint8_t index, uint16_t at);
 // The object engine's movement tables and counts (update_objects.cpp):
 // _ApplyObjX/YMovement(_Loop) (by OBJ_VAR_2 / OBJ_VAR_3), _ApplyObjSet-
 // Movement, Func_63209 (a platform's y movement, carrying Wario),

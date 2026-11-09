@@ -8,6 +8,7 @@
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
+#include "object.hpp"
 #include "../home/object_pos.hpp"
 #include "../home/level_map.hpp"
 
@@ -136,11 +137,7 @@ void BlockQueue::set_block(uint16_t at, uint8_t nybble)
 	mem_[wBlockPtrBank] = loc.bank;
 	uint8_t row = static_cast<uint8_t>(loc.ptr >> 8), col = static_cast<uint8_t>(loc.ptr);
 	home::level_block_to_hpos(gb_, row, col);
-	// SpawnObject takes the index in c, the object map entry in de
-	cpu_.c = nybble;
-	cpu_.d = row;
-	cpu_.e = col;
-	routines_.farcall(BANK_SpawnObject, ADDR_SpawnObject);
+	routines_.in_bank(BANK_SpawnObject, ADDR_SpawnObject, [&] { spawn_object(gb_, nybble, loc.ptr); });
 	pop_banks(outer);
 }
 

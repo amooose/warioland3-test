@@ -3,8 +3,7 @@
 // objects placed in the level map, the objects other objects create, and
 // despawning them all.
 //
-// The callers are C that may read registers after these, so each entry
-// point leaves the registers and flags the original does.
+// Nothing reads a register these leave (full fuzz tier).
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
@@ -21,12 +20,12 @@ constexpr uint8_t VRAM1 = BANK_v1Tiles0;
 
 class ObjectLoader {
 public:
-	explicit ObjectLoader(GB *gb) : gb_(gb), cpu_(gb->cpu), mem_(gb), routines_(gb) {}
+	explicit ObjectLoader(GB *gb) : gb_(gb), mem_(gb), routines_(gb) {}
 
-	void spawn(); // SpawnObject
+	void spawn(uint8_t index, uint16_t at); // SpawnObject
 	void create_got_pos(uint8_t x_hi, uint16_t slot_pos, uint16_t data); // CreateObject_GotPos
 	void create_from_cur_obj_pos(uint16_t data); // _CreateObjectFromCurObjPos
-	void create_at_relative_pos(); // _CreateObjectAtRelativePos
+	void create_at_relative_pos(uint16_t data); // _CreateObjectAtRelativePos
 	void despawn_all(); // DespawnAllObjects
 	void load_group(); // LoadObjectGroupData
 	void load_hidden_figure_data(); // LoadHiddenFigureData
@@ -38,65 +37,47 @@ private:
 	uint16_t load_data_pointers(uint16_t from, uint8_t count);
 
 	GB *gb_;
-	CPU &cpu_;
 	Memory mem_;
 	Routines routines_;
 };
 
-// the first slot without OBJFLAG_ACTIVE (rra through the carry, hl at its
-// flags), or -1 with hl at the last slot's
+// the first slot without OBJFLAG_ACTIVE, or -1
 int ObjectLoader::free_slot()
 {
 	for (int n = 0; n < NUM_OBJECTS; n++) {
-		SET_HL(gb_, slot(n));
-		cpu_.a = flags::rra(cpu_, mem_[slot(n)]);
-		if (!(cpu_.f & FLAG_C))
+		if (!(mem_[slot(n)] & 1))
 			return n;
 	}
 	return -1;
 }
 
-// input: de = the block, c = its entry in wObjDataPointers. Spawns the
-// block's object (bit 7 of the block set: not spawned yet) in the first
-// free slot, if it's on screen.
-void ObjectLoader::spawn()
+// index = its entry in wObjDataPointers, block = its place in the object
+// map. Spawns the block's object (bit 7 of the block set: not spawned yet)
+// in the first free slot, if it's on screen.
+void ObjectLoader::spawn(uint8_t index, uint16_t at)
 {
 	uint8_t x_hi = mem_[hXPosHi];
-	cpu_.a = x_hi;
-	cpu_.f = flags::cp(x_hi, 0x0a);
 	if (x_hi >= 0x0a)
 		return;
-
-	int n = -1;
-	for (int i = 0; i < NUM_OBJECTS && n < 0; i++) {
-		cpu_.a = flags::rra(cpu_, mem_[slot(i)]);
-		SET_HL(gb_, slot(i) + 1);
-		if (!(cpu_.f & FLAG_C))
-			n = i;
-	}
+	int n = free_slot();
 	if (n < 0)
 		return;
 
-	Byte block = mem_[REG_DE(gb_)];
+	Byte block = mem_[at];
 	uint8_t v = block;
-	if (!(v & 0x80)) {
-		cpu_.a = static_cast<uint8_t>(v << 1 | v >> 7); // rlca
-		cpu_.f = 0;
+	if (!(v & 0x80))
 		return;
-	}
 	block = v & 0x7f; // spawned now
 
 	uint16_t obj = slot(n);
-	mem_[obj + OBJ_UNK_01] = cpu_.e;
-	mem_[obj + OBJ_UNK_02] = static_cast<uint8_t>(((mem_[wccec] - 1) << 5) + cpu_.d);
+	mem_[obj + OBJ_UNK_01] = static_cast<uint8_t>(at);
+	mem_[obj + OBJ_UNK_02] = static_cast<uint8_t>(((mem_[wccec] - 1) << 5) + (at >> 8));
 	mem_[obj + OBJ_Y_POS + 0] = mem_[hYPosLo];
 	mem_[obj + OBJ_Y_POS + 1] = mem_[hYPosHi];
 	mem_[obj + OBJ_X_POS + 0] = mem_[hXPosLo];
 	mem_[obj + OBJ_X_POS + 1] = x_hi;
 
-	cpu_.c = static_cast<uint8_t>((cpu_.c - 1) << 1);
-	cpu_.b = 0;
-	uint16_t data = Word(gb_, wObjDataPointers + cpu_.c);
+	uint16_t data = Word(gb_, wObjDataPointers + static_cast<uint8_t>((index - 1) << 1));
 	mem_[obj + OBJ_ID] = mem_[data + 0];
 	mem_[obj + OBJ_INTERACTION_TYPE] = mem_[data + 1];
 	mem_[obj + OBJ_COLLBOX_TOP] = mem_[data + 2];
@@ -110,12 +91,7 @@ void ObjectLoader::spawn()
 	mem_[obj + OBJ_ACTION] = 2 | (1 << 7);
 	mem_[obj + OBJ_UPDATE_FUNCTION + 0] = mem_[data + 5];
 	mem_[obj + OBJ_UPDATE_FUNCTION + 1] = mem_[data + 6];
-	uint8_t obj_flags = mem_[data + 7] | OBJFLAG_ACTIVE | OBJFLAG_INVISIBLE;
-	mem_[obj + OBJ_FLAGS] = obj_flags;
-	SET_DE(gb_, obj);
-	SET_HL(gb_, data + 7);
-	cpu_.a = obj_flags;
-	cpu_.f = flags::or_(obj_flags);
+	mem_[obj + OBJ_FLAGS] = mem_[data + 7] | OBJFLAG_ACTIVE | OBJFLAG_INVISIBLE;
 }
 
 // The rest of an object made by another: x_hi to slot_pos (the slot's
@@ -141,13 +117,7 @@ void ObjectLoader::create_got_pos(uint8_t x_hi, uint16_t slot_pos, uint16_t data
 	mem_[field(OBJ_ACTION)] = 0; // OBJACTION_NONE
 	mem_[field(OBJ_UPDATE_FUNCTION + 0)] = mem_[src++];
 	mem_[field(OBJ_UPDATE_FUNCTION + 1)] = mem_[src++];
-	uint8_t obj_flags = mem_[src] | OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT;
-	mem_[field(OBJ_FLAGS)] = obj_flags;
-	SET_DE(gb_, field(OBJ_FLAGS));
-	SET_HL(gb_, src);
-	SET_BC(gb_, data);
-	cpu_.a = obj_flags;
-	cpu_.f = flags::or_(obj_flags);
+	mem_[field(OBJ_FLAGS)] = mem_[src] | OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT;
 }
 
 // bc = the creation data: at wCurObj's position
@@ -180,13 +150,12 @@ uint8_t ObjectLoader::relative(uint16_t pos, uint8_t offset, uint16_t &at)
 }
 
 // bc = the creation data, starting with the y and x offsets from wCurObj
-void ObjectLoader::create_at_relative_pos()
+void ObjectLoader::create_at_relative_pos(uint16_t data)
 {
 	int n = free_slot();
 	if (n < 0)
 		return;
 	uint16_t obj = slot(n);
-	uint16_t data = REG_BC(gb_);
 	mem_[obj + OBJ_FLAGS] = OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT;
 	mem_[obj + OBJ_UNK_01] = mem_[wCurObjUnk01];
 	mem_[obj + OBJ_UNK_02] = mem_[wCurObjUnk02];
@@ -201,27 +170,16 @@ void ObjectLoader::create_at_relative_pos()
 // back to their place in the level map (DespawnObject)
 void ObjectLoader::despawn_all()
 {
-	cpu_.h = wObjects >> 8;
 	for (int n = 0; n < NUM_OBJECTS; n++) {
-		uint8_t l = static_cast<uint8_t>(wObjects + OBJ_STRUCT_LENGTH * n);
-		cpu_.l = l;
-		uint8_t a = flags::rra(cpu_, mem_[REG_HL(gb_)]);
-		cpu_.a = a;
-		if (!(cpu_.f & FLAG_C))
+		uint16_t obj = static_cast<uint16_t>(wObjects + OBJ_STRUCT_LENGTH * n);
+		uint8_t obj_flags = mem_[obj];
+		if (!(obj_flags & 1))
 			continue; // not active
-		a = flags::rla(cpu_, a);
-		a = flags::rla(cpu_, a);
-		a = flags::rla(cpu_, a);
-		cpu_.a = a;
-		if (cpu_.f & FLAG_C) { // transient
-			mem_[REG_HL(gb_)] = 0;
-			cpu_.a = 0;
-			cpu_.f = FLAG_Z;
+		if (obj_flags & OBJFLAG_TRANSIENT) {
+			mem_[obj] = 0;
 			continue;
 		}
-		cpu_.f = flags::inc(cpu_.f, l);
-		cpu_.f = flags::inc(cpu_.f, static_cast<uint8_t>(l + 1));
-		cpu_.l = static_cast<uint8_t>(l + 2);
+		SET_HL(gb_, obj + 2); // DespawnObject takes its OBJ_UNK_02
 		routines_.farcall(BANK_DespawnObject, ADDR_DespawnObject);
 	}
 }
@@ -291,20 +249,22 @@ void ObjectLoader::load_group()
 
 } // namespace
 
+void spawn_object(GB *gb, uint8_t index, uint16_t at) { ObjectLoader(gb).spawn(index, at); }
 void create_object_from_cur_obj_pos(GB *gb, uint16_t params) { ObjectLoader(gb).create_from_cur_obj_pos(params); }
 
 } // namespace wl3::level
 
-using wl3::level::ObjectLoader;
+using namespace wl3::level;
 
-PORT(SpawnObject) { ObjectLoader(gb).spawn(); }
+// c = the entry, de = the object map entry
+PORT_EX(SpawnObject, 0, ALL_REGISTERS) { spawn_object(gb, gb->cpu.c, REG_DE(gb)); }
 
 // a = OBJ_X_POS + 1's byte, hl = where it goes, bc = the creation data
-PORT(CreateObject_GotPos) { ObjectLoader(gb).create_got_pos(gb->cpu.a, REG_HL(gb), REG_BC(gb)); }
+PORT_EX(CreateObject_GotPos, 0, ALL_REGISTERS) { ObjectLoader(gb).create_got_pos(gb->cpu.a, REG_HL(gb), REG_BC(gb)); }
 
-PORT(_CreateObjectFromCurObjPos) { ObjectLoader(gb).create_from_cur_obj_pos(REG_BC(gb)); }
-PORT(_CreateObjectAtRelativePos) { ObjectLoader(gb).create_at_relative_pos(); }
-PORT(DespawnAllObjects) { ObjectLoader(gb).despawn_all(); }
+PORT_EX(_CreateObjectFromCurObjPos, 0, ALL_REGISTERS) { ObjectLoader(gb).create_from_cur_obj_pos(REG_BC(gb)); }
+PORT_EX(_CreateObjectAtRelativePos, 0, ALL_REGISTERS) { ObjectLoader(gb).create_at_relative_pos(REG_BC(gb)); }
+PORT_EX(DespawnAllObjects, 0, ALL_REGISTERS) { ObjectLoader(gb).despawn_all(); }
 PORT_EX(LoadHiddenFigureData, 0, ALL_REGISTERS) { ObjectLoader(gb).load_hidden_figure_data(); }
 
 // ends in jp LoadObjPals (or LoadHiddenFigureData's ret)

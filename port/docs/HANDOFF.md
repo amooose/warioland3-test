@@ -1341,8 +1341,15 @@ check passed the full fuzz tier except for BigOctohonFunc, which writes 0
 through the hl the last block function left (a wall hit in .asm_4a78b).
 Older notes above about Muddee, Pesce, ZipLine and FlatFalling are out of
 date: those reads are gone. So block checks now keep only the result in b,
-and hl on the Func_19bc3 / Func_3513 path. Next: give Octohon that hl as a
-named value, then drop the SET_HLs and turn a and b into return values.
+and nothing else. Octohon works out that hl itself (the function of the
+block at wBlockPtr: Octohon::last_block_function). Block functions keep the
+replacement block and the block to break in members (b_, hl_), handed over
+by hooks in leave(). Object spawning and creation (load_objects) take plain
+arguments and leave no registers. Still register-level in stage 2: a as the
+block result (ProcessBlock is still called by address, stage 3),
+Anonster's SilkPlatformsFunc reading bc and de at entry, DespawnObject's hl,
+Func_ba42's hl and e, and CreateParticle's b in the Wario states. To find
+what reads a register: poison it, relax the contracts, run the full tier.
 Routines nothing references and whose callers' hooks have their own copies
 lost their hooks (PORT_COVERED, with a comment for the unreachable ones).
 Fuzzing a V-Blank `.Func` label reports 0 checks (all inconclusive): the
