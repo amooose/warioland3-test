@@ -61,6 +61,13 @@ bool update_golf_object_animation(GB *gb, uint16_t frameset, uint16_t duration, 
 // LoadGolfSprite: the golf object's 4 bytes at obj (y, x, frame,
 // attributes, as OAM takes them), from the OAM data at wGolfOAMPtr
 SpriteEnd load_golf_sprite(GB *gb, uint16_t obj);
+// Func_2c30: starts the VDMA from src to wdc11, of w1dc13's length
+void start_golf_vdma(GB *gb, uint16_t src);
+// Func_2c46: 4 BG palettes from src to rBGPD
+void copy_golf_bg_pals(GB *gb, uint16_t src);
+// UpdateGolfWarioAnimation: Golf Wario's OAM and frameset for his state
+// and direction, his animation step and his sprite
+void update_golf_wario_animation(GB *gb);
 
 void save_backup_vram(GB *gb); // SaveBackupVRAM: scroll, palettes and VRAM to WRAM 3-7
 void load_backup_vram(GB *gb); // LoadBackupVRAM: and back

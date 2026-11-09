@@ -74,13 +74,12 @@ void OverworldVblank::hdma_from(uint16_t params)
 // the HDMAs at wHDMA (from wHDMABank) and w2d0b5 (to VRAM1)
 void OverworldVblank::overworld()
 {
-	uint16_t base = gb_->cpu.pc;
 	mem_[rWBK] = 0x02; // BANK("WRAM2")
 	mem_[rSCY] = mem_[wSCY];
 	mem_[rSCX] = mem_[wSCX];
 	mem_[rWY] = mem_[wWY];
 	mem_[rWX] = static_cast<uint8_t>(mem_[wWX] + WX_OFS);
-	in_bank(BANK_Func_1d8c2c, [&] { gb_call_ret(gb_, ADDR_Func_1d8c2c, static_cast<uint16_t>(base + 0x2a)); });
+	in_bank(BANK_Func_1d8c2c, [&] { update_ow_tilemap_vdma(gb_); });
 	if (mem_[wPalConfig1])
 		home::apply_pal_config(gb_, wPalConfig1);
 	in_bank(mem_[wHDMABank], [&] {
@@ -109,7 +108,6 @@ void OverworldVblank::hdma_15_rows(uint16_t src, uint16_t dest)
 // w2d0b5 (from wHDMABank); the sprites' update; the palette configs
 void OverworldVblank::ow_scene()
 {
-	uint16_t base = gb_->cpu.pc;
 	mem_[rWBK] = 0x02;
 	mem_[rSCY] = mem_[wSCY];
 	mem_[rSCX] = mem_[wSCX];
@@ -122,7 +120,7 @@ void OverworldVblank::ow_scene()
 	if (uint8_t bank = mem_[wHDMABank])
 		in_bank(bank, [&] { home::start_hdma(gb_); });
 	mem_[rVBK] = 0;
-	in_bank(BANK_Func_1d8c2c, [&] { gb_call_ret(gb_, ADDR_Func_1d8c2c, static_cast<uint16_t>(base + 0x71)); });
+	in_bank(BANK_Func_1d8c2c, [&] { update_ow_tilemap_vdma(gb_); });
 	in_bank(BANK_ApplyPalConfig1, [&] {
 		if (mem_[wPalConfig1Register])
 			home::apply_pal_config(gb_, wPalConfig1);

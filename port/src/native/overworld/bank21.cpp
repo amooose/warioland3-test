@@ -4,6 +4,7 @@
 #include "../asm_module.hpp"
 #include "../home/memory.hpp"
 #include "../home/ow.hpp"
+#include "overworld.hpp"
 
 namespace wl3::overworld {
 
@@ -22,13 +23,11 @@ public:
 
 	// VBlank_OWPalTransition.Func, as copied to wVBlankFunc, plain over
 	// memory: the V-Blank handler pushes and pops every register around
-	// it. The scroll and window, Func_1d8c2c (in its bank; its call
-	// returns to base + n, the block's start wherever it runs from), the
+	// it. The scroll and window, Func_1d8c2c (in its bank), the
 	// 8 BG palettes from wTempBGPals, then a jump to hTransferVirtualOAM
 	// (a = wVirtualOAM's page).
 	void port_VBlank_OWPalTransition__Func()
 	{
-		uint16_t base = cpu_.pc;
 		mem_[rWBK] = 0x02; // BANK("WRAM2")
 		mem_[rSCY] = mem_[wSCY];
 		mem_[rSCX] = mem_[wSCX];
@@ -37,7 +36,7 @@ public:
 
 		uint8_t bank = mem_[wROMBank];
 		bankswitch(BANK_Func_1d8c2c);
-		gb_call_ret(gb_, ADDR_Func_1d8c2c, static_cast<uint16_t>(base + 0x2a));
+		update_ow_tilemap_vdma(gb_);
 		bankswitch(bank);
 
 		mem_[rBGPI] = BGPI_AUTOINC | 0; // palette 0

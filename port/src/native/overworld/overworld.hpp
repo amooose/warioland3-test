@@ -24,6 +24,8 @@ void set_vblank_ow_scene(GB *gb);
 // GetMapLevelCoords: where a level of the current map side is (its y and
 // x), from MapLevelCoords
 uint16_t map_level_coords(GB *gb, uint8_t level);
+// Func_1d8c2c: the overworld tilemap's attributes, and the VDMA at w2d044
+void update_ow_tilemap_vdma(GB *gb);
 
 void switch_day_night(GB *gb); // SwitchDayNight: wDayNight's bit 4
 void do_day_night_spell(GB *gb); // DoDayNightSpell

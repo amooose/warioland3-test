@@ -1,118 +1,85 @@
-// home/load_golf_sprite (src/home/load_golf_sprite.asm), converted from the register-level
-// C port by tools/c2cpp.py: the same logic, as a class over AsmModule,
-// keeping the original's registers, flags and return addresses for its
-// callers (see src/native/asm_module.hpp).
-#include "../asm_module.hpp"
+// home/load_golf_sprite (src/home/load_golf_sprite.asm) as plain C++; see
+// sprites.hpp. The callers are C++ (the golf V-Blank functions and
+// animations), which read no register after these.
+#include "../native.hpp"
+#include "../routines.hpp"
+#include "sprites.hpp"
 
 namespace wl3::home {
 
+void start_golf_vdma(GB *gb, uint16_t src)
+{
+	Memory mem(gb);
+	mem[rVDMA_SRC_HIGH] = static_cast<uint8_t>(src >> 8);
+	mem[rVDMA_SRC_LOW] = static_cast<uint8_t>(src);
+	mem[rVDMA_DEST_HIGH] = mem[wdc11 + 0];
+	mem[rVDMA_DEST_LOW] = mem[wdc11 + 1];
+	mem[rVDMA_LEN] = mem[w1dc13];
+}
+
+void copy_golf_bg_pals(GB *gb, uint16_t src)
+{
+	Memory mem(gb);
+	mem[rBGPI] = 0x80;
+	for (int i = 0; i < 4 * 0x10; i++)
+		mem[rBGPI + 1] = mem[src++];
+}
+
 namespace {
 
-class HomeLoadGolfSprite : public AsmModule {
-public:
-	using AsmModule::AsmModule;
-
-	// hl = source, wdc11 = destination, w1dc13 = length - 1
-	void port_Func_2c30()
-	{
-		cpu_.a = cpu_.h;
-		wr8(rVDMA_SRC_HIGH, cpu_.a);
-		cpu_.a = cpu_.l;
-		wr8(rVDMA_SRC_LOW, cpu_.a);
-		cpu_.a = rd8(wdc11 + 0);
-		wr8(rVDMA_DEST_HIGH, cpu_.a);
-		cpu_.a = rd8(wdc11 + 1);
-		wr8(rVDMA_DEST_LOW, cpu_.a);
-		cpu_.a = rd8(w1dc13);
-		wr8(rVDMA_LEN, cpu_.a);
-	}
-
-	// copies 4 BG palettes from hl to rBGPD
-	void port_Func_2c46()
-	{
-		SET_DE(gb_, rBGPI);
-		cpu_.c = 4;
-		cpu_.a = 0x80;
-		wr8(REG_DE(gb_), cpu_.a);
-		cpu_.e++; // inc e
-		uint16_t hl = REG_HL(gb_);
-		uint16_t de = REG_DE(gb_);
-		do {
-			for (int i = 0; i < 0x10; i++) {
-				cpu_.a = rd8(hl++);
-				wr8(de, cpu_.a);
-			}
-			cpu_.c = alu_.dec(cpu_.c);
-		} while (cpu_.c);
-		SET_HL(gb_, hl);
-	}
-
-	// updates Golf Wario sprite, given its state
-	// and which direction it is facing
-	void port_UpdateGolfWarioAnimation()
-	{
-		cpu_.a = rd8(wGolfWarioState);
-		cpu_.b = 0x00;
-		cpu_.c = cpu_.a;
-		uint16_t hl = alu_.add16(ADDR_UpdateGolfWarioAnimation + 0x75, REG_BC(gb_)); // .OAMBanks
-		cpu_.a = rd8(hl);
-		wr8(wTempBank, cpu_.a);
-
-		cpu_.a = rd8(wGolfWarioDir);
-		alu_.and_(cpu_.a, cpu_.a);
-		if (!(cpu_.f & FLAG_Z)) {
-			// dir left
-			cpu_.a = alu_.add(cpu_.c, NUM_GOLF_WARIO_STATES);
-			cpu_.c = cpu_.a;
-		}
-		// .dir_right
-		cpu_.b = 0x00;
-		cpu_.c = alu_.sla(cpu_.c);
-		hl = alu_.add16(ADDR_UpdateGolfWarioAnimation + 0x81, REG_BC(gb_)); // .OAMTable
-		cpu_.a = rd8(hl++);
-		wr8(wGolfOAMPtr + 1, cpu_.a);
-		cpu_.a = rd8(hl);
-		wr8(wGolfOAMPtr + 0, cpu_.a);
-
-		hl = alu_.add16(ADDR_UpdateGolfWarioAnimation + 0xb1, REG_BC(gb_)); // .Framesets
-		cpu_.a = rd8(hl++);
-		cpu_.d = rd8(hl);
-		cpu_.e = cpu_.a;
-		SET_HL(gb_, hl);
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = rd8(wTempBank);
-		bankswitch(cpu_.a);
-		SET_HL(gb_, wGolfWarioDuration);
-		CALL(UpdateGolfObjectAnimation);
-		cpu_.a = cpu_.c;
-		wr8(wHasGolfWarioAnimationFinished, cpu_.a);
-		pop_af();
-		bankswitch(cpu_.a);
-
-		cpu_.a = rd8(wHasGolfWarioAnimationFinished);
-		alu_.and_(cpu_.a, cpu_.a);
-		if (!(cpu_.f & FLAG_Z))
-			gb_call(gb_, ADDR_HoldGolfWarioLastFrame); // whatever bank is mapped
-		cpu_.a = rd8(wGolfWarioCurrentFrame);
-		wr8(wGolfWarioFrame, cpu_.a);
-		cpu_.a = rd8(wROMBank);
-		push_af();
-		cpu_.a = rd8(wTempBank);
-		bankswitch(cpu_.a);
-		SET_HL(gb_, wGolfWarioSprite);
-		CALL(LoadGolfSprite);
-		pop_af();
-		bankswitch(cpu_.a);
-	}
-};
+// HoldGolfWarioLastFrame: the states that stay on their last frame
+void hold_golf_wario_last_frame(Memory mem)
+{
+	uint8_t state = mem[wGolfWarioState];
+	if (state != GOLF_WARIO_CHARGING && state != GOLF_WARIO_ATTACKING_1 && state != GOLF_WARIO_MISSING &&
+		state != GOLF_WARIO_TURNING)
+		return;
+	mem[wGolfCounter] = static_cast<uint8_t>(mem[wGolfCounter] + 1);
+	mem[wGolfWarioCurrentFrame] = mem[wGolfAnimLastFrame];
+}
 
 } // namespace
 
+void update_golf_wario_animation(GB *gb)
+{
+	static constexpr uint16_t OAM_BANKS = ADDR_UpdateGolfWarioAnimation + 0x75;
+	static constexpr uint16_t OAM_TABLE = ADDR_UpdateGolfWarioAnimation + 0x81;
+	static constexpr uint16_t FRAMESETS = ADDR_UpdateGolfWarioAnimation + 0xb1;
+	Memory mem(gb);
+	Routines routines(gb);
+	uint8_t state = mem[wGolfWarioState];
+	uint8_t oam_bank = mem[static_cast<uint16_t>(OAM_BANKS + state)];
+	mem[wTempBank] = oam_bank;
+
+	uint8_t entry = mem[wGolfWarioDir] ? static_cast<uint8_t>(state + NUM_GOLF_WARIO_STATES) : state;
+	entry = static_cast<uint8_t>(entry << 1);
+	uint16_t oam = static_cast<uint16_t>(OAM_TABLE + entry);
+	mem[wGolfOAMPtr + 1] = mem[oam];
+	mem[wGolfOAMPtr + 0] = mem[static_cast<uint16_t>(oam + 1)];
+	uint16_t frameset = mem.word(static_cast<uint16_t>(FRAMESETS + entry));
+
+	uint8_t bank = mem[wROMBank];
+	routines.switch_bank(mem[wTempBank]);
+	bool finished = update_golf_object_animation(gb, frameset, wGolfWarioDuration);
+	mem[wHasGolfWarioAnimationFinished] = finished;
+	routines.switch_bank(bank);
+
+	if (mem[wHasGolfWarioAnimationFinished])
+		hold_golf_wario_last_frame(mem);
+	mem[wGolfWarioFrame] = mem[wGolfWarioCurrentFrame];
+
+	bank = mem[wROMBank];
+	routines.switch_bank(mem[wTempBank]);
+	load_golf_sprite(gb, wGolfWarioSprite);
+	routines.switch_bank(bank);
+}
+
 } // namespace wl3::home
 
-using wl3::home::HomeLoadGolfSprite;
+using namespace wl3::home;
 
-PORT_EX(Func_2c30, 0, 0) { HomeLoadGolfSprite(gb).port_Func_2c30(); }
-PORT_EX(Func_2c46, 0, 0) { HomeLoadGolfSprite(gb).port_Func_2c46(); }
-PORT_EX(UpdateGolfWarioAnimation, 0, 0) { HomeLoadGolfSprite(gb).port_UpdateGolfWarioAnimation(); }
+// hl = the source
+PORT_EX(Func_2c30, 0, ALL_REGISTERS) { start_golf_vdma(gb, REG_HL(gb)); }
+PORT_EX(Func_2c46, 0, ALL_REGISTERS) { copy_golf_bg_pals(gb, REG_HL(gb)); }
+PORT_EX(UpdateGolfWarioAnimation, 0, ALL_REGISTERS) { update_golf_wario_animation(gb); }
+PORT_COVERED(HoldGolfWarioLastFrame);

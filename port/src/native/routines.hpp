@@ -144,7 +144,7 @@ public:
 		home::load_golf_sprite(gb_, sprite);
 	}
 
-	void update_golf_wario_animation() { call(ADDR_UpdateGolfWarioAnimation); }
+	void update_golf_wario_animation() { home::update_golf_wario_animation(gb_); }
 
 private:
 	GB *gb_;
