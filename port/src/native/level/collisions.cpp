@@ -88,7 +88,6 @@ uint8_t Collisions::edge_dx(bool right, uint8_t in)
 void Collisions::at_edge(bool right)
 {
 	uint8_t dx = edge_dx(right, 3);
-	cpu_.c = dx;
 	set_hpos(0, right ? dx : -dx);
 }
 
@@ -335,10 +334,6 @@ void asm_centre_collision(GB *gb)
 {
 	Collisions c(gb);
 	gb->cpu.b = c.centre();
-	if (c.on_steppable_) { // get_pos_y
-		SET_HL(gb, wWarioYPos + 1);
-		SET_DE(gb, hYPosHi + 1);
-	}
 }
 void asm_front_collision(GB *gb) { gb->cpu.b = check_front_collision(gb); }
 void asm_up_collision(GB *gb) { gb->cpu.b = check_up_collision(gb); }
@@ -348,11 +343,12 @@ void asm_airborne_collision(GB *gb) { gb->cpu.b = check_airborne_collision(gb); 
 
 using wl3::level::Collisions;
 
-// The hooks leave the asm's registers for the register-level callers: the
-// CPU holds the last ProcessBlock's, and the result goes to b. a and f are
-// clobbered: every caller farcalls or homecalls these (the Wario states,
-// the objects, home's object mechanics), and hCallFunc / homecall pop af
-// after the call. (Never a macro around PORT_EX: tools/gen.c finds the
+// The result goes to b. Nothing reads c, d, e, h or l after a block check
+// (poisoning them passed the full fuzz tier) but Octohon, which writes 0
+// through the hl the last block function left (Func_19bc3, Func_3513). a and
+// f are clobbered: every caller farcalls or homecalls these (the Wario
+// states, the objects, home's object mechanics), and hCallFunc / homecall
+// pop af after the call. (Never a macro around PORT_EX: tools/gen.c finds the
 // hooks by their text.)
 
 namespace {
@@ -361,54 +357,52 @@ void result(GB *gb, uint8_t b) { gb->cpu.b = b; }
 
 } // namespace
 
-PORT_EX(Func_19b51, 0, R_A | R_F) { Collisions(gb).block(COLLISION_DOWN); }
-PORT_EX(Func_19b7b, 0, R_A | R_F) { Collisions(gb).block(COLLISION_UNK1); }
-PORT_EX(Func_19b8b, 0, R_A | R_F) { Collisions(gb).block(COLLISION_UNK2); }
-PORT_EX(Func_19b9b, 0, R_A | R_F) { Collisions(gb).block(COLLISION_UNK3); }
-PORT_EX(Func_19bc3, 0, R_A | R_F) { Collisions(gb).block(COLLISION_UNK4); }
-PORT_EX(_ProcessBlockOnLeft, 0, R_A | R_F)
+PORT_EX(Func_19b51, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).block(COLLISION_DOWN); }
+PORT_EX(Func_19b7b, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).block(COLLISION_UNK1); }
+PORT_EX(Func_19b8b, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).block(COLLISION_UNK2); }
+PORT_EX(Func_19b9b, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).block(COLLISION_UNK3); }
+PORT_EX(Func_19bc3, 0, ALL_REGISTERS & ~(R_B | R_H | R_L)) { Collisions(gb).block(COLLISION_UNK4); }
+PORT_EX(_ProcessBlockOnLeft, 0, ALL_REGISTERS & ~R_B)
 {
-	if (!Collisions(gb).process_adjacent(false))
-		SET_HL(gb, wBlockPtr + 1);
+	Collisions(gb).process_adjacent(false);
 }
-PORT_EX(_ProcessBlockOnRight, 0, R_A | R_F)
+PORT_EX(_ProcessBlockOnRight, 0, ALL_REGISTERS & ~R_B)
 {
-	if (!Collisions(gb).process_adjacent(true))
-		SET_HL(gb, wBlockPtr + 1);
+	Collisions(gb).process_adjacent(true);
 }
 // unreferenced: the block left (or right) of wBlockPtr, with no check for
 // its low byte wrapping around
-PORT(Func_19bab)
+PORT_EX(Func_19bab, 0, ALL_REGISTERS & ~R_B)
 {
 	--wl3::Memory(gb)[wBlockPtr + 1];
 	Collisions(gb).process_block();
 }
-PORT(Func_19bb7)
+PORT_EX(Func_19bb7, 0, ALL_REGISTERS & ~R_B)
 {
 	++wl3::Memory(gb)[wBlockPtr + 1];
 	Collisions(gb).process_block();
 }
-PORT_EX(Func_19acd, 0, R_A | R_F) { Collisions(gb).at_y_offset(0x0c); }
-PORT_EX(Func_19ae4, 0, R_A | R_F) { Collisions(gb).at_y_offset(0x1a); }
-PORT_EX(Func_19afb, 0, R_A | R_F) { Collisions(gb).at_y_offset(0x18); }
-PORT_EX(Func_19b12, 0, R_A | R_F) { Collisions(gb).at_y_offset(0); }
-PORT_EX(Func_19b25, 0, R_A | R_F) { Collisions(gb).at_y_offset(4); }
-PORT_EX(Func_198c7, 0, R_A | R_F) { Collisions(gb).below(); }
-PORT_EX(CheckCentreCollision, 0, R_A | R_F) { wl3::level::asm_centre_collision(gb); }
-PORT_EX(CheckFrontCollision, 0, R_A | R_F) { wl3::level::asm_front_collision(gb); }
-PORT_EX(Func_19741, 0, R_A | R_F)
+PORT_EX(Func_19acd, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).at_y_offset(0x0c); }
+PORT_EX(Func_19ae4, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).at_y_offset(0x1a); }
+PORT_EX(Func_19afb, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).at_y_offset(0x18); }
+PORT_EX(Func_19b12, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).at_y_offset(0); }
+PORT_EX(Func_19b25, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).at_y_offset(4); }
+PORT_EX(Func_198c7, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).below(); }
+PORT_EX(CheckCentreCollision, 0, ALL_REGISTERS & ~R_B) { wl3::level::asm_centre_collision(gb); }
+PORT_EX(CheckFrontCollision, 0, ALL_REGISTERS & ~R_B) { wl3::level::asm_front_collision(gb); }
+PORT_EX(Func_19741, 0, ALL_REGISTERS & ~R_B)
 {
 	Collisions c(gb);
 	c.set_break_flag();
 	result(gb, c.bottom(true));
 }
-PORT_EX(Func_197b1, 0, R_A | R_F)
+PORT_EX(Func_197b1, 0, ALL_REGISTERS & ~R_B)
 {
 	Collisions c(gb);
 	c.set_break_flag();
 	result(gb, c.bottom(false));
 }
-PORT_EX(Func_19706, 0, R_A | R_F)
+PORT_EX(Func_19706, 0, ALL_REGISTERS & ~R_B)
 {
 	Collisions c(gb);
 	result(gb, c.as_wario([&] {
@@ -416,7 +410,7 @@ PORT_EX(Func_19706, 0, R_A | R_F)
 		return c.bottom(true);
 	}));
 }
-PORT_EX(Func_19713, 0, R_A | R_F)
+PORT_EX(Func_19713, 0, ALL_REGISTERS & ~R_B)
 {
 	Collisions c(gb);
 	result(gb, c.as_wario([&] {
@@ -424,10 +418,10 @@ PORT_EX(Func_19713, 0, R_A | R_F)
 		return c.bottom(false);
 	}));
 }
-PORT_EX(CheckUpCollision, 0, R_A | R_F) { wl3::level::asm_up_collision(gb); }
-PORT_EX(CheckAirborneCollision, 0, R_A | R_F) { wl3::level::asm_airborne_collision(gb); }
+PORT_EX(CheckUpCollision, 0, ALL_REGISTERS & ~R_B) { wl3::level::asm_up_collision(gb); }
+PORT_EX(CheckAirborneCollision, 0, ALL_REGISTERS & ~R_B) { wl3::level::asm_airborne_collision(gb); }
 // ld a, b / and a / jp nz, TriggerFloorTransition / jp TriggerDownwardsFloorTransition
-PORT_EX(Func_19720, HOOK_MANUAL_RET, 0)
+PORT_EX(Func_19720, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_A | R_F | R_B))
 {
 	Collisions c(gb);
 	uint8_t b = c.as_wario([&] { return c.airborne(); });
@@ -436,7 +430,7 @@ PORT_EX(Func_19720, HOOK_MANUAL_RET, 0)
 	gb->cpu.f = wl3::flags::and_(b);
 	JUMP_TO(b ? ADDR_TriggerFloorTransition : ADDR_TriggerDownwardsFloorTransition);
 }
-PORT_EX(Func_19a77, 0, R_A | R_F) { Collisions(gb).sides(); }
+PORT_EX(Func_19a77, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).sides(); }
 
 // The routines only this file calls, now plain members.
 PORT_COVERED(Func_19b3a);

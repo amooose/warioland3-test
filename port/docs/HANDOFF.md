@@ -1336,6 +1336,13 @@ Stage 1 is done apart from what depends on later stages:
 - start_room and level_vblank: start_room's pushes are read by the block
   queue overrun; LevelVBlankFunc hands hl and bc to the RAM code.
 - Stage 4: header, start, main_state_table.
+Stage 2 finding (2026-11-09): poisoning c, d, e, h and l after every block
+check passed the full fuzz tier except for BigOctohonFunc, which writes 0
+through the hl the last block function left (a wall hit in .asm_4a78b).
+Older notes above about Muddee, Pesce, ZipLine and FlatFalling are out of
+date: those reads are gone. So block checks now keep only the result in b,
+and hl on the Func_19bc3 / Func_3513 path. Next: give Octohon that hl as a
+named value, then drop the SET_HLs and turn a and b into return values.
 Routines nothing references and whose callers' hooks have their own copies
 lost their hooks (PORT_COVERED, with a comment for the unreachable ones).
 Fuzzing a V-Blank `.Func` label reports 0 checks (all inconclusive): the

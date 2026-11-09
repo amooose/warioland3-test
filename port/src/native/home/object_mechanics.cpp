@@ -639,13 +639,13 @@ PORT_EX(ApplyObjXMovement, 0, R_B | R_C) { HomeObjectMechanics(gb).port_ApplyObj
 // homecalls the plain _VanishObject; its callers read no register after it
 PORT_EX(VanishObject, 0, ALL_REGISTERS) { HomeObjectMechanics(gb).port_VanishObject(); }
 PORT_EX(Func_34fc, 0, ALL_REGISTERS) { HomeObjectMechanics(gb).port_Func_34fc(); }
-PORT_EX(Func_3513, 0, 0) { HomeObjectMechanics(gb).port_Func_3513(); }
-PORT_EX(Func_352b, 0, 0) { HomeObjectMechanics(gb).port_Func_352b(); }
-PORT_EX(Func_3543, 0, 0) { HomeObjectMechanics(gb).port_Func_3543(); }
-PORT_EX(ProcessBlockOnLeft, 0, 0) { HomeObjectMechanics(gb).port_ProcessBlockOnLeft(); }
-PORT_EX(ProcessBlockOnRight, 0, 0) { HomeObjectMechanics(gb).port_ProcessBlockOnRight(); }
-PORT_EX(Func_358b, 0, 0) { HomeObjectMechanics(gb).port_Func_358b(); }
-PORT_EX(Func_35a3, 0, 0) { HomeObjectMechanics(gb).port_Func_35a3(); }
+PORT_EX(Func_3513, 0, ALL_REGISTERS & ~(R_A | R_B | R_H | R_L)) { HomeObjectMechanics(gb).port_Func_3513(); }
+PORT_EX(Func_352b, 0, ALL_REGISTERS & ~(R_A | R_B)) { HomeObjectMechanics(gb).port_Func_352b(); }
+PORT_EX(Func_3543, 0, ALL_REGISTERS & ~(R_A | R_B)) { HomeObjectMechanics(gb).port_Func_3543(); }
+PORT_EX(ProcessBlockOnLeft, 0, ALL_REGISTERS & ~(R_A | R_B)) { HomeObjectMechanics(gb).port_ProcessBlockOnLeft(); }
+PORT_EX(ProcessBlockOnRight, 0, ALL_REGISTERS & ~(R_A | R_B)) { HomeObjectMechanics(gb).port_ProcessBlockOnRight(); }
+PORT_EX(Func_358b, 0, ALL_REGISTERS & ~(R_A | R_B)) { HomeObjectMechanics(gb).port_Func_358b(); }
+PORT_EX(Func_35a3, 0, ALL_REGISTERS & ~(R_A | R_B)) { HomeObjectMechanics(gb).port_Func_35a3(); }
 PORT_EX(SetOBPals, 0, 0) { HomeObjectMechanics(gb).port_SetOBPals(); }
 PORT_EX(SetBGPals, 0, 0) { HomeObjectMechanics(gb).port_SetBGPals(); }
 PORT_EX(BlackOutOBPals, 0, 0) { HomeObjectMechanics(gb).port_BlackOutOBPals(); }

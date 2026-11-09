@@ -107,24 +107,11 @@ public:
 	void ball_o_string_block(); // Func_19502
 
 private:
-	bool zf() const { return cpu_.f & FLAG_Z; }
-	bool cf() const { return cpu_.f & FLAG_C; }
-	void xor_a()
-	{
-		cpu_.a = 0;
-		cpu_.f = FLAG_Z;
-	}
+	void xor_a() { cpu_.a = 0; }
 	void sram_switch(uint8_t bank)
 	{
 		mem_[wSRAMBank] = bank;
 		mem_[rRAMB + 0x100] = bank;
-	}
-	void push_af() { gb_push16(gb_, REG_AF(gb_)); }
-	void pop_af()
-	{
-		uint16_t af = gb_pop16(gb_);
-		cpu_.a = static_cast<uint8_t>(af >> 8);
-		cpu_.f = static_cast<uint8_t>(af & 0xf0);
 	}
 	// ld a, v / ld [addr], a
 	void st(uint16_t addr, uint8_t v)
@@ -136,39 +123,19 @@ private:
 	bool ld_and(uint16_t addr)
 	{
 		cpu_.a = mem_[addr];
-		cpu_.f = flags::and_(cpu_.a);
 		return cpu_.a;
 	}
 	// ld a, [addr] / bit n, a
 	bool ld_bit(uint16_t addr, int n)
 	{
 		cpu_.a = mem_[addr];
-		return bit_a(n);
-	}
-	// bit n, a
-	bool bit_a(int n)
-	{
-		cpu_.f = flags::bit(cpu_.f, cpu_.a, n);
 		return cpu_.a & (1 << n);
 	}
 	// ld a, [addr] / and mask: true if nz
 	bool ld_mask(uint16_t addr, uint8_t mask)
 	{
 		cpu_.a = mem_[addr] & mask;
-		cpu_.f = flags::and_(cpu_.a);
 		return cpu_.a;
-	}
-	// ld a, [addr] / cp v
-	void ld_cp(uint16_t addr, uint8_t v)
-	{
-		cpu_.a = mem_[addr];
-		cp_a(v);
-	}
-	void cp_a(uint8_t v) { cpu_.f = flags::cp(cpu_.a, v); }
-	void and_a(uint8_t mask)
-	{
-		cpu_.a &= mask;
-		cpu_.f = flags::and_(cpu_.a);
 	}
 	// big-endian words (hPos, wWarioXPos, wBlockPtr)
 	uint16_t word_be(uint16_t addr) const { return static_cast<uint16_t>(mem_[addr] << 8 | mem_[addr + 1]); }
@@ -192,7 +159,7 @@ private:
 			mem_[addr] = 0;
 	}
 	void set_slope_interaction(uint8_t slope);
-	void hypos_top_plus_c();
+	void hypos_top_plus_c(uint8_t c);
 	void save_block();
 	void replace_block(bool e2b);
 	void replace_and_break();
@@ -216,19 +183,13 @@ private:
 void BlockFuncs::process_block()
 {
 	mem_[wIsInWaterOrSand] = FALSE;
-	cpu_.a = mem_[wBlockPtrBank];
-	sram_switch(cpu_.a);
+	sram_switch(mem_[wBlockPtrBank]);
 	// the block (at wBlockPtr, stored big-endian) indexes the level's
 	// wBlockFunctionTable
 	uint16_t at = static_cast<uint16_t>(mem_[wBlockPtr + 0] << 8 | mem_[wBlockPtr + 1]);
 	uint8_t block = mem_[at];
 	uint8_t offset = static_cast<uint8_t>(block * 2);
-	cpu_.f = flags::add(block, block);
-	cpu_.d = 0;
-	cpu_.e = offset;
 	unsigned sum = wBlockFunctionTable + offset;
-	cpu_.f = static_cast<uint8_t>((cpu_.f & FLAG_Z) | ((wBlockFunctionTable & 0xfff) + offset > 0xfff ? FLAG_H : 0)
-		| (sum > 0xffff ? FLAG_C : 0));
 	uint16_t func = Word(gb_, static_cast<uint16_t>(sum));
 	cpu_.a = static_cast<uint8_t>(func);
 	SET_HL(gb_, func);
@@ -566,9 +527,7 @@ void BlockFuncs::solid()
 		return;
 	}
 	// .snap_y_pos
-	cpu_.a = mem_[hYPosLo] & 0xf0;
-	cpu_.f = flags::and_(cpu_.a);
-	mem_[hYPosLo] = cpu_.a;
+	mem_[hYPosLo] = mem_[hYPosLo] & 0xf0;
 	cpu_.a = 1;
 	mem_[wUnused_c18d] = 1;
 }
@@ -684,16 +643,15 @@ void BlockFuncs::set_slope_interaction(uint8_t slope)
 }
 
 // hYPos = the block's top + c
-void BlockFuncs::hypos_top_plus_c()
+void BlockFuncs::hypos_top_plus_c(uint8_t c)
 {
-	set_word_be(hYPosHi, static_cast<uint16_t>((word_be(hYPosHi) & 0xfff0) + cpu_.c));
+	set_word_be(hYPosHi, static_cast<uint16_t>((word_be(hYPosHi) & 0xfff0) + c));
 }
 
 void BlockFuncs::right_slope_collision()
 {
 	uint8_t x = mem_[hXPosLo] & 0x0f;
-	cpu_.c = static_cast<uint8_t>(0x10 - x);
-	hypos_top_plus_c();
+	hypos_top_plus_c(static_cast<uint8_t>(0x10 - x));
 	if ((mem_[wCollisionPoints] & (COLLISION_DOWN | COLLISION_UNK1)))
 		set_slope_interaction(RIGHT_SLOPE);
 	GOTO(ADDR_Func_18064);
@@ -702,8 +660,7 @@ void BlockFuncs::right_slope_collision()
 void BlockFuncs::left_slope_collision()
 {
 	if (mem_[wCollisionPoints] & (COLLISION_DOWN | COLLISION_UNK1)) {
-		cpu_.c = static_cast<uint8_t>((mem_[hXPosLo] & 0x0f) + 2);
-		hypos_top_plus_c();
+		hypos_top_plus_c(static_cast<uint8_t>((mem_[hXPosLo] & 0x0f) + 2));
 		set_slope_interaction(LEFT_SLOPE);
 	}
 	GOTO(ADDR_Func_18064);
@@ -716,8 +673,7 @@ void BlockFuncs::right_slope()
 		GOTO(FREE);
 	if (!(points & COLLISION_UNK1))
 		GOTO(ADDR_RightSlopeCollision);
-	cpu_.b = mem_[hYPosLo] & 0x0f;
-	GOTO((mem_[hXPosLo] & 0x0f) + cpu_.b < 0x10 ? FREE : ADDR_RightSlopeCollision);
+	GOTO((mem_[hXPosLo] & 0x0f) + (mem_[hYPosLo] & 0x0f) < 0x10 ? FREE : ADDR_RightSlopeCollision);
 }
 
 void BlockFuncs::left_slope()
@@ -727,8 +683,7 @@ void BlockFuncs::left_slope()
 		GOTO(FREE);
 	if (!(points & COLLISION_UNK1))
 		GOTO(ADDR_LeftSlopeCollision);
-	cpu_.b = mem_[hYPosLo] & 0x0f;
-	GOTO((mem_[hXPosLo] & 0x0f) < cpu_.b ? ADDR_LeftSlopeCollision : FREE);
+	GOTO((mem_[hXPosLo] & 0x0f) < (mem_[hYPosLo] & 0x0f) ? ADDR_LeftSlopeCollision : FREE);
 }
 
 void BlockFuncs::water_surface()
@@ -940,11 +895,9 @@ void BlockFuncs::vampire_block()
 	// pushed out past the block's edge, by b
 	uint16_t x = static_cast<uint16_t>(word_be(wWarioXPos) & 0xfff0);
 	if (!(mem_[wWarioXPos + 1] & 0x08)) {
-		cpu_.b = mem_[wCollisionBoxRight];
-		x = static_cast<uint16_t>(x - cpu_.b);
+		x = static_cast<uint16_t>(x - mem_[wCollisionBoxRight]);
 	} else {
-		cpu_.b = static_cast<uint8_t>(0x10 - mem_[wCollisionBoxLeft]);
-		x = static_cast<uint16_t>(x + cpu_.b);
+		x = static_cast<uint16_t>(x + static_cast<uint8_t>(0x10 - mem_[wCollisionBoxLeft]));
 	}
 	set_word_be(wWarioXPos, x);
 	GOTO(SOLID);
@@ -1062,24 +1015,19 @@ void BlockFuncs::break_block(bool chance, uint16_t params)
 	mem_[hYPosHiBackup] = mem_[hYPosHi];
 	mem_[hYPosLoBackup] = mem_[hYPosLo];
 	mem_[hXPosHiBackup] = mem_[hXPosHi];
-	cpu_.a = mem_[hXPosLo];
-	mem_[hXPosLoBackup] = cpu_.a;
+	mem_[hXPosLoBackup] = mem_[hXPosLo];
 
 	cpu_.b = PARTICLE_DEBRIS;
 	routines_.farcall(BANK_CreateParticleInBlock, ADDR_CreateParticleInBlock);
 	bool spawn = true;
 	if (chance) {
-		cpu_.a = mem_[rDIV] & 0x03;
-		cpu_.f = flags::and_(cpu_.a);
-		if (cpu_.a)
+		if (mem_[rDIV] & 0x03)
 			spawn = false;
 		else
 			spawn = !ld_and(wCoinCooldown);
 	}
 	if (spawn) {
-		cpu_.a = mem_[rWBK]; // push_wram BANK("Level Objects WRAM")
-		push_af();
-		cpu_.a = 0x01;
+		uint8_t wbk = mem_[rWBK]; // push_wram BANK("Level Objects WRAM")
 		mem_[rWBK] = 0x01;
 		if (chance)
 			st(wCoinCooldown, COIN_COOLDOWN);
@@ -1090,14 +1038,12 @@ void BlockFuncs::break_block(bool chance, uint16_t params)
 		cpu_.b = OBJ_ID - OBJ_UNK_01;
 		routines_.call(ADDR_CopyHLToDE);
 
-		xor_a();
 		mem_[wCurObjUnk01 + 0] = 0;
 		mem_[wCurObjUnk01 + 1] = 0;
 		mem_[wCurObjUnk01 + 2] = mem_[hYPosLo];
 		mem_[wCurObjUnk01 + 3] = mem_[hYPosHi];
 		mem_[wCurObjUnk01 + 4] = mem_[hXPosLo];
-		cpu_.a = mem_[hXPosHi];
-		mem_[wCurObjUnk01 + 5] = cpu_.a;
+		mem_[wCurObjUnk01 + 5] = mem_[hXPosHi];
 		SET_HL(gb_, wCurObjUnk01 + 6);
 		SET_BC(gb_, params);
 		routines_.farcall(BANK__CreateObjectFromCurObjPos, ADDR__CreateObjectFromCurObjPos);
@@ -1106,15 +1052,13 @@ void BlockFuncs::break_block(bool chance, uint16_t params)
 		SET_DE(gb_, wCurObjUnk01);
 		cpu_.b = OBJ_ID - OBJ_UNK_01;
 		routines_.call(ADDR_CopyHLToDE);
-		pop_af();
-		mem_[rWBK] = cpu_.a;
+		mem_[rWBK] = wbk;
 	}
 
 	mem_[hYPosHi] = mem_[hYPosHiBackup];
 	mem_[hYPosLo] = mem_[hYPosLoBackup];
 	mem_[hXPosHi] = mem_[hXPosHiBackup];
-	cpu_.a = mem_[hXPosLoBackup];
-	mem_[hXPosLo] = cpu_.a;
+	mem_[hXPosLo] = mem_[hXPosLoBackup];
 }
 
 // wcedb / wcedc / wcedf = the SRAM bank, pointer and value of the block at
@@ -1122,13 +1066,11 @@ void BlockFuncs::break_block(bool chance, uint16_t params)
 void BlockFuncs::save_block()
 {
 	mem_[wcedb] = mem_[wSRAMBank];
-	cpu_.d = mem_[wBlockPtr + 0];
-	mem_[wcedc + 0] = cpu_.d;
-	cpu_.e = mem_[wBlockPtr + 1];
-	mem_[wcedc + 1] = cpu_.e;
+	uint8_t row = mem_[wBlockPtr + 0], column = mem_[wBlockPtr + 1];
+	mem_[wcedc + 0] = row;
+	mem_[wcedc + 1] = column;
 	SET_HL(gb_, wBlockPtr + 1);
-	cpu_.a = mem_[REG_DE(gb_)];
-	mem_[wcedf] = cpu_.a;
+	mem_[wcedf] = mem_[static_cast<uint16_t>(row << 8 | column)];
 }
 
 // the block at wBlockPtr = b (keeping bit 7), redrawn with Func_e31 (or
@@ -1137,9 +1079,7 @@ void BlockFuncs::replace_block(bool e2b)
 {
 	uint16_t at = static_cast<uint16_t>(mem_[wBlockPtr] << 8 | mem_[wBlockPtr + 1]);
 	SET_HL(gb_, at);
-	cpu_.a = (mem_[at] & 0x80) | cpu_.b;
-	cpu_.f = flags::or_(cpu_.a);
-	mem_[at] = cpu_.a;
+	mem_[at] = (mem_[at] & 0x80) | cpu_.b;
 	gb_push16(gb_, at);
 	routines_.call(e2b ? ADDR_Func_e2b : ADDR_Func_e31);
 	SET_HL(gb_, gb_pop16(gb_));
@@ -1446,273 +1386,273 @@ using wl3::level::Progress;
 // chain ends in Free, Solid, Func_1808c, Func_18064 or Func_18078, which set
 // them, or Fire's ret, which is exact. So the hooks that only jump on
 // clobber them; the rest stay exact.
-PORT_EX(ProcessBlock, HOOK_MANUAL_RET, 0) { BlockFuncs(gb).process_block(); }
-PORT(BlockFunc_Free) { BlockFuncs(gb).free(); }
-PORT(BlockFunc_Solid) { BlockFuncs(gb).solid(); }
-PORT_EX(BlockFunc_Water, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Water); b.jump_on(); }
-PORT_EX(BlockFunc_RightCurrent, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_RightCurrent); b.jump_on(); }
-PORT_EX(BlockFunc_UpCurrent, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UpCurrent); b.jump_on(); }
-PORT_EX(BlockFunc_LeftCurrent, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LeftCurrent); b.jump_on(); }
-PORT_EX(BlockFunc_DownCurrent, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DownCurrent); b.jump_on(); }
-PORT_EX(BlockFunc_Floor, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Floor); b.jump_on(); }
-PORT(Func_1808c) { BlockFuncs(gb).free_1808c(); }
-PORT_EX(Func_182ec, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_182ec); b.jump_on(); }
-PORT_EX(EnterDoor, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_EnterDoor); b.jump_on(); }
-PORT(Func_18064) { BlockFuncs(gb).block_func_c18d(0x10); }
-PORT(Func_18078) { BlockFuncs(gb).block_func_c18d(0x01); }
-PORT_EX(BlockFunc_180b5, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_180b5); b.jump_on(); }
-PORT_EX(BlockFunc_1813f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1813f); b.jump_on(); }
-PORT_EX(BlockFunc_1809f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1809f); b.jump_on(); }
-PORT_EX(BlockFunc_18129, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18129); b.jump_on(); }
-PORT_EX(RightSlopeCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_RightSlopeCollision); b.jump_on(); }
-PORT_EX(LeftSlopeCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_LeftSlopeCollision); b.jump_on(); }
-PORT_EX(BlockFunc_RightSlope, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_RightSlope); b.jump_on(); }
-PORT_EX(BlockFunc_LeftSlope, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LeftSlope); b.jump_on(); }
-PORT_EX(BlockFunc_WaterSurface, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_WaterSurface); b.jump_on(); }
-PORT_EX(BlockFunc_18262, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18262); b.jump_on(); }
-PORT_EX(BlockFunc_Ladder, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Ladder); b.jump_on(); }
-PORT_EX(BlockFunc_182dc, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_182dc); b.jump_on(); }
-PORT_EX(BlockFunc_LadderTop, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LadderTop); b.jump_on(); }
-PORT_EX(BlockFunc_182fe, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_182fe); b.jump_on(); }
-PORT_EX(Func_1831a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1831a); b.jump_on(); }
-PORT_EX(BlockFunc_NonSolidSpike, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonSolidSpike); b.jump_on(); }
-PORT_EX(BlockFunc_SolidSpike, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SolidSpike); b.jump_on(); }
-PORT_EX(BlockFunc_WaterSpike, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_WaterSpike); b.jump_on(); }
-PORT_EX(EnterPipeDown, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_EnterPipeDown); b.jump_on(); }
-PORT_EX(EnterPipeUp, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_EnterPipeUp); b.jump_on(); }
-PORT_EX(BlockFunc_DownPipe_Left, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DownPipe_Left); b.jump_on(); }
-PORT_EX(BlockFunc_DownPipe_Right, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DownPipe_Right); b.jump_on(); }
-PORT_EX(BlockFunc_UpPipe_Left, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UpPipe_Left); b.jump_on(); }
-PORT_EX(BlockFunc_UpPipe_Right, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UpPipe_Right); b.jump_on(); }
-PORT_EX(BlockFunc_Door, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Door); b.jump_on(); }
-PORT_EX(BlockFunc_MinigameDoor, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_MinigameDoor); b.jump_on(); }
-PORT_EX(Func_18624, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18624); b.jump_on(); }
-PORT_EX(Func_1864e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1864e); b.jump_on(); }
-PORT_EX(BlockFunc_UnderwaterDoor, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UnderwaterDoor); b.jump_on(); }
-PORT_EX(BlockFunc_18727, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18727); b.jump_on(); }
-PORT_EX(Func_18755, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18755); b.jump_on(); }
-PORT_EX(BlockFunc_TreasureDoor, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_TreasureDoor); b.jump_on(); }
-PORT_EX(BlockFunc_187b0, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_187b0); b.jump_on(); }
-PORT_EX(Func_187c7, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_187c7); b.jump_on(); }
-PORT_EX(BlockFunc_187de, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_187de); b.jump_on(); }
-PORT_EX(Func_187f5, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_187f5); b.jump_on(); }
-PORT_EX(BlockFunc_WalkthroughPipe, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_WalkthroughPipe); b.jump_on(); }
-PORT_EX(BlockFunc_LightSource, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LightSource); b.jump_on(); }
-PORT_EX(BlockFunc_Sand, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Sand); b.jump_on(); }
-PORT_EX(BlockFunc_NonSubmersibleWater, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonSubmersibleWater); b.jump_on(); }
-PORT_EX(BlockFunc_18868, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18868); b.jump_on(); }
-PORT_EX(BlockFunc_188ba, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_188ba); b.jump_on(); }
-PORT_EX(BlockFunc_189f1, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_189f1); b.jump_on(); }
-PORT_EX(BlockFunc_Fire, HOOK_MANUAL_RET, 0) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Fire); b.jump_on(); }
-PORT_EX(BlockFunc_Fence, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Fence); b.jump_on(); }
-PORT_EX(BlockFunc_AirCurrent, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_AirCurrent); b.jump_on(); }
-PORT_EX(BlockFunc_SlipperySolid, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SlipperySolid); b.jump_on(); }
-PORT_EX(BlockFunc_SlipperyFloor, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SlipperyFloor); b.jump_on(); }
-PORT_EX(BlockFunc_CloudPlatform1, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CloudPlatform1); b.jump_on(); }
-PORT_EX(BlockFunc_CloudPlatform2, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CloudPlatform2); b.jump_on(); }
-PORT_EX(BlockFunc_SmallGap, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SmallGap); b.jump_on(); }
-PORT_EX(BlockFunc_Switch, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Switch); b.jump_on(); }
-PORT(BreakBlock) { BlockFuncs(gb).break_block(true, ADDR_ObjParams_Coin); }
-PORT(BreakBlockWithColourCoin) { BlockFuncs(gb).break_block(false, ADDR_ObjParams_ColourCoin); }
-PORT_EX(Func_18f32, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f32); b.jump_on(); }
-PORT_EX(Func_19246, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19246); b.jump_on(); }
-PORT_EX(Func_19481, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19481); b.jump_on(); }
-PORT_EX(Func_18df1, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18df1); b.jump_on(); }
-PORT_EX(Func_19086, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19086); b.jump_on(); }
-PORT_EX(Func_19423, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19423); b.jump_on(); }
-PORT_EX(DoughnutBlockCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_DoughnutBlockCollision); b.jump_on(); }
-PORT_EX(CrackedBlockWithColourCoinCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_CrackedBlockWithColourCoinCollision); b.jump_on(); }
-PORT_EX(CrackedBlockCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_CrackedBlockCollision); b.jump_on(); }
-PORT_EX(NonCrackedBlockCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_NonCrackedBlockCollision); b.jump_on(); }
-PORT_EX(EnemyBlockCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_EnemyBlockCollision); b.jump_on(); }
-PORT_EX(BonfireBlockCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BonfireBlockCollision); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlockWithColourCoin_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_78); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlockWithColourCoin_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_79); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7a); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7b); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7c); b.jump_on(); }
-PORT_EX(Func_18a0f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a0f); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7e); b.jump_on(); }
-PORT_EX(Func_18a17, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a17); b.jump_on(); }
-PORT_EX(Func_18aa8, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18aa8); b.jump_on(); }
-PORT_EX(Func_18aec, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18aec); b.jump_on(); }
-PORT_EX(Func_18b2d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b2d); b.jump_on(); }
-PORT_EX(Func_18b71, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b71); b.jump_on(); }
-PORT_EX(Func_18bb5, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bb5); b.jump_on(); }
-PORT_EX(Func_18bf9, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bf9); b.jump_on(); }
-PORT_EX(Func_18c3a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c3a); b.jump_on(); }
-PORT_EX(Func_18c7e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c7e); b.jump_on(); }
-PORT_EX(Func_19522, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19522); b.jump_on(); }
-PORT_EX(Func_19560, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19560); b.jump_on(); }
-PORT_EX(Func_1959b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1959b); b.jump_on(); }
-PORT_EX(YarnBlockCollision, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_YarnBlockCollision); b.jump_on(); }
-PORT_EX(Func_18e2c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e2c); b.jump_on(); }
-PORT_EX(Func_18ec0, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ec0); b.jump_on(); }
-PORT_EX(Func_18f7d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f7d); b.jump_on(); }
-PORT_EX(Func_19011, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19011); b.jump_on(); }
-PORT_EX(Func_190fe, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190fe); b.jump_on(); }
-PORT_EX(Func_191b3, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191b3); b.jump_on(); }
-PORT_EX(Func_19291, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19291); b.jump_on(); }
-PORT_EX(Func_19346, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19346); b.jump_on(); }
-PORT_EX(Func_193dc, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_193dc); b.jump_on(); }
-PORT_EX(Func_19502, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19502); b.jump_on(); }
-PORT_EX(Func_18a9a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a9a); b.jump_on(); }
-PORT_EX(Func_18a9e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a9e); b.jump_on(); }
-PORT_EX(Func_18aa2, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18aa2); b.jump_on(); }
-PORT_EX(BlockFunc_18aa6, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18aa6); b.jump_on(); }
-PORT_EX(Func_18ade, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ade); b.jump_on(); }
-PORT_EX(Func_18ae2, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ae2); b.jump_on(); }
-PORT_EX(Func_18ae6, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ae6); b.jump_on(); }
-PORT_EX(BlockFunc_18aea, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18aea); b.jump_on(); }
-PORT_EX(BlockFunc_18b23, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b23); b.jump_on(); }
-PORT_EX(BlockFunc_18b2b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b2b); b.jump_on(); }
-PORT_EX(BlockFunc_18b67, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b67); b.jump_on(); }
-PORT_EX(BlockFunc_18b6f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b6f); b.jump_on(); }
-PORT_EX(BlockFunc_18bb3, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18bb3); b.jump_on(); }
-PORT_EX(BlockFunc_18bf7, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18bf7); b.jump_on(); }
-PORT_EX(BlockFunc_18c30, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c30); b.jump_on(); }
-PORT_EX(BlockFunc_18c38, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c38); b.jump_on(); }
-PORT_EX(BlockFunc_18c74, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c74); b.jump_on(); }
-PORT_EX(BlockFunc_18c7c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c7c); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_78); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_79); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_7a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7a); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7b); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_7c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7c); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_7d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7d); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_7e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7e); b.jump_on(); }
-PORT_EX(BlockFunc_CrackedBlock_7f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7f); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_78); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_79); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_7a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7a); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7b); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_7c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7c); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_7d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7d); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_7e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7e); b.jump_on(); }
-PORT_EX(BlockFunc_NonCrackedBlock_7f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7f); b.jump_on(); }
-PORT_EX(BlockFunc_18e0e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e0e); b.jump_on(); }
-PORT_EX(BlockFunc_18e1a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e1a); b.jump_on(); }
-PORT_EX(BlockFunc_18e26, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e26); b.jump_on(); }
-PORT_EX(BlockFunc_18e2a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e2a); b.jump_on(); }
-PORT_EX(BlockFunc_18ea2, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18ea2); b.jump_on(); }
-PORT_EX(BlockFunc_18eae, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18eae); b.jump_on(); }
-PORT_EX(BlockFunc_18ebe, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18ebe); b.jump_on(); }
-PORT_EX(BlockFunc_18f5f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18f5f); b.jump_on(); }
-PORT_EX(BlockFunc_18f6b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18f6b); b.jump_on(); }
-PORT_EX(BlockFunc_18f7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18f7b); b.jump_on(); }
-PORT_EX(BlockFunc_18ff3, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18ff3); b.jump_on(); }
-PORT_EX(BlockFunc_18fff, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18fff); b.jump_on(); }
-PORT_EX(BlockFunc_19007, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19007); b.jump_on(); }
-PORT_EX(BlockFunc_1900f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1900f); b.jump_on(); }
-PORT_EX(BlockFunc_190e4, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_190e4); b.jump_on(); }
-PORT_EX(BlockFunc_190e8, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_190e8); b.jump_on(); }
-PORT_EX(BlockFunc_190fc, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_190fc); b.jump_on(); }
-PORT_EX(BlockFunc_19199, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19199); b.jump_on(); }
-PORT_EX(BlockFunc_1919d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1919d); b.jump_on(); }
-PORT_EX(BlockFunc_191b1, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_191b1); b.jump_on(); }
-PORT_EX(BlockFunc_19277, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19277); b.jump_on(); }
-PORT_EX(BlockFunc_1927b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1927b); b.jump_on(); }
-PORT_EX(BlockFunc_1928f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1928f); b.jump_on(); }
-PORT_EX(BlockFunc_1932c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1932c); b.jump_on(); }
-PORT_EX(BlockFunc_19330, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19330); b.jump_on(); }
-PORT_EX(BlockFunc_19344, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19344); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_78); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_79); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_7a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7a); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7b); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_7c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7c); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_7d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7d); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_7e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7e); b.jump_on(); }
-PORT_EX(BlockFunc_EnemyBlock_7f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7f); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_78); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_79); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_7a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7a); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7b); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_7c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7c); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_7d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7d); b.jump_on(); }
-PORT_EX(BlockFunc_BonfireBlock_7e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7e); b.jump_on(); }
-PORT_EX(BlockFunc_DoughnutBlock_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_78); b.jump_on(); }
-PORT_EX(BlockFunc_DoughnutBlock_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_79); b.jump_on(); }
-PORT_EX(BlockFunc_DoughnutBlock_7a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_7a); b.jump_on(); }
-PORT_EX(BlockFunc_DoughnutBlock_7b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_7b); b.jump_on(); }
-PORT_EX(BlockFunc_19518, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19518); b.jump_on(); }
-PORT_EX(BlockFunc_19520, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19520); b.jump_on(); }
-PORT_EX(BlockFunc_19552, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19552); b.jump_on(); }
-PORT_EX(BlockFunc_19556, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19556); b.jump_on(); }
-PORT_EX(BlockFunc_1955e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1955e); b.jump_on(); }
-PORT_EX(BlockFunc_1958d, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1958d); b.jump_on(); }
-PORT_EX(BlockFunc_19599, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19599); b.jump_on(); }
-PORT_EX(BlockFunc_YarnBlock_79, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_YarnBlock_79); b.jump_on(); }
-PORT_EX(BlockFunc_YarnBlock_78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_YarnBlock_78); b.jump_on(); }
-PORT_EX(Func_19467, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19467); b.jump_on(); }
-PORT_EX(Func_194a7, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194a7); b.jump_on(); }
-PORT_EX(Func_194ab, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194ab); b.jump_on(); }
-PORT_EX(Func_194af, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194af); b.jump_on(); }
-PORT_EX(Func_194b3, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194b3); b.jump_on(); }
-PORT_EX(Func_194e4, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194e4); b.jump_on(); }
-PORT_EX(Func_194e8, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194e8); b.jump_on(); }
-PORT_EX(Func_194ec, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194ec); b.jump_on(); }
-PORT_EX(Func_194f0, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194f0); b.jump_on(); }
-PORT_EX(Func_194f4, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194f4); b.jump_on(); }
-PORT_EX(Func_194f8, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194f8); b.jump_on(); }
-PORT_EX(Func_194fc, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194fc); b.jump_on(); }
-PORT_EX(Func_19500, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19500); b.jump_on(); }
-PORT_EX(Func_195cf, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_195cf); b.jump_on(); }
-PORT_EX(Func_195d3, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_195d3); b.jump_on(); }
-PORT_EX(Func_19514, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19514); b.jump_on(); }
-PORT_EX(Func_1951c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1951c); b.jump_on(); }
-PORT_EX(Func_1955a, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1955a); b.jump_on(); }
-PORT_EX(Func_19591, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19591); b.jump_on(); }
-PORT_EX(Func_19595, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19595); b.jump_on(); }
-PORT_EX(Func_19328, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19328); b.jump_on(); }
-PORT_EX(Func_19334, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19334); b.jump_on(); }
-PORT_EX(Func_19338, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19338); b.jump_on(); }
-PORT_EX(Func_1933c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1933c); b.jump_on(); }
-PORT_EX(Func_19340, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19340); b.jump_on(); }
-PORT_EX(Func_19273, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19273); b.jump_on(); }
-PORT_EX(Func_1927f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1927f); b.jump_on(); }
-PORT_EX(Func_19283, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19283); b.jump_on(); }
-PORT_EX(Func_19287, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19287); b.jump_on(); }
-PORT_EX(Func_1928b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1928b); b.jump_on(); }
-PORT_EX(Func_19195, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19195); b.jump_on(); }
-PORT_EX(Func_191a1, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191a1); b.jump_on(); }
-PORT_EX(Func_191a5, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191a5); b.jump_on(); }
-PORT_EX(Func_191a9, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191a9); b.jump_on(); }
-PORT_EX(Func_191ad, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191ad); b.jump_on(); }
-PORT_EX(Func_18b1f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b1f); b.jump_on(); }
-PORT_EX(Func_18b27, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b27); b.jump_on(); }
-PORT_EX(Func_18b63, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b63); b.jump_on(); }
-PORT_EX(Func_18b6b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b6b); b.jump_on(); }
-PORT_EX(Func_18ba7, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ba7); b.jump_on(); }
-PORT_EX(Func_18bab, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bab); b.jump_on(); }
-PORT_EX(Func_18baf, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18baf); b.jump_on(); }
-PORT_EX(Func_18beb, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18beb); b.jump_on(); }
-PORT_EX(Func_18bef, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bef); b.jump_on(); }
-PORT_EX(Func_18bf3, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bf3); b.jump_on(); }
-PORT_EX(Func_18c2c, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c2c); b.jump_on(); }
-PORT_EX(Func_18c34, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c34); b.jump_on(); }
-PORT_EX(Func_18c70, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c70); b.jump_on(); }
-PORT_EX(Func_18c78, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c78); b.jump_on(); }
-PORT_EX(Func_18e12, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e12); b.jump_on(); }
-PORT_EX(Func_18e16, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e16); b.jump_on(); }
-PORT_EX(Func_18e1e, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e1e); b.jump_on(); }
-PORT_EX(Func_18e22, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e22); b.jump_on(); }
-PORT_EX(Func_18ea6, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ea6); b.jump_on(); }
-PORT_EX(Func_18eaa, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eaa); b.jump_on(); }
-PORT_EX(Func_18eb2, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eb2); b.jump_on(); }
-PORT_EX(Func_18eb6, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eb6); b.jump_on(); }
-PORT_EX(Func_18eba, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eba); b.jump_on(); }
-PORT_EX(Func_18f63, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f63); b.jump_on(); }
-PORT_EX(Func_18f67, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f67); b.jump_on(); }
-PORT_EX(Func_18f6f, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f6f); b.jump_on(); }
-PORT_EX(Func_18f73, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f73); b.jump_on(); }
-PORT_EX(Func_18f77, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f77); b.jump_on(); }
-PORT_EX(Func_18ff7, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ff7); b.jump_on(); }
-PORT_EX(Func_18ffb, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ffb); b.jump_on(); }
-PORT_EX(Func_19003, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19003); b.jump_on(); }
-PORT_EX(Func_1900b, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1900b); b.jump_on(); }
-PORT_EX(Func_190e0, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190e0); b.jump_on(); }
-PORT_EX(Func_190ec, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190ec); b.jump_on(); }
-PORT_EX(Func_190f0, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190f0); b.jump_on(); }
-PORT_EX(Func_190f4, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190f4); b.jump_on(); }
-PORT_EX(Func_190f8, HOOK_MANUAL_RET, R_A | R_F) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190f8); b.jump_on(); }
+PORT_EX(ProcessBlock, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_A | R_H | R_L)) { BlockFuncs(gb).process_block(); }
+PORT_EX(BlockFunc_Free, 0, ALL_REGISTERS & ~(R_A | R_H | R_L)) { BlockFuncs(gb).free(); }
+PORT_EX(BlockFunc_Solid, 0, ALL_REGISTERS & ~(R_A | R_H | R_L)) { BlockFuncs(gb).solid(); }
+PORT_EX(BlockFunc_Water, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Water); b.jump_on(); }
+PORT_EX(BlockFunc_RightCurrent, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_RightCurrent); b.jump_on(); }
+PORT_EX(BlockFunc_UpCurrent, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UpCurrent); b.jump_on(); }
+PORT_EX(BlockFunc_LeftCurrent, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LeftCurrent); b.jump_on(); }
+PORT_EX(BlockFunc_DownCurrent, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DownCurrent); b.jump_on(); }
+PORT_EX(BlockFunc_Floor, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Floor); b.jump_on(); }
+PORT_EX(Func_1808c, 0, ALL_REGISTERS & ~(R_A | R_H | R_L)) { BlockFuncs(gb).free_1808c(); }
+PORT_EX(Func_182ec, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_182ec); b.jump_on(); }
+PORT_EX(EnterDoor, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_EnterDoor); b.jump_on(); }
+PORT_EX(Func_18064, 0, ALL_REGISTERS & ~(R_A | R_H | R_L)) { BlockFuncs(gb).block_func_c18d(0x10); }
+PORT_EX(Func_18078, 0, ALL_REGISTERS & ~(R_A | R_H | R_L)) { BlockFuncs(gb).block_func_c18d(0x01); }
+PORT_EX(BlockFunc_180b5, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_180b5); b.jump_on(); }
+PORT_EX(BlockFunc_1813f, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1813f); b.jump_on(); }
+PORT_EX(BlockFunc_1809f, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1809f); b.jump_on(); }
+PORT_EX(BlockFunc_18129, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18129); b.jump_on(); }
+PORT_EX(RightSlopeCollision, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_RightSlopeCollision); b.jump_on(); }
+PORT_EX(LeftSlopeCollision, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_LeftSlopeCollision); b.jump_on(); }
+PORT_EX(BlockFunc_RightSlope, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_RightSlope); b.jump_on(); }
+PORT_EX(BlockFunc_LeftSlope, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LeftSlope); b.jump_on(); }
+PORT_EX(BlockFunc_WaterSurface, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_WaterSurface); b.jump_on(); }
+PORT_EX(BlockFunc_18262, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18262); b.jump_on(); }
+PORT_EX(BlockFunc_Ladder, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Ladder); b.jump_on(); }
+PORT_EX(BlockFunc_182dc, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_182dc); b.jump_on(); }
+PORT_EX(BlockFunc_LadderTop, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LadderTop); b.jump_on(); }
+PORT_EX(BlockFunc_182fe, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_182fe); b.jump_on(); }
+PORT_EX(Func_1831a, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1831a); b.jump_on(); }
+PORT_EX(BlockFunc_NonSolidSpike, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonSolidSpike); b.jump_on(); }
+PORT_EX(BlockFunc_SolidSpike, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SolidSpike); b.jump_on(); }
+PORT_EX(BlockFunc_WaterSpike, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_WaterSpike); b.jump_on(); }
+PORT_EX(EnterPipeDown, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_EnterPipeDown); b.jump_on(); }
+PORT_EX(EnterPipeUp, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_EnterPipeUp); b.jump_on(); }
+PORT_EX(BlockFunc_DownPipe_Left, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DownPipe_Left); b.jump_on(); }
+PORT_EX(BlockFunc_DownPipe_Right, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DownPipe_Right); b.jump_on(); }
+PORT_EX(BlockFunc_UpPipe_Left, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UpPipe_Left); b.jump_on(); }
+PORT_EX(BlockFunc_UpPipe_Right, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UpPipe_Right); b.jump_on(); }
+PORT_EX(BlockFunc_Door, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Door); b.jump_on(); }
+PORT_EX(BlockFunc_MinigameDoor, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_MinigameDoor); b.jump_on(); }
+PORT_EX(Func_18624, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18624); b.jump_on(); }
+PORT_EX(Func_1864e, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1864e); b.jump_on(); }
+PORT_EX(BlockFunc_UnderwaterDoor, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UnderwaterDoor); b.jump_on(); }
+PORT_EX(BlockFunc_18727, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18727); b.jump_on(); }
+PORT_EX(Func_18755, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18755); b.jump_on(); }
+PORT_EX(BlockFunc_TreasureDoor, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_TreasureDoor); b.jump_on(); }
+PORT_EX(BlockFunc_187b0, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_187b0); b.jump_on(); }
+PORT_EX(Func_187c7, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_187c7); b.jump_on(); }
+PORT_EX(BlockFunc_187de, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_187de); b.jump_on(); }
+PORT_EX(Func_187f5, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_187f5); b.jump_on(); }
+PORT_EX(BlockFunc_WalkthroughPipe, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_WalkthroughPipe); b.jump_on(); }
+PORT_EX(BlockFunc_LightSource, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LightSource); b.jump_on(); }
+PORT_EX(BlockFunc_Sand, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Sand); b.jump_on(); }
+PORT_EX(BlockFunc_NonSubmersibleWater, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonSubmersibleWater); b.jump_on(); }
+PORT_EX(BlockFunc_18868, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18868); b.jump_on(); }
+PORT_EX(BlockFunc_188ba, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_188ba); b.jump_on(); }
+PORT_EX(BlockFunc_189f1, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_189f1); b.jump_on(); }
+PORT_EX(BlockFunc_Fire, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_A | R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Fire); b.jump_on(); }
+PORT_EX(BlockFunc_Fence, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Fence); b.jump_on(); }
+PORT_EX(BlockFunc_AirCurrent, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_AirCurrent); b.jump_on(); }
+PORT_EX(BlockFunc_SlipperySolid, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SlipperySolid); b.jump_on(); }
+PORT_EX(BlockFunc_SlipperyFloor, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SlipperyFloor); b.jump_on(); }
+PORT_EX(BlockFunc_CloudPlatform1, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CloudPlatform1); b.jump_on(); }
+PORT_EX(BlockFunc_CloudPlatform2, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CloudPlatform2); b.jump_on(); }
+PORT_EX(BlockFunc_SmallGap, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_SmallGap); b.jump_on(); }
+PORT_EX(BlockFunc_Switch, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Switch); b.jump_on(); }
+PORT_EX(BreakBlock, 0, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs(gb).break_block(true, ADDR_ObjParams_Coin); }
+PORT_EX(BreakBlockWithColourCoin, 0, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs(gb).break_block(false, ADDR_ObjParams_ColourCoin); }
+PORT_EX(Func_18f32, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f32); b.jump_on(); }
+PORT_EX(Func_19246, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19246); b.jump_on(); }
+PORT_EX(Func_19481, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19481); b.jump_on(); }
+PORT_EX(Func_18df1, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18df1); b.jump_on(); }
+PORT_EX(Func_19086, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19086); b.jump_on(); }
+PORT_EX(Func_19423, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19423); b.jump_on(); }
+PORT_EX(DoughnutBlockCollision, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_DoughnutBlockCollision); b.jump_on(); }
+PORT_EX(CrackedBlockWithColourCoinCollision, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_CrackedBlockWithColourCoinCollision); b.jump_on(); }
+PORT_EX(CrackedBlockCollision, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_CrackedBlockCollision); b.jump_on(); }
+PORT_EX(NonCrackedBlockCollision, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_NonCrackedBlockCollision); b.jump_on(); }
+PORT_EX(EnemyBlockCollision, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_EnemyBlockCollision); b.jump_on(); }
+PORT_EX(BonfireBlockCollision, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BonfireBlockCollision); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlockWithColourCoin_78, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_78); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlockWithColourCoin_79, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_79); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7a, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7a); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7b); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7c, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7c); b.jump_on(); }
+PORT_EX(Func_18a0f, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a0f); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlockWithColourCoin_7e, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlockWithColourCoin_7e); b.jump_on(); }
+PORT_EX(Func_18a17, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a17); b.jump_on(); }
+PORT_EX(Func_18aa8, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18aa8); b.jump_on(); }
+PORT_EX(Func_18aec, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18aec); b.jump_on(); }
+PORT_EX(Func_18b2d, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b2d); b.jump_on(); }
+PORT_EX(Func_18b71, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b71); b.jump_on(); }
+PORT_EX(Func_18bb5, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bb5); b.jump_on(); }
+PORT_EX(Func_18bf9, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bf9); b.jump_on(); }
+PORT_EX(Func_18c3a, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c3a); b.jump_on(); }
+PORT_EX(Func_18c7e, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c7e); b.jump_on(); }
+PORT_EX(Func_19522, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19522); b.jump_on(); }
+PORT_EX(Func_19560, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19560); b.jump_on(); }
+PORT_EX(Func_1959b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1959b); b.jump_on(); }
+PORT_EX(YarnBlockCollision, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_YarnBlockCollision); b.jump_on(); }
+PORT_EX(Func_18e2c, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e2c); b.jump_on(); }
+PORT_EX(Func_18ec0, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ec0); b.jump_on(); }
+PORT_EX(Func_18f7d, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f7d); b.jump_on(); }
+PORT_EX(Func_19011, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19011); b.jump_on(); }
+PORT_EX(Func_190fe, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190fe); b.jump_on(); }
+PORT_EX(Func_191b3, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191b3); b.jump_on(); }
+PORT_EX(Func_19291, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19291); b.jump_on(); }
+PORT_EX(Func_19346, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19346); b.jump_on(); }
+PORT_EX(Func_193dc, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_193dc); b.jump_on(); }
+PORT_EX(Func_19502, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19502); b.jump_on(); }
+PORT_EX(Func_18a9a, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a9a); b.jump_on(); }
+PORT_EX(Func_18a9e, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18a9e); b.jump_on(); }
+PORT_EX(Func_18aa2, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18aa2); b.jump_on(); }
+PORT_EX(BlockFunc_18aa6, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18aa6); b.jump_on(); }
+PORT_EX(Func_18ade, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ade); b.jump_on(); }
+PORT_EX(Func_18ae2, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ae2); b.jump_on(); }
+PORT_EX(Func_18ae6, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ae6); b.jump_on(); }
+PORT_EX(BlockFunc_18aea, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18aea); b.jump_on(); }
+PORT_EX(BlockFunc_18b23, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b23); b.jump_on(); }
+PORT_EX(BlockFunc_18b2b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b2b); b.jump_on(); }
+PORT_EX(BlockFunc_18b67, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b67); b.jump_on(); }
+PORT_EX(BlockFunc_18b6f, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18b6f); b.jump_on(); }
+PORT_EX(BlockFunc_18bb3, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18bb3); b.jump_on(); }
+PORT_EX(BlockFunc_18bf7, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18bf7); b.jump_on(); }
+PORT_EX(BlockFunc_18c30, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c30); b.jump_on(); }
+PORT_EX(BlockFunc_18c38, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c38); b.jump_on(); }
+PORT_EX(BlockFunc_18c74, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c74); b.jump_on(); }
+PORT_EX(BlockFunc_18c7c, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18c7c); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_78, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_78); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_79, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_79); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_7a, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7a); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_7b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7b); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_7c, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7c); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_7d, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7d); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_7e, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7e); b.jump_on(); }
+PORT_EX(BlockFunc_CrackedBlock_7f, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_CrackedBlock_7f); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_78, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_78); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_79, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_79); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_7a, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7a); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_7b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7b); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_7c, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7c); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_7d, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7d); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_7e, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7e); b.jump_on(); }
+PORT_EX(BlockFunc_NonCrackedBlock_7f, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_NonCrackedBlock_7f); b.jump_on(); }
+PORT_EX(BlockFunc_18e0e, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e0e); b.jump_on(); }
+PORT_EX(BlockFunc_18e1a, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e1a); b.jump_on(); }
+PORT_EX(BlockFunc_18e26, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e26); b.jump_on(); }
+PORT_EX(BlockFunc_18e2a, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18e2a); b.jump_on(); }
+PORT_EX(BlockFunc_18ea2, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18ea2); b.jump_on(); }
+PORT_EX(BlockFunc_18eae, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18eae); b.jump_on(); }
+PORT_EX(BlockFunc_18ebe, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18ebe); b.jump_on(); }
+PORT_EX(BlockFunc_18f5f, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18f5f); b.jump_on(); }
+PORT_EX(BlockFunc_18f6b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18f6b); b.jump_on(); }
+PORT_EX(BlockFunc_18f7b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18f7b); b.jump_on(); }
+PORT_EX(BlockFunc_18ff3, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18ff3); b.jump_on(); }
+PORT_EX(BlockFunc_18fff, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_18fff); b.jump_on(); }
+PORT_EX(BlockFunc_19007, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19007); b.jump_on(); }
+PORT_EX(BlockFunc_1900f, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1900f); b.jump_on(); }
+PORT_EX(BlockFunc_190e4, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_190e4); b.jump_on(); }
+PORT_EX(BlockFunc_190e8, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_190e8); b.jump_on(); }
+PORT_EX(BlockFunc_190fc, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_190fc); b.jump_on(); }
+PORT_EX(BlockFunc_19199, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19199); b.jump_on(); }
+PORT_EX(BlockFunc_1919d, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1919d); b.jump_on(); }
+PORT_EX(BlockFunc_191b1, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_191b1); b.jump_on(); }
+PORT_EX(BlockFunc_19277, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19277); b.jump_on(); }
+PORT_EX(BlockFunc_1927b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1927b); b.jump_on(); }
+PORT_EX(BlockFunc_1928f, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1928f); b.jump_on(); }
+PORT_EX(BlockFunc_1932c, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1932c); b.jump_on(); }
+PORT_EX(BlockFunc_19330, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19330); b.jump_on(); }
+PORT_EX(BlockFunc_19344, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19344); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_78, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_78); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_79, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_79); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_7a, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7a); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_7b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7b); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_7c, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7c); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_7d, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7d); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_7e, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7e); b.jump_on(); }
+PORT_EX(BlockFunc_EnemyBlock_7f, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_EnemyBlock_7f); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_78, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_78); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_79, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_79); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_7a, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7a); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_7b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7b); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_7c, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7c); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_7d, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7d); b.jump_on(); }
+PORT_EX(BlockFunc_BonfireBlock_7e, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_BonfireBlock_7e); b.jump_on(); }
+PORT_EX(BlockFunc_DoughnutBlock_78, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_78); b.jump_on(); }
+PORT_EX(BlockFunc_DoughnutBlock_79, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_79); b.jump_on(); }
+PORT_EX(BlockFunc_DoughnutBlock_7a, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_7a); b.jump_on(); }
+PORT_EX(BlockFunc_DoughnutBlock_7b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DoughnutBlock_7b); b.jump_on(); }
+PORT_EX(BlockFunc_19518, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19518); b.jump_on(); }
+PORT_EX(BlockFunc_19520, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19520); b.jump_on(); }
+PORT_EX(BlockFunc_19552, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19552); b.jump_on(); }
+PORT_EX(BlockFunc_19556, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19556); b.jump_on(); }
+PORT_EX(BlockFunc_1955e, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1955e); b.jump_on(); }
+PORT_EX(BlockFunc_1958d, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1958d); b.jump_on(); }
+PORT_EX(BlockFunc_19599, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_19599); b.jump_on(); }
+PORT_EX(BlockFunc_YarnBlock_79, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_YarnBlock_79); b.jump_on(); }
+PORT_EX(BlockFunc_YarnBlock_78, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_YarnBlock_78); b.jump_on(); }
+PORT_EX(Func_19467, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19467); b.jump_on(); }
+PORT_EX(Func_194a7, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194a7); b.jump_on(); }
+PORT_EX(Func_194ab, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194ab); b.jump_on(); }
+PORT_EX(Func_194af, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194af); b.jump_on(); }
+PORT_EX(Func_194b3, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194b3); b.jump_on(); }
+PORT_EX(Func_194e4, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194e4); b.jump_on(); }
+PORT_EX(Func_194e8, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194e8); b.jump_on(); }
+PORT_EX(Func_194ec, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194ec); b.jump_on(); }
+PORT_EX(Func_194f0, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194f0); b.jump_on(); }
+PORT_EX(Func_194f4, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194f4); b.jump_on(); }
+PORT_EX(Func_194f8, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194f8); b.jump_on(); }
+PORT_EX(Func_194fc, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_194fc); b.jump_on(); }
+PORT_EX(Func_19500, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19500); b.jump_on(); }
+PORT_EX(Func_195cf, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_195cf); b.jump_on(); }
+PORT_EX(Func_195d3, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_195d3); b.jump_on(); }
+PORT_EX(Func_19514, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19514); b.jump_on(); }
+PORT_EX(Func_1951c, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1951c); b.jump_on(); }
+PORT_EX(Func_1955a, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1955a); b.jump_on(); }
+PORT_EX(Func_19591, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19591); b.jump_on(); }
+PORT_EX(Func_19595, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19595); b.jump_on(); }
+PORT_EX(Func_19328, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19328); b.jump_on(); }
+PORT_EX(Func_19334, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19334); b.jump_on(); }
+PORT_EX(Func_19338, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19338); b.jump_on(); }
+PORT_EX(Func_1933c, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1933c); b.jump_on(); }
+PORT_EX(Func_19340, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19340); b.jump_on(); }
+PORT_EX(Func_19273, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19273); b.jump_on(); }
+PORT_EX(Func_1927f, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1927f); b.jump_on(); }
+PORT_EX(Func_19283, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19283); b.jump_on(); }
+PORT_EX(Func_19287, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19287); b.jump_on(); }
+PORT_EX(Func_1928b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1928b); b.jump_on(); }
+PORT_EX(Func_19195, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19195); b.jump_on(); }
+PORT_EX(Func_191a1, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191a1); b.jump_on(); }
+PORT_EX(Func_191a5, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191a5); b.jump_on(); }
+PORT_EX(Func_191a9, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191a9); b.jump_on(); }
+PORT_EX(Func_191ad, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_191ad); b.jump_on(); }
+PORT_EX(Func_18b1f, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b1f); b.jump_on(); }
+PORT_EX(Func_18b27, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b27); b.jump_on(); }
+PORT_EX(Func_18b63, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b63); b.jump_on(); }
+PORT_EX(Func_18b6b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18b6b); b.jump_on(); }
+PORT_EX(Func_18ba7, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ba7); b.jump_on(); }
+PORT_EX(Func_18bab, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bab); b.jump_on(); }
+PORT_EX(Func_18baf, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18baf); b.jump_on(); }
+PORT_EX(Func_18beb, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18beb); b.jump_on(); }
+PORT_EX(Func_18bef, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bef); b.jump_on(); }
+PORT_EX(Func_18bf3, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18bf3); b.jump_on(); }
+PORT_EX(Func_18c2c, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c2c); b.jump_on(); }
+PORT_EX(Func_18c34, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c34); b.jump_on(); }
+PORT_EX(Func_18c70, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c70); b.jump_on(); }
+PORT_EX(Func_18c78, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18c78); b.jump_on(); }
+PORT_EX(Func_18e12, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e12); b.jump_on(); }
+PORT_EX(Func_18e16, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e16); b.jump_on(); }
+PORT_EX(Func_18e1e, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e1e); b.jump_on(); }
+PORT_EX(Func_18e22, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18e22); b.jump_on(); }
+PORT_EX(Func_18ea6, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ea6); b.jump_on(); }
+PORT_EX(Func_18eaa, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eaa); b.jump_on(); }
+PORT_EX(Func_18eb2, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eb2); b.jump_on(); }
+PORT_EX(Func_18eb6, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eb6); b.jump_on(); }
+PORT_EX(Func_18eba, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18eba); b.jump_on(); }
+PORT_EX(Func_18f63, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f63); b.jump_on(); }
+PORT_EX(Func_18f67, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f67); b.jump_on(); }
+PORT_EX(Func_18f6f, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f6f); b.jump_on(); }
+PORT_EX(Func_18f73, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f73); b.jump_on(); }
+PORT_EX(Func_18f77, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18f77); b.jump_on(); }
+PORT_EX(Func_18ff7, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ff7); b.jump_on(); }
+PORT_EX(Func_18ffb, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_18ffb); b.jump_on(); }
+PORT_EX(Func_19003, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_19003); b.jump_on(); }
+PORT_EX(Func_1900b, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_1900b); b.jump_on(); }
+PORT_EX(Func_190e0, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190e0); b.jump_on(); }
+PORT_EX(Func_190ec, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190ec); b.jump_on(); }
+PORT_EX(Func_190f0, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190f0); b.jump_on(); }
+PORT_EX(Func_190f4, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190f4); b.jump_on(); }
+PORT_EX(Func_190f8, HOOK_MANUAL_RET, ALL_REGISTERS & ~(R_H | R_L)) { BlockFuncs b(gb); b.dispatch(ADDR_Func_190f8); b.jump_on(); }
