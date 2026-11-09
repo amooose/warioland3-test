@@ -1,9 +1,7 @@
 // Home's floor transitions (src/home/floor_transition.asm) as plain C++;
-// see floor_transition.hpp. The hooks leave the registers the asm leaves
-// (Func_19720 jumps to them, and its callers are register-level).
+// see floor_transition.hpp. No caller reads a register these leave.
 #include "floor_transition.hpp"
 
-#include "../flags.hpp"
 #include "../routines.hpp"
 #include "memory.hpp"
 
@@ -91,73 +89,14 @@ void handle_floor_transition(GB *gb)
 } // namespace wl3::home
 
 using namespace wl3::home;
-namespace flags = wl3::flags;
 
-namespace {
-
-// GetFloorForYPos's registers: c = the floor, a and f from the cp $80 (and
-// the inc c after it)
-void floor_regs(GB *gb)
-{
-	wl3::Memory mem(gb);
-	uint8_t floor = floor_for_y_pos(gb);
-	uint8_t lo = mem[wWarioYPos + 1];
-	gb->cpu.a = lo;
-	gb->cpu.f = flags::cp(lo, 0x80);
-	if (lo < 0x80)
-		gb->cpu.f = flags::inc(gb->cpu.f, static_cast<uint8_t>(floor - 1));
-	gb->cpu.c = floor;
-}
-
-// The camera and floor check: false (with carry) without CAM_TRANSITIONS,
-// else a = wFloor - c and its flags
-bool check_regs(GB *gb)
-{
-	wl3::Memory mem(gb);
-	uint8_t a = mem[wCameraConfigFlags] & CAM_SCROLLING_MASK;
-	gb->cpu.a = a;
-	gb->cpu.f = flags::cp(a, CAM_TRANSITIONS);
-	if (a < CAM_TRANSITIONS)
-		return false;
-	floor_regs(gb);
-	uint8_t floor = mem[wFloor];
-	gb->cpu.a = static_cast<uint8_t>(floor - gb->cpu.c);
-	gb->cpu.f = flags::sub(floor, gb->cpu.c);
-	return true;
-}
-
-// StartUpwards / DownwardsFloorTransition (c = the new floor), ending on xor a
-void start_regs(GB *gb, bool up)
-{
-	start_floor_transition(gb, gb->cpu.c, up);
-	gb->cpu.a = 0;
-	gb->cpu.f = FLAG_Z;
-}
-
-} // namespace
-
-PORT_EX(GetFloorForYPos, 0, 0) { floor_regs(gb); }
-PORT_EX(UpdateFloor, 0, 0)
-{
-	floor_regs(gb);
-	gb->cpu.a = gb->cpu.c;
-	update_floor(gb);
-}
-PORT_EX(StartDownwardsFloorTransition, 0, 0) { start_regs(gb, false); }
-PORT_EX(StartUpwardsFloorTransition, 0, 0) { start_regs(gb, true); }
-PORT_EX(HandleDownwardsFloorTransition, 0, 0)
-{
-	if (check_regs(gb) && !(gb->cpu.f & (FLAG_Z | FLAG_C)))
-		start_regs(gb, false);
-}
+// c = the floor
+PORT_EX(GetFloorForYPos, 0, ALL_REGISTERS & ~R_C) { gb->cpu.c = floor_for_y_pos(gb); }
+PORT_EX(UpdateFloor, 0, ALL_REGISTERS) { update_floor(gb); }
+// c = the new floor
+PORT_EX(StartDownwardsFloorTransition, 0, ALL_REGISTERS) { start_floor_transition(gb, gb->cpu.c, false); }
+PORT_EX(StartUpwardsFloorTransition, 0, ALL_REGISTERS) { start_floor_transition(gb, gb->cpu.c, true); }
+PORT_EX(HandleDownwardsFloorTransition, 0, ALL_REGISTERS) { handle_downwards_floor_transition(gb); }
 // unreferenced?
-PORT_EX(Func_1180, 0, 0)
-{
-	if (check_regs(gb) && !(gb->cpu.f & FLAG_Z))
-		start_regs(gb, gb->cpu.f & FLAG_C);
-}
-PORT_EX(HandleUpwardsFloorTransition, 0, 0)
-{
-	if (check_regs(gb) && (gb->cpu.f & FLAG_C))
-		start_regs(gb, true);
-}
+PORT_EX(Func_1180, 0, ALL_REGISTERS) { handle_floor_transition(gb); }
+PORT_EX(HandleUpwardsFloorTransition, 0, ALL_REGISTERS) { handle_upwards_floor_transition(gb); }

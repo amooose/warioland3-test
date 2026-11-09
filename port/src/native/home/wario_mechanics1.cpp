@@ -1,9 +1,7 @@
 // home/wario_mechanics1 (src/home/wario_mechanics1.asm) as plain C++; see
 // wario.hpp. The callers are C++ (the Wario states, the object
 // interactions), which read no register after the velocity helpers: those
-// hooks clobber them all but b, the walk velocity. The floor transitions
-// stay exact (Func_19720 jumps to them) and the recoveries too (the block
-// functions call them, and the states they set read the registers).
+// hooks clobber them all but b, the walk velocity.
 #include "wario.hpp"
 
 #include "../flags.hpp"
@@ -85,13 +83,9 @@ void trigger_floor_transition(GB *gb, bool update_y)
 	handle_floor_transition(gb);
 }
 
-void recover_from_transformation(GB *gb, bool invincible)
+static void reset_level_music_wario_pals_and_state(GB *gb)
 {
 	Memory mem(gb);
-	clear_transformation_values(gb);
-	if (invincible)
-		mem[wInvincibleCounter] = 0x10;
-	// ResetLevelMusicWarioPalsAndState
 	update_level_music(gb);
 	set_wario_pal(gb, ADDR_WarioDefaultPal);
 	if (mem[wJumpVelTable])
@@ -100,6 +94,18 @@ void recover_from_transformation(GB *gb, bool invincible)
 		Routines(gb).farcall(BANK_SetState_Idling, ADDR_SetState_Idling);
 	play_sfx(mem, SFX_RECOVERY); // PlayRecoverySFX
 }
+
+void recover_from_transformation(GB *gb, bool invincible)
+{
+	Memory mem(gb);
+	clear_transformation_values(gb);
+	if (invincible)
+		mem[wInvincibleCounter] = 0x10;
+	reset_level_music_wario_pals_and_state(gb);
+}
+
+// callable by the hooks below
+static void reset_level_music_wario_pals(GB *gb) { reset_level_music_wario_pals_and_state(gb); }
 
 } // namespace wl3::home
 
@@ -112,49 +118,11 @@ PORT_EX(ApplySlopedWalkVelocity, 0, ALL_REGISTERS & ~R_B) { gb->cpu.b = sloped_w
 PORT_EX(ApplyWalkVelocity_Right, 0, ALL_REGISTERS & ~R_B) { gb->cpu.b = apply_walk_velocity(gb, true); }
 PORT_EX(ApplyWalkVelocity_Left, 0, ALL_REGISTERS & ~R_B) { gb->cpu.b = apply_walk_velocity(gb, false); }
 
-// TriggerDownwardsFloorTransition is HandleDownwardsFloorTransition, and
-// TriggerFloorTransition_SkipUpdateYPos Func_1180, to the register (called:
-// the fuzzer wants a hook's exit where the asm's ret goes)
-PORT_EX(TriggerDownwardsFloorTransition, 0, 0) { wl3::Routines(gb).call(ADDR_HandleDownwardsFloorTransition); }
-PORT_EX(TriggerFloorTransition_SkipUpdateYPos, 0, 0) { wl3::Routines(gb).call(ADDR_Func_1180); }
-PORT_EX(TriggerFloorTransition, 0, 0)
-{
-	wl3::Memory mem(gb);
-	mem[wWarioYPos + 0] = mem[hYPosHi];
-	mem[wWarioYPos + 1] = mem[hYPosHi + 1];
-	gb->cpu.a = mem[hYPosHi + 1];
-	SET_HL(gb, hYPosHi + 1);
-	SET_DE(gb, wWarioYPos + 1);
-	wl3::Routines(gb).call(ADDR_Func_1180);
-}
+PORT_EX(TriggerDownwardsFloorTransition, 0, ALL_REGISTERS) { handle_downwards_floor_transition(gb); }
+PORT_EX(TriggerFloorTransition_SkipUpdateYPos, 0, ALL_REGISTERS) { trigger_floor_transition(gb, false); }
+PORT_EX(TriggerFloorTransition, 0, ALL_REGISTERS) { trigger_floor_transition(gb, true); }
 
-// The recoveries as the asm leaves the registers: SetState_Idling and
-// StartFall stay exact for the block functions
-PORT_EX(ResetLevelMusicWarioPalsAndState, HOOK_MANUAL_RET, 0)
-{
-	wl3::Routines r(gb);
-	r.call(ADDR_UpdateLevelMusic);
-	SET_HL(gb, ADDR_WarioDefaultPal);
-	r.call(ADDR_SetWarioPal);
-	gb->cpu.a = wl3::Memory(gb)[wJumpVelTable];
-	gb->cpu.f = wl3::flags::and_(gb->cpu.a);
-	if (gb->cpu.a)
-		r.farcall(BANK_StartFall, ADDR_StartFall); // .fall
-	else
-		r.farcall(BANK_SetState_Idling, ADDR_SetState_Idling);
-	JUMP_TO(ADDR_PlayRecoverySFX);
-}
-PORT_EX(RecoverFromTransformation, HOOK_MANUAL_RET, 0)
-{
-	wl3::Routines(gb).call(ADDR_ClearTransformationValues);
-	gb->cpu.a = 0x10;
-	wl3::Memory mem(gb);
-	mem[wInvincibleCounter] = 0x10;
-	JUMP_TO(ADDR_ResetLevelMusicWarioPalsAndState);
-}
-PORT_EX(RecoverFromTransformation_WithoutInvincibility, HOOK_MANUAL_RET, 0)
-{
-	wl3::Routines(gb).call(ADDR_ClearTransformationValues);
-	JUMP_TO(ADDR_ResetLevelMusicWarioPalsAndState);
-}
+PORT_EX(ResetLevelMusicWarioPalsAndState, 0, ALL_REGISTERS) { reset_level_music_wario_pals(gb); }
+PORT_EX(RecoverFromTransformation, 0, ALL_REGISTERS) { recover_from_transformation(gb, true); }
+PORT_EX(RecoverFromTransformation_WithoutInvincibility, 0, ALL_REGISTERS) { recover_from_transformation(gb, false); }
 PORT_EX(InvalidWarioStateReset, HOOK_MANUAL_RET, 0) { JUMP_TO(ADDR_Init); }

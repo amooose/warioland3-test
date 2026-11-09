@@ -2677,7 +2677,7 @@ PORT_EX(SetState_ZombieKnockBack, 0, ALL_REGISTERS) { WarioStates3(gb).port_SetS
 // BlockFunc_LightSource farcalls it from inside a collision check, and the
 // check's register-level callers may read what the block function leaves:
 // it leaves b to l alone, and a and f as its xor a
-PORT_EX(SetState_ZombieRecovering, 0, 0)
+PORT_EX(SetState_ZombieRecovering, 0, ALL_REGISTERS)
 {
 	WarioStates3(gb).port_SetState_ZombieRecovering();
 	gb->cpu.a = 0;

@@ -1347,9 +1347,9 @@ replacement block and the block to break in members (b_, hl_), handed over
 by hooks in leave(). Object spawning and creation (load_objects) take plain
 arguments and leave no registers, as do DespawnObject, Func_ba42, Func_bb2d
 and the particle creators. Left for stage 3: a as the block result
-(ProcessBlock is still called by address). Worth trying next: the hooks kept
-exact only for the block functions (SetState_OnFire and friends, the
-recoveries, the floor transitions): their callers now clobber everything.
+(ProcessBlock is still called by address). The hooks that were exact only
+for the block functions (SetState_OnFire and friends, the recoveries, the
+floor transitions) now clobber every register and their bodies are plain.
 To find what reads a register: poison it, relax the contracts, run the
 full tier. Stop if the build fails: ctest happily runs the old binary.
 Routines nothing references and whose callers' hooks have their own copies

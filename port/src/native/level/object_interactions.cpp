@@ -714,14 +714,10 @@ public:
 
 	void restore_pos_backup()
 	{
-		cpu_.a = rd8(hYPosHiBackup);
-		wr8(hYPosHi, cpu_.a);
-		cpu_.a = rd8(hYPosLoBackup);
-		wr8(hYPosLo, cpu_.a);
-		cpu_.a = rd8(hXPosHiBackup);
-		wr8(hXPosHi, cpu_.a);
-		cpu_.a = rd8(hXPosLoBackup);
-		wr8(hXPosLo, cpu_.a);
+		wr8(hYPosHi, rd8(hYPosHiBackup));
+		wr8(hYPosLo, rd8(hYPosLoBackup));
+		wr8(hXPosHi, rd8(hXPosHiBackup));
+		wr8(hXPosLo, rd8(hXPosLoBackup));
 	}
 
 	void port_SetState_Stung()
@@ -739,14 +735,10 @@ public:
 		bool low_ceiling = false;
 		if (rd8(wIsCrouching)) {
 			wr8(wCollisionBoxTop, (uint8_t)-27);
-			cpu_.a = rd8(hYPosHi);
-			wr8(hYPosHiBackup, cpu_.a);
-			cpu_.a = rd8(hYPosLo);
-			wr8(hYPosLoBackup, cpu_.a);
-			cpu_.a = rd8(hXPosHi);
-			wr8(hXPosHiBackup, cpu_.a);
-			cpu_.a = rd8(hXPosLo);
-			wr8(hXPosLoBackup, cpu_.a);
+			wr8(hYPosHiBackup, rd8(hYPosHi));
+			wr8(hYPosLoBackup, rd8(hYPosLo));
+			wr8(hXPosHiBackup, rd8(hXPosHi));
+			wr8(hXPosLoBackup, rd8(hXPosLo));
 			if (up_collision()) {
 				low_ceiling = true;
 			} else {
@@ -2264,9 +2256,9 @@ PORT_COVERED(Func_20a63);
 PORT_COVERED(Func_20a69);
 PORT_COVERED(Func_21cc9);
 PORT_COVERED(CollectKey);
-PORT_EX(SetState_OnFire, 0, 0) { ObjectInteractions(gb).port_SetState_OnFire(); }
+PORT_EX(SetState_OnFire, 0, ALL_REGISTERS) { ObjectInteractions(gb).port_SetState_OnFire(); }
 PORT_COVERED(VanishObjectAndKnockBackIfZombie);
-PORT_EX(SetState_OnFire_ResetStateCounter, 0, 0) { ObjectInteractions(gb).port_SetState_OnFire_ResetStateCounter(); }
+PORT_EX(SetState_OnFire_ResetStateCounter, 0, ALL_REGISTERS) { ObjectInteractions(gb).port_SetState_OnFire_ResetStateCounter(); }
 PORT_COVERED(ObjInteraction_RedKey);
 PORT_COVERED(ObjInteraction_GreyKey);
 PORT_COVERED(ObjInteraction_GreenKey);
@@ -2294,11 +2286,11 @@ PORT_COVERED(ObjInteraction_ZombieHead);
 PORT_COVERED(Func_2028a);
 PORT_COVERED(Func_208f2);
 PORT_COVERED(Func_20899);
-PORT_EX(SetState_WaterStung, 0, 0) { ObjectInteractions(gb).port_SetState_WaterStung(); }
+PORT_EX(SetState_WaterStung, 0, ALL_REGISTERS) { ObjectInteractions(gb).port_SetState_WaterStung(); }
 PORT_COVERED(ObjInteraction_Rail);
 PORT_COVERED(GetTreasure);
-PORT_EX(SetState_Stung, 0, 0) { ObjectInteractions(gb).port_SetState_Stung(); }
-PORT_EX(Func_206eb, 0, 0) { ObjectInteractions(gb).port_Func_206eb(); }
+PORT_EX(SetState_Stung, 0, ALL_REGISTERS) { ObjectInteractions(gb).port_SetState_Stung(); }
+PORT_EX(Func_206eb, 0, ALL_REGISTERS) { ObjectInteractions(gb).port_Func_206eb(); }
 PORT_COVERED(Func_207ed);
 PORT_COVERED(ObjInteraction_WaterTeleporting);
 PORT_COVERED(ObjInteraction_Jamano);

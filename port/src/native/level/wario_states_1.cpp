@@ -2986,8 +2986,7 @@ public:
 			wAttackCounter, wWalkVelIndex, wJumpVelTable, wJumpVelIndex, 0};
 		clear(zero);
 		wr8(wIsCrouching, TRUE);
-		cpu_.a = alu_.and_(rd8(wJoypadDown), PAD_RIGHT | PAD_LEFT);
-		if (!ZF) {
+		if (rd8(wJoypadDown) & (PAD_RIGHT | PAD_LEFT)) {
 			port_SetState_CrouchWalking();
 			return;
 		}
@@ -3002,17 +3001,12 @@ public:
 
 	void get_pos_with_offset(int dy, int dx)
 	{
-		cpu_.a = dx < 0 ? alu_.sub(rd8(wWarioXPos + 1), (uint8_t)-dx)
-			: alu_.add(rd8(wWarioXPos + 1), (uint8_t)dx);
-		wr8(hXPosLo, cpu_.a);
-		cpu_.a = dx < 0 ? alu_.sbc(rd8(wWarioXPos), 0) : alu_.adc(rd8(wWarioXPos), 0);
-		wr8(hXPosLo - 1, cpu_.a);
-		cpu_.a = alu_.sub(rd8(wWarioYPos + 1), (uint8_t)-dy);
-		wr8(hXPosLo - 2, cpu_.a);
-		cpu_.a = alu_.sbc(rd8(wWarioYPos), 0);
-		wr8(hXPosLo - 3, cpu_.a);
-		SET_HL(gb_, wWarioYPos);
-		SET_DE(gb_, hXPosLo - 3);
+		auto x = static_cast<uint16_t>((rd8(wWarioXPos) << 8 | rd8(wWarioXPos + 1)) + dx);
+		auto y = static_cast<uint16_t>((rd8(wWarioYPos) << 8 | rd8(wWarioYPos + 1)) + dy);
+		wr8(hXPosLo, static_cast<uint8_t>(x));
+		wr8(hXPosLo - 1, static_cast<uint8_t>(x >> 8));
+		wr8(hXPosLo - 2, static_cast<uint8_t>(y));
+		wr8(hXPosLo - 3, static_cast<uint8_t>(y >> 8));
 	}
 
 	void port_SetState_Sliding()
@@ -3093,14 +3087,8 @@ public:
 
 	void port_StartJump()
 	{
-		ld_cp(wPowerUpLevel, HIGH_JUMP_BOOTS);
-		cpu_.a = JUMP_VEL_NORMAL;
-		if (!CF) {
-			SET_HL(gb_, wJoypadDown);
-			if (alu_.bit(rd8(wJoypadDown), B_PAD_UP))
-				cpu_.a = JUMP_VEL_HIGH_JUMP;
-		}
-		wr8(wJumpVelTable, cpu_.a);
+		bool high = rd8(wPowerUpLevel) >= HIGH_JUMP_BOOTS && (rd8(wJoypadDown) & (1 << B_PAD_UP));
+		wr8(wJumpVelTable, high ? JUMP_VEL_HIGH_JUMP : JUMP_VEL_NORMAL);
 		port_SetState_Airborne(); // fallthrough
 	}
 
@@ -3124,8 +3112,7 @@ public:
 	{
 		if (!ld_and(wIsOnSteppableObject))
 			return;
-		cpu_.b = 2;
-		CALL(MoveWarioUp);
+		home::move_wario_y(gb_, -2);
 	}
 };
 
@@ -3153,14 +3140,14 @@ PORT_COVERED(Func_1f6c2);
 PORT_COVERED(HandleWaterSurfaceFloatingMovement);
 PORT_COVERED(StartJump);
 PORT_COVERED(SetState_Walking_ResetWalkVel);
-PORT_EX(CrouchOrSlide, 0, 0) { wl3::level::WarioStates1Exact(gb).port_CrouchOrSlide(); }
+PORT_EX(CrouchOrSlide, 0, ALL_REGISTERS) { wl3::level::WarioStates1Exact(gb).port_CrouchOrSlide(); }
 PORT_EX(StartCrouchFall, 0, ALL_REGISTERS) { WarioStates1(gb).port_StartCrouchFall(); }
 PORT_EX(StartCrouchJump, 0, ALL_REGISTERS) { WarioStates1(gb).port_StartCrouchJump(); }
 PORT_COVERED(StartFall_SkipResetJumpUpwards);
 PORT_EX(StartJump_FromInput, 0, ALL_REGISTERS) { WarioStates1(gb).port_StartJump_FromInput(); }
 PORT_EX(DiveFromSurface_SkipSplash, 0, ALL_REGISTERS) { WarioStates1(gb).port_DiveFromSurface_SkipSplash(); }
 PORT_COVERED(SurfaceFromUnderwater);
-PORT_EX(StartFall, 0, 0) { wl3::level::WarioStates1Exact(gb).port_StartFall(); }
+PORT_EX(StartFall, 0, ALL_REGISTERS) { wl3::level::WarioStates1Exact(gb).port_StartFall(); }
 PORT_COVERED(StartJump_FromWaterSurface);
 PORT_EX(StartJump_FromSand, 0, ALL_REGISTERS) { WarioStates1(gb).port_StartJump_FromSand(); }
 PORT_COVERED(DiveFromSurface);
@@ -3191,7 +3178,7 @@ PORT_COVERED(Func_1de3f);
 PORT_EX(DoGroundPound, 0, ALL_REGISTERS) { WarioStates1(gb).port_DoGroundPound(); }
 PORT_EX(DoWarioGroundShake, 0, ALL_REGISTERS) { WarioStates1(gb).port_DoWarioGroundShake(); }
 PORT_COVERED(HandleGroundShake);
-PORT_EX(SetState_Idling, 0, 0) { wl3::level::WarioStates1Exact(gb).port_SetState_Idling(); }
+PORT_EX(SetState_Idling, 0, ALL_REGISTERS) { wl3::level::WarioStates1Exact(gb).port_SetState_Idling(); }
 PORT_EX(WalkIfPossible_Right, 0, ALL_REGISTERS) { WarioStates1(gb).port_WalkIfPossible_Right(); }
 PORT_EX(WalkIfPossible_Left, 0, ALL_REGISTERS) { WarioStates1(gb).port_WalkIfPossible_Left(); }
 PORT_COVERED(Func_1ec19);

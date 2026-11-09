@@ -1589,7 +1589,7 @@ PORT_COVERED(Func_1edaf8);
 PORT_COVERED(SetState_SnowmanAirborne_Fall);
 PORT_COVERED(SetState_SnowmanAirborne_Jump);
 PORT_EX(SetState_Swallowed, 0, ALL_REGISTERS) { WarioStates4(gb).port_SetState_Swallowed(); }
-PORT_EX(SetState_FanStart, 0, 0) { wl3::level::FanStartExact(gb).run(); }
+PORT_EX(SetState_FanStart, 0, ALL_REGISTERS) { wl3::level::FanStartExact(gb).run(); }
 PORT_EX(SetState_IceSkatinStart, 0, ALL_REGISTERS) { WarioStates4(gb).port_SetState_IceSkatinStart(); }
 PORT_COVERED(HandleWarioOwlInput);
 PORT_EX(SetState_SplitHit, 0, ALL_REGISTERS) { WarioStates4(gb).port_SetState_SplitHit(); }
