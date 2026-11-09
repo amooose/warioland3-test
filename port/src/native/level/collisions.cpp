@@ -344,8 +344,8 @@ void asm_airborne_collision(GB *gb) { gb->cpu.b = check_airborne_collision(gb); 
 using wl3::level::Collisions;
 
 // The result goes to b. Nothing reads c, d, e, h or l after a block check
-// (poisoning them passed the full fuzz tier) but Octohon, which writes 0
-// through the hl the last block function left (Func_19bc3, Func_3513). a and
+// (poisoning them passed the full fuzz tier; Octohon, which writes 0 through
+// the hl, works out that value itself). a and
 // f are clobbered: every caller farcalls or homecalls these (the Wario
 // states, the objects, home's object mechanics), and hCallFunc / homecall
 // pop af after the call. (Never a macro around PORT_EX: tools/gen.c finds the
@@ -361,7 +361,7 @@ PORT_EX(Func_19b51, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).block(COLLISION_DO
 PORT_EX(Func_19b7b, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).block(COLLISION_UNK1); }
 PORT_EX(Func_19b8b, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).block(COLLISION_UNK2); }
 PORT_EX(Func_19b9b, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).block(COLLISION_UNK3); }
-PORT_EX(Func_19bc3, 0, ALL_REGISTERS & ~(R_B | R_H | R_L)) { Collisions(gb).block(COLLISION_UNK4); }
+PORT_EX(Func_19bc3, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).block(COLLISION_UNK4); }
 PORT_EX(_ProcessBlockOnLeft, 0, ALL_REGISTERS & ~R_B)
 {
 	Collisions(gb).process_adjacent(false);

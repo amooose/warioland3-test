@@ -317,6 +317,20 @@ uint16_t create_particle(GB *gb, uint8_t id)
 	return at;
 }
 
+void create_particle_in_block(GB *gb, uint16_t block, uint8_t id)
+{
+	Memory mem(gb);
+	uint8_t row = static_cast<uint8_t>((block >> 8) - 0xa0), column = static_cast<uint8_t>(block);
+	uint8_t y_hi = static_cast<uint8_t>((mem[wBlockPtrBank] - 1) * 2 + (row >> 4));
+	unsigned y_lo = ((row & 0x0f) << 4) + 0x10;
+	mem[hYPosLo] = static_cast<uint8_t>(y_lo);
+	mem[hYPosHi] = static_cast<uint8_t>(y_hi + (y_lo > 0xff));
+	unsigned x_lo = ((column & 0x0f) << 4) + 0x08;
+	mem[hXPosLo] = static_cast<uint8_t>(x_lo);
+	mem[hXPosHi] = static_cast<uint8_t>((column >> 4) + (x_lo > 0xff));
+	create_particle(gb, id);
+}
+
 } // namespace wl3::level
 
 using wl3::level::Particles;

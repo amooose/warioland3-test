@@ -32,6 +32,10 @@ bool object_state(GB *gb, uint16_t wrapper);
 // CreateParticle: particle `id` at hYPos / hXPos, in the next of the 4
 // slots; returns the address past what it wrote (particles.cpp)
 uint16_t create_particle(GB *gb, uint8_t id);
+// CreateParticleInBlock: a particle at the block's position in the level map
+void create_particle_in_block(GB *gb, uint16_t block, uint8_t id);
+// _CreateObjectFromCurObjPos: an object from its creation data, at wCurObj's position
+void create_object_from_cur_obj_pos(GB *gb, uint16_t params);
 // The object engine's movement tables and counts (update_objects.cpp):
 // _ApplyObjX/YMovement(_Loop) (by OBJ_VAR_2 / OBJ_VAR_3), _ApplyObjSet-
 // Movement, Func_63209 (a platform's y movement, carrying Wario),

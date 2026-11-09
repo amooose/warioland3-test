@@ -9,6 +9,7 @@
 #include "../native.hpp"
 #include "../routines.hpp"
 #include "../home/pals.hpp"
+#include "object.hpp"
 
 namespace wl3::level {
 
@@ -24,7 +25,7 @@ public:
 
 	void spawn(); // SpawnObject
 	void create_got_pos(uint8_t x_hi, uint16_t slot_pos, uint16_t data); // CreateObject_GotPos
-	void create_from_cur_obj_pos(); // _CreateObjectFromCurObjPos
+	void create_from_cur_obj_pos(uint16_t data); // _CreateObjectFromCurObjPos
 	void create_at_relative_pos(); // _CreateObjectAtRelativePos
 	void despawn_all(); // DespawnAllObjects
 	void load_group(); // LoadObjectGroupData
@@ -150,7 +151,7 @@ void ObjectLoader::create_got_pos(uint8_t x_hi, uint16_t slot_pos, uint16_t data
 }
 
 // bc = the creation data: at wCurObj's position
-void ObjectLoader::create_from_cur_obj_pos()
+void ObjectLoader::create_from_cur_obj_pos(uint16_t data)
 {
 	int n = free_slot();
 	if (n < 0)
@@ -162,7 +163,7 @@ void ObjectLoader::create_from_cur_obj_pos()
 	mem_[obj + OBJ_Y_POS + 0] = mem_[wCurObjYPos + 0];
 	mem_[obj + OBJ_Y_POS + 1] = mem_[wCurObjYPos + 1];
 	mem_[obj + OBJ_X_POS + 0] = mem_[wCurObjXPos + 0];
-	create_got_pos(mem_[wCurObjXPos + 1], obj + OBJ_X_POS + 1, REG_BC(gb_));
+	create_got_pos(mem_[wCurObjXPos + 1], obj + OBJ_X_POS + 1, data);
 }
 
 // pos + the signed offset: its low byte to `at`, the high byte returned
@@ -290,6 +291,8 @@ void ObjectLoader::load_group()
 
 } // namespace
 
+void create_object_from_cur_obj_pos(GB *gb, uint16_t params) { ObjectLoader(gb).create_from_cur_obj_pos(params); }
+
 } // namespace wl3::level
 
 using wl3::level::ObjectLoader;
@@ -299,7 +302,7 @@ PORT(SpawnObject) { ObjectLoader(gb).spawn(); }
 // a = OBJ_X_POS + 1's byte, hl = where it goes, bc = the creation data
 PORT(CreateObject_GotPos) { ObjectLoader(gb).create_got_pos(gb->cpu.a, REG_HL(gb), REG_BC(gb)); }
 
-PORT(_CreateObjectFromCurObjPos) { ObjectLoader(gb).create_from_cur_obj_pos(); }
+PORT(_CreateObjectFromCurObjPos) { ObjectLoader(gb).create_from_cur_obj_pos(REG_BC(gb)); }
 PORT(_CreateObjectAtRelativePos) { ObjectLoader(gb).create_at_relative_pos(); }
 PORT(DespawnAllObjects) { ObjectLoader(gb).despawn_all(); }
 PORT_EX(LoadHiddenFigureData, 0, ALL_REGISTERS) { ObjectLoader(gb).load_hidden_figure_data(); }

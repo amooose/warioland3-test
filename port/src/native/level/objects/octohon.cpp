@@ -34,6 +34,7 @@ private:
 	void big_lap(uint16_t frameset); // .asm_4a6df
 	void step(bool right); // a step of Data_4a5a9
 	bool wall_at(int dx); // Func_3513, dx pixels along
+	uint16_t last_block_function();
 	void knocked_back(uint16_t zero_addr, uint16_t frameset); // .asm_4a6eb, .asm_4a6f0
 	void big_turn(); // .asm_4a860
 	void big_swim_on(); // .asm_4a823
@@ -82,6 +83,19 @@ bool Octohon::wall_at(int dx)
 	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
 	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
 	return hpos_block_unk4();
+}
+
+// The asm writes 0 through the hl its block check leaves: ProcessBlock's
+// jp hl target, the function of the block at wBlockPtr. (Only a check made
+// for Wario could leave another hl, and an object's never is.)
+uint16_t Octohon::last_block_function()
+{
+	if (gb_->test.active && mem_[wBlockFuncWarioFlag])
+		gb_->test.unrealistic = true;
+	mem_[rRAMB + 0x100] = mem_[wBlockPtrBank];
+	uint8_t block = mem_[static_cast<uint16_t>(mem_[wBlockPtr + 0] << 8 | mem_[wBlockPtr + 1])];
+	mem_[rRAMB + 0x100] = mem_[wSRAMBank];
+	return Word(gb_, static_cast<uint16_t>(wBlockFunctionTable + static_cast<uint8_t>(block * 2)));
 }
 
 // facing away from Wario (var1 the way it swims), at random flipped
@@ -184,7 +198,7 @@ void Octohon::big_charge()
 		call_home(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 		return;
 	}
-	knocked_back(REG_HL(gb_), right ? ADDR_Frameset_69b74 : ADDR_Frameset_69b69);
+	knocked_back(last_block_function(), right ? ADDR_Frameset_69b74 : ADDR_Frameset_69b69);
 }
 
 void Octohon::big_swim()
