@@ -212,29 +212,19 @@ bool BlockQueue::queue_changed_block()
 
 } // namespace
 
+void despawn_object(GB *gb, uint16_t at) { BlockQueue(gb).despawn(at); }
+void set_object_block(GB *gb, uint16_t at, uint8_t nybble) { BlockQueue(gb).set_block(at, nybble); }
+void clear_object_block(GB *gb, uint16_t at) { BlockQueue(gb).clear_block(at); }
+
 } // namespace wl3::level
 
-using wl3::level::BlockQueue;
+using namespace wl3::level;
 
-// DespawnObject: hl = the object's OBJ_UNK_02. It leaves what the asm does
-// for DespawnAllObjects (which goes on along the objects' page in h): hl =
-// the object's OBJ_FLAGS, de the object map entry, c its bank; a and f
-// as push_wram found them.
-PORT(DespawnObject)
-{
-	uint8_t a = wl3::Memory(gb)[rWBK], f = gb->cpu.f;
-	uint16_t at = REG_HL(gb);
-	wl3::level::MapLoc loc = BlockQueue(gb).despawn(at);
-	SET_HL(gb, at - 2);
-	SET_DE(gb, loc.ptr);
-	gb->cpu.c = loc.bank;
-	gb->cpu.a = a;
-	gb->cpu.f = f;
-}
-// The objects call these (hl = OBJ_UNK_02, e = the index for Func_ba42)
-// and read no register after.
-PORT_EX(Func_ba42, 0, ALL_REGISTERS) { BlockQueue(gb).set_block(REG_HL(gb), gb->cpu.e); }
-PORT_EX(Func_bb2d, 0, ALL_REGISTERS) { BlockQueue(gb).clear_block(REG_HL(gb)); }
+// hl = the object's OBJ_UNK_02 (e = the index for Func_ba42). No caller
+// reads a register after these.
+PORT_EX(DespawnObject, 0, ALL_REGISTERS) { despawn_object(gb, REG_HL(gb)); }
+PORT_EX(Func_ba42, 0, ALL_REGISTERS) { set_object_block(gb, REG_HL(gb), gb->cpu.e); }
+PORT_EX(Func_bb2d, 0, ALL_REGISTERS) { clear_object_block(gb, REG_HL(gb)); }
 // ProcessMultiBlock's loop calls this, and the b it leaves goes on through
 // ProcessBlock to the multi-block functions that jump straight to the
 // replace (Func_18f32 and the like), which write it to the level map as

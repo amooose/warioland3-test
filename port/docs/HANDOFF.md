@@ -1345,11 +1345,13 @@ and nothing else. Octohon works out that hl itself (the function of the
 block at wBlockPtr: Octohon::last_block_function). Block functions keep the
 replacement block and the block to break in members (b_, hl_), handed over
 by hooks in leave(). Object spawning and creation (load_objects) take plain
-arguments and leave no registers. Still register-level in stage 2: a as the
-block result (ProcessBlock is still called by address, stage 3),
-Anonster's SilkPlatformsFunc reading bc and de at entry, DespawnObject's hl,
-Func_ba42's hl and e, and CreateParticle's b in the Wario states. To find
-what reads a register: poison it, relax the contracts, run the full tier.
+arguments and leave no registers, as do DespawnObject, Func_ba42, Func_bb2d
+and the particle creators. Left for stage 3: a as the block result
+(ProcessBlock is still called by address). Worth trying next: the hooks kept
+exact only for the block functions (SetState_OnFire and friends, the
+recoveries, the floor transitions): their callers now clobber everything.
+To find what reads a register: poison it, relax the contracts, run the
+full tier. Stop if the build fails: ctest happily runs the old binary.
 Routines nothing references and whose callers' hooks have their own copies
 lost their hooks (PORT_COVERED, with a comment for the unreachable ones).
 Fuzzing a V-Blank `.Func` label reports 0 checks (all inconclusive): the

@@ -471,9 +471,7 @@ void JamanoHat::flying()
 	if (--state_duration())
 		return;
 	flags() = 0;
-	SET_HL(gb_, wCurObjUnk02);
-	gb_->cpu.e = 0x06;
-	routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
+	set_block_object(0x06);
 	mem_[wBossState] = BOSS_DEFEATED;
 	call_home(ADDR_UpdateLevelMusic);
 	mem_[wIsBossBattle] = 0;
@@ -564,9 +562,7 @@ void Skull::spawner_update()
 	frame_duration() = 0x02;
 	if (!fight_on(mem_)) {
 		flags() = 0;
-		SET_HL(gb_, wCurObjUnk02);
-		gb_->cpu.e = 0x07;
-		routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
+		set_block_object(0x07);
 		return;
 	}
 	call_home(ADDR_Func_55407);

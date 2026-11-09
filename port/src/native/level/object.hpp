@@ -34,10 +34,15 @@ bool object_state(GB *gb, uint16_t wrapper);
 uint16_t create_particle(GB *gb, uint8_t id);
 // CreateParticleInBlock: a particle at the block's position in the level map
 void create_particle_in_block(GB *gb, uint16_t block, uint8_t id);
+void block_to_hpos(GB *gb, uint16_t block); // Func_ce3e
 // _CreateObjectFromCurObjPos: an object from its creation data, at wCurObj's position
 void create_object_from_cur_obj_pos(GB *gb, uint16_t params);
 // SpawnObject: index = its wObjDataPointers entry, at = its object map entry
 void spawn_object(GB *gb, uint8_t index, uint16_t at);
+// The object's place in the level map, from its OBJ_UNK_02 at `at`:
+void despawn_object(GB *gb, uint16_t at); // DespawnObject
+void set_object_block(GB *gb, uint16_t at, uint8_t nybble); // Func_ba42
+void clear_object_block(GB *gb, uint16_t at); // Func_bb2d
 // The object engine's movement tables and counts (update_objects.cpp):
 // _ApplyObjX/YMovement(_Loop) (by OBJ_VAR_2 / OBJ_VAR_3), _ApplyObjSet-
 // Movement, Func_63209 (a platform's y movement, carrying Wario),
@@ -224,6 +229,8 @@ protected:
 	void black_out_bg_pals(uint8_t count, uint8_t first) { home::black_out_pals(gb_, true, count, first); }
 	void black_out_ob_pals(uint8_t count, uint8_t first) { home::black_out_pals(gb_, false, count, first); }
 	// CreateParticle (farcalled): particle `id` at hYPos / hXPos
+	// Func_ba42: this object's entry in the level map becomes `nybble`
+	void set_block_object(uint8_t nybble);
 	void particle(uint8_t id)
 	{
 		routines_.in_bank(BANK_CreateParticle, ADDR_CreateParticle, [&] { create_particle(gb_, id); });

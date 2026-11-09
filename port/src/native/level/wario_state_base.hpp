@@ -16,6 +16,8 @@
 #include "../home/sprites.hpp"
 #include "../home/system.hpp"
 #include "../home/wario.hpp"
+#include "../routines.hpp"
+#include "object.hpp"
 
 namespace wl3::level {
 
@@ -125,8 +127,7 @@ protected:
 	// a particle at hPos (CreateParticle takes it in b)
 	void particle(uint8_t id)
 	{
-		cpu_.b = id;
-		FARCALL(CreateParticle);
+		Routines(gb_).in_bank(BANK_CreateParticle, ADDR_CreateParticle, [&] { create_particle(gb_, id); });
 	}
 	void particle_at_wario(uint8_t id)
 	{

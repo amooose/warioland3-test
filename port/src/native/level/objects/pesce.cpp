@@ -442,9 +442,7 @@ void Pesce::beaten()
 		}
 		set_interaction(OBJ_INTERACTION_51);
 		var1() = 0x03;
-		SET_HL(gb_, wCurObjUnk02);
-		gb_->cpu.e = 0x07;
-		routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
+		set_block_object(0x07);
 		mem_[wDollBoyHammerRange] = 0x01;
 		return;
 	case 3:
@@ -479,9 +477,7 @@ void PesceHelper::spawner_frame()
 // the end of the boss battle: e, the index of the object, for Func_ba42
 void PesceHelper::spawner_done(uint8_t e)
 {
-	SET_HL(gb_, wCurObjUnk02);
-	gb_->cpu.e = e;
-	routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
+	set_block_object(e);
 }
 
 void PesceHelper::dragonfly_spawner()

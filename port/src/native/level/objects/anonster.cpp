@@ -663,9 +663,7 @@ void Anonster::defeated()
 		play_sfx(SFX_0B1);
 	if (--state_duration())
 		return;
-	SET_HL(gb_, wCurObjUnk02);
-	gb_->cpu.e = 0x05;
-	routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
+	set_block_object(0x05);
 	mem_[wBossState] = BOSS_DEFEATED;
 	call_home(ADDR_UpdateLevelMusic);
 	mem_[wIsBossBattle] = 0;
@@ -697,7 +695,11 @@ void AnonsterHelper::platforms()
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	substate() |= 1 << OBJSUBFLAG_UNK_4_F;
 	state_duration() = 0x28;
-	create_platform(REG_BC(gb_), REG_DE(gb_));
+	// the asm falls into .asm_50746 with stale bc and de, but $28 can't count
+	// down to 0 here, so they're never used
+	no_actions();
+	frame_duration() = 2;
+	--state_duration();
 }
 
 void AnonsterHelper::create_platform(uint16_t params, uint16_t next)

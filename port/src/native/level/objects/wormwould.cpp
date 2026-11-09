@@ -232,9 +232,7 @@ void Wormwould::main()
 		if ((substate() & 0x0f) == 1) {
 			var3() = 0x21;
 			set_update(DEFEATED_RAISE);
-			SET_HL(gb_, wCurObjUnk02);
-			gb_->cpu.e = 0x05;
-			routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
+			set_block_object(0x05);
 			play_sfx(SFX_0A7);
 			return;
 		}

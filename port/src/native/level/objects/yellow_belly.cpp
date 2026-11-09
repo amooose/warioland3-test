@@ -631,9 +631,7 @@ void YellowBellyHelper::platform_update()
 
 void YellowBellyHelper::platform_done()
 {
-	SET_HL(gb_, wCurObjUnk02);
-	gb_->cpu.e = 0x07;
-	routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
+	set_block_object(0x07);
 }
 
 void YellowBellyHelper::platform_vanish()

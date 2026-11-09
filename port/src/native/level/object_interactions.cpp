@@ -9,6 +9,8 @@
 #include "../asm_module.hpp"
 #include "../home/system.hpp"
 #include "../home/wario.hpp"
+#include "../routines.hpp"
+#include "object.hpp"
 
 namespace wl3::level {
 
@@ -1018,8 +1020,7 @@ public:
 		wr8(hYPosLo, static_cast<uint8_t>(y));
 
 		// .spawn_stars
-		cpu_.b = PARTICLE_STARS;
-		FARCALL(CreateParticle);
+		Routines(gb_).in_bank(BANK_CreateParticle, ADDR_CreateParticle, [&] { create_particle(gb_, PARTICLE_STARS); });
 		set_obj_action(OBJACTION_ATTACK);
 		uint8_t transformation = rd8(wTransformation);
 		if (transformation == TRANSFORMATION_FAT_WARIO) {

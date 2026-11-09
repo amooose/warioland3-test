@@ -236,9 +236,7 @@ void Muddee::hit()
 			substate() |= 1 << 7;
 		var3() = 0;
 		flags() |= OBJFLAG_PRIORITY;
-		SET_HL(gb_, wCurObjUnk02);
-		gb_->cpu.e = 0x07;
-		routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
+		set_block_object(0x07);
 		stop_music2(mem_);
 		mem_[wMuddeeAmbushState] = 2;
 		return;
@@ -651,9 +649,7 @@ void Turtle::under()
 	state_duration() = 0x3c;
 	var1() = 0x40;
 	set_update(T1_RESURFACING);
-	SET_HL(gb_, wCurObjUnk02);
-	gb_->cpu.e = 0x06;
-	routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
+	set_block_object(0x06);
 }
 
 // then the boss fight's over, and it's a turtle like the others

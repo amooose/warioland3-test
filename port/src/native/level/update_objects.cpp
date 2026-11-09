@@ -96,8 +96,7 @@ public:
 			return;
 		// OBJSUBFLAG_UNK_4 is not set
 		if (sub) {
-			SET_HL(gb_, wCurObjUnk02);
-			FARCALL(DespawnObject);
+			routines_.in_bank(BANK_DespawnObject, ADDR_DespawnObject, [&] { despawn_object(gb_, wCurObjUnk02); });
 			return;
 		}
 		wr8(wCurObjFlags, 0);

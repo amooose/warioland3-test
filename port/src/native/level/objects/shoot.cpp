@@ -696,9 +696,7 @@ void Shoot::set_defeated()
 	substate() &= OBJSUBFLAG_UNINITIALISED | OBJSUBFLAG_VDIR | OBJSUBFLAG_HDIR;
 	var3() = 0;
 	flags() |= OBJFLAG_PRIORITY;
-	SET_HL(gb_, wCurObjUnk02);
-	gb_->cpu.e = 0x09;
-	routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
+	set_block_object(0x09);
 	play_sfx(SFX_0A9);
 }
 
@@ -1078,9 +1076,7 @@ void GKTortoise::run(uint16_t handler)
 		if (--state_duration())
 			return;
 		flags() = 0;
-		SET_HL(gb_, wCurObjUnk02);
-		gb_->cpu.e = 0x08;
-		routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
+		set_block_object(0x08);
 		mem_[wBossState] = BOSS_DEFEATED;
 		call_home(ADDR_UpdateLevelMusic);
 		mem_[wIsBossBattle] = 0;

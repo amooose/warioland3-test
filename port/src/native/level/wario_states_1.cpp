@@ -147,12 +147,12 @@ public:
 		set_oam(BANK_OAM_1644a, ADDR_OAM_1644a);
 		if (!ld_bit(wWarioSlopeInteraction, LEFT_SLOPE_F)) {
 			get_pos_with_offset(-0x0c, 0x0c);
-			particle(PARTICLE_SLIDE_DUST_LEFT);
+			Routines(gb_).in_bank(BANK_CreateParticle, ADDR_CreateParticle, [&] { create_particle(gb_, PARTICLE_SLIDE_DUST_LEFT); });
 			wr8(wDirection, DIRECTION_LEFT);
 			set_frameset(ADDR_Frameset_16708);
 		} else {
 			get_pos_with_offset(-0x0c, -0x0c);
-			particle(PARTICLE_SLIDE_DUST_RIGHT);
+			Routines(gb_).in_bank(BANK_CreateParticle, ADDR_CreateParticle, [&] { create_particle(gb_, PARTICLE_SLIDE_DUST_RIGHT); });
 			wr8(wDirection, DIRECTION_RIGHT);
 			set_frameset(ADDR_Frameset_1671d);
 		}
@@ -3027,14 +3027,12 @@ public:
 		set_oam(BANK_OAM_1644a, ADDR_OAM_1644a);
 		if (!ld_bit(wWarioSlopeInteraction, LEFT_SLOPE_F)) {
 			get_pos_with_offset(-0x0c, 0x0c);
-			cpu_.b = PARTICLE_SLIDE_DUST_LEFT;
-			FARCALL(CreateParticle);
+			Routines(gb_).in_bank(BANK_CreateParticle, ADDR_CreateParticle, [&] { create_particle(gb_, PARTICLE_SLIDE_DUST_LEFT); });
 			st(wDirection, DIRECTION_LEFT);
 			set_frameset(ADDR_Frameset_16708);
 		} else {
 			get_pos_with_offset(-0x0c, -0x0c);
-			cpu_.b = PARTICLE_SLIDE_DUST_RIGHT;
-			FARCALL(CreateParticle);
+			Routines(gb_).in_bank(BANK_CreateParticle, ADDR_CreateParticle, [&] { create_particle(gb_, PARTICLE_SLIDE_DUST_RIGHT); });
 			st(wDirection, DIRECTION_RIGHT);
 			set_frameset(ADDR_Frameset_1671d);
 		}

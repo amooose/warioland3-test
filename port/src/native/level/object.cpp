@@ -63,14 +63,17 @@ void Object::move_wario(uint16_t routine, uint8_t n)
 
 void Object::despawn()
 {
-	SET_HL(gb_, wCurObjUnk02);
-	routines_.farcall(BANK_DespawnObject, ADDR_DespawnObject);
+	routines_.in_bank(BANK_DespawnObject, ADDR_DespawnObject, [&] { despawn_object(gb_, wCurObjUnk02); });
+}
+
+void Object::set_block_object(uint8_t nybble)
+{
+	routines_.in_bank(BANK_Func_ba42, ADDR_Func_ba42, [&] { set_object_block(gb_, wCurObjUnk02, nybble); });
 }
 
 void Object::collect()
 {
-	SET_HL(gb_, wCurObjUnk02);
-	routines_.farcall(BANK_Func_bb2d, ADDR_Func_bb2d);
+	routines_.in_bank(BANK_Func_bb2d, ADDR_Func_bb2d, [&] { clear_object_block(gb_, wCurObjUnk02); });
 }
 
 void Object::start(uint16_t update, uint16_t frameset)

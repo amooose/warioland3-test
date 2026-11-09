@@ -179,8 +179,7 @@ void ObjectLoader::despawn_all()
 			mem_[obj] = 0;
 			continue;
 		}
-		SET_HL(gb_, obj + 2); // DespawnObject takes its OBJ_UNK_02
-		routines_.farcall(BANK_DespawnObject, ADDR_DespawnObject);
+		routines_.in_bank(BANK_DespawnObject, ADDR_DespawnObject, [&] { despawn_object(gb_, static_cast<uint16_t>(obj + 2)); });
 	}
 }
 

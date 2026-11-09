@@ -414,9 +414,7 @@ void Scowler::defeated_gone()
 	no_actions();
 	flashes();
 	if (state_duration() && !--state_duration()) {
-		SET_HL(gb_, wCurObjUnk02);
-		gb_->cpu.e = 0x05;
-		routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
+		set_block_object(0x05);
 		mem_[wBossState] = BOSS_DEFEATED;
 		call_home(ADDR_UpdateLevelMusic);
 		mem_[wIsBossBattle] = 0;

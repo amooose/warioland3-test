@@ -37,8 +37,6 @@ class Particles {
 public:
 	explicit Particles(GB *gb) : gb_(gb), cpu_(gb->cpu), mem_(gb), routines_(gb) {}
 
-	void create(); // CreateParticle
-	void block_pos(); // Func_ce3e
 	void update(); // UpdateParticles
 	void run(const ParticleFunc &f, uint16_t particle);
 	// UpdateParticleAnimation: at = the particle's frame duration (then its
@@ -57,37 +55,6 @@ private:
 	Memory mem_;
 	Routines routines_;
 };
-
-// b = the PARTICLE_* constant: a particle at hYPos / hXPos, in the next
-// of the 4 slots
-// (the hook leaves de the slot's offset, hl past what it wrote, a hXPosLo)
-void Particles::create()
-{
-	uint8_t offset = static_cast<uint8_t>(mem_[wCurParticleIndex] * 16);
-	SET_DE(gb_, offset);
-	SET_HL(gb_, create_particle(gb_, cpu_.b));
-	cpu_.a = mem_[hXPosLo];
-	cpu_.f = FLAG_Z; // xor a
-}
-
-// hl = a block in the level map: hYPos / hXPos = its position
-void Particles::block_pos()
-{
-	uint8_t h = static_cast<uint8_t>(cpu_.h - 0xa0);
-	cpu_.h = h;
-	cpu_.d = h >> 4;
-	uint8_t y_hi = static_cast<uint8_t>((mem_[wBlockPtrBank] - 1) * 2 + cpu_.d);
-	unsigned y_lo = ((h & 0x0f) << 4) + 0x10;
-	mem_[hYPosLo] = static_cast<uint8_t>(y_lo);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_hi + (y_lo > 0xff));
-	uint8_t x_hi = cpu_.l >> 4;
-	unsigned x_lo = ((cpu_.l & 0x0f) << 4) + 0x08;
-	bool carry = x_lo > 0xff;
-	mem_[hXPosLo] = static_cast<uint8_t>(x_lo);
-	cpu_.a = static_cast<uint8_t>(x_hi + carry);
-	cpu_.f = flags::add(x_hi, 0, carry);
-	mem_[hXPosHi] = cpu_.a;
-}
 
 // runs the function of every slot in use (UpdateParticles' jumptable, by
 // the particle's id)
@@ -317,7 +284,7 @@ uint16_t create_particle(GB *gb, uint8_t id)
 	return at;
 }
 
-void create_particle_in_block(GB *gb, uint16_t block, uint8_t id)
+void block_to_hpos(GB *gb, uint16_t block)
 {
 	Memory mem(gb);
 	uint8_t row = static_cast<uint8_t>((block >> 8) - 0xa0), column = static_cast<uint8_t>(block);
@@ -328,23 +295,25 @@ void create_particle_in_block(GB *gb, uint16_t block, uint8_t id)
 	unsigned x_lo = ((column & 0x0f) << 4) + 0x08;
 	mem[hXPosLo] = static_cast<uint8_t>(x_lo);
 	mem[hXPosHi] = static_cast<uint8_t>((column >> 4) + (x_lo > 0xff));
+}
+
+void create_particle_in_block(GB *gb, uint16_t block, uint8_t id)
+{
+	block_to_hpos(gb, block);
 	create_particle(gb, id);
 }
 
 } // namespace wl3::level
 
-using wl3::level::Particles;
+using namespace wl3::level;
 
-PORT(CreateParticle) { Particles(gb).create(); }
-PORT(Func_ce3e) { Particles(gb).block_pos(); }
+// b = the PARTICLE_* constant
+PORT_EX(CreateParticle, 0, ALL_REGISTERS) { create_particle(gb, gb->cpu.b); }
+// hl = a block in the level map: hYPos / hXPos = its position
+PORT_EX(Func_ce3e, 0, ALL_REGISTERS) { block_to_hpos(gb, REG_HL(gb)); }
 
 // b = the PARTICLE_* constant, hl = a block: a particle there
-PORT(CreateParticleInBlock)
-{
-	Particles particles(gb);
-	particles.block_pos();
-	particles.create();
-}
+PORT_EX(CreateParticleInBlock, 0, ALL_REGISTERS) { create_particle_in_block(gb, REG_HL(gb), gb->cpu.b); }
 
 // The particles' update, plain: UpdateParticles runs the functions and
 // animations itself. Their only callers are each other and the level's

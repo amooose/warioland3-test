@@ -475,9 +475,7 @@ void DollBoy::walking_phase()
 	state_duration() = DOLLBOY_DEFEAT_DURATION;
 	set_update(DEFEATED);
 	flags() |= OBJFLAG_PRIORITY;
-	SET_HL(gb_, wCurObjUnk02);
-	gb_->cpu.e = 0x05;
-	routines_.farcall(BANK_Func_ba42, ADDR_Func_ba42);
+	set_block_object(0x05);
 	stop_music2(mem_);
 	set_frameset(ADDR_Frameset_6967f);
 }
