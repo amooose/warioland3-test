@@ -5,10 +5,9 @@
 //
 // Plain C++ over memory. The callers are C and read no registers after,
 // so the hooks clobber them all, except GetNextLevelRoomID (exact).
-// One stack frame is kept: QueueBlockAttributesAlongRow_OddColumn's first
-// half block reads its tile from past the tile queue, which reaches the
-// stack, so that routine pushes its af and the block map pointer as the
-// asm does (see HANDOFF.md). The other pushes leave only dead stack.
+// QueueBlockAttributesAlongRow_OddColumn's first half block reads its tile
+// from past the tile queue, which can reach the stack in the asm. The port
+// doesn't keep that stack, so that byte can differ (see ASM_BUGS.md).
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
@@ -31,9 +30,8 @@ public:
 	void queue_column_at_block(); // Func_a0e2
 	// Func_a2aa, Func_a79e, Func_aca6, Func_b182
 	void queue_column(uint16_t map, uint16_t queue, uint16_t ptr_var, uint16_t base, int offset, bool wram);
-	// QueueBlockTilesAlongRow_OddColumn, ... (row_block_queue.asm); f: the
-	// flags the quirk's push af saves
-	void queue_block_row(uint16_t map, uint8_t f, uint16_t queue, uint16_t ptr_var, uint16_t base, int offset,
+	// QueueBlockTilesAlongRow_OddColumn, ... (row_block_queue.asm)
+	void queue_block_row(uint16_t map, uint16_t queue, uint16_t ptr_var, uint16_t base, int offset,
 		bool wram, bool quirk);
 
 private:
@@ -50,7 +48,7 @@ private:
 	}
 	// the camera's position at a whole tile
 	uint16_t tile_pos(uint16_t cam) { return static_cast<uint16_t>(be(cam) & 0xfff8); }
-	uint16_t step(uint16_t map, uint16_t base, uint16_t ptr_var, int incs, Step kind, bool row, bool push);
+	uint16_t step(uint16_t map, uint16_t base, uint16_t ptr_var, int incs, Step kind, bool row);
 	void queue_row(uint16_t map, uint16_t queue, uint16_t ptr_var, uint16_t base, bool bottom, bool wram);
 	void start_queue(uint16_t queue, uint16_t ptr_var);
 	uint16_t column_y();
@@ -66,13 +64,10 @@ private:
 // bytes of its 4-byte entry in base (skipping incs) to the queue at
 // [ptr_var]. Returns the next block's pointer: a column's moves down a row
 // (into the next SRAM bank at the end of one), a row's right.
-// push: the block map pointer is on the stack while the entry is read
-uint16_t EdgeQueue::step(uint16_t map, uint16_t base, uint16_t ptr_var, int incs, Step kind, bool row, bool push)
+uint16_t EdgeQueue::step(uint16_t map, uint16_t base, uint16_t ptr_var, int incs, Step kind, bool row)
 {
 	uint8_t block = mem_[map];
 	uint16_t next = row ? static_cast<uint16_t>(map + 1) : map;
-	if (push)
-		gb_push16(gb_, next);
 	// ld d, 0 / ld e, a / sla e / sla e / rl d: block * 4, but only the
 	// second sla's carry reaches d (bit 7 is lost)
 	uint16_t entry = static_cast<uint16_t>(base + ((block * 4) & 0x1ff));
@@ -92,8 +87,6 @@ uint16_t EdgeQueue::step(uint16_t map, uint16_t base, uint16_t ptr_var, int incs
 			entry = static_cast<uint16_t>((entry & 0xff00) | static_cast<uint8_t>(entry + 1));
 		mem_[queue_at(static_cast<uint8_t>(lo + 1))] = mem_[entry]; // inc e
 	}
-	if (push)
-		gb_pop16(gb_);
 	if (row || kind == Step::LAST_FULL || kind == Step::LAST_HALF)
 		return next;
 	next = static_cast<uint16_t>(next + 0x100); // inc h
@@ -125,13 +118,13 @@ void EdgeQueue::queue_column(uint16_t map, uint16_t queue, uint16_t ptr_var, uin
 	}
 	if (!half) {
 		for (int i = 0; i < 11; i++)
-			map = step(map, base, ptr_var, offset, Step::FULL, false, false);
-		step(map, base, ptr_var, offset, Step::LAST_HALF, false, false);
+			map = step(map, base, ptr_var, offset, Step::FULL, false);
+		step(map, base, ptr_var, offset, Step::LAST_HALF, false);
 	} else {
-		map = step(map, base, ptr_var, offset + 2, Step::FIRST, false, false);
+		map = step(map, base, ptr_var, offset + 2, Step::FIRST, false);
 		for (int i = 0; i < 10; i++)
-			map = step(map, base, ptr_var, offset, Step::FULL, false, false);
-		step(map, base, ptr_var, offset, Step::LAST_FULL, false, false);
+			map = step(map, base, ptr_var, offset, Step::FULL, false);
+		step(map, base, ptr_var, offset, Step::LAST_FULL, false);
 	}
 	if (wram)
 		mem_[rWBK] = wbk;
@@ -143,27 +136,23 @@ void EdgeQueue::queue_column(uint16_t map, uint16_t queue, uint16_t ptr_var, uin
 // quirk (QueueBlockAttributesAlongRow_OddColumn): the half first block's
 // tile is read from the queue's address instead of the attributes, and a
 // whole first block gets an extra half step at the end
-void EdgeQueue::queue_block_row(uint16_t map, uint8_t f, uint16_t queue, uint16_t ptr_var, uint16_t base,
+void EdgeQueue::queue_block_row(uint16_t map, uint16_t queue, uint16_t ptr_var, uint16_t base,
 	int offset, bool wram, bool quirk)
 {
 	uint8_t wbk = 0;
 	if (wram) {
 		wbk = mem_[rWBK];
-		if (quirk) // push af
-			gb_push16(gb_, static_cast<uint16_t>(wbk << 8 | f));
 		mem_[rWBK] = BANK_wRoomBlockAttributes;
 	}
 	start_queue(queue, ptr_var);
 	bool half = mem_[wBlockYPos + 1] & 0x08;
 	if (half)
-		map = step(map, quirk ? wBGMapTileVRAM1Queue : base, ptr_var, offset + 2, Step::FIRST, false, quirk);
+		map = step(map, quirk ? wBGMapTileVRAM1Queue : base, ptr_var, offset + 2, Step::FIRST, false);
 	for (int i = 0; i < 0x10; i++)
-		map = step(map, base, ptr_var, offset, Step::FULL, false, false);
+		map = step(map, base, ptr_var, offset, Step::FULL, false);
 	if (quirk && !half)
-		step(map, base, ptr_var, offset, Step::LAST_HALF, false, false);
+		step(map, base, ptr_var, offset, Step::LAST_HALF, false);
 	if (wram) {
-		if (quirk)
-			gb_pop16(gb_);
 		mem_[rWBK] = wbk;
 	}
 }
@@ -206,14 +195,14 @@ void EdgeQueue::queue_row(uint16_t map, uint16_t queue, uint16_t ptr_var, uint16
 	int offset = bottom ? 2 : 0;
 	if (!half) {
 		for (int i = 0; i < 12; i++)
-			map = step(map, base, ptr_var, offset, Step::FULL, true, false);
-		step(map, base, ptr_var, offset, Step::LAST_HALF, true, false);
+			map = step(map, base, ptr_var, offset, Step::FULL, true);
+		step(map, base, ptr_var, offset, Step::LAST_HALF, true);
 	} else {
-		map = step(map, base, ptr_var, offset + 1, Step::FIRST, true, false);
+		map = step(map, base, ptr_var, offset + 1, Step::FIRST, true);
 		for (int i = 0; i < (bottom ? 11 : 12); i++)
-			map = step(map, base, ptr_var, offset, Step::FULL, true, false);
+			map = step(map, base, ptr_var, offset, Step::FULL, true);
 		if (bottom)
-			step(map, base, ptr_var, offset, Step::LAST_FULL, true, false);
+			step(map, base, ptr_var, offset, Step::LAST_FULL, true);
 	}
 	if (wram)
 		mem_[rWBK] = wbk;
@@ -351,17 +340,17 @@ PORT_EX(Func_b182, 0, ALL_REGISTERS)
 }
 PORT_EX(QueueBlockTilesAlongRow_OddColumn, 0, ALL_REGISTERS)
 {
-	EdgeQueue(gb).queue_block_row(REG_HL(gb), gb->cpu.f, wBGMapTileVRAM0Queue, wcce7, wRoomBlockTiles, 1, false, false);
+	EdgeQueue(gb).queue_block_row(REG_HL(gb), wBGMapTileVRAM0Queue, wcce7, wRoomBlockTiles, 1, false, false);
 }
 PORT_EX(QueueBlockAttributesAlongRow_OddColumn, 0, ALL_REGISTERS)
 {
-	EdgeQueue(gb).queue_block_row(REG_HL(gb), gb->cpu.f, wBGMapTileVRAM1Queue, wc0b3, wRoomBlockAttributes, 1, true, true);
+	EdgeQueue(gb).queue_block_row(REG_HL(gb), wBGMapTileVRAM1Queue, wc0b3, wRoomBlockAttributes, 1, true, true);
 }
 PORT_EX(QueueBlockTilesAlongRow_EvenColumn, 0, ALL_REGISTERS)
 {
-	EdgeQueue(gb).queue_block_row(REG_HL(gb), gb->cpu.f, wBGMapTileVRAM0Queue, wcce7, wRoomBlockTiles, 0, false, false);
+	EdgeQueue(gb).queue_block_row(REG_HL(gb), wBGMapTileVRAM0Queue, wcce7, wRoomBlockTiles, 0, false, false);
 }
 PORT_EX(QueueBlockAttributesAlongRow_EvenColumn, 0, ALL_REGISTERS)
 {
-	EdgeQueue(gb).queue_block_row(REG_HL(gb), gb->cpu.f, wBGMapTileVRAM1Queue, wc0b3, wRoomBlockAttributes, 0, true, false);
+	EdgeQueue(gb).queue_block_row(REG_HL(gb), wBGMapTileVRAM1Queue, wc0b3, wRoomBlockAttributes, 0, true, false);
 }

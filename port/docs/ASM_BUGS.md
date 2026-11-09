@@ -28,7 +28,7 @@ whether a player can ever see it.
 
 | Where | What | Status | Visible |
 |---|---|---|---|
-| `QueueBlockTilesAlongRow_*` (level block queue) | Writes one byte past the tile queue into the first attribute-queue entry, and that byte comes from the stack (a caller's return address). One tile attribute is wrong until the room redraws (e.g. `yellowbelly`, game frame 16296, $9929 in VRAM bank 1). | confirmed | yes, briefly |
+| `QueueBlockTilesAlongRow_*` (level block queue) | Writes one byte past the tile queue into the first attribute-queue entry, and that byte comes from the stack (a caller's return address). One tile attribute is wrong until the room redraws. **Deliberately not kept (2026-11-09):** the port no longer emulates the return addresses and pushes there, so when `QueueBlockAttributesAlongRow_OddColumn`'s half first block reads the stack (block about $5e to $71) it can see different bytes and that one attribute can differ from the original. None of the 14 recordings reach that read. | confirmed | yes, briefly |
 | `Func_811cf` (overworld) | `ld [hl], a` writes 0 through hl, which still holds the jumptable's target: it writes the MBC's RAM-bank register. | confirmed, harmless | no |
 | `LoadTreasureTiles` (src/engine/overworld/bank26.asm) | Falls through into `.CopyGfx` after the fourth treasure, copying a fifth time. | confirmed (marked in the disassembly) | unknown |
 | `CalculateChecksumLong` (src/engine/pause/save/checksum.asm) | Its loop jumps to `CalculateChecksum` instead of `.start`. | confirmed (marked in the disassembly) | unknown; changing it changes save checksums |

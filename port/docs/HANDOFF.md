@@ -1353,11 +1353,12 @@ floor transitions) now clobber every register and their bodies are plain.
 Stage 3 (2026-11-09): a call by address is fine if nothing passes through
 registers, so the work is the calls passing arguments in registers: 173
 down to about 20, nearly all boot and audio (stage 4). Still needed: the
-return addresses and pushes in start_room and update_level. Removing them
-passed every tier, but QueueBlockAttributesAlongRow_OddColumn's half first
-block can read those stack bytes (block about $5e to $71) and none of the
-14 recordings reach that read, so passing proves nothing; they went back.
-To drop them, model the bytes that read would see.
+Dropped quirk (2026-11-09, the user's decision): start_room, update_level
+and scroll.cpp no longer keep the return addresses and pushes that only
+QueueBlockAttributesAlongRow_OddColumn's half first block could read
+(block about $5e to $71). None of the 14 recordings reach that read, so
+the tiers can't show the difference; see ASM_BUGS.md. Older notes in this
+file saying those frames are kept describe the earlier state.
 To find what reads a register: poison it, relax the contracts, run the
 full tier. Stop if the build fails: ctest happily runs the old binary.
 Routines nothing references and whose callers' hooks have their own copies

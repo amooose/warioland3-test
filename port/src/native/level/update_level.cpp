@@ -72,23 +72,23 @@ private:
 void LevelFrame::cam_path(const CamPath &p)
 {
 	wario_flag(true);
-	routines_.farcall_ret(BANK_UpdateWarioStates, ADDR_UpdateWarioStates, UL(p.wario));
+	routines_.farcall(BANK_UpdateWarioStates, ADDR_UpdateWarioStates);
 	scroll_from_camera();
 	wario_flag(false);
-	in_objects_wram([&] { routines_.farcall_ret(BANK_UpdateObjects, ADDR_UpdateObjects, UL(p.objects)); });
-	routines_.call_ret(ADDR_SetWarioScreenPos, UL(p.screen_pos));
+	in_objects_wram([&] { routines_.farcall(BANK_UpdateObjects, ADDR_UpdateObjects); });
+	routines_.call(ADDR_SetWarioScreenPos);
 	wario_flag(true);
-	routines_.farcall_ret(BANK_ProcessInteractions, ADDR_ProcessInteractions, UL(p.interactions));
+	routines_.farcall(BANK_ProcessInteractions, ADDR_ProcessInteractions);
 	wario_flag(false);
-	in_objects_wram([&] { routines_.farcall_ret(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority, UL(p.no_prio)); });
+	in_objects_wram([&] { routines_.farcall(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority); });
 	home::draw_wario(gb_);
-	in_objects_wram([&] { routines_.farcall_ret(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, UL(p.with_prio)); });
+	in_objects_wram([&] { routines_.farcall(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority); });
 	home::clear_unused_virtual_oam(gb_);
 	mem_[wScrollUpEdge] = 0;
 	mem_[wScrollDownEdge] = 0;
-	routines_.call_ret(ADDR_LevelScroll_Vertical, UL(p.vertical));
+	routines_.call(ADDR_LevelScroll_Vertical);
 	if (p.horizontal)
-		routines_.call_ret(ADDR_LevelScroll_Horizontal, UL(p.horizontal));
+		routines_.call(ADDR_LevelScroll_Horizontal);
 }
 
 // the level's end screens: game over, the epilogue, or the clear screen
@@ -159,7 +159,7 @@ void LevelFrame::check_end_screen()
 	}
 
 	// .tick_time
-	routines_.call_ret(ADDR_TickLevelTime, UL(0x231));
+	routines_.call(ADDR_TickLevelTime);
 	if (mem_[wFloorTransitionDir] || mem_[wRoomTransitionParam])
 		return;
 	if (mem_[wJoypadPressed] & (PAD_SELECT | PAD_START))
@@ -173,10 +173,10 @@ void LevelFrame::process_blocks()
 	cpu_.a = mem_[wSRAMBank]; // push af
 	gb_push16(gb_, REG_AF(gb_));
 	sram_switch(BANK_sLevelBlockObjectMap); // BANK("SRAM1")
-	routines_.call_ret(ADDR_Func_8ed9, UL(0x18e));
-	routines_.call_ret(ADDR_Func_bb85, UL(0x191));
+	routines_.call(ADDR_Func_8ed9);
+	routines_.call(ADDR_Func_bb85);
 	cpu_.ime = false; // di
-	routines_.call_ret(ADDR_SetTileQueueProcessingFunctions, UL(0x195));
+	routines_.call(ADDR_SetTileQueueProcessingFunctions);
 	cpu_.ime = true; // ei
 	cpu_.ime_delay = 0;
 	sram_switch(static_cast<uint8_t>(gb_pop16(gb_) >> 8)); // pop af
@@ -186,7 +186,7 @@ void LevelFrame::process_blocks()
 void LevelFrame::update()
 {
 	mem_[wRoomAnimatedPalsEnabled] = TRUE;
-	routines_.farcall_ret(BANK_UpdateParticles, ADDR_UpdateParticles, UL(0x14));
+	routines_.farcall(BANK_UpdateParticles, ADDR_UpdateParticles);
 
 	uint8_t mode = mem_[wCameraConfigFlags] & CAM_SCROLLING_MASK;
 	if (mode == CAM_FREE || mode == CAM_YSCROLL) {
@@ -198,7 +198,7 @@ void LevelFrame::update()
 	// no Wario state update during a floor transition
 	if (!mem_[wFloorTransitionDir]) {
 		wario_flag(true);
-		routines_.farcall_ret(BANK_UpdateWarioStates, ADDR_UpdateWarioStates, UL(0x3d));
+		routines_.farcall(BANK_UpdateWarioStates, ADDR_UpdateWarioStates);
 	}
 
 	// .skip_update_wario_state
@@ -213,23 +213,23 @@ void LevelFrame::update()
 
 	// .applied_cam_scrolling
 	wario_flag(false);
-	in_objects_wram([&] { routines_.farcall_ret(BANK_UpdateObjects, ADDR_UpdateObjects, UL(0x82)); });
-	routines_.call_ret(ADDR_SetWarioScreenPos, UL(0x88));
+	in_objects_wram([&] { routines_.farcall(BANK_UpdateObjects, ADDR_UpdateObjects); });
+	routines_.call(ADDR_SetWarioScreenPos);
 
 	// in the Hidden Figure's battle, wAutoMoveState $02 starts the fence
 	// shake sliding
 	if (mem_[wLevel] == THE_TEMPLE && mem_[wAutoMoveState] == 0x02)
-		routines_.farcall_ret(BANK_SetState_FenceShakeSliding, ADDR_SetState_FenceShakeSliding, UL(0xa5));
+		routines_.farcall(BANK_SetState_FenceShakeSliding, ADDR_SetState_FenceShakeSliding);
 
 	// .process_interactions
 	in_objects_wram([&] {
 		wario_flag(true);
-		routines_.farcall_ret(BANK_ProcessInteractions, ADDR_ProcessInteractions, UL(0xc0));
+		routines_.farcall(BANK_ProcessInteractions, ADDR_ProcessInteractions);
 		wario_flag(false);
 	});
-	in_objects_wram([&] { routines_.farcall_ret(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority, UL(0xdd)); });
+	in_objects_wram([&] { routines_.farcall(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority); });
 	home::draw_wario(gb_);
-	in_objects_wram([&] { routines_.farcall_ret(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, UL(0xf9)); });
+	in_objects_wram([&] { routines_.farcall(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority); });
 	home::clear_unused_virtual_oam(gb_);
 
 	bool floor = (mem_[wFloorTransitionDir] & (FLOOR_TRANSITION_DOWN | FLOOR_TRANSITION_UP)) && !mem_[wIsDMATransferPending];
@@ -240,7 +240,7 @@ void LevelFrame::update()
 			return;
 		}
 		if ((config & CAM_SCROLLING_MASK) != (CAM_XSCROLL2 | CAM_TRANSITIONS))
-			routines_.call_ret(ADDR_LevelScroll_Horizontal, UL(0x17b));
+			routines_.call(ADDR_LevelScroll_Horizontal);
 		process_blocks();
 		return;
 	}
@@ -273,7 +273,7 @@ void LevelFrame::update()
 	// .asm_8209
 	mem_[wScrollUpEdge] = 0;
 	mem_[wScrollDownEdge] = 0;
-	routines_.call_ret(ADDR_LevelScroll_Vertical, UL(0x169));
+	routines_.call(ADDR_LevelScroll_Vertical);
 	process_blocks();
 }
 
