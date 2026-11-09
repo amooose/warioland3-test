@@ -85,7 +85,7 @@ void Wormwould::init()
 	var2() = 0x20;
 	move_down_by_var2();
 	mem_[wBossState] = BOSS_REGULAR;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	mem_[wIsBossBattle] = TRUE;
 	change_side();
 }
@@ -94,7 +94,7 @@ void Wormwould::leave()
 {
 	set_update(DO_NOTHING);
 	mem_[wBossState] = NONE;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 }
 
 // comes up facing Wario, moved to the other side ($70 pixels over) when
@@ -329,7 +329,7 @@ void Wormwould::defeated_wait()
 	var3() = 0;
 	flags() |= OBJFLAG_PRIORITY;
 	mem_[wBossState] = BOSS_DEFEATED;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	mem_[wIsBossBattle] = 0;
 }
 

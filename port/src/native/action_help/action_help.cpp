@@ -76,7 +76,7 @@ void ActionHelp::init()
 	wram_.animated_tiles_frame() = 0;
 	wram_.room_animated_tiles_enabled() = 0;
 
-	routines_.call(ADDR_ClearBGMap0);
+	home::fill_bg_map0(gb_, 0xff);
 	routines_.clear_virtual_oam();
 	routines_.in_bank(BANK_LoadActionHelpCommonPals, ADDR_LoadActionHelpCommonPals, [&] { load_common_pals(); });
 	routines_.in_bank(BANK_LoadActionHelpPowerUpPals, ADDR_LoadActionHelpPowerUpPals, [&] { load_power_up_pals(); });

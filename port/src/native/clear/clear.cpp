@@ -130,7 +130,7 @@ void ClearScreen::init()
 {
 	wram_.reset_disabled() = TRUE;
 	routines_.disable_lcd();
-	routines_.call(ADDR_ClearBGMap0);
+	home::fill_bg_map0(gb_, 0xff);
 	routines_.clear_virtual_oam();
 	set_treasure_transition_param();
 	count_music_boxes();
@@ -359,7 +359,7 @@ void ClearScreen::init_time_attack()
 {
 	wram_.reset_disabled() = TRUE;
 	routines_.disable_lcd();
-	routines_.call(ADDR_ClearBGMap0);
+	home::fill_bg_map0(gb_, 0xff);
 	routines_.clear_virtual_oam();
 	wram_.transition_param() = TRANSITION_RETURN_TO_MAP;
 	routines_.in_bank(BANK_Func_1e000d, ADDR_Func_1e000d, [&] {
@@ -472,7 +472,7 @@ void ClearScreen::update_time_attack()
 void ClearScreen::init_musical_coins()
 {
 	routines_.disable_lcd();
-	routines_.call(ADDR_ClearBGMap0);
+	home::fill_bg_map0(gb_, 0xff);
 	routines_.clear_virtual_oam();
 	routines_.load_pals_to_temp_pals1(ADDR_Pals_d50a4);
 	routines_.load_pals_to_temp_pals2(ADDR_Pals_d50e4);

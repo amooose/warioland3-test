@@ -72,7 +72,7 @@ void LevelState::run_state()
 void LevelState::init()
 {
 	routines_.disable_lcd();
-	routines_.call(ADDR_FillBGMap0_With7f);
+	home::fill_bg_map0(gb_, 0x7f);
 	routines_.clear_virtual_oam();
 	routines_.call(ADDR_ClearParticles);
 
@@ -84,7 +84,7 @@ void LevelState::init()
 	routines_.in_bank(BANK_LoadLevelCommonGfxAndTreasures, ADDR_LoadLevelCommonGfxAndTreasures, [&] { load_common_gfx(); });
 
 	routines_.call(ADDR_StartRoom_FromLevelStart);
-	routines_.call(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 
 	mem_[wRoomAnimatedTilesEnabled] = TRUE;
 	mem_[wceef] = 0;

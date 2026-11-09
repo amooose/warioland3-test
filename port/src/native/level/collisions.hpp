@@ -17,6 +17,15 @@ uint8_t check_up_collision(GB *gb); // CheckUpCollision
 uint8_t check_airborne_collision(GB *gb); // CheckAirborneCollision
 // Func_19b51: the block at hPos, its bottom points
 uint8_t check_block_below(GB *gb);
+uint8_t check_func_19741(GB *gb); // Func_19741
+uint8_t check_func_197b1(GB *gb); // Func_197b1
+uint8_t check_func_198c7(GB *gb); // Func_198c7
+uint8_t check_func_19a77(GB *gb); // Func_19a77
+uint8_t check_func_19acd(GB *gb); // Func_19acd
+uint8_t check_func_19ae4(GB *gb); // Func_19ae4
+uint8_t check_func_19afb(GB *gb); // Func_19afb
+uint8_t check_func_19b12(GB *gb); // Func_19b12
+uint8_t check_func_19b25(GB *gb); // Func_19b25
 
 // The same, for register-level code (the Wario states, through AsmModule's
 // centre_collision() etc.): the result in b and the registers the asm

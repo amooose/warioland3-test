@@ -263,7 +263,7 @@ void Shoot::taunt()
 	set_interaction(OBJ_INTERACTION_SHOOT);
 	mem_[wShootBallState] = 0x01;
 	mem_[wBossState] = BOSS_REGULAR;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	set_standing();
 }
 
@@ -592,19 +592,19 @@ void Shoot::prekick_y_movement(uint16_t offsets)
 		return;
 	}
 	move_wario(ADDR_MoveWarioDown, a);
-	call_home(ADDR_HandleDownwardsFloorTransition);
+	home::handle_downwards_floor_transition(gb_);
 }
 
 void Shoot::kicked_ball_y_offset(uint16_t offsets)
 {
 	move_wario(ADDR_MoveWarioDown, kick_offset(offsets));
-	call_home(ADDR_HandleDownwardsFloorTransition);
+	home::handle_downwards_floor_transition(gb_);
 }
 
 void Shoot::move_wario_up_by_neg(uint8_t b)
 {
 	move_wario(ADDR_MoveWarioUp, static_cast<uint8_t>(-b));
-	call_home(ADDR_HandleUpwardsFloorTransition);
+	home::handle_upwards_floor_transition(gb_);
 }
 
 // --- Shoot, ball form ---
@@ -1078,7 +1078,7 @@ void GKTortoise::run(uint16_t handler)
 		flags() = 0;
 		set_block_object(0x08);
 		mem_[wBossState] = BOSS_DEFEATED;
-		call_home(ADDR_UpdateLevelMusic);
+		home::update_level_music(gb_);
 		mem_[wIsBossBattle] = 0;
 		return;
 	case GK_DUCKING:
@@ -1271,7 +1271,7 @@ void GKTortoise::platform_move_up_and_down()
 		if (flags() & OBJFLAG_STEPPED) {
 			flags() &= ~OBJFLAG_STEPPED;
 			move_wario(ADDR_MoveWarioDown, 1);
-			call_home(ADDR_HandleDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 		}
 		move_down();
 		return;
@@ -1283,7 +1283,7 @@ void GKTortoise::platform_move_up_and_down()
 	if (flags() & OBJFLAG_STEPPED) {
 		flags() &= ~OBJFLAG_STEPPED;
 		move_wario(ADDR_MoveWarioUp, 1);
-		call_home(ADDR_HandleUpwardsFloorTransition);
+		home::handle_upwards_floor_transition(gb_);
 	}
 	move_up();
 }

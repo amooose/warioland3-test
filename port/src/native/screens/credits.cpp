@@ -53,7 +53,7 @@ void Credits::run_state()
 void Credits::init()
 {
 	routines_.disable_lcd();
-	routines_.call(ADDR_FillBGMap0_With7f);
+	home::fill_bg_map0(gb_, 0x7f);
 	routines_.clear_virtual_oam();
 	routines_.load_pals_to_temp_pals1(ADDR_Pals_1604cc);
 	routines_.load_pals_to_temp_pals2(ADDR_Pals_16050c);

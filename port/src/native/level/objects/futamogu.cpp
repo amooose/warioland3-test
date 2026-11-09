@@ -122,7 +122,7 @@ void Futamogu::climb()
 		if (!(mem_[wGlobalCounter] & 1))
 			return;
 		move_wario(ADDR_MoveWarioUp, 1);
-		call_home(ADDR_HandleUpwardsFloorTransition);
+		home::handle_upwards_floor_transition(gb_);
 		move_up();
 		return;
 	}

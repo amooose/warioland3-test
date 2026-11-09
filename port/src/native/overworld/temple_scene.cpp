@@ -47,7 +47,7 @@ void TempleScene::load_far(uint16_t routine, uint8_t bank, uint16_t src)
 void TempleScene::init()
 {
 	routines_.disable_lcd();
-	routines_.call(ADDR_FillBGMap0_With7f);
+	home::fill_bg_map0(gb_, 0x7f);
 	routines_.clear_virtual_oam();
 	stop_music2(mem_);
 	mem_[rWBK] = 0x02; // BANK("WRAM2")

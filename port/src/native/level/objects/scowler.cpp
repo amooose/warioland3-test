@@ -120,7 +120,7 @@ void Scowler::begin()
 {
 	mem_[wIsBossBattle] = TRUE;
 	mem_[wBossState] = BOSS_REGULAR;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	set_update(WALKING);
 	create_object_here(ADDR_ObjParams_ScrowlerTentacleRight);
 	create_object_here(ADDR_ObjParams_ScrowlerTentacleLeft);
@@ -416,7 +416,7 @@ void Scowler::defeated_gone()
 	if (state_duration() && !--state_duration()) {
 		set_block_object(0x05);
 		mem_[wBossState] = BOSS_DEFEATED;
-		call_home(ADDR_UpdateLevelMusic);
+		home::update_level_music(gb_);
 		mem_[wIsBossBattle] = 0;
 		if (mem_[w1d147]) {
 			mem_[w1d147] = 0;
@@ -529,7 +529,7 @@ void ScowlerHelper::ring_up()
 	}
 	flags() &= ~OBJFLAG_STEPPED;
 	move_wario(ADDR_MoveWarioUp, 0x01);
-	call_home(ADDR_HandleUpwardsFloorTransition);
+	home::handle_upwards_floor_transition(gb_);
 	move_up();
 }
 
@@ -552,7 +552,7 @@ void ScowlerHelper::ring_down()
 	if (!(mem_[wGlobalCounter] & 1))
 		return;
 	move_wario(ADDR_MoveWarioDown, 0x01);
-	call_home(ADDR_HandleDownwardsFloorTransition);
+	home::handle_downwards_floor_transition(gb_);
 	move_down();
 }
 

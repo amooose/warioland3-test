@@ -609,7 +609,7 @@ void BlockFuncs::enter_door()
 		mem_[addr] = 0;
 	mem_[wDMASourceBank] = BANK_WarioIdleGfx;
 	st_ptr(wDMASourcePtr, ADDR_WarioIdleGfx);
-	routines_.call(ADDR_LoadWarioGfx);
+	home::load_wario_gfx(gb_);
 	mem_[wWarioOAMBank] = BANK_OAM_14a82;
 	st_ptr(wWarioOAMPtr, ADDR_OAM_14a82);
 	bool right = mem_[wDirection];
@@ -787,7 +787,7 @@ void BlockFuncs::enter_pipe(bool down)
 		mem_[wIsSmashAttacking] = 0;
 	mem_[wDMASourceBank] = BANK_WarioIdleGfx;
 	st_ptr(wDMASourcePtr, ADDR_WarioIdleGfx);
-	routines_.call(ADDR_LoadWarioGfx);
+	home::load_wario_gfx(gb_);
 	mem_[wWarioOAMBank] = BANK_OAM_14a82;
 	st_ptr(wWarioOAMPtr, ADDR_OAM_14a82);
 	st_ptr(wWarioFramesetPtr, ADDR_Frameset_14cf6);
@@ -939,7 +939,7 @@ void BlockFuncs::fire()
 	st(wca94, 0x02);
 	st(wTransformationDuration + 0, static_cast<uint8_t>(HOT_WARIO_DURATION >> 8));
 	st(wTransformationDuration + 1, static_cast<uint8_t>(HOT_WARIO_DURATION));
-	routines_.call(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	routines_.farcall(BANK_SetState_OnFire_ResetStateCounter, ADDR_SetState_OnFire_ResetStateCounter);
 	// ret
 }

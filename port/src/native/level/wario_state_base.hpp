@@ -35,7 +35,7 @@ protected:
 	void ld_cp(uint16_t, uint8_t) = delete;
 	void b_and() = delete;
 	void collision_check(uint8_t, uint16_t, void (*)(GB *)) = delete;
-	void run_check(uint8_t, uint16_t, void (*)(GB *)) = delete;
+	void collision(uint8_t, uint16_t, void (*)(GB *)) = delete;
 	void run_centre_collision() = delete;
 	void run_front_collision() = delete;
 	void run_up_collision() = delete;
@@ -66,14 +66,12 @@ protected:
 	}
 
 	// Func_19741 / Func_197b1: the bottom collision at the box's right or
-	// left edge, breaking blocks (farcalled, the result in b)
+	// left edge, breaking blocks (farcalled)
 	uint8_t side_collision(bool right)
 	{
 		if (right)
-			FARCALL(Func_19741);
-		else
-			FARCALL(Func_197b1);
-		return cpu_.b;
+			return collision(BANK_Func_19741, ADDR_Func_19741, check_func_19741);
+		return collision(BANK_Func_197b1, ADDR_Func_197b1, check_func_197b1);
 	}
 
 	// wDMASourceBank/Ptr = gfx, call LoadWarioGfx
@@ -149,7 +147,7 @@ protected:
 	// farcall Func_19b25 / the room transition check; true if it started one
 	bool room_transition_check()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (room_transition()) {
 			home::trigger_room_transition(gb_);
 			return true;

@@ -81,9 +81,9 @@ void LevelFrame::cam_path(const CamPath &p)
 	routines_.farcall_ret(BANK_ProcessInteractions, ADDR_ProcessInteractions, UL(p.interactions));
 	wario_flag(false);
 	in_objects_wram([&] { routines_.farcall_ret(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority, UL(p.no_prio)); });
-	routines_.call_ret(ADDR_DrawWario, UL(p.draw_wario));
+	home::draw_wario(gb_);
 	in_objects_wram([&] { routines_.farcall_ret(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, UL(p.with_prio)); });
-	routines_.call_ret(ADDR_ClearUnusedVirtualOAM, UL(p.clear_oam));
+	home::clear_unused_virtual_oam(gb_);
 	mem_[wScrollUpEdge] = 0;
 	mem_[wScrollDownEdge] = 0;
 	routines_.call_ret(ADDR_LevelScroll_Vertical, UL(p.vertical));
@@ -228,9 +228,9 @@ void LevelFrame::update()
 		wario_flag(false);
 	});
 	in_objects_wram([&] { routines_.farcall_ret(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority, UL(0xdd)); });
-	routines_.call_ret(ADDR_DrawWario, UL(0xe3));
+	home::draw_wario(gb_);
 	in_objects_wram([&] { routines_.farcall_ret(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, UL(0xf9)); });
-	routines_.call_ret(ADDR_ClearUnusedVirtualOAM, UL(0xff));
+	home::clear_unused_virtual_oam(gb_);
 
 	bool floor = (mem_[wFloorTransitionDir] & (FLOOR_TRANSITION_DOWN | FLOOR_TRANSITION_UP)) && !mem_[wIsDMATransferPending];
 	if (!floor) { // .no_floor_transition

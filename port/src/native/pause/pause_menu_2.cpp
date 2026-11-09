@@ -31,7 +31,7 @@ public:
 		FARCALL(VBlank_Level);
 		FARCALL(SetTileQueueProcessingFunctions);
 		farcall_obj_wram(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority);
-		CALL(DrawWario);
+		home::draw_wario(gb_);
 		farcall_obj_wram(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority);
 	}
 };
@@ -44,4 +44,4 @@ using wl3::pause::PausePauseMenu2;
 
 // ends on DrawObjects, which leaves b to l as it pleases; ExitPauseMenu and
 // ReturnToLevelFromGolf read none after it (live.py)
-PORT_EX(DrawLevelObjectsAfterLevelReturn, 0, R_B | R_C | R_D | R_E | R_H | R_L) { PausePauseMenu2(gb).port_DrawLevelObjectsAfterLevelReturn(); }
+PORT_EX(DrawLevelObjectsAfterLevelReturn, 0, ALL_REGISTERS) { PausePauseMenu2(gb).port_DrawLevelObjectsAfterLevelReturn(); }

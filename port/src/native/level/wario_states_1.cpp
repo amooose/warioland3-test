@@ -480,7 +480,7 @@ public:
 			return;
 
 		if (ld_bit(wJoypadDown, B_PAD_DOWN)) {
-			FARCALL(Func_19b12);
+			collision(BANK_Func_19b12, ADDR_Func_19b12, check_func_19b12);
 			if (!still_in(WST_IDLING))
 				return;
 			if (rd8(wLadderInteraction) != LADDER_UNDERNEATH) {
@@ -492,7 +492,7 @@ public:
 		}
 
 		anim(OAM1);
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (room_transition()) {
 			home::trigger_room_transition(gb_);
 			return;
@@ -826,7 +826,7 @@ public:
 	// farcall Func_19b12 / ld a, [wWaterInteraction] / cp NON_SUBMERSIBLE_WATER
 	bool non_submersible()
 	{
-		FARCALL(Func_19b12);
+		collision(BANK_Func_19b12, ADDR_Func_19b12, check_func_19b12);
 		return rd8(wWaterInteraction) == NON_SUBMERSIBLE_WATER;
 	}
 
@@ -1352,7 +1352,7 @@ public:
 
 	void port_UpdateState_Crouching()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (!still_in(WST_CROUCHING))
 			return;
 		if (ld_and(wWaterInteraction)) {
@@ -1673,7 +1673,7 @@ public:
 			water_stung_end(&WarioStates1::port_SetState_Submerged);
 			return;
 		}
-		FARCALL(Func_19acd);
+		collision(BANK_Func_19acd, ADDR_Func_19acd, check_func_19acd);
 		if (!rd8(wWaterInteraction)) {
 			if (count >= 0x78)
 				water_stung_end(&WarioStates1::port_SurfaceFromUnderwater);
@@ -1707,7 +1707,7 @@ public:
 	{
 		if (up_collision())
 			return;
-		FARCALL(Func_19acd);
+		collision(BANK_Func_19acd, ADDR_Func_19acd, check_func_19acd);
 		if (!ld_and(wWaterInteraction)) {
 			port_SurfaceFromUnderwater();
 			return;
@@ -1847,7 +1847,7 @@ public:
 			}
 			if (!still_in(WST_AIRBORNE))
 				return;
-			FARCALL(Func_19afb);
+			collision(BANK_Func_19afb, ADDR_Func_19afb, check_func_19afb);
 			if (ld_and(wIsNearFence) && ld_bit(wJoypadDown, B_PAD_UP)) {
 				FARCALL(SetState_FenceMovingVertical);
 				return;
@@ -1974,8 +1974,7 @@ public:
 		if (!still_in(WST_SLIDING))
 			return;
 		// the ground below, by Func_198c7 (the result in b)
-		FARCALL(Func_198c7);
-		if (!cpu_.b) {
+		if (!collision(BANK_Func_198c7, ADDR_Func_198c7, check_func_198c7)) {
 			port_Func_1e174();
 			return;
 		}
@@ -2356,7 +2355,7 @@ public:
 			port_StartDive();
 			return;
 		}
-		FARCALL(Func_19acd);
+		collision(BANK_Func_19acd, ADDR_Func_19acd, check_func_19acd);
 		if (!ld_and(wWaterInteraction)) {
 			port_SurfaceFromUnderwater();
 			return;
@@ -2416,7 +2415,7 @@ public:
 			set_c0e1(B_PAD_UP);
 			return;
 		}
-		FARCALL(Func_19acd);
+		collision(BANK_Func_19acd, ADDR_Func_19acd, check_func_19acd);
 		if (!ld_and(wWaterInteraction)) {
 			port_SurfaceFromUnderwater();
 			return;
@@ -2493,7 +2492,7 @@ public:
 	void port_UpdateState_WaterSurfaceIdling()
 	{
 		wr8(wc0e1, 0);
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (!still_in(WST_WATER_SURFACE_IDLING))
 			return;
 		if (room_transition()) {
@@ -2667,7 +2666,7 @@ public:
 			wr8(wc0e1, PAD_UP);
 			return;
 		}
-		FARCALL(Func_19acd);
+		collision(BANK_Func_19acd, ADDR_Func_19acd, check_func_19acd);
 		if (!ld_and(wWaterInteraction)) {
 			port_SurfaceFromUnderwater();
 			return;

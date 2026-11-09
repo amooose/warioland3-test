@@ -232,7 +232,7 @@ public:
 		fill(gb_, 0xff80, 0, hDemoPowerUp - 0xff80); // STARTOF(HRAM)
 
 		// clear BGMap0 and BGMap1
-		gb_call_ret(gb_, ADDR_FillBGMap0_With7f, INIT_WO + 0x56);
+		home::fill_bg_map0(gb_, 0x7f);
 		gb_call_ret(gb_, ADDR_ClearBGMap1, INIT_WO + 0x59);
 
 		bankswitch(BANK_MainStateTable); // BANK("Main State Table")

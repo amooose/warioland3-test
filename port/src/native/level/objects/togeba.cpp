@@ -145,7 +145,7 @@ void Togeba::sink()
 	if (flags() & OBJFLAG_STEPPED) {
 		flags() &= ~OBJFLAG_STEPPED;
 		move_wario(ADDR_MoveWarioDown, 0x01);
-		call_home(ADDR_HandleDownwardsFloorTransition);
+		home::handle_downwards_floor_transition(gb_);
 	}
 	move_down();
 }

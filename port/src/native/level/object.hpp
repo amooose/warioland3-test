@@ -22,6 +22,9 @@
 #include "../home/object_mechanics.hpp"
 #include "../home/pals.hpp"
 #include "../home/memory.hpp"
+#include "../home/floor_transition.hpp"
+#include "../home/sprites.hpp"
+#include "../home/system.hpp"
 #include <initializer_list>
 
 namespace wl3::level {

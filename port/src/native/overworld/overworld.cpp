@@ -306,7 +306,7 @@ void Overworld::update_map_side()
 void Overworld::init_map_side()
 {
 	routines_.disable_lcd();
-	routines_.call(ADDR_FillBGMap0_With7f);
+	home::fill_bg_map0(gb_, 0x7f);
 	stop_music();
 	mem_[rWBK] = WRAM2;
 	routines_.clear_virtual_oam();

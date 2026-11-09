@@ -170,7 +170,7 @@ protected:
 		wr8(wDMASourceBank, bank);
 		wr8(wDMASourcePtr + 0, static_cast<uint8_t>(ptr >> 8));
 		st(wDMASourcePtr + 1, static_cast<uint8_t>(ptr));
-		CALL(LoadWarioGfx);
+		home::load_wario_gfx(gb_);
 	}
 	void set_oam(uint8_t bank, uint16_t ptr)
 	{

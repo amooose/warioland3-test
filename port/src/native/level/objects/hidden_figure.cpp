@@ -193,7 +193,7 @@ void HiddenFigure::wait_start()
 	var1() = 0x00;
 	set_update(MAIN);
 	mem_[wBossState] = BOSS_HIDDEN_FIGURE;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 }
 
 void HiddenFigure::main()

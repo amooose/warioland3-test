@@ -107,7 +107,7 @@ void Pesce::start()
 	move_down_by_var2();
 	var2() = 0x3c;
 	mem_[wBossState] = BOSS_REGULAR;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	mem_[wIsBossBattle] = TRUE;
 }
 
@@ -518,7 +518,7 @@ void PesceHelper::dragonfly_done()
 	flags() = 0;
 	spawner_done(0x08);
 	mem_[wBossState] = BOSS_DEFEATED;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	mem_[wIsBossBattle] = 0;
 	mem_[wSwitchStateUpdated] = 0x01;
 	mem_[wSwitchState] = 0x60;

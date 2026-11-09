@@ -180,7 +180,7 @@ void Anonster::enter()
 	if (--state_duration())
 		return;
 	mem_[wBossState] = BOSS_REGULAR;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	hide();
 }
 
@@ -665,7 +665,7 @@ void Anonster::defeated()
 		return;
 	set_block_object(0x05);
 	mem_[wBossState] = BOSS_DEFEATED;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	mem_[wIsBossBattle] = 0;
 	set_frameset(facing(ADDR_Frameset_694d7, ADDR_Frameset_694dc));
 	state() = 0x48;

@@ -189,11 +189,11 @@ void ZipLine::slope(bool up)
 		return;
 	if (up) {
 	move_wario(ADDR_MoveWarioUp, var2());
-		call_home(ADDR_HandleUpwardsFloorTransition);
+		home::handle_upwards_floor_transition(gb_);
 		return;
 	}
 	move_wario(ADDR_MoveWarioDown, var2());
-	call_home(ADDR_HandleDownwardsFloorTransition);
+	home::handle_downwards_floor_transition(gb_);
 	if (mem_[wCurObjId] < ZIP_LINE4)
 		return;
 	if (!(mem_[wGlobalCounter] & 0b111))

@@ -280,7 +280,7 @@ public:
 
 	void port_Func_1edf2b()
 	{
-		FARCALL(Func_19acd);
+		collision(BANK_Func_19acd, ADDR_Func_19acd, check_func_19acd);
 		if (!ld_and(wIsInAirCurrent)) {
 			port_SetState_FanSpinning();
 			return;
@@ -326,7 +326,7 @@ public:
 
 	void port_UpdateState_FanStart()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		sfx_loop(0x0c, SFX_07D);
 		anim(OAM3);
 		if (anim_ended())
@@ -703,7 +703,7 @@ public:
 		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
 			move_y(-3);
 			if (!up_collision()) {
-				CALL(HandleUpwardsFloorTransition);
+				home::handle_upwards_floor_transition(gb_);
 				return;
 			}
 			wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
@@ -720,7 +720,7 @@ public:
 
 	void port_UpdateState_MagicRising()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (up_collision()) {
 			particle_at_wario(PARTICLE_MAGIC_STOP);
 			wr8(wWarioState, WST_MAGIC_STOPPING);
@@ -737,7 +737,7 @@ public:
 
 	void port_UpdateState_Launched()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (room_transition()) {
 			home::trigger_room_transition(gb_);
 			return;
@@ -1053,7 +1053,7 @@ public:
 
 	void port_UpdateStart_FanLifting()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (!ld_and(wIsInAirCurrent)) {
 			port_SetState_FanRecovering();
 			return;
@@ -1068,7 +1068,7 @@ public:
 
 	void port_UpdateState_FanSpinning()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (!ld_and(wIsInAirCurrent)) {
 			port_SetState_FanRecovering();
 			return;
@@ -1533,7 +1533,7 @@ public:
 		clear(zero);
 		cpu_.a = alu_.inc(cpu_.a);
 		wr8(wJumpVelTable, cpu_.a);
-		CALL(UpdateLevelMusic);
+		home::update_level_music(gb_);
 		reset_anim();
 		load_gfx(BANK_WarioFanGfx, ADDR_WarioFanGfx);
 		set_oam(BANK_OAM_1dc000, ADDR_OAM_1dc000);

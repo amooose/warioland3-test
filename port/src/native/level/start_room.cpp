@@ -473,9 +473,9 @@ void RoomStart::process_multi_block()
 	routines_.call_ret(PROCESS_BLOCKS, ADDR_ProcessMultiBlock + 0x03);
 	routines_.farcall(BANK_UpdateParticles, ADDR_UpdateParticles);
 	farcall_obj_wram(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority);
-	routines_.call(ADDR_DrawWario);
+	home::draw_wario(gb_);
 	farcall_obj_wram(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority);
-	routines_.call(ADDR_ClearUnusedVirtualOAM);
+	home::clear_unused_virtual_oam(gb_);
 	cpu_.a = mem_[wSRAMBank];
 	push_af();
 	sram_switch(SRAM1);
@@ -593,7 +593,7 @@ void RoomStart::from_transition()
 	routines_.call_ret(ADDR_LoadRoom, SRT(0xbd));
 	pop_wram();
 
-	routines_.call_ret(ADDR_FillBGMap0_With7f, SRT(0xc3));
+	home::fill_bg_map0(gb_, 0x7f);
 	routines_.call_ret(ADDR_ClearVirtualOAM, SRT(0xc6));
 	routines_.call_ret(ADDR_ClearParticles, SRT(0xc9));
 	routines_.call_ret(ADDR_SetWarioPositionToSpawn, SRT(0xcc));
@@ -619,7 +619,7 @@ void RoomStart::from_transition()
 	}
 
 	// .not_entering_door
-	routines_.call_ret(ADDR_UpdateLevelMusic, SRT(0x13c));
+	home::update_level_music(gb_);
 	mem_[wBlockFuncWarioFlag] = FALSE;
 	mem_[wIsFloorTransition] = 0;
 	push_wram(BANK_wObjects);
@@ -629,7 +629,7 @@ void RoomStart::from_transition()
 	push_wram(BANK_wObjects);
 	routines_.farcall_ret(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority, SRT(0x181));
 	pop_wram();
-	routines_.call_ret(ADDR_DrawWario, SRT(0x187));
+	home::draw_wario(gb_);
 	push_wram(BANK_wObjects);
 	routines_.farcall_ret(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, SRT(0x19d));
 	pop_wram();
@@ -665,7 +665,7 @@ void RoomStart::from_level_start()
 	} else {
 		// .skip_init_vars_and_objects
 		mem_[wLevelRoomID] = mem_[wTempLevelRoomID];
-		routines_.call_ret(ADDR_LoadWarioGfx, SRL(0xa4));
+		home::load_wario_gfx(gb_);
 	}
 
 	// .load_blocks_and_objects
@@ -745,7 +745,7 @@ void RoomStart::from_level_start()
 	push_wram(BANK_wObjects);
 	routines_.farcall_ret(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority, SRL(0x208));
 	pop_wram();
-	routines_.call_ret(ADDR_DrawWario, SRL(0x20e));
+	home::draw_wario(gb_);
 	push_wram(BANK_wObjects);
 	routines_.farcall_ret(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, SRL(0x224));
 	pop_wram();

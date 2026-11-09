@@ -246,7 +246,7 @@ void Omodonmeka::run(uint16_t handler)
 		if (!(mem_[wGlobalCounter] & 0x07))
 			play_sfx(SFX_087);
 		move_wario(ADDR_MoveWarioUp, 0x01);
-		call_home(ADDR_HandleUpwardsFloorTransition);
+		home::handle_upwards_floor_transition(gb_);
 		move_up();
 		return;
 	}
@@ -464,7 +464,7 @@ void Omodonmeka::run_owo(uint16_t handler)
 			if (mem_[wGlobalCounter] & 1)
 				return;
 			move_wario(ADDR_MoveWarioUp, 0x01);
-			call_home(ADDR_HandleUpwardsFloorTransition);
+			home::handle_upwards_floor_transition(gb_);
 		}
 		if (dec_at(wCurObjStateDuration)) {
 			move_up();

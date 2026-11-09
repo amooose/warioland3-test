@@ -37,7 +37,7 @@ void GBIncompatible::run_state()
 void GBIncompatible::init()
 {
 	routines_.disable_lcd();
-	routines_.call(ADDR_ClearBGMap0);
+	home::fill_bg_map0(gb_, 0xff);
 	routines_.clear_virtual_oam();
 	routines_.in_bank(BANK_LoadGBIncompatibleScreenGfx, ADDR_LoadGBIncompatibleScreenGfx, [&] { engine::load_gb_incompatible_screen_gfx(gb_); });
 	routines_.in_bank(BANK_LoadGBIncompatibleScreenMap, ADDR_LoadGBIncompatibleScreenMap, [&] { engine::load_gb_incompatible_screen_map(gb_); });
@@ -69,7 +69,7 @@ void LanguageSelection::run_state()
 void LanguageSelection::init()
 {
 	routines_.disable_lcd();
-	routines_.call(ADDR_FillBGMap0_With7f);
+	home::fill_bg_map0(gb_, 0x7f);
 	routines_.clear_virtual_oam();
 	routines_.in_bank(BANK_LoadFontPals, ADDR_LoadFontPals, [&] { engine::load_font_pals(gb_); });
 	routines_.in_bank(BANK_LoadFontTiles, ADDR_LoadFontTiles, [&] { engine::load_font_tiles(gb_); });
@@ -147,7 +147,7 @@ void Perfect::run_state()
 void Perfect::init()
 {
 	routines_.disable_lcd();
-	routines_.call(ADDR_FillBGMap0_With7f);
+	home::fill_bg_map0(gb_, 0x7f);
 	routines_.clear_virtual_oam();
 	routines_.load_pals_to_temp_pals1(ADDR_Pals_dc173);
 	routines_.load_pals_to_temp_pals2(ADDR_Pals_dc1fb);

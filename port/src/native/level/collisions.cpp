@@ -329,6 +329,15 @@ uint8_t check_front_collision(GB *gb) { return Collisions(gb).front(); }
 uint8_t check_up_collision(GB *gb) { return Collisions(gb).up(); }
 uint8_t check_airborne_collision(GB *gb) { return Collisions(gb).airborne(); }
 uint8_t check_block_below(GB *gb) { return Collisions(gb).block(COLLISION_DOWN); }
+uint8_t check_func_19741(GB *gb) { Collisions c(gb); c.set_break_flag(); return c.bottom(true); }
+uint8_t check_func_197b1(GB *gb) { Collisions c(gb); c.set_break_flag(); return c.bottom(false); }
+uint8_t check_func_198c7(GB *gb) { return Collisions(gb).below(); }
+uint8_t check_func_19a77(GB *gb) { return Collisions(gb).sides(); }
+uint8_t check_func_19acd(GB *gb) { return Collisions(gb).at_y_offset(0x0c); }
+uint8_t check_func_19ae4(GB *gb) { return Collisions(gb).at_y_offset(0x1a); }
+uint8_t check_func_19afb(GB *gb) { return Collisions(gb).at_y_offset(0x18); }
+uint8_t check_func_19b12(GB *gb) { return Collisions(gb).at_y_offset(0); }
+uint8_t check_func_19b25(GB *gb) { return Collisions(gb).at_y_offset(4); }
 
 void asm_centre_collision(GB *gb)
 {

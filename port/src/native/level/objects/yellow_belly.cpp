@@ -147,7 +147,7 @@ void YellowBelly::music_start()
 	state_duration() = 0x20;
 	set_update(RISING);
 	mem_[wBossState] = BOSS_REGULAR;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 }
 
 void YellowBelly::rising()
@@ -624,7 +624,7 @@ void YellowBellyHelper::platform_update()
 	state_duration() = 0x5a;
 	set_update(ADDR_Func_51c77);
 	mem_[wBossState] = BOSS_DEFEATED;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	mem_[wIsBossBattle] = 0;
 	platform_done();
 }

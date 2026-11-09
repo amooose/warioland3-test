@@ -144,7 +144,7 @@ void Muddee::lurking()
 	var3() = 0;
 	flags() &= ~OBJFLAG_INVISIBLE;
 	mem_[wBossState] = BOSS_REGULAR;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	mem_[w1d147] = 0;
 	spawn_stingers();
 }
@@ -662,7 +662,7 @@ void Turtle::resurfacing()
 		if (--state_duration())
 			return;
 		mem_[wBossState] = BOSS_DEFEATED;
-		call_home(ADDR_UpdateLevelMusic);
+		home::update_level_music(gb_);
 		mem_[wIsBossBattle] = 0;
 		return;
 	}

@@ -54,7 +54,7 @@ void Epilogue::decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vram1)
 void Epilogue::init()
 {
 	routines_.disable_lcd();
-	routines_.call(ADDR_FillBGMap0_With7f);
+	home::fill_bg_map0(gb_, 0x7f);
 	routines_.clear_virtual_oam();
 	stop_music2(mem_);
 	mem_[rWBK] = 0x02;

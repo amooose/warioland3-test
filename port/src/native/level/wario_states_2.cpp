@@ -97,7 +97,7 @@ public:
 
 	void port_UpdateState_Slipping()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (room_transition()) {
 			home::trigger_room_transition(gb_);
 			return;
@@ -194,7 +194,7 @@ public:
 
 	void port_UpdateState_CrouchSlipping()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (room_transition()) {
 			home::trigger_room_transition(gb_);
 			return;
@@ -337,7 +337,7 @@ public:
 
 	void port_UpdateState_SandJumping()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (!ld_and(wIsInSand)) {
 			FARCALL(StartJump_FromSand);
 			return;
@@ -386,7 +386,7 @@ public:
 		port_Func_1b333();
 		if (rd8(wWarioState) != WST_SAND_WALKING)
 			return;
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (room_transition()) {
 			home::trigger_room_transition(gb_);
 			return;
@@ -438,7 +438,7 @@ public:
 
 	void port_UpdateState_LadderClimbing()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (room_transition()) {
 			home::trigger_room_transition(gb_);
 			return;
@@ -465,7 +465,7 @@ public:
 
 	void port_UpdateState_LadderIdling()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (room_transition()) {
 			home::trigger_room_transition(gb_);
 			return;
@@ -480,7 +480,7 @@ public:
 
 	void port_UpdateState_LadderShakeSlipping()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (room_transition()) {
 			home::trigger_room_transition(gb_);
 			return;
@@ -516,7 +516,7 @@ public:
 	{
 		sfx_loop(32, SFX_CLIMB);
 		move_by_dir(1);
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (rd8(wLadderInteraction))
 			return;
 		wr8(wIsGettingOffLadder, 0);
@@ -542,7 +542,7 @@ public:
 	// The shared body of UpdateState_LadderSliding and UpdateState_FenceSliding.
 	void update_sliding(bool fence)
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (room_transition()) {
 			home::trigger_room_transition(gb_);
 			return;
@@ -590,7 +590,7 @@ public:
 
 	void port_UpdateState_GrabSlipping()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (room_transition()) {
 			home::trigger_room_transition(gb_);
 			return;
@@ -927,7 +927,7 @@ public:
 
 	void port_UpdateState_FenceMovingHorizontal()
 	{
-		FARCALL(Func_19afb);
+		collision(BANK_Func_19afb, ADDR_Func_19afb, check_func_19afb);
 		if (!ld_and(wIsNearFence)) {
 			FARCALL(StartFall);
 			return;
@@ -963,7 +963,7 @@ public:
 
 		uint8_t joy = rd8(wJoypadDown);
 		if (joy & PAD_UP) {
-			FARCALL(Func_19ae4);
+			collision(BANK_Func_19ae4, ADDR_Func_19ae4, check_func_19ae4);
 			if (ld_and(wIsNearFence))
 				move_y(-1);
 			return;
@@ -975,7 +975,7 @@ public:
 				FARCALL(SetState_Idling);
 				return;
 			}
-			FARCALL(Func_19afb);
+			collision(BANK_Func_19afb, ADDR_Func_19afb, check_func_19afb);
 			if (!ld_and(wIsNearFence))
 				FARCALL(StartFall);
 			return;
@@ -1098,7 +1098,7 @@ public:
 				return;
 			if (ld_and(wLadderInteraction))
 				return;
-			FARCALL(Func_19b12);
+			collision(BANK_Func_19b12, ADDR_Func_19b12, check_func_19b12);
 			if (ld_and(wLadderInteraction))
 				return;
 			FARCALL(SetState_Idling);
@@ -1113,7 +1113,7 @@ public:
 					return;
 				}
 			}
-			FARCALL(Func_19b12);
+			collision(BANK_Func_19b12, ADDR_Func_19b12, check_func_19b12);
 			if (rd8(wLadderInteraction)) {
 				if (centre_collision())
 					center_on_ladder();
@@ -1133,14 +1133,15 @@ public:
 	{
 		if (ld_bit(wJoypadDown, B_PAD_B) && ld_mask(wJoypadDown, PAD_RIGHT | PAD_LEFT)) {
 			// .asm_1b4a7: the bottom collision a block to the side, result in b
+			uint8_t hit;
 			if (ld_bit(wJoypadDown, B_PAD_RIGHT)) {
 				wr8(wCollisionBoxRight, 16);
-				FARCALL(Func_19741);
+				hit = collision(BANK_Func_19741, ADDR_Func_19741, check_func_19741);
 			} else {
 				wr8(wCollisionBoxLeft, static_cast<uint8_t>(-16));
-				FARCALL(Func_197b1);
+				hit = collision(BANK_Func_197b1, ADDR_Func_197b1, check_func_197b1);
 			}
-			bool ok = !cpu_.b;
+			bool ok = !hit;
 			wr8(wCollisionBoxLeft, static_cast<uint8_t>(-9));
 			wr8(wCollisionBoxRight, 9);
 			if (ok)

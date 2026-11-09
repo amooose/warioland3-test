@@ -77,7 +77,7 @@ void Title::return_from_action_help()
 void Title::init_intro()
 {
 	routines_.disable_lcd();
-	routines_.call(ADDR_FillBGMap0_With7f);
+	home::fill_bg_map0(gb_, 0x7f);
 	routines_.clear_virtual_oam();
 	load_title_pals();
 	load_title_tiles();
@@ -718,7 +718,7 @@ void Title::set_select_flag()
 void Title::init_time_attack_description()
 {
 	routines_.disable_lcd();
-	routines_.call(ADDR_FillBGMap0_With7f);
+	home::fill_bg_map0(gb_, 0x7f);
 	routines_.clear_virtual_oam();
 	routines_.load_pals_to_temp_pals1(ADDR_Pals_71b0);
 	routines_.call(ADDR_ApplyTempPals1ToBGPals);

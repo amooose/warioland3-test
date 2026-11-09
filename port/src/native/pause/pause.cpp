@@ -103,7 +103,7 @@ void PauseMenu::init_menu()
 	play_music(mem_, MUSIC_PAUSE_MENU);
 	wram_.pause_menu_selection() = PAUSEMENU_RETURN;
 	wram_.room_animated_tiles_enabled() = 0;
-	routines_.call(ADDR_ClearBGMap0);
+	home::fill_bg_map0(gb_, 0xff);
 	routines_.clear_virtual_oam();
 	routines_.in_bank(BANK_LoadPauseMenuPals, ADDR_LoadPauseMenuPals, [&] {
 		routines_.load_pals_to_temp_pals1(ADDR_Pals_1f4182);
@@ -205,7 +205,7 @@ void PauseMenu::exit()
 	wram_.animated_tiles_frame_count() = 0;
 	wram_.animated_tiles_frame() = 0;
 	wram_.room_animated_tiles_enabled() = TRUE;
-	routines_.call(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	mem_[rLCDC] = LCDC_DEFAULT;
 	++wram_.sub_state();
 }

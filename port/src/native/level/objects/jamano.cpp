@@ -143,7 +143,7 @@ void Jamano::starting()
 	if (--state_duration())
 		return;
 	mem_[wBossState] = BOSS_REGULAR;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	flags() |= 1 << 7;
 	set_update(FIGHTING);
 	state_duration() = 0;
@@ -473,7 +473,7 @@ void JamanoHat::flying()
 	flags() = 0;
 	set_block_object(0x06);
 	mem_[wBossState] = BOSS_DEFEATED;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	mem_[wIsBossBattle] = 0;
 }
 
@@ -523,10 +523,10 @@ void HatPlatform::move(bool down)
 		flags() &= ~OBJFLAG_STEPPED;
 		if (down) {
 			move_wario(ADDR_MoveWarioDown, 0x01);
-			call_home(ADDR_HandleDownwardsFloorTransition);
+			home::handle_downwards_floor_transition(gb_);
 		} else {
 			move_wario(ADDR_MoveWarioUp, 0x01);
-			call_home(ADDR_HandleUpwardsFloorTransition);
+			home::handle_upwards_floor_transition(gb_);
 		}
 	}
 	if (down)

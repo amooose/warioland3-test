@@ -154,7 +154,7 @@ void Wolfenboss::smoke_entrance()
 	mem_[wCurObjFramesetOffset] = 2;
 	set_coll_box(static_cast<uint8_t>(-8), 12, static_cast<uint8_t>(-8), 7);
 	mem_[wBossState] = BOSS_REGULAR;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 }
 
 void Wolfenboss::emerge_from_smoke()
@@ -378,7 +378,7 @@ void Wolfenboss::defeat_fall()
 		return;
 	}
 	mem_[wBossState] = BOSS_DEFEATED;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 	mem_[wIsBossBattle] = 0;
 	call_home(ADDR_Func_56326);
 	for (uint8_t obj = static_cast<uint8_t>(wObj1);; obj = static_cast<uint8_t>(obj + OBJ_STRUCT_LENGTH)) {

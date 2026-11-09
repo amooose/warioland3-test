@@ -20,6 +20,14 @@ class ObjectInteractions : public AsmModule {
 public:
 	using AsmModule::AsmModule;
 
+	// a farcalled collision check: its result
+	uint8_t collision(uint8_t bank, uint16_t addr, uint8_t (*check)(GB *))
+	{
+		uint8_t result = 0;
+		Routines(gb_).in_bank(bank, addr, [&] { result = check(gb_); });
+		return result;
+	}
+
 	#define ProcessInteractions_table (ADDR_ProcessInteractions + 0x150) // after the $ef
 
 	// an edge of a collision box on screen: pos + the box's offset - $d0
@@ -544,7 +552,7 @@ public:
 			return;
 		set_obj_action(OBJACTION_06);
 		wr8(wTransformation, TRANSFORMATION_VAMPIRE_WARIO);
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (rd8(wTransformation) != TRANSFORMATION_VAMPIRE_WARIO)
 			return;
 		FARCALL(SetState_VampireTransforming);
@@ -836,13 +844,12 @@ public:
 		}
 		uint8_t dy = rd8(wc1c2);
 		home::move_wario_y(gb_, dy >= 0x10 ? 0x0c : dy);
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (rd8(wWaterInteraction)) {
 			FARCALL(DiveFromSurface_SkipSplash);
 			return;
 		}
-		run_centre_collision();
-		bool ground = cpu_.b;
+		bool ground = collision(BANK_CheckCentreCollision, ADDR_CheckCentreCollision, check_centre_collision);
 		if (ground)
 			update_pos_y();
 		if (rd8(wInvincibleCounter) == 0x01)
@@ -944,8 +951,7 @@ public:
 					return;
 				}
 				wr8(wInteractionSide, INTERACTION_RIGHT);
-				FARCALL(Func_197b1);
-				if (cpu_.b)
+				if (collision(BANK_Func_197b1, ADDR_Func_197b1, check_func_197b1))
 					break;
 				uint8_t dx = rd8(wc1c3);
 				if (dx == 0xff) {
@@ -960,8 +966,7 @@ public:
 					return;
 				}
 				wr8(wInteractionSide, INTERACTION_LEFT);
-				FARCALL(Func_19741);
-				if (cpu_.b)
+				if (collision(BANK_Func_19741, ADDR_Func_19741, check_func_19741))
 					break;
 				uint8_t dx = rd8(wc1c4);
 				if (dx == 0xff) {
@@ -2144,10 +2149,8 @@ public:
 		wr8(wCollisionBoxLeft, static_cast<uint8_t>(-11));
 		wr8(wCollisionBoxRight, 11);
 		if (rd8(wLadderInteraction) != LADDER_UNDERNEATH) {
-			FARCALL(Func_197b1);
-			if (!cpu_.b) {
-				FARCALL(Func_19741);
-				if (!cpu_.b) {
+			if (!collision(BANK_Func_197b1, ADDR_Func_197b1, check_func_197b1)) {
+				if (!collision(BANK_Func_19741, ADDR_Func_19741, check_func_19741)) {
 					set_obj_action(OBJACTION_FLATTEN);
 					FARCALL(SetState_FlatAirborne);
 					return;

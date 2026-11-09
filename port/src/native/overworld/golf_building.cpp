@@ -35,7 +35,7 @@ uint8_t GolfBuilding::walk(bool right)
 void GolfBuilding::init()
 {
 	routines_.disable_lcd();
-	routines_.call(ADDR_FillBGMap0_With7f);
+	home::fill_bg_map0(gb_, 0x7f);
 	routines_.clear_virtual_oam();
 	stop_music2(mem_);
 	mem_[rWBK] = 2; // BANK("WRAM2")

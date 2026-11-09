@@ -140,7 +140,7 @@ void DollBoy::init()
 	mem_[wDollBoyHammerRange] = 0;
 	mem_[wDollBoyActiveBarrels] = DOLLBOY_BARREL1 | DOLLBOY_BARREL2 | DOLLBOY_BARREL3;
 	mem_[wBossState] = BOSS_REGULAR;
-	call_home(ADDR_UpdateLevelMusic);
+	home::update_level_music(gb_);
 }
 
 void DollBoy::copy_pals(uint16_t pals)
@@ -516,7 +516,7 @@ void DollBoy::defeated()
 	if (screen_y() >= 0xd0) {
 		flags() = 0;
 		mem_[wBossState] = BOSS_DEFEATED;
-		call_home(ADDR_UpdateLevelMusic);
+		home::update_level_music(gb_);
 		mem_[wIsBossBattle] = 0;
 		ground_shake();
 		return;
@@ -755,7 +755,7 @@ void DollBoyHelper::platform_down()
 	if (!(mem_[wGlobalCounter] & 1))
 		return;
 	move_wario(ADDR_MoveWarioDown, 1);
-	call_home(ADDR_HandleDownwardsFloorTransition);
+	home::handle_downwards_floor_transition(gb_);
 	move_down();
 }
 
@@ -777,7 +777,7 @@ void DollBoyHelper::platform_up()
 	if (!(mem_[wGlobalCounter] & 1))
 		return;
 	move_wario(ADDR_MoveWarioUp, 1);
-	call_home(ADDR_HandleUpwardsFloorTransition);
+	home::handle_upwards_floor_transition(gb_);
 	move_up();
 }
 

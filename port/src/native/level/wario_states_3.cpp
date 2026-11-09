@@ -1147,7 +1147,7 @@ public:
 
 	void port_UpdateState_ZombieIdling()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (!still_in(WST_ZOMBIE_IDLING))
 			return;
 		uint8_t hit = centre_collision();
@@ -1223,7 +1223,7 @@ public:
 		wr8(wJumpVelTable, 0);
 		wr8(wWarioState, WST_ZOMBIE_LANDING);
 		clear({wWarioStateCounter, wFrameDuration, wAnimationFrame});
-		FARCALL(Func_19a77);
+		collision(BANK_Func_19a77, ADDR_Func_19a77, check_func_19a77);
 		if (rd8(wc1ca)) {
 			wr8(wWarioStateCounter, 0x01);
 			frameset_by_dir(ADDR_Frameset_1fc8bc, ADDR_Frameset_1fc8d5);
@@ -2552,7 +2552,7 @@ public:
 
 	void port_UpdateState_InBubble()
 	{
-		FARCALL(Func_19b25);
+		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (!ld_and(wWaterInteraction)) {
 			// .asm_2ad45
 			particle_at_wario(PARTICLE_BUBBLE_BURST);
