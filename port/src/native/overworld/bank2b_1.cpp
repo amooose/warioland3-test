@@ -93,3 +93,8 @@ PORT_COVERED(Func_ad329);
 PORT_COVERED(Func_ad33c);
 PORT_LOCAL_EX(VBlank_PrologueEpilogue, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { prologue_epilogue_vblank(gb); }
 PORT_LOCAL_EX(_GolfBuilding, func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { golf_building_vblank(gb); }
+
+// Unreferenced in the original, so unreachable: nothing to run. Marked for
+// the progress report.
+PORT_COVERED(DebugSceneWario);
+PORT_COVERED(Func_aca68);

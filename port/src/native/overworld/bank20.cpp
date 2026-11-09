@@ -17,3 +17,13 @@ uint16_t map_level_coords(GB *gb, uint8_t level)
 }
 
 } // namespace wl3::overworld
+
+// Unreferenced in the original, so unreachable: nothing to run. Marked for
+// the progress report.
+PORT_COVERED(Func_812b0);
+PORT_COVERED(Func_8143d);
+PORT_COVERED(Func_817b1);
+PORT_COVERED(UnreferencedLCD_82729);
+PORT_COVERED(UnreferencedLCD_82754);
+PORT_COVERED(Func_b4895);
+PORT_COVERED(UnreferencedOpenTreasureCollection);

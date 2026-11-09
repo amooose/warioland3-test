@@ -10,3 +10,8 @@ PORT_EX(PlayRecoverySFX, 0, 0)
 	wl3::play_sfx(wl3::Memory(gb), SFX_RECOVERY);
 	gb->cpu.a = static_cast<uint8_t>(SFX_RECOVERY); // the macro leaves the low byte
 }
+
+// Unreferenced in the original, so unreachable: nothing to run. Marked for
+// the progress report.
+PORT_COVERED(Func_10fc);
+PORT_COVERED(Func_111e);

@@ -1323,6 +1323,24 @@ Next:
   instruction percentage instead.
 - `build/progress.md` lists the rest under "Ready to port".
 
+Toward no registers (2026-11-08): the goal is a game build with no CPU
+struct. Order: (1) finish the plain modules, (2) untangle block functions
+and objects, (3) direct calls instead of addresses (Routines::call,
+farcall, JUMP_TO), (4) the header and main loop as plain code, (5) compile
+the hook glue out of the game build, keeping it in `WL3_INTERPRETER`
+builds so the fuzzer and difftests still compare against the asm.
+Stage 1 is done apart from what depends on later stages:
+- Stage 2: load_objects (register arguments and results for object code),
+  object_interactions, wario_states_1, particles' CreateParticle,
+  collisions, update_objects, block_functions.
+- start_room and level_vblank: start_room's pushes are read by the block
+  queue overrun; LevelVBlankFunc hands hl and bc to the RAM code.
+- Stage 4: header, start, main_state_table.
+Routines nothing references and whose callers' hooks have their own copies
+lost their hooks (PORT_COVERED, with a comment for the unreachable ones).
+Fuzzing a V-Blank `.Func` label reports 0 checks (all inconclusive): the
+quick tier's traces are what covers those.
+
 ## Recordings
 
 `tests/inputs/*.input` (plus `.state`) drive both the difftest and the

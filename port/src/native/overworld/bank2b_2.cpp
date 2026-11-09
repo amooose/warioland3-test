@@ -11,3 +11,7 @@ PORT_COVERED(Func_ae1c9);
 PORT_COVERED(Func_ae1d5);
 PORT_COVERED(Func_af130);
 PORT_COVERED(Func_af135);
+
+// Unreferenced in the original, so unreachable: nothing to run. Marked for
+// the progress report.
+PORT_COVERED(Func_af01f);
