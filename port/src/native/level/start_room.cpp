@@ -21,8 +21,6 @@ namespace wl3::level {
 
 namespace {
 
-constexpr uint16_t SRT(uint16_t offset) { return static_cast<uint16_t>(ADDR_StartRoom_FromTransition + offset); }
-constexpr uint16_t SRL(uint16_t offset) { return static_cast<uint16_t>(ADDR_StartRoom_FromLevelStart + offset); }
 constexpr uint16_t PROCESS_BLOCKS = ADDR_ProcessMultiBlock + 0x63; // .ProcessBlocks
 constexpr uint8_t SRAM1 = BANK_sLevelBlockObjectMap;
 constexpr uint8_t GFX_RAM = BANK_w3d280;
@@ -50,13 +48,6 @@ private:
 		mem_[wSRAMBank] = bank;
 		mem_[rRAMB + 0x100] = bank;
 	}
-	void push_af() { gb_push16(gb_, REG_AF(gb_)); }
-	void pop_af()
-	{
-		uint16_t af = gb_pop16(gb_);
-		cpu_.a = static_cast<uint8_t>(af >> 8);
-		cpu_.f = static_cast<uint8_t>(af & 0xf0);
-	}
 	void xor_a()
 	{
 		cpu_.a = 0;
@@ -74,18 +65,13 @@ private:
 		for (uint16_t addr : addrs)
 			mem_[addr] = 0;
 	}
+	// push_wram / pop_wram: WRAM bank, then back
 	void push_wram(uint8_t bank)
 	{
-		cpu_.a = mem_[rWBK];
-		push_af();
-		cpu_.a = bank;
+		saved_wbk_[saved_++] = mem_[rWBK];
 		mem_[rWBK] = bank;
 	}
-	void pop_wram()
-	{
-		pop_af();
-		mem_[rWBK] = cpu_.a;
-	}
+	void pop_wram() { mem_[rWBK] = saved_wbk_[--saved_]; }
 	// ld a, [wceef] / and %00111100: from a saved level
 	bool from_saved_level()
 	{
@@ -136,9 +122,11 @@ private:
 	bool cam_border(int bit) const { return mem_[wCameraConfigFlags] & (1 << bit); }
 	void draw_room_column(uint16_t queue);
 	void queue_row_tiles_and_attributes();
-	void call_in_sram1(uint16_t addr, uint16_t ret);
+	void call_in_sram1(uint16_t addr);
 	void farcall_obj_wram(uint8_t bank, uint16_t addr);
 
+	uint8_t saved_wbk_[4] = {};
+	int saved_ = 0;
 	GB *gb_;
 	CPU &cpu_;
 	Memory mem_;
@@ -421,18 +409,14 @@ void RoomStart::queue_row_tiles_and_attributes()
 	mem_[wBGMapAddressQueueSize] = static_cast<uint8_t>(mem_[wBGMapAddressQueueSize] + 2 * TILEMAP_HEIGHT);
 
 	// the tiles and attributes of the column's blocks: the queue routines
-	// take the block pointer in hl, and keep the asm's push and return
-	// addresses (their overrun reads them, see HANDOFF.md)
+	// take the block pointer in hl
 	SET_HL(gb_, home::block_ptr(gb_, wBlockPos).ptr);
 	sram_switch(mem_[wBlockPtrBank]);
 	bool odd = mem_[wBlockXPos + 1] & 0x08;
-	// the a and f hCallFunc's push af saves: and $08's
-	cpu_.a = mem_[wBlockXPos + 1] & 0x08;
-	cpu_.f = flags::and_(cpu_.a);
-	gb_push16(gb_, REG_HL(gb_));
+	uint16_t block = REG_HL(gb_);
 	routines_.farcall(BANK_QueueBlockTilesAlongRow_OddColumn,
 		odd ? ADDR_QueueBlockTilesAlongRow_OddColumn : ADDR_QueueBlockTilesAlongRow_EvenColumn);
-	SET_HL(gb_, gb_pop16(gb_));
+	SET_HL(gb_, block);
 	sram_switch(mem_[wBlockPtrBank]);
 	routines_.farcall(BANK_QueueBlockTilesAlongRow_OddColumn,
 		odd ? ADDR_QueueBlockAttributesAlongRow_OddColumn : ADDR_QueueBlockAttributesAlongRow_EvenColumn);
@@ -477,15 +461,13 @@ void RoomStart::process_multi_block()
 	home::draw_wario(gb_);
 	farcall_obj_wram(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority);
 	home::clear_unused_virtual_oam(gb_);
-	cpu_.a = mem_[wSRAMBank];
-	push_af();
+	uint8_t sram = mem_[wSRAMBank];
 	sram_switch(SRAM1);
 	cpu_.ime = false; // di
 	level::set_tile_queue_processing_functions(gb_);
 	cpu_.ime = true; // ei
 	cpu_.ime_delay = 0;
-	pop_af();
-	sram_switch(cpu_.a);
+	sram_switch(sram);
 }
 
 // the block next to wcedb:wcedc in the direction in wMultiBlockParam's low
@@ -540,15 +522,12 @@ void RoomStart::process_blocks()
 
 // ld a, [wSRAMBank] / push af / ld a, BANK("SRAM1") / sramswitch /
 // call addr / pop af / sramswitch
-void RoomStart::call_in_sram1(uint16_t addr, uint16_t ret)
+void RoomStart::call_in_sram1(uint16_t addr)
 {
-	cpu_.a = mem_[wSRAMBank];
-	push_af();
-	cpu_.a = SRAM1;
+	uint8_t sram = mem_[wSRAMBank];
 	sram_switch(SRAM1);
-	routines_.call_ret(addr, ret);
-	pop_af();
-	sram_switch(cpu_.a);
+	routines_.call(addr);
+	sram_switch(sram);
 }
 
 // a room from a transition (or the golf minigame)
@@ -606,8 +585,8 @@ void RoomStart::from_transition()
 	mem_[wRoomTransitionParam] = 0;
 
 	routines_.call(ADDR_UpdateSwitchableBlocks);
-	call_in_sram1(ADDR_DrawRoom_FromStart, SRT(0xf2));
-	call_in_sram1(ADDR_Func_896f, SRT(0x108));
+	call_in_sram1(ADDR_DrawRoom_FromStart);
+	call_in_sram1(ADDR_Func_896f);
 	level::set_wario_screen_pos(gb_);
 
 	if (mem_[wWarioState] == WST_ENTERING_DOOR) {
@@ -695,9 +674,9 @@ void RoomStart::from_level_start()
 	routines_.call(ADDR_ApplyInitialCameraScroll);
 	routines_.call(ADDR_VBlank_Level);
 	level::set_tile_queue_processing_functions(gb_);
-	call_in_sram1(ADDR_DrawRoom_FromStart, SRL(0x14c));
+	call_in_sram1(ADDR_DrawRoom_FromStart);
 	if (!from_saved_level())
-		call_in_sram1(ADDR_Func_896f, SRL(0x169));
+		call_in_sram1(ADDR_Func_896f);
 
 	// .asm_88b7
 	if (mem_[wLevel] == THE_TEMPLE) {

@@ -144,11 +144,11 @@ public:
 	uint16_t top() const { return static_cast<uint16_t>(obj_y() - static_cast<uint8_t>(-rd8(wCurObjCollBoxTop))); }
 	void res_flag(uint8_t bit) { wr8(wCurObjFlags, rd8(wCurObjFlags) & ~(1 << bit)); }
 
-	// A block check through home's wrapper (Func_3513 and the like),
-	// returning to ret as the asm's call does: the block function's result
-	uint8_t block(uint16_t wrapper, uint16_t ret)
+	// A block check through home's wrapper (Func_3513 and the like): the
+	// block function's result
+	uint8_t block(uint16_t wrapper)
 	{
-		gb_call_ret(gb_, wrapper, ret);
+		gb_call(gb_, wrapper);
 		return cpu_.a;
 	}
 
@@ -236,7 +236,6 @@ public:
 	// hits something or OBJ_STATE_DURATION runs out.
 	void thrown_object_movement(bool left, uint16_t table)
 	{
-		uint16_t routine = left ? ADDR_Func_62ec3 : ADDR_Func_62faa;
 		uint8_t v = table_step(wCurObjVar3, table, 0x10);
 		if (v) {
 			// an add with the carry taken as a negative's
@@ -251,11 +250,11 @@ public:
 		// its top, then 8 above its feet at the side it moves to
 		set_hpos_y(top());
 		set_hpos_x(obj_x());
-		bool collided = block(ADDR_Func_358b, static_cast<uint16_t>(routine + 0x50)) & 0x0f;
+		bool collided = block(ADDR_Func_358b) & 0x0f;
 		if (!collided) {
 			set_hpos_y(static_cast<uint16_t>(obj_y() - 8));
 			set_hpos_x(edge(left));
-			collided = block(ADDR_Func_3513, static_cast<uint16_t>(routine + (left ? 0x73 : 0x70))) & 0x0f;
+			collided = block(ADDR_Func_3513) & 0x0f;
 		}
 		if (!collided) {
 			uint8_t d = static_cast<uint8_t>(rd8(wCurObjStateDuration) - 1);
@@ -329,7 +328,7 @@ public:
 	void fall_if_no_floor(uint16_t routine, uint8_t state)
 	{
 		hpos_at_obj();
-		if (!block(ADDR_Func_3543, static_cast<uint16_t>(routine + 0x12)))
+		if (!block(ADDR_Func_3543))
 			wr8(wCurObjState, state);
 		home_jump_ret();
 	}
@@ -392,7 +391,7 @@ public:
 	{
 		hpos_at_obj();
 		wr8(wObjSlopeInteraction, 0);
-		if (!block(ADDR_Func_352b, ret)) {
+		if (!block(ADDR_Func_352b)) {
 			if (rd8(wIsInWaterOrSand))
 				wr8(wCurObjState, OBJSTATE_VANISH_TOUCH);
 			home_jump_ret();
@@ -503,10 +502,9 @@ public:
 	// bumped into something slides back, slowing down
 	void obj_bump_slide(bool left)
 	{
-		uint16_t routine = left ? ADDR_Func_62ae5 : ADDR_Func_62bce;
 		set_hpos_y(static_cast<uint16_t>(obj_y() - 4));
 		set_hpos_x(edge(left));
-		if (block(ADDR_Func_3513, static_cast<uint16_t>(routine + (left ? 0x1f : 0x1c))) & 0x0f) {
+		if (block(ADDR_Func_3513) & 0x0f) {
 			play_sfx(SFX_01A);
 			wr8(wCurObjState, left ? OBJSTATE_STUN_RIGHT_START : OBJSTATE_STUN_LEFT_START);
 		} else {
@@ -514,7 +512,7 @@ public:
 			let_go_off_screen(left);
 			hpos_at_obj();
 			wr8(wObjSlopeInteraction, 0);
-			uint8_t floor = block(ADDR_Func_3543, static_cast<uint16_t>(routine + (left ? 0x4a : 0x47)));
+			uint8_t floor = block(ADDR_Func_3543);
 			wr8(wCurObjYPos + 0, rd8(hYPosLo));
 			wr8(wCurObjYPos + 1, rd8(hYPosHi));
 			if (floor == 0x10) {
@@ -532,8 +530,7 @@ public:
 			bool hit = false;
 			for (int side = 0; side < 2 && !hit; side++) {
 				set_hpos_x(edge((side == 0) == left));
-				hit = block(ADDR_Func_35a3, static_cast<uint16_t>(routine +
-					(left ? (side ? 0x81 : 0x6c) : (side ? 0x7e : 0x66)))) != 0;
+				hit = block(ADDR_Func_35a3) != 0;
 			}
 			if (!hit)
 				wr8(wCurObjState, left ? OBJSTATE_14 : OBJSTATE_15);
@@ -569,14 +566,13 @@ public:
 	// land_by_slope), vanishes in water or sand, or hits a wall
 	void obj_knocked_fall(bool left)
 	{
-		uint16_t routine = left ? ADDR_Func_62ca8 : ADDR_Func_62d86;
 		move_x_by_var2(left);
 		let_go_off_screen(left);
 		set_obj_y(static_cast<uint16_t>(obj_y() + obj_y_vel(ADDR_FallingYVel_Light, ADDR_FallingYVel_Heavy)));
 		hpos_at_obj();
 		wr8(wObjSlopeInteraction, 0);
 		wr8(wc1ca, 0);
-		if (block(ADDR_Func_352b, static_cast<uint16_t>(routine + 0x4f))) {
+		if (block(ADDR_Func_352b)) {
 			land_by_slope(left);
 			return;
 		}
@@ -587,7 +583,7 @@ public:
 		}
 		set_hpos_y(static_cast<uint16_t>(obj_y() - 4));
 		set_hpos_x(edge(left));
-		if (block(ADDR_Func_3513, static_cast<uint16_t>(routine + (left ? 0x77 : 0x74))) & 0x0f)
+		if (block(ADDR_Func_3513) & 0x0f)
 			wr8(wCurObjState, left ? OBJSTATE_15 : OBJSTATE_14);
 		home_jump_ret();
 	}
@@ -1032,7 +1028,7 @@ public:
 			set_hpos_y(obj_y());
 			wr8(wc1ca, FALSE);
 			wr8(wBlockFuncSpecialCollision, COLLISION_THROWN_OBJ);
-			uint8_t floor = block(ADDR_Func_352b, static_cast<uint16_t>(routine + 0x20));
+			uint8_t floor = block(ADDR_Func_352b);
 			wr8(hffa0, 0x03);
 			if (floor) {
 				land_by_slope(left);
@@ -1047,7 +1043,7 @@ public:
 
 		set_hpos_y(top());
 		wr8(wBlockFuncSpecialCollision, COLLISION_THROWN_OBJ);
-		if (block(ADDR_Func_358b, static_cast<uint16_t>(routine + 0x50))) {
+		if (block(ADDR_Func_358b)) {
 			wr8(wCurObjState, ceil_state);
 			home_jump_ret();
 			return;
@@ -1055,7 +1051,7 @@ public:
 		set_hpos_y(static_cast<uint16_t>(obj_y() - 8));
 		set_hpos_x(edge(left));
 		wr8(wBlockFuncSpecialCollision, COLLISION_THROWN_OBJ);
-		if (block(ADDR_Func_3513, static_cast<uint16_t>(routine + wall_ret)) & 0x0f) {
+		if (block(ADDR_Func_3513) & 0x0f) {
 			wr8(wCurObjState, wall_state);
 			home_jump_ret();
 			return;
@@ -1120,7 +1116,6 @@ public:
 	// back at their 0 end; stopped by a wall or ceiling), then held
 	void grabbed_object(bool right)
 	{
-		uint16_t routine = right ? ADDR_Func_61f54 : ADDR_Func_620a6;
 		uint8_t drop_state = right ? OBJSTATE_14 : OBJSTATE_15;
 		uint8_t idle_state = right ? OBJSTATE_19 : OBJSTATE_18;
 		no_actions();
@@ -1136,7 +1131,7 @@ public:
 			hold_above_wario(right);
 			hpos_at_obj();
 			wr8(wc1ca, FALSE);
-			if (!block(ADDR_Func_352b, static_cast<uint16_t>(routine + 0x55)) || rd8(wc1ca)) {
+			if (!block(ADDR_Func_352b) || rd8(wc1ca)) {
 				wr8(wCurObjState, idle_state);
 				home_jump_ret();
 				return;
@@ -1170,10 +1165,10 @@ public:
 		set_hpos_y(static_cast<uint16_t>(picked_y() - 4));
 		set_hpos_x(right ? static_cast<uint16_t>(picked_x() + rd8(wCurObjCollBoxRight))
 			: static_cast<uint16_t>(picked_x() - static_cast<uint8_t>(-rd8(wCurObjCollBoxLeft))));
-		if (!(block(ADDR_Func_3513, static_cast<uint16_t>(routine + (right ? 0x106 : 0x109))) & 0x0f)) {
+		if (!(block(ADDR_Func_3513) & 0x0f)) {
 			set_hpos_y(static_cast<uint16_t>(picked_y() - static_cast<uint8_t>(-rd8(wCurObjCollBoxTop))));
 			set_hpos_x(picked_x());
-			if (!(block(ADDR_Func_358b, static_cast<uint16_t>(routine + (right ? 0x125 : 0x128))) & 0x0f)) {
+			if (!(block(ADDR_Func_358b) & 0x0f)) {
 				obj_to_picked();
 				home_jump_ret();
 				return;
@@ -1195,7 +1190,6 @@ public:
 	// Func_621fb (held to the right) / Func_622bd (held to the left)
 	void held_object(bool right)
 	{
-		uint16_t routine = right ? ADDR_Func_621fb : ADDR_Func_622bd;
 		no_actions();
 		uint8_t grab = rd8(wGrabState);
 		uint8_t g = grab & 0x0f;
@@ -1224,10 +1218,10 @@ public:
 		hold_above_wario(right);
 		set_hpos_y(top());
 		set_hpos_x(obj_x());
-		if (!(block(ADDR_Func_358b, static_cast<uint16_t>(routine + 0x7d)) & (right ? 0x0f : 0xff))) {
+		if (!(block(ADDR_Func_358b) & (right ? 0x0f : 0xff))) {
 			set_hpos_y(static_cast<uint16_t>(obj_y() - 8));
 			set_hpos_x(edge(!right));
-			if (!(block(ADDR_Func_3513, static_cast<uint16_t>(routine + (right ? 0x9d : 0x9f))) & (right ? 0xff : 0x0f))) {
+			if (!(block(ADDR_Func_3513) & (right ? 0xff : 0x0f))) {
 				home_jump_ret();
 				return;
 			}
@@ -1247,7 +1241,6 @@ public:
 	// Func_6247b (charging a throw to the right) / Func_62382 (to the left)
 	void charging_throw(bool right)
 	{
-		uint16_t routine = right ? ADDR_Func_6247b : ADDR_Func_62382;
 		no_actions();
 		uint8_t grab = rd8(wGrabState);
 		uint8_t g = grab & 0x0f;
@@ -1262,7 +1255,7 @@ public:
 				static_cast<uint16_t>(right ? wario_x() - 5 : wario_x() + 5));
 			set_hpos_y(static_cast<uint16_t>(picked_y() - 4));
 			set_hpos_x(picked_x());
-			if (!(block(ADDR_Func_3513, static_cast<uint16_t>(routine + 0x81)) & 0x0f)) {
+			if (!(block(ADDR_Func_3513) & 0x0f)) {
 				obj_to_picked();
 				home_jump_ret();
 				return;
@@ -1286,20 +1279,12 @@ public:
 
 	enum { UPD_NORMAL, UPD_TEMPLE, UPD_FLOOR };
 
-	// Return addresses (the bytes after each call, checked against the ROM).
-	#define RET_TEMPLE_HCALL 0x5261  // UpdateObject_Temple: call hCallFunc
-	#define RET_NORMAL_HCALL 0x5479  // UpdateObject: call hCallFunc
-	#define RET_FLOOR_HCALL 0x55b4  // UpdateObjectDuringFloorTransition: call hCallFunc
-	#define RET_FLOOR_FRAME 0x55b7
-	#define RET_TEMPLE_LOOP 0x5316  // first call c, UpdateObject_Temple (then +7 each)
-	#define RET_UPDATE_LOOP 0x5370  // first call c, UpdateObject
-	#define RET_FLOOR_LOOP 0x53aa   // first call c, UpdateObjectDuringFloorTransition
 	#define OBJFUNCS1_BANK 0x10     // BANK("Object Functions 1")
 	#define OBJFUNCS4_BANK 0x13     // BANK("Object Functions 4")
 
 	// The update function's pointer and bank into hCallFunc (the bank by the
 	// object's id, or the temple's), and the call
-	void call_update_function(uint8_t bank, bool by_id, uint16_t ret)
+	void call_update_function(uint8_t bank, bool by_id)
 	{
 		if (by_id) {
 			uint8_t id = rd8(wCurObjId);
@@ -1318,7 +1303,7 @@ public:
 		if (gb_->test.active && rd8(wCurObjUpdateFunction + 1) < 0x40)
 			gb_->test.unrealistic = true;
 		uint8_t entry_bank = rd8(wROMBank);
-		gb_call_ret(gb_, hCallFunc, ret);
+		gb_call(gb_, hCallFunc);
 		if (gb_->test.active && gb_->rom_bank != entry_bank)
 			gb_->test.unrealistic = true;
 	}
@@ -1332,11 +1317,9 @@ public:
 	// UpdateObject and friends: the object at obj (its flags, which the
 	// loop passes rotated in a) copied to wCurObj, its action, update
 	// function and animation run, its screen position set, and copied back
-	// (all but OBJFLAG_STEPPED, unk01, unk02 and unk1d). The object's slot
-	// stays pushed while it runs, as in the asm.
+	// (all but OBJFLAG_STEPPED, unk01, unk02 and unk1d).
 	void update_object(int kind, uint16_t obj, uint8_t flags)
 	{
-		gb_push16(gb_, obj);
 		wr8(wCurObjFlags, flags);
 		uint16_t src = next_in_page(obj);
 		for (int n = 1; n < OBJ_STRUCT_LENGTH; n++)
@@ -1346,13 +1329,13 @@ public:
 		switch (kind) {
 		case UPD_NORMAL:
 			do_object_action();
-			call_update_function(0, true, RET_NORMAL_HCALL);
+			call_update_function(0, true);
 			home::update_object_animation(gb_);
 			check_object_on_screen();
 			break;
 		case UPD_TEMPLE:
 			do_object_action();
-			call_update_function(OBJFUNCS4_BANK, false, RET_TEMPLE_HCALL);
+			call_update_function(OBJFUNCS4_BANK, false);
 			home::update_object_animation(gb_);
 			check_object_on_screen();
 			break;
@@ -1360,8 +1343,8 @@ public:
 			// during a floor transition only an object's first update runs
 			SET_HL(gb_, wCurObjSubState);
 			if (rd8(wCurObjSubState) & (1 << OBJSUBFLAG_UNINITIALISED_F))
-				call_update_function(0, true, RET_FLOOR_HCALL);
-			gb_call_ret(gb_, ADDR_UpdateObjectFrame, RET_FLOOR_FRAME);
+				call_update_function(0, true);
+			gb_call(gb_, ADDR_UpdateObjectFrame);
 			check_object_on_screen();
 			break;
 		}
@@ -1372,8 +1355,6 @@ public:
 			wr8(wSCY, static_cast<uint8_t>(rd8(wHiddenFigureSCYShake) + rd8(wSCYShake)));
 			wr8(wSCX, rd8(wc08b));
 		}
-		obj = gb_pop16(gb_);
-
 		wr8(obj, rd8(wCurObjFlags) & (0xff ^ OBJFLAG_STEPPED));
 		uint16_t dst = next_in_page(next_in_page(static_cast<uint16_t>(obj + 1)));
 		for (int n = OBJ_Y_POS; n <= OBJ_ACTION; n++)
@@ -1383,29 +1364,21 @@ public:
 		wr8(static_cast<uint16_t>(dst + 1), rd8(wCurObjUpdateFunction + 1));
 	}
 
-	// Every active object (OBJFLAG_ACTIVE, bit 0) updated by kind, with the
-	// return address its call in the asm pushes
-	void update_all(int kind, uint16_t ret)
+	// Every active object (OBJFLAG_ACTIVE, bit 0) updated by kind
+	void update_all(int kind)
 	{
 		for (int n = 0; n < NUM_OBJECTS; n++) {
 			uint16_t obj = static_cast<uint16_t>(wObj1Flags + n * OBJ_STRUCT_SIZE);
 			uint8_t flags = rd8(obj);
-			if (!(flags & OBJFLAG_ACTIVE))
-				continue;
-			gb_push16(gb_, static_cast<uint16_t>(ret + n * 7));
-			update_object(kind, obj, flags);
-			// the asm returns to what's there: something that changed it
-			// (a fuzzed table popping past its frame) isn't comparable
-			if (gb_pop16(gb_) != static_cast<uint16_t>(ret + n * 7))
-				if (gb_->test.active)
-					gb_->test.unrealistic = true;
+			if (flags & OBJFLAG_ACTIVE)
+				update_object(kind, obj, flags);
 		}
 	}
 
 	void update_objects_temple()
 	{
 		handle_grabbed_object_collisions();
-		update_all(UPD_TEMPLE, RET_TEMPLE_LOOP);
+		update_all(UPD_TEMPLE);
 	}
 
 
@@ -1415,10 +1388,10 @@ public:
 		if (rd8(wLevel) == THE_TEMPLE)
 			update_objects_temple();
 		else if (rd8(wIsFloorTransition))
-			update_all(UPD_FLOOR, RET_FLOOR_LOOP);
+			update_all(UPD_FLOOR);
 		else {
 			handle_grabbed_object_collisions();
-			update_all(UPD_NORMAL, RET_UPDATE_LOOP);
+			update_all(UPD_NORMAL);
 		}
 	}
 };
