@@ -25,6 +25,25 @@ scripting and expansion on top. The approach:
 
 ## Current state
 
+- **Faithful version (2026-11-10): tag `faithful-native`** on branch
+  `claude/cleanup`. Every routine is native C++ checked against the asm
+  (registers, flags and memory where its contract says so), and in play
+  native code calls native code directly: the CPU dispatches only the five
+  frame-loop hooks (.GameLoop, after_halt, wait_vblank_exec, VBlankVector,
+  VBlank), once per frame, and the entries into the loop: EntryPoint at
+  boot, and Init / InitWithoutDemoPowerUpReset on a reset (game over,
+  saving, the action help's return; the call never returns, so the native
+  frames are dropped and the loop restarts from the top). 8 hooks in all,
+  399 run directly (`tools/hook_report.sh`, 14 recordings). Kept original-game
+  bugs are in `docs/ASM_BUGS.md`; the one asm quirk dropped is the block
+  queue's stack read (b70ac05).
+- **Next: modernisation.** Verification moves from cycle-exact traces to
+  whole-game behaviour. First the native frame loop (game logic, the screen
+  to V-Blank with the LCD handler at its events, V-Blank: it can't match
+  cpu_step's per-step timing, so it waits for the new verification), then
+  the register glue of hooks nothing reaches in play, then typed state
+  instead of raw addresses, ROM data as arrays, no bank switching, the
+  renderer.
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`.
 - **Progress (2026-10-31):** 3497 / 3497 routines are ported. While the
   port plays the recordings, the interpreter runs no instructions at all
