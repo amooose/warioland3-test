@@ -8,6 +8,7 @@
 #include "../level/frame.hpp"
 #include "../engine/main_state_table.hpp"
 #include "../audio/audio.hpp"
+#include <csetjmp>
 
 namespace wl3::home {
 
@@ -98,7 +99,7 @@ public:
 			audio::turn_music_off(gb_);
 			audio::turn_off_sfx(gb_, SOUND_OFF);
 			audio::update(gb_);
-			JUMP_TO(ADDR_Init);
+			port_Init();
 			return;
 		}
 		// .no_reset: where all main game logic is handled
@@ -153,17 +154,25 @@ public:
 		Memory mem(gb_);
 		mem[hCGB] = cpu_.a == BOOTUP_A_CGB ? TRUE : FALSE;
 		mem[hUnused_fffd] = 0;
-		JUMP_TO(ADDR_Init); // fallthrough
+		port_Init(); // falls through
 	}
 
 	void port_Init()
 	{
 		Memory(gb_).byte(hDemoPowerUp) = 0; // reset power up to show in Demo
-		JUMP_TO(INIT_WO); // fallthrough
+		port_InitWithoutDemoPowerUpReset(); // falls through
 	}
 
 	void port_InitWithoutDemoPowerUpReset()
 	{
+		// A reset from inside native code (Init reached by a call or tail
+		// jump): drop the native frames, as call_ret does on reaching here,
+		// and start again from the top
+		if (gb_->call_depth && gb_->reset_unwind && !gb_->test.active) {
+			cpu_.pc = INIT_WO;
+			gb_->call_depth = 0;
+			std::longjmp(*static_cast<std::jmp_buf *>(gb_->reset_unwind), 1);
+		}
 		Memory mem(gb_);
 		// init the stack, clearing its $100 bytes
 		cpu_.ime = false; // di
@@ -249,6 +258,9 @@ public:
 };
 
 } // namespace
+
+// Start, falling through Init into the game loop (EntryPoint's jp)
+void start(GB *gb) { HomeStart(gb).port_Start(); }
 
 } // namespace wl3::home
 

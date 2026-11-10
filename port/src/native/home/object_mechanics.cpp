@@ -107,7 +107,7 @@ class HomeObjectMechanics : public AsmModule {
 public:
 	using AsmModule::AsmModule;
 
-	// The wrappers jump and call with JUMP_TO / gb_call rather than JUMP / CALL:
+	// The wrappers call with gb_call rather than CALL:
 	// bankswitch only sets the low ROM bank register, so if the high bit is set
 	// the asm runs whatever is mapped, and so must the port.
 
@@ -135,276 +135,6 @@ public:
 	{
 		pop_af();
 		bankswitch(cpu_.a);
-	}
-
-	void port_Func_3173()
-	{
-		homejp(BANK_Func_62e57);
-		JUMP_TO(ADDR_Func_62e57);
-	}
-
-	void port_VanishObject2()
-	{
-		homejp(BANK__VanishObject2);
-		JUMP_TO(ADDR__VanishObject2);
-	}
-
-	void port_Func_3191()
-	{
-		homejp(BANK_Func_62e8f);
-		JUMP_TO(ADDR_Func_62e8f);
-	}
-
-	void port_Func_31a0()
-	{
-		homejp(BANK_Func_62ea5);
-		JUMP_TO(ADDR_Func_62ea5);
-	}
-
-	void port_Func_31af()
-	{
-		homejp(BANK_Func_62f76);
-		JUMP_TO(ADDR_Func_62f76);
-	}
-
-	void port_Func_31be()
-	{
-		homejp(BANK_Func_62f8c);
-		JUMP_TO(ADDR_Func_62f8c);
-	}
-
-	void port_Func_31cd()
-	{
-		homejp(BANK_Func_62eaa);
-		JUMP_TO(ADDR_Func_62eaa);
-	}
-
-	void port_Func_31dc()
-	{
-		homejp(BANK_Func_62ec0);
-		JUMP_TO(ADDR_Func_62ec0);
-	}
-
-	void port_Func_31eb()
-	{
-		homejp(BANK_Func_62f91);
-		JUMP_TO(ADDR_Func_62f91);
-	}
-
-	void port_Func_31fa()
-	{
-		homejp(BANK_Func_62fa7);
-		JUMP_TO(ADDR_Func_62fa7);
-	}
-
-	void port_Func_3209()
-	{
-		homejp(BANK_Func_62e74);
-		JUMP_TO(ADDR_Func_62e74);
-	}
-
-	void port_Func_3218()
-	{
-		homejp(BANK_Func_62e8a);
-		JUMP_TO(ADDR_Func_62e8a);
-	}
-
-	void port_Func_3227()
-	{
-		homejp(BANK_Func_62f5b);
-		JUMP_TO(ADDR_Func_62f5b);
-	}
-
-	void port_Func_3236()
-	{
-		homejp(BANK_Func_62f71);
-		JUMP_TO(ADDR_Func_62f71);
-	}
-
-	void port_Func_3245()
-	{
-		homejp(BANK_Func_62c9f);
-		JUMP_TO(ADDR_Func_62c9f);
-	}
-
-	void port_Func_3254()
-	{
-		homejp(BANK_Func_62d7d);
-		JUMP_TO(ADDR_Func_62d7d);
-	}
-
-	void port_Func_3263()
-	{
-		homejp(BANK_Func_6303f);
-		JUMP_TO(ADDR_Func_6303f);
-	}
-
-	void port_Func_3272()
-	{
-		homejp(BANK_Func_63050);
-		JUMP_TO(ADDR_Func_63050);
-	}
-
-	void port_Func_3281()
-	{
-		homejp(BANK_Func_6305f);
-		JUMP_TO(ADDR_Func_6305f);
-	}
-
-	void port_ObjState_Fall()
-	{
-		homejp(BANK__ObjState_Fall);
-		JUMP_TO(ADDR__ObjState_Fall);
-	}
-
-	void port_ObjState_StandingFall()
-	{
-		homejp(BANK__ObjState_StandingFall);
-		JUMP_TO(ADDR__ObjState_StandingFall);
-	}
-
-	void port_Func_32ae()
-	{
-		homejp(BANK_Func_62ae5);
-		JUMP_TO(ADDR_Func_62ae5);
-	}
-
-	void port_Func_32bd()
-	{
-		homejp(BANK_Func_62bce);
-		JUMP_TO(ADDR_Func_62bce);
-	}
-
-	void port_Func_32cc()
-	{
-		homejp(BANK_Func_62ca8);
-		JUMP_TO(ADDR_Func_62ca8);
-	}
-
-	void port_Func_32db()
-	{
-		homejp(BANK_Func_62d86);
-		JUMP_TO(ADDR_Func_62d86);
-	}
-
-	void port_Func_32ea()
-	{
-		homejp(BANK_Func_628ea);
-		JUMP_TO(ADDR_Func_628ea);
-	}
-
-	void port_Func_32f9()
-	{
-		homejp(BANK_Func_629a6);
-		JUMP_TO(ADDR_Func_629a6);
-	}
-
-	void port_Func_3308()
-	{
-		homejp(BANK_Func_62908);
-		JUMP_TO(ADDR_Func_62908);
-	}
-
-	void port_Func_3317()
-	{
-		homejp(BANK_Func_62898);
-		JUMP_TO(ADDR_Func_62898);
-	}
-
-	void port_Func_3326()
-	{
-		homejp(BANK_Func_62840);
-		JUMP_TO(ADDR_Func_62840);
-	}
-
-	void port_Func_3335()
-	{
-		homejp(BANK_Func_61f54);
-		JUMP_TO(ADDR_Func_61f54);
-	}
-
-	void port_Func_3344()
-	{
-		homejp(BANK_Func_620a6);
-		JUMP_TO(ADDR_Func_620a6);
-	}
-
-	void port_Func_3353()
-	{
-		homejp(BANK_Func_621fb);
-		JUMP_TO(ADDR_Func_621fb);
-	}
-
-	void port_Func_3362()
-	{
-		homejp(BANK_Func_622bd);
-		JUMP_TO(ADDR_Func_622bd);
-	}
-
-	void port_Func_3371()
-	{
-		homejp(BANK_Func_62926);
-		JUMP_TO(ADDR_Func_62926);
-	}
-
-	void port_Func_3380()
-	{
-		homejp(BANK_Func_62382);
-		JUMP_TO(ADDR_Func_62382);
-	}
-
-	void port_Func_338f()
-	{
-		homejp(BANK_Func_6247b);
-		JUMP_TO(ADDR_Func_6247b);
-	}
-
-	void port_Func_339e()
-	{
-		homejp(BANK_Func_62574);
-		JUMP_TO(ADDR_Func_62574);
-	}
-
-	void port_Func_33ad()
-	{
-		homejp(BANK_Func_62605);
-		JUMP_TO(ADDR_Func_62605);
-	}
-
-	void port_ObjState_FullThrowLeft()
-	{
-		homejp(BANK_Func_626da);
-		JUMP_TO(ADDR_Func_626da);
-	}
-
-	void port_ObjState_FullThrowRight()
-	{
-		homejp(BANK_Func_62768);
-		JUMP_TO(ADDR_Func_62768);
-	}
-
-	void port_ObjState_BumpLeft()
-	{
-		homejp(BANK__ObjState_BumpLeft);
-		JUMP_TO(ADDR__ObjState_BumpLeft);
-	}
-
-	void port_ObjState_BumpRight()
-	{
-		homejp(BANK__ObjState_BumpRight);
-		JUMP_TO(ADDR__ObjState_BumpRight);
-	}
-
-	void port_Func_33f8()
-	{
-		homejp(BANK_Func_62892);
-		JUMP_TO(ADDR_Func_62892);
-	}
-
-	void port_Func_3407()
-	{
-		homejp(BANK_Func_6283a);
-		JUMP_TO(ADDR_Func_6283a);
 	}
 
 	void port_CreateObjectAtRelativePos()
@@ -519,6 +249,11 @@ public:
 
 } // namespace wl3::home
 
+namespace wl3::level {
+// The homejp state wrappers below run their states plain (update_objects.cpp)
+bool object_state(GB *gb, uint16_t wrapper);
+} // namespace wl3::level
+
 using wl3::home::HomeObjectMechanics;
 using namespace wl3::home;
 
@@ -578,51 +313,51 @@ PORT_EX(SetObjectFramesetPtr, 0, ALL_REGISTERS) { set_object_frameset_ptr(gb, RE
 PORT_EX(HomeJumpRet, 0, 0) { HomeObjectMechanics(gb).port_HomeJumpRet(); }
 // the objects (C++) read no register after it
 PORT_EX(SetOneWayPlatformAction, 0, ALL_REGISTERS) { set_one_way_platform_action(gb); }
-PORT_EX(Func_3173, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3173(); }
-PORT_EX(VanishObject2, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_VanishObject2(); }
-PORT_EX(Func_3191, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3191(); }
-PORT_EX(Func_31a0, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_31a0(); }
-PORT_EX(Func_31af, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_31af(); }
-PORT_EX(Func_31be, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_31be(); }
-PORT_EX(Func_31cd, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_31cd(); }
-PORT_EX(Func_31dc, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_31dc(); }
-PORT_EX(Func_31eb, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_31eb(); }
-PORT_EX(Func_31fa, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_31fa(); }
-PORT_EX(Func_3209, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3209(); }
-PORT_EX(Func_3218, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3218(); }
-PORT_EX(Func_3227, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3227(); }
-PORT_EX(Func_3236, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3236(); }
-PORT_EX(Func_3245, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3245(); }
-PORT_EX(Func_3254, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3254(); }
-PORT_EX(Func_3263, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3263(); }
-PORT_EX(Func_3272, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3272(); }
-PORT_EX(Func_3281, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3281(); }
-PORT_EX(ObjState_Fall, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_ObjState_Fall(); }
-PORT_EX(ObjState_StandingFall, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_ObjState_StandingFall(); }
-PORT_EX(Func_32ae, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_32ae(); }
-PORT_EX(Func_32bd, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_32bd(); }
-PORT_EX(Func_32cc, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_32cc(); }
-PORT_EX(Func_32db, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_32db(); }
-PORT_EX(Func_32ea, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_32ea(); }
-PORT_EX(Func_32f9, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_32f9(); }
-PORT_EX(Func_3308, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3308(); }
-PORT_EX(Func_3317, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3317(); }
-PORT_EX(Func_3326, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3326(); }
-PORT_EX(Func_3335, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3335(); }
-PORT_EX(Func_3344, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3344(); }
-PORT_EX(Func_3353, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3353(); }
-PORT_EX(Func_3362, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3362(); }
-PORT_EX(Func_3371, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3371(); }
-PORT_EX(Func_3380, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3380(); }
-PORT_EX(Func_338f, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_338f(); }
-PORT_EX(Func_339e, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_339e(); }
-PORT_EX(Func_33ad, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_33ad(); }
-PORT_EX(ObjState_FullThrowLeft, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_ObjState_FullThrowLeft(); }
-PORT_EX(ObjState_FullThrowRight, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_ObjState_FullThrowRight(); }
-PORT_EX(ObjState_BumpLeft, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_ObjState_BumpLeft(); }
-PORT_EX(ObjState_BumpRight, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_ObjState_BumpRight(); }
-PORT_EX(Func_33f8, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_33f8(); }
-PORT_EX(Func_3407, HOOK_MANUAL_RET, 0) { HomeObjectMechanics(gb).port_Func_3407(); }
+PORT_EX(Func_3173, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3173); }
+PORT_EX(VanishObject2, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_VanishObject2); }
+PORT_EX(Func_3191, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3191); }
+PORT_EX(Func_31a0, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_31a0); }
+PORT_EX(Func_31af, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_31af); }
+PORT_EX(Func_31be, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_31be); }
+PORT_EX(Func_31cd, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_31cd); }
+PORT_EX(Func_31dc, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_31dc); }
+PORT_EX(Func_31eb, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_31eb); }
+PORT_EX(Func_31fa, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_31fa); }
+PORT_EX(Func_3209, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3209); }
+PORT_EX(Func_3218, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3218); }
+PORT_EX(Func_3227, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3227); }
+PORT_EX(Func_3236, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3236); }
+PORT_EX(Func_3245, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3245); }
+PORT_EX(Func_3254, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3254); }
+PORT_EX(Func_3263, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3263); }
+PORT_EX(Func_3272, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3272); }
+PORT_EX(Func_3281, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3281); }
+PORT_EX(ObjState_Fall, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_ObjState_Fall); }
+PORT_EX(ObjState_StandingFall, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_ObjState_StandingFall); }
+PORT_EX(Func_32ae, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_32ae); }
+PORT_EX(Func_32bd, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_32bd); }
+PORT_EX(Func_32cc, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_32cc); }
+PORT_EX(Func_32db, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_32db); }
+PORT_EX(Func_32ea, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_32ea); }
+PORT_EX(Func_32f9, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_32f9); }
+PORT_EX(Func_3308, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3308); }
+PORT_EX(Func_3317, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3317); }
+PORT_EX(Func_3326, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3326); }
+PORT_EX(Func_3335, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3335); }
+PORT_EX(Func_3344, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3344); }
+PORT_EX(Func_3353, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3353); }
+PORT_EX(Func_3362, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3362); }
+PORT_EX(Func_3371, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3371); }
+PORT_EX(Func_3380, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3380); }
+PORT_EX(Func_338f, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_338f); }
+PORT_EX(Func_339e, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_339e); }
+PORT_EX(Func_33ad, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_33ad); }
+PORT_EX(ObjState_FullThrowLeft, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_ObjState_FullThrowLeft); }
+PORT_EX(ObjState_FullThrowRight, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_ObjState_FullThrowRight); }
+PORT_EX(ObjState_BumpLeft, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_ObjState_BumpLeft); }
+PORT_EX(ObjState_BumpRight, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_ObjState_BumpRight); }
+PORT_EX(Func_33f8, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_33f8); }
+PORT_EX(Func_3407, 0, ALL_REGISTERS) { wl3::level::object_state(gb, ADDR_Func_3407); }
 PORT_EX(CreateObjectAtRelativePos, 0, ALL_REGISTERS) { HomeObjectMechanics(gb).port_CreateObjectAtRelativePos(); }
 PORT_EX(CreateObjectFromCurObjPos, 0, ALL_REGISTERS) { HomeObjectMechanics(gb).port_CreateObjectFromCurObjPos(); }
 PORT_EX(Func_3444, 0, ALL_REGISTERS & ~R_E) { HomeObjectMechanics(gb).port_Func_3444(); }

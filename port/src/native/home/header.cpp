@@ -6,6 +6,8 @@
 
 namespace wl3::home {
 
+void start(GB *gb); // start.cpp
+
 namespace {
 
 class HomeHeader : public AsmModule {
@@ -75,7 +77,7 @@ public:
 	}
 
 	// Where the boot ROM hands over: nop / jp Start
-	void port_EntryPoint() { JUMP_TO(ADDR_Start); }
+	void port_EntryPoint() { start(gb_); } // nop / jp Start
 
 	// The interrupt vectors
 	void port_VBlankVector() { JUMP_TO(ADDR_VBlank); }
