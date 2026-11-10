@@ -13,6 +13,7 @@
 #include "../native.hpp"
 #include "../routines.hpp"
 #include "../home/wario.hpp"
+#include "block_functions.hpp"
 #include "object.hpp"
 
 #include <initializer_list>
@@ -39,8 +40,12 @@ enum class Progress { ANY, SNOWBALL, BIG_SNOWBALL };
 class BlockFuncs {
 public:
 	explicit BlockFuncs(GB *gb) : gb_(gb), cpu_(gb->cpu), mem_(gb), routines_(gb), b_(gb->cpu.b), hl_(REG_HL(gb)) {}
+	BlockFuncs(GB *gb, uint8_t b) : gb_(gb), cpu_(gb->cpu), mem_(gb), routines_(gb), b_(b), hl_(0) {}
 
-	void process_block(); // ProcessBlock
+	void process_block(); // ProcessBlock, as a hook
+	uint16_t block_function(); // ProcessBlock's lookup: the function to run
+	// ProcessBlock's jp hl and the chain it starts, to the last one's ret
+	void run_block_function(uint16_t func);
 	// The block function at func, by address: false if there's none there.
 	// It leaves in next_ the one it jumps on to (0: it returned).
 	bool dispatch(uint16_t func);
@@ -188,9 +193,8 @@ private:
 	uint16_t hl_; // the block that breaks (where the chain has left it)
 };
 
-// the function of the block at wBlockPtrBank:wBlockPtr: jp hl, so it
-// returns to the caller
-void BlockFuncs::process_block()
+// the function of the block at wBlockPtrBank:wBlockPtr
+uint16_t BlockFuncs::block_function()
 {
 	mem_[wIsInWaterOrSand] = FALSE;
 	sram_switch(mem_[wBlockPtrBank]);
@@ -208,8 +212,27 @@ void BlockFuncs::process_block()
 	if (gb_->test.active && (func < ADDR_ProcessBlock || func > ADDR_BreakBlockWithColourCoin
 		|| !sym_is_rom_label(BANK_ProcessBlock, func)))
 		gb_->test.unrealistic = true;
-	// jp hl: the block functions run here when their bank is mapped (the
-	// asm's jp runs whatever is), and the last one's ret is ProcessBlock's
+	return func;
+}
+
+// jp hl: the block functions run here when their bank is mapped (the asm's
+// jp runs whatever is, here through the emulator)
+void BlockFuncs::run_block_function(uint16_t func)
+{
+	if (gb_->rom_bank == BANK_ProcessBlock && dispatch(func)) {
+		run(next_);
+		leave();
+		return;
+	}
+	cpu_.a = static_cast<uint8_t>(func); // what jp hl runs may read it
+	leave();
+	routines_.call(func);
+}
+
+// jp hl, so it returns to the caller
+void BlockFuncs::process_block()
+{
+	uint16_t func = block_function();
 	if (gb_->rom_bank == BANK_ProcessBlock && dispatch(func)) {
 		run(next_);
 		cpu_.pc = gb_pop16(gb_);
@@ -1376,6 +1399,13 @@ void BlockFuncs::ball_o_string_block()
 #undef GOTO
 
 } // namespace
+
+uint8_t process_block(GB *gb, uint8_t b)
+{
+	BlockFuncs f(gb, b);
+	f.run_block_function(f.block_function());
+	return gb->cpu.a;
+}
 
 } // namespace wl3::level
 

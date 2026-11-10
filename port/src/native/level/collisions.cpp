@@ -13,6 +13,8 @@
 // two are set where the asm sets them, and after a check the CPU holds the
 // registers of its last ProcessBlock, as in the asm.
 #include "collisions.hpp"
+#include "block_functions.hpp"
+#include "../home/level_map.hpp"
 #include "../home/wario.hpp"
 
 #include "../flags.hpp"
@@ -26,7 +28,7 @@ namespace {
 
 class Collisions {
 public:
-	explicit Collisions(GB *gb) : gb_(gb), cpu_(gb->cpu), mem_(gb), routines_(gb) {}
+	explicit Collisions(GB *gb) : gb_(gb), cpu_(gb->cpu), mem_(gb), routines_(gb), b_(gb->cpu.b) {}
 
 	uint8_t block(uint8_t points); // Func_19b51, Func_19b7b, ...: the block at hPos
 	uint8_t process_block(); // Func_19b5c, Func_19bce: ProcessBlock / ld b, a
@@ -68,6 +70,9 @@ private:
 	CPU &cpu_;
 	Memory mem_;
 	Routines routines_;
+	// the asm's b going into ProcessBlock: the last block's result, its
+	// SRAM bank (GetBlockPtr's), or a row
+	uint8_t b_;
 };
 
 // hPos = Wario's position + (dy, dx)
@@ -94,18 +99,16 @@ void Collisions::at_edge(bool right)
 
 uint8_t Collisions::process_block()
 {
-	routines_.call(ADDR_ProcessBlock);
+	uint8_t r = level::process_block(gb_, b_);
 	if (gb_->test.active && gb_->rom_bank != BANK_ProcessBlock)
 		gb_->test.unrealistic = true; // the asm would go on in that bank
-	cpu_.b = cpu_.a;
-	return cpu_.a;
+	cpu_.b = b_ = r;
+	return r;
 }
 
 uint8_t Collisions::block(uint8_t points)
 {
-	// ProcessBlock takes GetBlockPtr's hl (the block) and b (its SRAM bank)
-	SET_HL(gb_, hPos);
-	routines_.call(ADDR_GetBlockPtr);
+	b_ = home::block_ptr(gb_, hPos).bank; // GetBlockPtr's b
 	mem_[wCollisionPoints] = points;
 	return process_block();
 }
@@ -192,7 +195,7 @@ uint8_t Collisions::slide_under()
 		uint8_t row = static_cast<uint8_t>(mem_[wWarioYPos + 1] + mem_[wCollisionBoxTop] + 2) & 0xf0;
 		if (mem_[wc0dc] != row) {
 			set_break_flag();
-			cpu_.b = row;
+			b_ = row;
 			uint8_t r = up_row();
 			if (!(r & 0x0f))
 				return r;
