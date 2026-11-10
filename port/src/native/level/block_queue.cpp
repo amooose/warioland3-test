@@ -5,6 +5,7 @@
 //
 // Plain C++ over memory; the hooks leave the registers their callers read
 // (DespawnObject's, for DespawnAllObjects; the rest have plain callers).
+#include "frame.hpp"
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
@@ -230,10 +231,14 @@ PORT_EX(Func_bb2d, 0, ALL_REGISTERS) { clear_object_block(gb, REG_HL(gb)); }
 // replace (Func_18f32 and the like), which write it to the level map as
 // the new block: SRAM1 when there was nothing to queue, 0 after queueing
 // one (the asm's ld bc, TILEMAP_WIDTH), the caller's while a DMA's pending.
-PORT_EX(Func_bb85, 0, ALL_REGISTERS & ~R_B)
+PORT_EX(Func_bb85, 0, ALL_REGISTERS & ~R_B) { wl3::level::queue_changed_block(gb); }
+
+namespace wl3::level {
+void queue_changed_block(GB *gb)
 {
 	uint16_t entry = static_cast<uint16_t>(wc18e + wl3::Memory(gb)[wc19f]);
 	bool nothing = !wl3::Memory(gb)[entry];
 	if (BlockQueue(gb).queue_changed_block())
-		gb->cpu.b = nothing ? wl3::level::SRAM1 : 0;
+		gb->cpu.b = nothing ? SRAM1 : 0;
 }
+} // namespace wl3::level

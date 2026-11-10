@@ -6,6 +6,7 @@
 // They call much that's still C with its registers, and the room drawing's
 // queues read the stack (the asm's return addresses, see HANDOFF.md), so
 // these keep the original's registers, flags and return addresses.
+#include "frame.hpp"
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
@@ -471,7 +472,7 @@ void RoomStart::farcall_obj_wram(uint8_t bank, uint16_t addr)
 void RoomStart::process_multi_block()
 {
 	routines_.call(PROCESS_BLOCKS);
-	routines_.farcall(BANK_UpdateParticles, ADDR_UpdateParticles);
+	routines_.in_bank(BANK_UpdateParticles, ADDR_UpdateParticles, [&] { level::update_particles(gb_); });
 	farcall_obj_wram(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority);
 	home::draw_wario(gb_);
 	farcall_obj_wram(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority);
@@ -480,7 +481,7 @@ void RoomStart::process_multi_block()
 	push_af();
 	sram_switch(SRAM1);
 	cpu_.ime = false; // di
-	routines_.call(ADDR_SetTileQueueProcessingFunctions);
+	level::set_tile_queue_processing_functions(gb_);
 	cpu_.ime = true; // ei
 	cpu_.ime_delay = 0;
 	pop_af();
@@ -528,7 +529,7 @@ void RoomStart::process_blocks()
 		routines_.farcall(BANK_ProcessBlock, ADDR_ProcessBlock);
 		if (!(mem_[wMultiBlockParam] & 0x07))
 			break;
-		routines_.call(ADDR_Func_bb85);
+		level::queue_changed_block(gb_);
 	}
 
 	// .break
@@ -607,7 +608,7 @@ void RoomStart::from_transition()
 	routines_.call(ADDR_UpdateSwitchableBlocks);
 	call_in_sram1(ADDR_DrawRoom_FromStart, SRT(0xf2));
 	call_in_sram1(ADDR_Func_896f, SRT(0x108));
-	routines_.call(ADDR_SetWarioScreenPos);
+	level::set_wario_screen_pos(gb_);
 
 	if (mem_[wWarioState] == WST_ENTERING_DOOR) {
 		mem_[wFrameDuration] = 0;
@@ -622,15 +623,15 @@ void RoomStart::from_transition()
 	mem_[wBlockFuncWarioFlag] = FALSE;
 	mem_[wIsFloorTransition] = 0;
 	push_wram(BANK_wObjects);
-	routines_.farcall(BANK_UpdateObjects, ADDR_UpdateObjects);
-	routines_.farcall(BANK_UpdateObjects, ADDR_UpdateObjects);
+	routines_.in_bank(BANK_UpdateObjects, ADDR_UpdateObjects, [&] { level::update_objects(gb_); });
+	routines_.in_bank(BANK_UpdateObjects, ADDR_UpdateObjects, [&] { level::update_objects(gb_); });
 	pop_wram();
 	push_wram(BANK_wObjects);
-	routines_.farcall(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority);
+	routines_.in_bank(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority, [&] { level::draw_objects_no_priority(gb_); });
 	pop_wram();
 	home::draw_wario(gb_);
 	push_wram(BANK_wObjects);
-	routines_.farcall(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority);
+	routines_.in_bank(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, [&] { level::draw_objects_with_priority(gb_); });
 	pop_wram();
 	mem_[wIsIntangible] = 0;
 	mem_[wSubState] = 0x02;
@@ -693,7 +694,7 @@ void RoomStart::from_level_start()
 	routines_.call(ADDR_SetInitialCameraScroll);
 	routines_.call(ADDR_ApplyInitialCameraScroll);
 	routines_.call(ADDR_VBlank_Level);
-	routines_.call(ADDR_SetTileQueueProcessingFunctions);
+	level::set_tile_queue_processing_functions(gb_);
 	call_in_sram1(ADDR_DrawRoom_FromStart, SRL(0x14c));
 	if (!from_saved_level())
 		call_in_sram1(ADDR_Func_896f, SRL(0x169));
@@ -709,32 +710,32 @@ void RoomStart::from_level_start()
 	}
 
 	// .not_the_temple
-	routines_.call(ADDR_SetWarioScreenPos);
+	level::set_wario_screen_pos(gb_);
 	mem_[wBlockFuncWarioFlag] = FALSE;
 
 	if (!from_saved_level()) {
 		mem_[wIsFloorTransition] = FALSE;
 		push_wram(BANK_wObjects);
 		// the objects updated twice
-		routines_.farcall(BANK_UpdateObjects, ADDR_UpdateObjects);
-		routines_.farcall(BANK_UpdateObjects, ADDR_UpdateObjects);
+		routines_.in_bank(BANK_UpdateObjects, ADDR_UpdateObjects, [&] { level::update_objects(gb_); });
+		routines_.in_bank(BANK_UpdateObjects, ADDR_UpdateObjects, [&] { level::update_objects(gb_); });
 		pop_wram();
 	} else {
 		// .asm_8917
 		mem_[wIsFloorTransition] = TRUE;
 		push_wram(BANK_wObjects);
-		routines_.farcall(BANK_UpdateObjects, ADDR_UpdateObjects);
+		routines_.in_bank(BANK_UpdateObjects, ADDR_UpdateObjects, [&] { level::update_objects(gb_); });
 		pop_wram();
 	}
 
 	// .draw_objs
 	mem_[wIsFloorTransition] = FALSE;
 	push_wram(BANK_wObjects);
-	routines_.farcall(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority);
+	routines_.in_bank(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority, [&] { level::draw_objects_no_priority(gb_); });
 	pop_wram();
 	home::draw_wario(gb_);
 	push_wram(BANK_wObjects);
-	routines_.farcall(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority);
+	routines_.in_bank(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, [&] { level::draw_objects_with_priority(gb_); });
 	pop_wram();
 }
 

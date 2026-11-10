@@ -5,6 +5,7 @@
 //
 // Most of these are called from C that still reads registers after them,
 // so each entry point leaves the registers and flags the original does.
+#include "frame.hpp"
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../ram.hpp"
@@ -274,7 +275,7 @@ PORT_EX(LevelStateTable, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 // flags of cp 100.
 PORT(CollectKeyDelay) { LevelState(gb).collect_key_delay(); }
 
-PORT(TickLevelTime) { LevelState(gb).tick_time(); }
+PORT(TickLevelTime) { wl3::level::tick_level_time(gb); }
 
 // a = the SRAM bank, hl = $b000, f = cp $68's (or a = 0 and and a's when
 // there was nothing to do)
@@ -282,7 +283,7 @@ PORT(UpdateSwitchableBlocks) { LevelState(gb).update_switchable_blocks(); }
 
 // hl = the last byte written, a = HIGH(ClearLevelTileQueue); with a queue,
 // c = 0 and dec c's flags, else and a's
-PORT(SetTileQueueProcessingFunctions) { LevelState(gb).set_tile_queue_functions(); }
+PORT(SetTileQueueProcessingFunctions) { wl3::level::set_tile_queue_processing_functions(gb); }
 
 // copies .Func (jp LevelVBlankFunc) to wVBlankFunc, with CopyHLToDE's
 // registers
@@ -295,3 +296,8 @@ PORT_EX(VBlank_Level, 0, ALL_REGISTERS)
 PORT_COVERED(_LevelStateTable);
 PORT_COVERED(InitLevel);
 PORT_COVERED(LoadLevelCommonGfxAndTreasures);
+
+namespace wl3::level {
+void tick_level_time(GB *gb) { LevelState(gb).tick_time(); }
+void set_tile_queue_processing_functions(GB *gb) { LevelState(gb).set_tile_queue_functions(); }
+} // namespace wl3::level

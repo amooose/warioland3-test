@@ -6,6 +6,7 @@
 // The routines pass the particle in bc and leave registers their callers
 // see (UpdateParticles returns with the last function's), so each keeps
 // the original's registers and flags.
+#include "frame.hpp"
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
@@ -318,7 +319,7 @@ PORT_EX(CreateParticleInBlock, 0, ALL_REGISTERS) { create_particle_in_block(gb, 
 // animations itself. Their only callers are each other and the level's
 // frame and room start (plain C++), and UpdateParticles' own loop reloads
 // hl for each slot, so the hooks clobber every register.
-PORT_EX(UpdateParticles, 0, ALL_REGISTERS) { Particles(gb).update(); }
+PORT_EX(UpdateParticles, 0, ALL_REGISTERS) { wl3::level::update_particles(gb); }
 // hl = the frame duration, de = the frameset
 PORT_EX(UpdateParticleAnimation, 0, ALL_REGISTERS) { Particles(gb).update_animation(REG_HL(gb), REG_DE(gb)); }
 // hl = the OAM data
@@ -362,3 +363,7 @@ PORT_EX(ParticleAnim_Stars, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_Parti
 PORT_EX(ParticleAnim_SmokeLarge, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_SmokeLarge, REG_BC(gb)); }
 PORT_EX(ParticleAnim_SmokeSmall, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_SmokeSmall, REG_BC(gb)); }
 PORT_EX(ParticleAnim_Splash, 0, ALL_REGISTERS) { Particles(gb).animate(ADDR_ParticleAnim_Splash, REG_BC(gb)); }
+
+namespace wl3::level {
+void update_particles(GB *gb) { Particles(gb).update(); }
+} // namespace wl3::level

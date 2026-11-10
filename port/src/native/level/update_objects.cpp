@@ -6,6 +6,7 @@
 // Objects (C++) and register-level C call these. It's plain C++
 // (docs/HANDOFF.md); registers are left only where a hook takes an input in
 // one or the objects read what it leaves.
+#include "frame.hpp"
 #include "../asm_module.hpp"
 #include "../home/object_mechanics.hpp"
 #include "../home/memory.hpp"
@@ -1531,8 +1532,8 @@ PORT_COVERED(ThrowObject_Right);
 PORT_COVERED(DoObjectAction);
 PORT_COVERED(ClearObjects);
 PORT_COVERED(ClearObjDataPointers);
-PORT_EX(DrawObjects_NoPriority, 0, ALL_REGISTERS) { ObjectEngine(gb).port_DrawObjects_NoPriority(); }
-PORT_EX(DrawObjects_WithPriority, 0, ALL_REGISTERS) { ObjectEngine(gb).port_DrawObjects_WithPriority(); }
+PORT_EX(DrawObjects_NoPriority, 0, ALL_REGISTERS) { wl3::level::draw_objects_no_priority(gb); }
+PORT_EX(DrawObjects_WithPriority, 0, ALL_REGISTERS) { wl3::level::draw_objects_with_priority(gb); }
 PORT_EX(Func_62ec3, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62ec3(); }
 PORT_EX(Func_62faa, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62faa(); }
 PORT_EX(_CountActiveTransientObjects, 0, R_A | R_F | R_B | R_C) { ObjectEngine(gb).port__CountActiveTransientObjects(); }
@@ -1592,4 +1593,10 @@ PORT_EX(Func_621fb, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func
 PORT_EX(Func_622bd, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_622bd(); }
 PORT_EX(Func_6247b, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_6247b(); }
 PORT_EX(Func_62382, HOOK_MANUAL_RET, ALL_REGISTERS) { ObjectEngine(gb).port_Func_62382(); }
-PORT_EX(UpdateObjects, 0, ALL_REGISTERS) { ObjectEngine(gb).port_UpdateObjects(); }
+PORT_EX(UpdateObjects, 0, ALL_REGISTERS) { wl3::level::update_objects(gb); }
+
+namespace wl3::level {
+void update_objects(GB *gb) { ObjectEngine(gb).port_UpdateObjects(); }
+void draw_objects_no_priority(GB *gb) { ObjectEngine(gb).port_DrawObjects_NoPriority(); }
+void draw_objects_with_priority(GB *gb) { ObjectEngine(gb).port_DrawObjects_WithPriority(); }
+} // namespace wl3::level

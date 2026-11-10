@@ -6,6 +6,7 @@
 //
 // Called by the level's frame and register-level C, so these keep the
 // original's registers, flags and return addresses (see asm_module.hpp).
+#include "frame.hpp"
 #include "../asm_module.hpp"
 #include "../home/system.hpp"
 #include "../home/wario.hpp"
@@ -2249,7 +2250,7 @@ using wl3::level::ObjectInteractions;
 
 // farcalled by update_level: hCallFunc pops af, and what follows (xor a,
 // DrawObjects_NoPriority) sets every register it uses
-PORT_EX(ProcessInteractions, 0, ALL_REGISTERS) { ObjectInteractions(gb).port_ProcessInteractions(); }
+PORT_EX(ProcessInteractions, 0, ALL_REGISTERS) { wl3::level::process_interactions(gb); }
 PORT_COVERED(SetObjAction);
 PORT_COVERED(Func_20a63);
 PORT_COVERED(Func_20a69);
@@ -2376,3 +2377,7 @@ PORT_COVERED(ObjInteraction_Richtertoffen);
 PORT_COVERED(ObjInteraction_Omodonmeka);
 PORT_COVERED(ObjInteraction_OrangeBird);
 PORT_COVERED(ObjInteraction_Owl);
+
+namespace wl3::level {
+void process_interactions(GB *gb) { ObjectInteractions(gb).port_ProcessInteractions(); }
+} // namespace wl3::level

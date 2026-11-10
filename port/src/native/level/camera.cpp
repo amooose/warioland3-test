@@ -6,6 +6,7 @@
 // with ProcessInteractions, Func_8ed9 and Func_bb85 after) read no
 // register these leave (live.py over every call site, and the entry
 // liveness of what follows), so the hooks clobber them all.
+#include "frame.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
 
@@ -281,6 +282,12 @@ PORT_EX(ScrollCameraRight, 0, ALL_REGISTERS) { Camera(gb).scroll_right(gb->cpu.b
 PORT_EX(ScrollCameraLeft, 0, ALL_REGISTERS) { Camera(gb).scroll_left(gb->cpu.b); }
 PORT_EX(ScrollCameraDown, 0, ALL_REGISTERS) { Camera(gb).scroll_down(gb->cpu.b); }
 PORT_EX(ScrollCameraUp, 0, ALL_REGISTERS) { Camera(gb).scroll_up(gb->cpu.b); }
-PORT_EX(SetWarioScreenPos, 0, ALL_REGISTERS) { Camera(gb).set_wario_screen_pos(); }
-PORT_EX(LevelScroll_Vertical, 0, ALL_REGISTERS) { Camera(gb).level_scroll_vertical(); }
-PORT_EX(LevelScroll_Horizontal, 0, ALL_REGISTERS) { Camera(gb).level_scroll_horizontal(); }
+PORT_EX(SetWarioScreenPos, 0, ALL_REGISTERS) { wl3::level::set_wario_screen_pos(gb); }
+PORT_EX(LevelScroll_Vertical, 0, ALL_REGISTERS) { wl3::level::level_scroll_vertical(gb); }
+PORT_EX(LevelScroll_Horizontal, 0, ALL_REGISTERS) { wl3::level::level_scroll_horizontal(gb); }
+
+namespace wl3::level {
+void set_wario_screen_pos(GB *gb) { Camera(gb).set_wario_screen_pos(); }
+void level_scroll_vertical(GB *gb) { Camera(gb).level_scroll_vertical(); }
+void level_scroll_horizontal(GB *gb) { Camera(gb).level_scroll_horizontal(); }
+} // namespace wl3::level

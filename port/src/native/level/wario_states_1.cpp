@@ -3,6 +3,7 @@
 // crouching, sliding and rolling, swimming, grabbing and throwing, the
 // bumps and stings), and the frame's state dispatch, as plain C++ over
 // WarioStateBase. Its hooks are the labels called from other files.
+#include "frame.hpp"
 #include "wario_state_base.hpp"
 
 namespace wl3::level {
@@ -3261,4 +3262,8 @@ PORT_COVERED(UpdateState_GrabWalking);
 PORT_COVERED(UpdateState_Attacking);
 PORT_EX(UpdateWarioStates_Group1, 0, ALL_REGISTERS) { WarioStates1(gb).port_UpdateWarioStates_Group1(gb->cpu.a); }
 // update_level farcalls it and reloads every register it uses after
-PORT_EX(UpdateWarioStates, 0, ALL_REGISTERS) { WarioStates1(gb).port_UpdateWarioStates(); }
+PORT_EX(UpdateWarioStates, 0, ALL_REGISTERS) { wl3::level::update_wario_states(gb); }
+
+namespace wl3::level {
+void update_wario_states(GB *gb) { WarioStates1(gb).port_UpdateWarioStates(); }
+} // namespace wl3::level

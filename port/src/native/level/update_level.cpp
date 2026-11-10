@@ -8,6 +8,7 @@
 // callers' return addresses off the stack.
 #include "../native.hpp"
 #include "../routines.hpp"
+#include "frame.hpp"
 
 #include <initializer_list>
 
@@ -38,17 +39,14 @@ private:
 		mem_[wSRAMBank] = bank;
 		mem_[rRAMB + 0x100] = bank;
 	}
-	// fn with the Level Objects WRAM bank mapped (push_wram / pop_wram: the
-	// bank goes on the stack, as the asm's push af, so the calls' return
-	// addresses sit where the asm's do)
+	// fn with the Level Objects WRAM bank mapped (push_wram / pop_wram)
 	template <class F>
 	void in_objects_wram(F fn)
 	{
-		cpu_.a = mem_[rWBK];
-		gb_push16(gb_, REG_AF(gb_));
+		uint8_t wbk = mem_[rWBK];
 		mem_[rWBK] = BANK_wObjects;
 		fn();
-		mem_[rWBK] = static_cast<uint8_t>(gb_pop16(gb_) >> 8);
+		mem_[rWBK] = wbk;
 	}
 	void wario_flag(bool on) { mem_[wBlockFuncWarioFlag] = on ? TRUE : FALSE; }
 	void scroll_from_camera()
@@ -72,23 +70,23 @@ private:
 void LevelFrame::cam_path(const CamPath &p)
 {
 	wario_flag(true);
-	routines_.farcall(BANK_UpdateWarioStates, ADDR_UpdateWarioStates);
+	routines_.in_bank(BANK_UpdateWarioStates, ADDR_UpdateWarioStates, [&] { update_wario_states(gb_); });
 	scroll_from_camera();
 	wario_flag(false);
-	in_objects_wram([&] { routines_.farcall(BANK_UpdateObjects, ADDR_UpdateObjects); });
-	routines_.call(ADDR_SetWarioScreenPos);
+	in_objects_wram([&] { routines_.in_bank(BANK_UpdateObjects, ADDR_UpdateObjects, [&] { update_objects(gb_); }); });
+	set_wario_screen_pos(gb_);
 	wario_flag(true);
-	routines_.farcall(BANK_ProcessInteractions, ADDR_ProcessInteractions);
+	routines_.in_bank(BANK_ProcessInteractions, ADDR_ProcessInteractions, [&] { process_interactions(gb_); });
 	wario_flag(false);
-	in_objects_wram([&] { routines_.farcall(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority); });
+	in_objects_wram([&] { routines_.in_bank(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority, [&] { draw_objects_no_priority(gb_); }); });
 	home::draw_wario(gb_);
-	in_objects_wram([&] { routines_.farcall(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority); });
+	in_objects_wram([&] { routines_.in_bank(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, [&] { draw_objects_with_priority(gb_); }); });
 	home::clear_unused_virtual_oam(gb_);
 	mem_[wScrollUpEdge] = 0;
 	mem_[wScrollDownEdge] = 0;
-	routines_.call(ADDR_LevelScroll_Vertical);
+	level_scroll_vertical(gb_);
 	if (p.horizontal)
-		routines_.call(ADDR_LevelScroll_Horizontal);
+		level_scroll_horizontal(gb_);
 }
 
 // the level's end screens: game over, the epilogue, or the clear screen
@@ -159,7 +157,7 @@ void LevelFrame::check_end_screen()
 	}
 
 	// .tick_time
-	routines_.call(ADDR_TickLevelTime);
+	tick_level_time(gb_);
 	if (mem_[wFloorTransitionDir] || mem_[wRoomTransitionParam])
 		return;
 	if (mem_[wJoypadPressed] & (PAD_SELECT | PAD_START))
@@ -170,23 +168,22 @@ void LevelFrame::check_end_screen()
 // mapped), the queue's V-Blank code, then .check_end_screen
 void LevelFrame::process_blocks()
 {
-	cpu_.a = mem_[wSRAMBank]; // push af
-	gb_push16(gb_, REG_AF(gb_));
+	uint8_t sram = mem_[wSRAMBank];
 	sram_switch(BANK_sLevelBlockObjectMap); // BANK("SRAM1")
-	routines_.call(ADDR_Func_8ed9);
-	routines_.call(ADDR_Func_bb85);
+	queue_scrolled_edge(gb_);
+	queue_changed_block(gb_);
 	cpu_.ime = false; // di
-	routines_.call(ADDR_SetTileQueueProcessingFunctions);
+	set_tile_queue_processing_functions(gb_);
 	cpu_.ime = true; // ei
 	cpu_.ime_delay = 0;
-	sram_switch(static_cast<uint8_t>(gb_pop16(gb_) >> 8)); // pop af
+	sram_switch(sram);
 	check_end_screen();
 }
 
 void LevelFrame::update()
 {
 	mem_[wRoomAnimatedPalsEnabled] = TRUE;
-	routines_.farcall(BANK_UpdateParticles, ADDR_UpdateParticles);
+	routines_.in_bank(BANK_UpdateParticles, ADDR_UpdateParticles, [&] { update_particles(gb_); });
 
 	uint8_t mode = mem_[wCameraConfigFlags] & CAM_SCROLLING_MASK;
 	if (mode == CAM_FREE || mode == CAM_YSCROLL) {
@@ -198,7 +195,7 @@ void LevelFrame::update()
 	// no Wario state update during a floor transition
 	if (!mem_[wFloorTransitionDir]) {
 		wario_flag(true);
-		routines_.farcall(BANK_UpdateWarioStates, ADDR_UpdateWarioStates);
+		routines_.in_bank(BANK_UpdateWarioStates, ADDR_UpdateWarioStates, [&] { update_wario_states(gb_); });
 	}
 
 	// .skip_update_wario_state
@@ -213,8 +210,8 @@ void LevelFrame::update()
 
 	// .applied_cam_scrolling
 	wario_flag(false);
-	in_objects_wram([&] { routines_.farcall(BANK_UpdateObjects, ADDR_UpdateObjects); });
-	routines_.call(ADDR_SetWarioScreenPos);
+	in_objects_wram([&] { routines_.in_bank(BANK_UpdateObjects, ADDR_UpdateObjects, [&] { update_objects(gb_); }); });
+	set_wario_screen_pos(gb_);
 
 	// in the Hidden Figure's battle, wAutoMoveState $02 starts the fence
 	// shake sliding
@@ -224,12 +221,12 @@ void LevelFrame::update()
 	// .process_interactions
 	in_objects_wram([&] {
 		wario_flag(true);
-		routines_.farcall(BANK_ProcessInteractions, ADDR_ProcessInteractions);
+		routines_.in_bank(BANK_ProcessInteractions, ADDR_ProcessInteractions, [&] { process_interactions(gb_); });
 		wario_flag(false);
 	});
-	in_objects_wram([&] { routines_.farcall(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority); });
+	in_objects_wram([&] { routines_.in_bank(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority, [&] { draw_objects_no_priority(gb_); }); });
 	home::draw_wario(gb_);
-	in_objects_wram([&] { routines_.farcall(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority); });
+	in_objects_wram([&] { routines_.in_bank(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, [&] { draw_objects_with_priority(gb_); }); });
 	home::clear_unused_virtual_oam(gb_);
 
 	bool floor = (mem_[wFloorTransitionDir] & (FLOOR_TRANSITION_DOWN | FLOOR_TRANSITION_UP)) && !mem_[wIsDMATransferPending];
@@ -240,7 +237,7 @@ void LevelFrame::update()
 			return;
 		}
 		if ((config & CAM_SCROLLING_MASK) != (CAM_XSCROLL2 | CAM_TRANSITIONS))
-			routines_.call(ADDR_LevelScroll_Horizontal);
+			level_scroll_horizontal(gb_);
 		process_blocks();
 		return;
 	}
@@ -273,7 +270,7 @@ void LevelFrame::update()
 	// .asm_8209
 	mem_[wScrollUpEdge] = 0;
 	mem_[wScrollDownEdge] = 0;
-	routines_.call(ADDR_LevelScroll_Vertical);
+	level_scroll_vertical(gb_);
 	process_blocks();
 }
 

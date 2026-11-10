@@ -8,6 +8,7 @@
 // QueueBlockAttributesAlongRow_OddColumn's first half block reads its tile
 // from past the tile queue, which can reach the stack in the asm. The port
 // doesn't keep that stack, so that byte can differ (see ASM_BUGS.md).
+#include "frame.hpp"
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
@@ -320,7 +321,7 @@ PORT(GetNextLevelRoomID)
 	cpu.a = id;
 	mem[wLevelRoomID] = id;
 }
-PORT_EX(Func_8ed9, 0, ALL_REGISTERS) { EdgeQueue(gb).update(); }
+PORT_EX(Func_8ed9, 0, ALL_REGISTERS) { wl3::level::queue_scrolled_edge(gb); }
 PORT_EX(Func_a0e2, 0, ALL_REGISTERS) { EdgeQueue(gb).queue_column_at_block(); }
 PORT_EX(Func_a2aa, 0, ALL_REGISTERS)
 {
@@ -354,3 +355,7 @@ PORT_EX(QueueBlockAttributesAlongRow_EvenColumn, 0, ALL_REGISTERS)
 {
 	EdgeQueue(gb).queue_block_row(REG_HL(gb), wBGMapTileVRAM1Queue, wc0b3, wRoomBlockAttributes, 0, true, false);
 }
+
+namespace wl3::level {
+void queue_scrolled_edge(GB *gb) { EdgeQueue(gb).update(); }
+} // namespace wl3::level
