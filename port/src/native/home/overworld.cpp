@@ -56,7 +56,7 @@ void load_far_bg_map(GB *gb, uint8_t bank, uint16_t src)
 	Memory mem(gb);
 	uint8_t rom = mem.rom_bank();
 	bankswitch(gb, bank, ADDR_LoadFarBGMap);
-	copy(gb, src, v0BGMap0, 18 * TILEMAP_WIDTH);
+	copy(gb, RomPtr(gb, bank, src), v0BGMap0, 18 * TILEMAP_WIDTH);
 	bankswitch(gb, rom, ADDR_LoadFarBGMap);
 }
 

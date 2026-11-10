@@ -52,7 +52,7 @@ public:
 	{
 		uint16_t frameset = static_cast<uint16_t>(base_ + 7);
 		if (bank)
-			home::farcall(gb_, bank, ADDR_UpdateObjAnim, [&] { home::update_obj_anim(gb_, frameset); });
+			home::farcall(gb_, bank, ADDR_UpdateObjAnim, [&] { home::update_obj_anim(gb_, frameset, bank); });
 		else
 			home::update_obj_anim(gb_, frameset);
 		return Byte(gb_, wObjAnimWasReset);
@@ -63,7 +63,7 @@ public:
 	bool animate_far(uint8_t bank)
 	{
 		uint16_t frameset = static_cast<uint16_t>(base_ + 7);
-		home::farcall(gb_, bank, ADDR_UpdateObjAnim, [&] { home::update_obj_anim(gb_, frameset); });
+		home::farcall(gb_, bank, ADDR_UpdateObjAnim, [&] { home::update_obj_anim(gb_, frameset, bank); });
 		return Byte(gb_, wObjAnimWasReset);
 	}
 

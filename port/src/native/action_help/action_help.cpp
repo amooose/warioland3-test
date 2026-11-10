@@ -301,7 +301,7 @@ void ActionHelp::load_power_up_pals()
 void ActionHelp::load_gfx()
 {
 	ram(rVBK) = VRAM1;
-	routines_.decompress(main_power_up() ? ADDR_ActionHelpObjects1Gfx : ADDR_ActionHelpObjects2Gfx, v1Tiles0);
+	routines_.decompress(main_power_up() ? ROM(gb_, ActionHelpObjects1Gfx) : ROM(gb_, ActionHelpObjects2Gfx), v1Tiles0);
 	ram(rVBK) = 0;
 	routines_.decompress(ROM(gb_, ActionHelpHUDGfx), v0Tiles0);
 }

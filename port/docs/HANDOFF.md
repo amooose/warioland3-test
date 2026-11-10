@@ -128,6 +128,20 @@ scripting and expansion on top. The approach:
   does, and marks the check unrealistic if its bank isn't the one mapped:
   fuzzed copies can run into the MBC's registers and remap mid-routine
   (a389464 failed the fuzz tier on that; fixed in the next commit).
+  Then (134707c): the object and particle framesets and sprites, copy /
+  decompress / palette loaders by label (ROM(gb, Label) overloads), the
+  room header, block function table, palette cycle, object group data and
+  OW scene params: 740 labels left. Next batch: the far loaders
+  (copy_far_bytes, load_far_tiles, load_far_pals_*, load_far_bg_map) by
+  their bank argument, event treasures, the treasure gfx, and the menu /
+  Wario animation steppers given their frameset's bank (-1 = the bank
+  mapped, for the hooks).
+  **Step 4's verification (decided 2026-11-10):** when the worklist is
+  empty, the trace check stops comparing the bank bookkeeping (rom_bank,
+  wROMBank, hCallFunc's bank), as it already ignores the dead stack and
+  wSoundEngineParam1; the bank switches in play are then deleted. The
+  hooks keep switching banks under test, where difftest / fuzz compare
+  them against the asm.
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`.
 - **Progress (2026-10-31):** 3497 / 3497 routines are ported. While the
   port plays the recordings, the interpreter runs no instructions at all

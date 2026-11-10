@@ -20,15 +20,16 @@ bool Events::collected(uint8_t treasure)
 Events::Found Events::event_with_treasure(uint8_t treasure)
 {
 	uint16_t entry = ADDR_EventTreasures;
+	auto next = [&] { return RomPtr(gb_, BANK_EventTreasures, entry++)[0]; };
 	for (uint8_t event = EVENT_00;; event++) {
-		uint8_t first = mem_[entry++];
+		uint8_t first = next();
 		if (first == TREASURES_END)
 			return {EVENT_00, entry, false};
 		if (first == treasure)
 			return {event, entry, true};
-		if (mem_[entry++] == treasure)
+		if (next() == treasure)
 			return {event, entry, true};
-		if (mem_[entry++] == treasure)
+		if (next() == treasure)
 			return {event, entry, true};
 	}
 }
@@ -37,10 +38,10 @@ Events::Found Events::event_with_treasure(uint8_t treasure)
 // w2dffd
 void Events::load_event_treasures(uint8_t event)
 {
-	uint16_t entry = static_cast<uint16_t>(ADDR_EventTreasures + event * 3);
-	mem_.unk_2dfff() = mem_[entry];
-	mem_.unk_2dffe() = mem_[entry + 1];
-	mem_.unk_2dffd() = mem_[entry + 2];
+	RomPtr entry = ROM(gb_, EventTreasures) + event * 3;
+	mem_.unk_2dfff() = entry[0];
+	mem_.unk_2dffe() = entry[1];
+	mem_.unk_2dffd() = entry[2];
 }
 
 // CheckIfEventIsUnlocked: whether the event's treasures are all collected

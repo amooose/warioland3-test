@@ -68,27 +68,27 @@ int update_ow_animation(GB *gb, uint8_t bank, uint16_t duration, uint16_t frames
 
 void copy_far_bytes(GB *gb, uint8_t bank, uint16_t src, uint16_t dest, uint8_t count)
 {
-	in_bank(gb, bank, ADDR_CopyFarBytes, [&] { return copy(gb, src, dest, count ? count : 0x100); });
+	in_bank(gb, bank, ADDR_CopyFarBytes, [&] { return copy(gb, RomPtr(gb, bank, src), dest, count ? count : 0x100); });
 }
 
 void copy_far_bytes_long(GB *gb, uint8_t bank, uint16_t src, uint16_t dest, uint8_t pages)
 {
-	in_bank(gb, bank, ADDR_CopyFarBytes_Long, [&] { return copy(gb, src, dest, pages ? pages * 0x100u : 0x10000u); });
+	in_bank(gb, bank, ADDR_CopyFarBytes_Long, [&] { return copy(gb, RomPtr(gb, bank, src), dest, pages ? pages * 0x100u : 0x10000u); });
 }
 
 void load_far_tiles(GB *gb, uint8_t bank, uint16_t src)
 {
-	in_bank(gb, bank, ADDR_LoadFarTiles, [&] { return copy(gb, src, v0Tiles2, 0x80 * TILE_SIZE); });
+	in_bank(gb, bank, ADDR_LoadFarTiles, [&] { return copy(gb, RomPtr(gb, bank, src), v0Tiles2, 0x80 * TILE_SIZE); });
 }
 
 void load_far_pals_to_temp_pals1(GB *gb, uint8_t bank, uint16_t pals)
 {
-	in_bank(gb, bank, ADDR_LoadFarPalsToTempPals1, [&] { return copy_short(gb, pals, wTempPals1, 8 * PAL_SIZE); });
+	in_bank(gb, bank, ADDR_LoadFarPalsToTempPals1, [&] { return copy_short(gb, RomPtr(gb, bank, pals), wTempPals1, 8 * PAL_SIZE); });
 }
 
 void load_far_pals_to_temp_pals2(GB *gb, uint8_t bank, uint16_t pals)
 {
-	in_bank(gb, bank, ADDR_LoadFarPalsToTempPals2, [&] { return copy_short(gb, pals, wTempPals2, 8 * PAL_SIZE); });
+	in_bank(gb, bank, ADDR_LoadFarPalsToTempPals2, [&] { return copy_short(gb, RomPtr(gb, bank, pals), wTempPals2, 8 * PAL_SIZE); });
 }
 
 void set_scene_obj_state(GB *gb, uint16_t state_addr, uint8_t state)

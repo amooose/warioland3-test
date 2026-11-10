@@ -264,10 +264,10 @@ void Demo::load_wario_sprite()
 void SpecialDemo::load_wario_sprite_from_bank()
 {
 	wario().set_cur_sprite();
-	SET_HL(gb_, static_cast<uint16_t>(mem_.action_help_wario_oam_ptr() << 8 | mem_[wActionHelpWarioOAMPtr + 1]));
+	auto oam = static_cast<uint16_t>(mem_.action_help_wario_oam_ptr() << 8 | mem_[wActionHelpWarioOAMPtr + 1]);
 	uint8_t bank = wram_.action_help_wario_oam_bank();
 	wram_.temp_bank() = bank;
-	routines_.farcall(bank, ADDR_LoadSprite);
+	home::farcall(gb_, bank, ADDR_LoadSprite, [&] { home::load_sprite(gb_, RomPtr(gb_, bank, oam)); });
 }
 
 // ---------------------------------------------------------------------------

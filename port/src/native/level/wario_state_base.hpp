@@ -97,7 +97,7 @@ protected:
 	// ld a, BANK("Wario OAM n") / ldh [hCallFuncBank], a / hcall UpdateWarioAnimation
 	void anim(uint8_t bank)
 	{
-		home::farcall(gb_, bank, ADDR_UpdateWarioAnimation, [&] { home::update_wario_animation(gb_); });
+		home::farcall(gb_, bank, ADDR_UpdateWarioAnimation, [&] { home::update_wario_animation(gb_, bank); });
 	}
 	void set_pal(uint16_t pals) { home::set_wario_pal(gb_, pals); } // SetWarioPal
 

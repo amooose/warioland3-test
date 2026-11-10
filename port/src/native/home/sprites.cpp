@@ -63,7 +63,8 @@ struct AnimBytes {
 	uint16_t frameset, duration, offset, frame, offset2, duration2, ended;
 };
 
-AnimStep step(GB *gb, const AnimBytes &at)
+// bank: the frameset's, or -1 for the bank mapped (the hooks)
+AnimStep step(GB *gb, const AnimBytes &at, int bank)
 {
 	Memory mem(gb);
 	mem[at.ended] = FALSE;
@@ -72,7 +73,10 @@ AnimStep step(GB *gb, const AnimBytes &at)
 	if (left != 0xff)
 		return {false, false, 0, left};
 	uint16_t entry = static_cast<uint16_t>(at.frameset + mem[at.offset]);
-	uint8_t next = mem[entry];
+	auto rom = [&](uint16_t addr) {
+		return bank < 0 ? RomPtr::mapped(gb, addr)[0] : RomPtr(gb, static_cast<uint8_t>(bank), addr)[0];
+	};
+	uint8_t next = rom(entry);
 	if (next == 0xff) {
 		mem[at.offset] = 0;
 		mem[at.duration] = 0;
@@ -82,7 +86,7 @@ AnimStep step(GB *gb, const AnimBytes &at)
 	mem[at.frame] = next;
 	uint8_t offset = mem[at.offset2];
 	mem[at.offset2] = static_cast<uint8_t>(offset + 2);
-	mem[at.duration2] = mem[++entry];
+	mem[at.duration2] = rom(++entry);
 	return {true, false, entry, offset};
 }
 
@@ -111,14 +115,14 @@ AnimBytes wario_anim_bytes(GB *gb)
 
 } // namespace
 
-AnimStep update_obj_anim(GB *gb, uint16_t frameset)
+AnimStep update_obj_anim(GB *gb, uint16_t frameset, int bank)
 {
-	return step(gb, obj_anim_bytes(gb, frameset));
+	return step(gb, obj_anim_bytes(gb, frameset), bank);
 }
 
-AnimStep update_wario_animation(GB *gb)
+AnimStep update_wario_animation(GB *gb, int bank)
 {
-	return step(gb, wario_anim_bytes(gb));
+	return step(gb, wario_anim_bytes(gb), bank);
 }
 
 uint8_t queue_block_update(GB *gb, uint16_t block)
@@ -147,7 +151,7 @@ SpriteEnd load_sprite_in(GB *gb, uint8_t bank, uint16_t table, uint16_t routine)
 {
 	uint8_t saved = Memory(gb).rom_bank();
 	bankswitch(gb, bank, routine);
-	SpriteEnd end = load_sprite(gb, table);
+	SpriteEnd end = load_sprite(gb, RomPtr(gb, bank, table));
 	bankswitch(gb, saved, routine);
 	return end;
 }

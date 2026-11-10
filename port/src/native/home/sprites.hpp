@@ -38,8 +38,8 @@ struct AnimStep {
 };
 // frameset: the object's frameset pointer's high byte; below it the low
 // byte, the duration, the offset and, two bytes on, the frame
-AnimStep update_obj_anim(GB *gb, uint16_t frameset);
-AnimStep update_wario_animation(GB *gb);
+AnimStep update_obj_anim(GB *gb, uint16_t frameset, int bank = -1); // bank: the frameset's (-1: the bank mapped)
+AnimStep update_wario_animation(GB *gb, int bank = -1);
 
 // Func_e31: the block at block (in SRAM bank wBlockPtrBank) queued for a
 // BG map update; returns the queue entry's offset (wc19e before)

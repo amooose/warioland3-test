@@ -41,7 +41,7 @@ public:
 			wLevelGreenTreasurePal, wLevelBlueTreasurePal};
 		Memory mem(gb_);
 		for (int i = 0; i < 4; i++)
-			mem[pals[i]] = mem[static_cast<uint16_t>(ADDR_TreasureOBPals + mem[ids[i]])];
+			mem[pals[i]] = (ROM(gb_, TreasureOBPals) + mem[ids[i]])[0];
 	}
 
 	// .CopyGfx: the treasure's 4 tiles from TreasureGfx to dest, returning
@@ -51,7 +51,7 @@ public:
 	{
 		uint8_t rotated = static_cast<uint8_t>(id << 2 | id >> 7);
 		uint16_t offset = static_cast<uint16_t>((id & 0x40) << 6 | rotated << 4);
-		uint8_t last = home::copy(gb_, static_cast<uint16_t>(ADDR_TreasureGfx + offset), dest, 4 * TILE_SIZE);
+		uint8_t last = home::copy(gb_, ROM(gb_, TreasureGfx) + offset, dest, 4 * TILE_SIZE);
 		dest = static_cast<uint16_t>(dest + 4 * TILE_SIZE);
 		return last;
 	}
