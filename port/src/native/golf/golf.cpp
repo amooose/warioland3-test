@@ -3,6 +3,9 @@
 
 #include <initializer_list>
 
+// golf's ROM data, all in its bank ($72) (RAM through the memory map)
+#define GOLF(addr) ::wl3::RomPtr(gb_, BANK_Func_1c86f8, static_cast<uint16_t>(addr))
+
 namespace wl3::golf {
 
 namespace {
@@ -583,13 +586,13 @@ void Golf::load_course()
 {
 	wram_.temp_bank() = BANK_GolfBuildingCourse1Tilemap; // BANK("Golf Gfx 2")
 	uint16_t entry = static_cast<uint16_t>(COURSE_DATA + static_cast<uint8_t>(wram_.golf_course() * 4));
-	routines_.far_copy(mem_.word(entry), wGolfCourseTileMap, 7 * TILEMAP_WIDTH);
-	routines_.copy(mem_.word(static_cast<uint16_t>(entry + 2)), w1db00, 8 * 8);
+	routines_.far_copy(GOLF(entry).word(), wGolfCourseTileMap, 7 * TILEMAP_WIDTH);
+	routines_.copy(GOLF(GOLF(static_cast<uint16_t>(entry + 2)).word()), w1db00, 8 * 8);
 }
 
 void Golf::set_course_target_scx()
 {
-	wram_.golf_menu_target_scx() = ram(static_cast<uint16_t>(COURSE_SCROLL_X + wram_.golf_course()));
+	wram_.golf_menu_target_scx() = GOLF(COURSE_SCROLL_X + wram_.golf_course())[0];
 }
 
 void Golf::handle_building()
@@ -693,7 +696,7 @@ void Golf::pay_for_course()
 		return;
 	}
 	play_sfx(mem_, SFX_SELECTION);
-	wram_.predetermined_golf_hole() = ram(static_cast<uint16_t>(FIRST_GOLF_HOLES + wram_.golf_menu_option()));
+	wram_.predetermined_golf_hole() = GOLF(FIRST_GOLF_HOLES + wram_.golf_menu_option())[0];
 	wram_.sub_state() = 0x04;
 }
 
@@ -714,7 +717,7 @@ void Golf::update_building_animations()
 	golfer.y() = 0x76;
 	golfer.x() = 0x6c;
 	uint16_t frameset =
-		mem_.word(static_cast<uint16_t>(COURSE_WARIO_FRAMESETS + static_cast<uint8_t>(wram_.golf_menu_option() * 2)));
+		GOLF(static_cast<uint16_t>(COURSE_WARIO_FRAMESETS + static_cast<uint8_t>(wram_.golf_menu_option() * 2))).word();
 	routines_.update_golf_object_animation(frameset, golfer.duration().addr());
 	golfer.frame() = golfer.current_frame();
 	routines_.load_golf_sprite(golfer.sprite());

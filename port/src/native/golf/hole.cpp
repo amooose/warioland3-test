@@ -3,6 +3,9 @@
 
 #include <initializer_list>
 
+// golf's ROM data, all in its bank ($72) (RAM through the memory map)
+#define GOLF(addr) ::wl3::RomPtr(gb_, BANK_Func_1c86f8, static_cast<uint16_t>(addr))
+
 namespace wl3::golf {
 
 namespace {
@@ -60,8 +63,8 @@ void GolfHole::init()
 			break;
 	}
 
-	uint16_t pals = mem_.word(static_cast<uint16_t>(COURSE_PALS + static_cast<uint8_t>(wram_.golf_menu_option() * 2)));
-	routines_.load_pals_to_temp_pals1(pals);
+	uint16_t pals = GOLF(static_cast<uint16_t>(COURSE_PALS + static_cast<uint8_t>(wram_.golf_menu_option() * 2))).word();
+	routines_.load_pals_to_temp_pals1(GOLF(pals));
 	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_1ca18f));
 
 	ram(rVBK) = VRAM1;
@@ -115,7 +118,7 @@ void GolfHole::pick_and_load_hole()
 	// a hole: 4 pointers to its tilemaps and attribute maps (in the order
 	// they're used, from the last), then one to its data
 	uint16_t entry = static_cast<uint16_t>(ADDR_GolfHoles + hole * 10);
-	auto pointer = [&](int i) -> uint16_t { return mem_.word(static_cast<uint16_t>(entry + i * 2)); };
+	auto pointer = [&](int i) -> uint16_t { return GOLF(static_cast<uint16_t>(entry + i * 2)).word(); };
 	ram(rVBK) = VRAM1;
 	routines_.far_decompress(BANK_GolfGfx, pointer(4), 7 * TILEMAP_WIDTH + v0BGMap0);
 	routines_.far_decompress(BANK_GolfGfx, ADDR_GolfBackground1Attrmap, v1BGMap0);
@@ -157,7 +160,7 @@ void GolfHole::show_flag_and_par()
 	if (wram_.unk_1d800() != 0x02) {
 		uint16_t flag = ADDR_GolfHoleFlagGfx;
 		for (uint16_t dest : {tiles(0x20), tiles(0x40), tiles(0x60), static_cast<uint16_t>(v0Tiles1)}) {
-			routines_.copy(flag, dest, 6 * 0x10);
+			routines_.copy(GOLF(flag), dest, 6 * 0x10);
 			flag = static_cast<uint16_t>(flag + 6 * 0x10);
 		}
 	}
@@ -385,9 +388,9 @@ void GolfHole::state_select_shot_power()
 	wram_.shot_power_level() = levels[level];
 
 	uint16_t vels = static_cast<uint16_t>(SHOT_POWER_VELS + static_cast<uint8_t>(wram_.shot_power_level() << 1));
-	ram(wShotYVel + 0) = mem_[vels];
+	ram(wShotYVel + 0) = GOLF(vels)[0];
 	ram(wShotYVel + 1) = 0;
-	wram_.shot_x_vel() = mem_[static_cast<uint16_t>(vels + 1)];
+	wram_.shot_x_vel() = GOLF(static_cast<uint16_t>(vels + 1))[0];
 
 	// a shot from the rough or a bunker goes less high
 	uint8_t terrain = wram_.golf_terrain();
@@ -511,9 +514,9 @@ void GolfHole::state_shot()
 	else if (spin != SHOT_NORMAL)
 		wram_.shot_direction() ^= 0x1; // backspin bounces back
 	uint16_t vels = static_cast<uint16_t>(table + static_cast<uint8_t>(wram_.shot_power_level() << 1));
-	ram(wShotYVel + 0) = mem_[vels];
+	ram(wShotYVel + 0) = GOLF(vels)[0];
 	ram(wShotYVel + 1) = 0;
-	wram_.shot_x_vel() = mem_[static_cast<uint16_t>(vels + 1)];
+	wram_.shot_x_vel() = GOLF(static_cast<uint16_t>(vels + 1))[0];
 
 	uint8_t modifier = wram_.shot_terrain_modifier();
 	uint8_t y_vel = wram_.shot_y_vel();
@@ -552,10 +555,10 @@ void GolfHole::state_special_terrain()
 				return; // a delay
 			// rolling into the hole
 			Word x = wram_.golf_para_goom_x_pos().word();
-			uint8_t offset = mem_[static_cast<uint16_t>(HOLE_X_OFFSETS + counter)];
-			x = static_cast<uint16_t>(mem_[static_cast<uint16_t>(HOLE_X_OFFSET_SIGNS + counter)] ? x - offset : x + offset);
+			uint8_t offset = GOLF(static_cast<uint16_t>(HOLE_X_OFFSETS + counter))[0];
+			x = static_cast<uint16_t>(GOLF(static_cast<uint16_t>(HOLE_X_OFFSET_SIGNS + counter))[0] ? x - offset : x + offset);
 			wram_.golf_para_goom_y_pos() =
-				static_cast<uint8_t>(wram_.golf_para_goom_y_pos() + mem_[static_cast<uint16_t>(HOLE_Y_OFFSETS + counter)]);
+				static_cast<uint8_t>(wram_.golf_para_goom_y_pos() + GOLF(static_cast<uint16_t>(HOLE_Y_OFFSETS + counter))[0]);
 			return;
 		}
 		uint8_t stroke = wram_.golf_stroke(), par = wram_.golf_par();
@@ -1184,7 +1187,7 @@ void GolfHole::update_paragoom()
 	uint8_t y_offset = state == GOLF_PARAGOOM_5 ? 0x13 : 0x12;
 	paragoom.y() = static_cast<uint8_t>(static_cast<uint8_t>(wram_.golf_para_goom_y_pos().word() >> 2) + y_offset);
 
-	uint16_t frameset = mem_.word(static_cast<uint16_t>(PARAGOOM_FRAMESETS + static_cast<uint8_t>(state << 1)));
+	uint16_t frameset = GOLF(static_cast<uint16_t>(PARAGOOM_FRAMESETS + static_cast<uint8_t>(state << 1))).word();
 	if (routines_.update_golf_object_animation(frameset, paragoom.duration().addr()) && respawn_paragoom())
 		return;
 	if (wram_.golf_para_goom_state() == 0x02 && !paragoom.duration()) {
@@ -1222,7 +1225,7 @@ void GolfHole::show_result_overlay_text()
 	GolfObject text = object(wGolfOverlayText);
 	text.y() = 0x50;
 	text.x() = 0x58;
-	uint16_t frameset = mem_.word(static_cast<uint16_t>(RESULT_FRAMESETS + static_cast<uint8_t>(wram_.golf_result() * 2)));
+	uint16_t frameset = GOLF(static_cast<uint16_t>(RESULT_FRAMESETS + static_cast<uint8_t>(wram_.golf_result() * 2))).word();
 	routines_.update_golf_object_animation(frameset, text.duration().addr());
 	load_object_sprite(text);
 }
@@ -1266,11 +1269,11 @@ bool GolfHole::animate_overlay_text_1cb016()
 void GolfHole::load_wario_state_gfx()
 {
 	uint8_t state = wram_.golf_wario_state();
-	wram_.golf_wario_tiles_bank() = mem_[static_cast<uint16_t>(WARIO_GFX_BANKS + state)];
+	wram_.golf_wario_tiles_bank() = GOLF(static_cast<uint16_t>(WARIO_GFX_BANKS + state))[0];
 	uint16_t pointer = static_cast<uint16_t>(WARIO_GFX_POINTERS + static_cast<uint8_t>(state << 1));
 	// stored high byte first
-	ram(wGolfWarioTilesPtr + 1) = mem_[pointer];
-	ram(wGolfWarioTilesPtr + 0) = mem_[static_cast<uint16_t>(pointer + 1)];
+	ram(wGolfWarioTilesPtr + 1) = GOLF(pointer)[0];
+	ram(wGolfWarioTilesPtr + 0) = GOLF(static_cast<uint16_t>(pointer + 1))[0];
 }
 
 // ---------------------------------------------------------------------------
