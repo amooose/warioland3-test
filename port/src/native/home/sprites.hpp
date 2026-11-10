@@ -40,6 +40,8 @@ struct AnimStep {
 // byte, the duration, the offset and, two bytes on, the frame
 AnimStep update_obj_anim(GB *gb, uint16_t frameset, int bank = -1); // bank: the frameset's (-1: the bank mapped)
 AnimStep update_wario_animation(GB *gb, int bank = -1);
+// UpdateWarioAnimation with the registers it leaves (its hook's body)
+void update_wario_animation_regs(GB *gb, int bank);
 
 // Func_e31: the block at block (in SRAM bank wBlockPtrBank) queued for a
 // BG map update; returns the queue entry's offset (wc19e before)
@@ -59,7 +61,7 @@ void load_wario_gfx(GB *gb);
 // duration), ended by $ff, which keeps the last frame in
 // wGolfAnimLastFrame and starts over); true when it started over.
 // new_duration: the duration it read for the next frame, if any
-bool update_golf_object_animation(GB *gb, uint16_t frameset, uint16_t duration, uint8_t *new_duration = nullptr);
+bool update_golf_object_animation(GB *gb, uint16_t frameset, uint16_t duration, uint8_t *new_duration = nullptr, int bank = -1); // bank: the frameset's (-1: mapped)
 // LoadGolfSprite: the golf object's 4 bytes at obj (y, x, frame,
 // attributes, as OAM takes them), from the OAM data at wGolfOAMPtr
 SpriteEnd load_golf_sprite(GB *gb, uint16_t obj, uint8_t bank); // wGolfOAMPtr's table, in bank

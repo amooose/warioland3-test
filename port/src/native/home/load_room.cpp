@@ -105,7 +105,7 @@ void RoomLoader::load_palettes()
 	uint16_t src = pointer(ADDR_RoomPals, mem_.room_palettes());
 	uint8_t bank = mem_.palette_bank();
 	mem_.temp_bank() = bank;
-	farcall(gb_, bank, ADDR_LoadPalsToTempPals1, [&] { load_pals_to_temp_pals1(gb_, src); });
+	farcall(gb_, bank, ADDR_LoadPalsToTempPals1, [&] { load_pals_to_temp_pals1(gb_, RomPtr(gb_, bank, src)); });
 }
 
 // the room's palette cycle: when its duration has passed, the next of its

@@ -160,7 +160,7 @@ public:
 	// animation finished.
 	bool update_golf_object_animation(uint16_t frameset, uint16_t duration)
 	{
-		return home::update_golf_object_animation(gb_, frameset, duration);
+		return home::update_golf_object_animation(gb_, frameset, duration, nullptr, BANK_Func_1c86f8); // golf's framesets, in its bank
 	}
 
 	void load_golf_sprite(uint16_t sprite)

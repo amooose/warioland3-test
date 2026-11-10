@@ -60,7 +60,7 @@ void update_golf_wario_animation(GB *gb)
 
 	uint8_t bank = mem.rom_bank();
 	routines.switch_bank(mem.temp_bank());
-	bool finished = update_golf_object_animation(gb, frameset, wGolfWarioDuration);
+	bool finished = update_golf_object_animation(gb, frameset, wGolfWarioDuration, nullptr, mem.temp_bank());
 	mem.has_golf_wario_animation_finished() = finished;
 	routines.switch_bank(bank);
 

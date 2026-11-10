@@ -148,7 +148,7 @@ void PauseMenu::show(MenuObject obj, uint8_t y, uint8_t x, uint8_t attributes, u
 {
 	obj.init(y, x, frameset);
 	obj.attributes() = attributes;
-	obj.animate();
+	obj.animate_in(BANK_UpdatePauseMenu);
 	draw(obj);
 }
 
@@ -156,7 +156,7 @@ void PauseMenu::update()
 {
 	handle_input();
 	MenuObject box = object(wMenuObj3);
-	box.animate();
+	box.animate_in(BANK_UpdatePauseMenu);
 	draw(box);
 	static constexpr struct { int flag; uint16_t obj; } KEYS[4] = {
 		{GREY_KEY_F, wMenuObj4}, {RED_KEY_F, wMenuObj5}, {GREEN_KEY_F, wMenuObj6}, {BLUE_KEY_F, wMenuObj7},
@@ -168,7 +168,7 @@ void PauseMenu::update()
 	draw(object(wMenuObj9));
 	draw(object(wMenuObj10));
 	draw(object(wMenuObj11));
-	cursor().animate();
+	cursor().animate_in(BANK_UpdatePauseMenu);
 	draw(cursor());
 	routines_.clear_unused_virtual_oam();
 

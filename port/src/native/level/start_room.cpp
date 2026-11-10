@@ -9,6 +9,7 @@
 #include "room_gfx.hpp"
 #include "frame.hpp"
 #include "../flags.hpp"
+#include "../home/sprites.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
 #include "object.hpp"
@@ -596,7 +597,7 @@ void RoomStart::from_transition()
 		mem_.animation_frame() = 0;
 		mem_[wWarioFramesetPtr + 0] = ADDR_Frameset_14d18 >> 8;
 		mem_[wWarioFramesetPtr + 1] = static_cast<uint8_t>(ADDR_Frameset_14d18);
-		routines_.farcall(OAM1, ADDR_UpdateWarioAnimation);
+		home::farcall(gb_, OAM1, ADDR_UpdateWarioAnimation, [&] { home::update_wario_animation_regs(gb_, OAM1); });
 	}
 
 	// .not_entering_door

@@ -91,16 +91,16 @@ void Title::init_intro()
 
 	if (!wram_.unk_ceef()) {
 		init_plane(64, 208, ADDR_Frameset_712c);
-		plane().animate();
+		plane().animate_in(BANK_TitleStateTable);
 		MenuObject obj1 = object(wMenuObj1);
 		obj1.init(128, 80, ADDR_Frameset_6ce6);
-		obj1.animate();
+		obj1.animate_in(BANK_TitleStateTable);
 		MenuObject obj4 = object(wMenuObj4);
 		obj4.init(16, 0, ADDR_Frameset_71a1);
-		obj4.animate();
+		obj4.animate_in(BANK_TitleStateTable);
 		MenuObject obj5 = object(wMenuObj5);
 		obj5.init(8, 32, ADDR_Frameset_71a4);
-		obj5.animate();
+		obj5.animate_in(BANK_TitleStateTable);
 		load_intro_sprite(obj4);
 		load_intro_sprite(obj5);
 		wram_.start_menu_selection() = STARTMENU_NEW_GAME;
@@ -112,16 +112,16 @@ void Title::init_intro()
 		bool time_attack = wram_.game_mode_flags().bit(MODE_TIME_ATTACK_F);
 		MenuObject obj1 = object(wMenuObj1);
 		obj1.init(0x82, 0x50, time_attack ? ADDR_Frameset_6d1e : ADDR_Frameset_6ce9);
-		obj1.animate();
+		obj1.animate_in(BANK_TitleStateTable);
 		MenuObject obj2 = object(wMenuObj2);
 		obj2.init(0x86, time_attack ? 0x40 : 0x44, ADDR_Frameset_6d1b);
-		obj2.animate();
+		obj2.animate_in(BANK_TitleStateTable);
 		wram_.start_menu_selection() = STARTMENU_CONTINUE;
 	}
 
 	MenuObject obj3 = object(wMenuObj3);
 	obj3.init(36, 104, ADDR_Frameset_6d18);
-	obj3.animate();
+	obj3.animate_in(BANK_TitleStateTable);
 
 	ram(rLCDC) = LCDC_DEFAULT;
 	wram_.timer() = 0;
@@ -228,7 +228,7 @@ void Title::intro_phase1()
 	}
 
 	scroll_layers();
-	p.animate();
+	p.animate_in(BANK_TitleStateTable);
 	draw_intro(p, object(wMenuObj4), object(wMenuObj5));
 }
 
@@ -277,7 +277,7 @@ void Title::intro_phase2()
 	}
 
 	scroll_layers();
-	p.animate();
+	p.animate_in(BANK_TitleStateTable);
 	draw_intro(object(wMenuObj4), p, object(wMenuObj5));
 }
 
@@ -334,7 +334,7 @@ void Title::intro_phase3()
 		finish_scroll();
 	else
 		scroll_layers();
-	p.animation_ended() = p.animate();
+	p.animation_ended() = p.animate_in(BANK_TitleStateTable);
 	draw_intro(object(wMenuObj4), p, object(wMenuObj5));
 }
 
@@ -349,7 +349,7 @@ bool Title::phase3_fall(uint8_t y)
 
 void Title::end_intro()
 {
-	plane().animate();
+	plane().animate_in(BANK_TitleStateTable);
 	load_intro_sprite(plane());
 	routines_.clear_unused_virtual_oam();
 
@@ -528,7 +528,7 @@ void Title::play_plane_sfx(uint16_t sfx)
 
 void Title::start_menu()
 {
-	plane().animate();
+	plane().animate_in(BANK_TitleStateTable);
 	load_intro_sprite(plane());
 	load_start_menu_sprite(object(wMenuObj3));
 	handle_selection();
@@ -614,7 +614,7 @@ void Title::set_selection(uint8_t selection, uint16_t frameset)
 	wram_.start_menu_selection() = selection;
 	MenuObject obj1 = object(wMenuObj1);
 	obj1.set_frameset(frameset);
-	obj1.animate();
+	obj1.animate_in(BANK_TitleStateTable);
 }
 
 void Title::handle_selection()
@@ -623,7 +623,7 @@ void Title::handle_selection()
 	if (selection & STARTMENUF_SCROLLING)
 		scroll_selection();
 	else if (selection & STARTMENUF_ANIM1) {
-		if (object(wMenuObj1).animate())
+		if (object(wMenuObj1).animate_in(BANK_TitleStateTable))
 			set_select_flag();
 	} else if (selection & STARTMENUF_ANIM2)
 		blink_selection();

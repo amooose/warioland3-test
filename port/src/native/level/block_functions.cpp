@@ -13,6 +13,7 @@
 #include "../native.hpp"
 #include "../routines.hpp"
 #include "../home/wario.hpp"
+#include "../home/sprites.hpp"
 #include "block_functions.hpp"
 #include "object.hpp"
 
@@ -645,7 +646,7 @@ void BlockFuncs::enter_door()
 	st_ptr(wWarioOAMPtr, ADDR_OAM_14a82);
 	bool right = mem_.direction();
 	st_ptr(wWarioFramesetPtr, right ? ADDR_Frameset_14d10 : ADDR_Frameset_14d0b);
-	routines_.farcall(OAM1, ADDR_UpdateWarioAnimation);
+	home::farcall(gb_, OAM1, ADDR_UpdateWarioAnimation, [&] { home::update_wario_animation_regs(gb_, OAM1); });
 	GOTO(FREE);
 }
 
@@ -822,7 +823,7 @@ void BlockFuncs::enter_pipe(bool down)
 	mem_.wario_oam_bank() = BANK_OAM_14a82;
 	st_ptr(wWarioOAMPtr, ADDR_OAM_14a82);
 	st_ptr(wWarioFramesetPtr, ADDR_Frameset_14cf6);
-	routines_.farcall(OAM1, ADDR_UpdateWarioAnimation);
+	home::farcall(gb_, OAM1, ADDR_UpdateWarioAnimation, [&] { home::update_wario_animation_regs(gb_, OAM1); });
 	GOTO(SOLID);
 }
 

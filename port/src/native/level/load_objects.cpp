@@ -77,21 +77,22 @@ void ObjectLoader::spawn(uint8_t index, uint16_t at)
 	mem_[obj + OBJ_X_POS + 0] = mem_.x_pos_lo();
 	mem_[obj + OBJ_X_POS + 1] = x_hi;
 
-	uint16_t data = Word(gb_, wObjDataPointers + static_cast<uint8_t>((index - 1) << 1));
-	mem_[obj + OBJ_ID] = mem_[data + 0];
-	mem_[obj + OBJ_INTERACTION_TYPE] = mem_[data + 1];
-	mem_[obj + OBJ_COLLBOX_TOP] = mem_[data + 2];
+	// the object data, in the object loader's bank (as is all the creation data)
+	RomPtr data(gb_, BANK_SpawnObject, Word(gb_, wObjDataPointers + static_cast<uint8_t>((index - 1) << 1)));
+	mem_[obj + OBJ_ID] = data[0];
+	mem_[obj + OBJ_INTERACTION_TYPE] = data[1];
+	mem_[obj + OBJ_COLLBOX_TOP] = data[2];
 	mem_[obj + OBJ_COLLBOX_BOTTOM] = 0;
 	mem_[obj + OBJ_FRAME] = 0;
-	mem_[obj + OBJ_OAM_PTR + 0] = mem_[data + 3];
-	mem_[obj + OBJ_OAM_PTR + 1] = mem_[data + 4];
+	mem_[obj + OBJ_OAM_PTR + 0] = data[3];
+	mem_[obj + OBJ_OAM_PTR + 1] = data[4];
 	mem_[obj + OBJ_FRAME_DURATION] = 0x7f;
 	mem_[obj + OBJ_SUBSTATE] = 0x1 | OBJSUBFLAG_UNINITIALISED;
 	mem_[obj + OBJ_STATE] = 0; // OBJSTATE_00
 	mem_[obj + OBJ_ACTION] = 2 | (1 << 7);
-	mem_[obj + OBJ_UPDATE_FUNCTION + 0] = mem_[data + 5];
-	mem_[obj + OBJ_UPDATE_FUNCTION + 1] = mem_[data + 6];
-	mem_[obj + OBJ_FLAGS] = mem_[data + 7] | OBJFLAG_ACTIVE | OBJFLAG_INVISIBLE;
+	mem_[obj + OBJ_UPDATE_FUNCTION + 0] = data[5];
+	mem_[obj + OBJ_UPDATE_FUNCTION + 1] = data[6];
+	mem_[obj + OBJ_FLAGS] = data[7] | OBJFLAG_ACTIVE | OBJFLAG_INVISIBLE;
 }
 
 // The rest of an object made by another: x_hi to slot_pos (the slot's
@@ -105,19 +106,24 @@ void ObjectLoader::create_got_pos(uint8_t x_hi, uint16_t slot_pos, uint16_t data
 	auto field = [&](uint8_t f) {
 		return static_cast<uint16_t>((id_at & 0xff00) | static_cast<uint8_t>(id_at + f - OBJ_ID));
 	};
-	uint16_t src = data;
+	RomPtr src(gb_, BANK__CreateObjectFromCurObjPos, data);
+	auto next = [&] {
+		uint8_t v = *src;
+		++src;
+		return v;
+	};
 	for (uint8_t f = OBJ_ID; f <= OBJ_COLLBOX_RIGHT; f++)
-		mem_[field(f)] = mem_[src++];
+		mem_[field(f)] = next();
 	for (uint8_t f = OBJ_OAM_PTR; f < OBJ_OAM_PTR + 4; f++) // and OBJ_FRAMESET_PTR
-		mem_[field(f)] = mem_[src++];
+		mem_[field(f)] = next();
 	mem_[field(OBJ_FRAME_DURATION)] = 0;
 	mem_[field(OBJ_FRAMESET_OFFSET)] = 0;
 	for (uint8_t f = OBJ_STATE_DURATION; f <= OBJ_STATE; f++)
-		mem_[field(f)] = mem_[src++];
+		mem_[field(f)] = next();
 	mem_[field(OBJ_ACTION)] = 0; // OBJACTION_NONE
-	mem_[field(OBJ_UPDATE_FUNCTION + 0)] = mem_[src++];
-	mem_[field(OBJ_UPDATE_FUNCTION + 1)] = mem_[src++];
-	mem_[field(OBJ_FLAGS)] = mem_[src] | OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT;
+	mem_[field(OBJ_UPDATE_FUNCTION + 0)] = next();
+	mem_[field(OBJ_UPDATE_FUNCTION + 1)] = next();
+	mem_[field(OBJ_FLAGS)] = *src | OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT;
 }
 
 // bc = the creation data: at wCurObj's position
@@ -160,9 +166,9 @@ void ObjectLoader::create_at_relative_pos(uint16_t data)
 	mem_[obj + OBJ_UNK_01] = mem_.cur_obj_unk01();
 	mem_[obj + OBJ_UNK_02] = mem_.cur_obj_unk02();
 	uint16_t at = obj + OBJ_Y_POS;
-	uint8_t y_hi = relative(wCurObjYPos, mem_[data], at);
+	uint8_t y_hi = relative(wCurObjYPos, RomPtr(gb_, BANK__CreateObjectAtRelativePos, data)[0], at);
 	mem_[at++] = y_hi;
-	uint8_t x_hi = relative(wCurObjXPos, mem_[data + 1], at);
+	uint8_t x_hi = relative(wCurObjXPos, RomPtr(gb_, BANK__CreateObjectAtRelativePos, data)[1], at);
 	create_got_pos(x_hi, at, data + 2);
 }
 

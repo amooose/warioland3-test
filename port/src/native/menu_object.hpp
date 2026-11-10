@@ -58,6 +58,14 @@ public:
 		return Byte(gb_, wObjAnimWasReset);
 	}
 
+	// UpdateObjAnim run from code in code_bank (mapped, its frameset in
+	// it): animate() with the frameset read from code_bank
+	bool animate_in(uint8_t code_bank)
+	{
+		home::update_obj_anim(gb_, static_cast<uint16_t>(base_ + 7), code_bank);
+		return Byte(gb_, wObjAnimWasReset);
+	}
+
 	// UpdateObjAnim through farcall with bank mapped, whatever it is (bank 0
 	// too, as hCallFunc maps it)
 	bool animate_far(uint8_t bank)

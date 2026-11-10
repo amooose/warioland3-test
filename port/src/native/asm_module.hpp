@@ -16,6 +16,7 @@
 #include "level/collisions.hpp"
 #include "native.hpp"
 #include "routines.hpp"
+#include "home/sprites.hpp"
 
 #include <initializer_list>
 
@@ -184,7 +185,10 @@ protected:
 		st(wWarioFramesetPtr + 1, static_cast<uint8_t>(ptr));
 	}
 	// ld a, BANK("Wario OAM n") / ldh [hCallFuncBank], a / hcall UpdateWarioAnimation
-	void anim(uint8_t bank) { FARCALL_BANK(bank, UpdateWarioAnimation); }
+	void anim(uint8_t bank)
+	{
+		home::farcall(gb_, bank, ADDR_UpdateWarioAnimation, [&] { home::update_wario_animation_regs(gb_, bank); });
+	}
 	// bottom -1, left -9, right 9, top -27 (a = -27)
 	void coll_box_blrt()
 	{

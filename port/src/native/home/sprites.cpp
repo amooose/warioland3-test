@@ -173,21 +173,24 @@ SpriteEnd load_credits_music_box_sprite(GB *gb, uint16_t obj)
 	return load_sprite_in(gb, mem.temp_bank(), table, ADDR_LoadCreditsMusicBoxSprite);
 }
 
-bool update_golf_object_animation(GB *gb, uint16_t frameset, uint16_t duration, uint8_t *new_duration)
+bool update_golf_object_animation(GB *gb, uint16_t frameset, uint16_t duration, uint8_t *new_duration, int bank)
 {
 	Memory mem(gb);
+	auto rom = [&](uint16_t addr) {
+		return bank < 0 ? RomPtr::mapped(gb, addr)[0] : RomPtr(gb, static_cast<uint8_t>(bank), addr)[0];
+	};
 	uint8_t left = static_cast<uint8_t>(mem[duration] - 1);
 	mem[duration] = left;
 	if (left != 0xff)
 		return false;
 	uint16_t offset = static_cast<uint16_t>(duration + 1), frame = static_cast<uint16_t>(duration + 2);
 	uint16_t entry = static_cast<uint16_t>(frameset + mem[offset]);
-	uint8_t next = mem[entry];
+	uint8_t next = rom(entry);
 	if (next == 0xff) {
 		mem.golf_anim_last_frame() = mem[frame];
-		mem[frame] = mem[frameset];
+		mem[frame] = rom(frameset);
 		mem[offset] = 2;
-		uint8_t next_duration = mem[static_cast<uint16_t>(frameset + 1)];
+		uint8_t next_duration = rom(static_cast<uint16_t>(frameset + 1));
 		mem[duration] = next_duration;
 		if (new_duration)
 			*new_duration = next_duration;
@@ -195,7 +198,7 @@ bool update_golf_object_animation(GB *gb, uint16_t frameset, uint16_t duration, 
 	}
 	mem[frame] = next;
 	mem[offset] = static_cast<uint8_t>(mem[offset] + 2);
-	uint8_t next_duration = mem[static_cast<uint16_t>(entry + 1)];
+	uint8_t next_duration = rom(static_cast<uint16_t>(entry + 1));
 	mem[duration] = next_duration;
 	if (new_duration)
 		*new_duration = next_duration;
@@ -300,7 +303,7 @@ namespace {
 // An animation step's registers: hl where it last wrote (the offset, the
 // duration on a reset, the duration again on a new frame), bc the entry,
 // a and f from its last arithmetic
-void anim_regs(GB *gb, const AnimStep &s, uint16_t offset, uint16_t duration, uint16_t duration2)
+void anim_regs(GB *gb, const AnimStep &s, uint16_t offset, uint16_t duration, uint16_t duration2, int bank)
 {
 	if (!s.new_frame) {
 		gb->cpu.a = s.value;
@@ -316,11 +319,23 @@ void anim_regs(GB *gb, const AnimStep &s, uint16_t offset, uint16_t duration, ui
 		return;
 	}
 	SET_HL(gb, duration2);
-	gb->cpu.a = wl3::Memory(gb)[s.entry];
+	gb->cpu.a = bank < 0 ? wl3::RomPtr::mapped(gb, s.entry)[0] : wl3::RomPtr(gb, static_cast<uint8_t>(bank), s.entry)[0];
 	gb->cpu.f = flags::add(s.value, 2);
 }
 
 } // namespace
+
+namespace wl3::home {
+
+void update_wario_animation_regs(GB *gb, int bank)
+{
+	wl3::Memory mem(gb);
+	gb->cpu.d = mem[wWarioFramesetPtr + 0];
+	gb->cpu.e = mem[wWarioFramesetPtr + 1];
+	anim_regs(gb, update_wario_animation(gb, bank), wAnimationFrame, wFrameDuration, wFrameDuration, bank);
+}
+
+} // namespace wl3::home
 
 PORT_EX(LoadSprite, 0, 0)
 {
@@ -359,15 +374,12 @@ PORT_EX(UpdateObjAnim, 0, 0)
 	gb->cpu.e = mem[hl];
 	gb->cpu.d = mem[static_cast<uint16_t>(hl - 1)];
 	AnimBytes at = obj_anim_bytes(gb, hl);
-	anim_regs(gb, update_obj_anim(gb, hl), at.offset, at.duration, at.duration2);
+	anim_regs(gb, update_obj_anim(gb, hl), at.offset, at.duration, at.duration2, -1);
 }
 
 PORT_EX(UpdateWarioAnimation, 0, 0)
 {
-	wl3::Memory mem(gb);
-	gb->cpu.d = mem[wWarioFramesetPtr + 0];
-	gb->cpu.e = mem[wWarioFramesetPtr + 1];
-	anim_regs(gb, update_wario_animation(gb), wAnimationFrame, wFrameDuration, wFrameDuration);
+	wl3::home::update_wario_animation_regs(gb, -1);
 }
 
 PORT_EX(Func_e31, 0, 0)
