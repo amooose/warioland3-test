@@ -35,33 +35,54 @@ uint8_t copy(GB *gb, uint16_t src, uint16_t dest, uint32_t count)
 	return last;
 }
 
+uint8_t copy(GB *gb, RomPtr src, uint16_t dest, uint32_t count)
+{
+	Memory mem(gb);
+	uint8_t last = 0;
+	while (count--) {
+		mem[dest++] = last = *src;
+		++src;
+	}
+	return last;
+}
+
 void far_copy(GB *gb, uint16_t src, uint16_t dest, uint32_t count)
 {
 	Memory mem(gb);
 	uint8_t bank = mem.rom_bank();
 	bankswitch(gb, mem.temp_bank(), ADDR_FarCopyHLToDE_BC2);
-	copy(gb, src, dest, count);
+	copy(gb, RomPtr(gb, mem.temp_bank(), src), dest, count);
 	bankswitch(gb, bank, ADDR_FarCopyHLToDE_BC2);
 }
 
 DecompressEnd decompress(GB *gb, uint16_t src, uint16_t dest)
 {
+	return decompress(gb, RomPtr::mapped(gb, src), dest);
+}
+
+DecompressEnd decompress(GB *gb, RomPtr src, uint16_t dest)
+{
 	Memory mem(gb);
 	DecompressEnd end = {0, 0, false, -1};
-	while (uint8_t cmd = mem[src++]) {
+	auto next = [&] {
+		uint8_t v = *src;
+		++src;
+		return v;
+	};
+	while (uint8_t cmd = next()) {
 		if (cmd & 0x80) {
 			int n = (cmd & 0x7f) ? (cmd & 0x7f) : 256;
 			while (n--)
-				mem[dest++] = mem[src++];
+				mem[dest++] = next();
 		} else {
-			uint8_t value = mem[src++];
+			uint8_t value = next();
 			while (cmd--)
 				mem[dest++] = value;
 			end.last_fill = value;
 		}
 		end.any = true;
 	}
-	end.src = src;
+	end.src = src.addr();
 	end.dest = dest;
 	return end;
 }
@@ -71,7 +92,7 @@ DecompressEnd far_decompress(GB *gb, uint16_t src, uint16_t dest)
 	Memory mem(gb);
 	uint8_t bank = mem.rom_bank();
 	bankswitch(gb, mem.temp_bank(), ADDR_FarDecompress);
-	DecompressEnd end = decompress(gb, src, dest);
+	DecompressEnd end = decompress(gb, RomPtr(gb, mem.temp_bank(), src), dest);
 	bankswitch(gb, bank, ADDR_FarDecompress);
 	return end;
 }

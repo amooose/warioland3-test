@@ -59,7 +59,7 @@ void TreasureCollection::set_scene_obj_state(uint16_t state, uint8_t value)
 void TreasureCollection::decompress(uint8_t bank, uint16_t src, uint16_t dest)
 {
 	wram_.temp_bank() = bank;
-	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, src, dest); });
+	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, RomPtr(gb_, bank, src), dest); });
 }
 
 void TreasureCollection::init()

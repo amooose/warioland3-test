@@ -48,7 +48,7 @@ private:
 		mem_.temp_bank() = bank;
 		uint8_t rom = mem_.rom_bank();
 		switch_bank(bank);
-		copy(gb_, src, dest, count);
+		copy(gb_, RomPtr(gb_, bank, src), dest, count);
 		switch_bank(rom);
 	}
 	void switch_bank(uint8_t bank) { bankswitch(gb_, bank, gb_->cpu.pc); }
@@ -83,7 +83,7 @@ void RoomLoader::load_tile_map()
 	uint16_t src = pointer(ADDR_RoomBlockAttributePointers, mem_.room_tile_map());
 	uint8_t bank = mem_.unk_c0d0();
 	mem_.temp_bank() = bank;
-	farcall(gb_, bank, ADDR_Decompress, [&] { decompress(gb_, src, wRoomBlockAttributes); });
+	farcall(gb_, bank, ADDR_Decompress, [&] { decompress(gb_, RomPtr(gb_, bank, src), wRoomBlockAttributes); });
 }
 
 void RoomLoader::load_main_tiles()

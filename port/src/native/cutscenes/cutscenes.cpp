@@ -51,7 +51,7 @@ void Cutscenes::init()
 	if (wram_.cur_event() != EVENT_PROLOGUE) { // decompress_tiles1
 		mem_[rVBK] = 1;
 		wram_.temp_bank() = BANK_Cutscenes6Gfx;
-		routines_.in_bank(BANK_Cutscenes6Gfx, ADDR_Decompress, [&] { home::decompress(gb_, ADDR_Cutscenes6Gfx, v1Tiles0); });
+		routines_.in_bank(BANK_Cutscenes6Gfx, ADDR_Decompress, [&] { home::decompress(gb_, ROM(gb_, Cutscenes6Gfx), v1Tiles0); });
 		mem_[rVBK] = 0;
 	}
 	uint8_t event = wram_.cur_event();
@@ -322,7 +322,7 @@ void Cutscenes::decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vram1
 	if (vram1)
 		mem_[rVBK] = 1;
 	wram_.temp_bank() = bank;
-	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, src, dest); });
+	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, RomPtr(gb_, bank, src), dest); });
 	if (vram1)
 		mem_[rVBK] = 0;
 }

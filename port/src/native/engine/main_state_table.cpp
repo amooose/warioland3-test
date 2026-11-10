@@ -10,8 +10,7 @@ void run_main_state(GB *gb)
 {
 	Memory mem(gb);
 	// rst JumpTable over the table after it (add a, a: the index wraps at $80)
-	uint16_t entry = static_cast<uint16_t>(ADDR_MainStateTable + 4 + static_cast<uint8_t>(mem.state() * 2));
-	uint16_t target = static_cast<uint16_t>(mem[entry] | mem[static_cast<uint16_t>(entry + 1)] << 8);
+	uint16_t target = (ROM(gb, MainStateTable) + 4).word(static_cast<uint8_t>(mem.state() * 2));
 	Routines(gb).call(target);
 }
 

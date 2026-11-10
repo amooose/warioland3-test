@@ -26,7 +26,7 @@ void TempleScene::decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vra
 	if (vram1)
 		mem_[rVBK] = 1;
 	wram_.temp_bank() = bank;
-	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, src, dest); });
+	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, RomPtr(gb_, bank, src), dest); });
 	if (vram1)
 		mem_[rVBK] = 0;
 }

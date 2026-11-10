@@ -571,7 +571,7 @@ void Overworld::decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vram1
 	if (vram1)
 		set_vram1(true);
 	wram_.temp_bank() = bank;
-	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, src, dest); });
+	routines_.in_bank(bank, ADDR_Decompress, [&] { home::decompress(gb_, RomPtr(gb_, bank, src), dest); });
 	if (vram1)
 		set_vram1(false);
 }

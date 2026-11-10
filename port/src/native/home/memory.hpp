@@ -11,6 +11,8 @@ namespace wl3::home {
 void fill(GB *gb, uint16_t dest, uint8_t value, uint32_t count); // WriteAToHL_BCTimes
 // CopyHLToDE_BC; returns the last byte copied
 uint8_t copy(GB *gb, uint16_t src, uint16_t dest, uint32_t count);
+// the same from the ROM (src stepping on in its bank)
+uint8_t copy(GB *gb, RomPtr src, uint16_t dest, uint32_t count);
 // FarCopyHLToDE_BC(2): from the ROM bank in wTempBank
 void far_copy(GB *gb, uint16_t src, uint16_t dest, uint32_t count);
 
@@ -22,7 +24,8 @@ struct DecompressEnd {
 	bool any;      // a command ran (the asm leaves d = 0)
 	int last_fill; // the last run's byte (the asm leaves it in e), or -1
 };
-DecompressEnd decompress(GB *gb, uint16_t src, uint16_t dest);
+DecompressEnd decompress(GB *gb, uint16_t src, uint16_t dest); // from the bank mapped
+DecompressEnd decompress(GB *gb, RomPtr src, uint16_t dest);
 DecompressEnd far_decompress(GB *gb, uint16_t src, uint16_t dest); // FarDecompress: wTempBank
 
 void clear_virtual_oam(GB *gb); // ClearVirtualOAM

@@ -715,7 +715,7 @@ void Engine::do_audio_commands(uint16_t cmd)
 // JumpToPointerInTable into one of the command tables
 bool Engine::run_command(uint16_t table, uint8_t index, uint16_t &cmd)
 {
-	return command_by_address(mem_.word(static_cast<uint16_t>(table + static_cast<uint8_t>(index << 1))), cmd);
+	return command_by_address(RomPtr(gb_, AUDIO_ENGINE_BANK, table).word(static_cast<uint8_t>(index << 1)), cmd);
 }
 
 bool Engine::command_by_address(uint16_t handler, uint16_t &cmd)
