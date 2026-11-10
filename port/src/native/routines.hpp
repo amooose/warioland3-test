@@ -133,7 +133,7 @@ public:
 
 	void load_golf_sprite(uint16_t sprite)
 	{
-		home::load_golf_sprite(gb_, sprite);
+		home::load_golf_sprite(gb_, sprite, BANK_OAM_1ca6cf); // the golf objects' tables' bank
 	}
 
 	void update_golf_wario_animation() { home::update_golf_wario_animation(gb_); }

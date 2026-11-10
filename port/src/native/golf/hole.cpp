@@ -1278,7 +1278,7 @@ void GolfHole::load_wario_state_gfx()
 
 void GolfHole::copy_vblank_func(uint16_t func, uint8_t length)
 {
-	routines_.copy(func, wVBlankFunc, length);
+	home::copy(gb_, RomPtr(gb_, BANK_VBlank_1c9d1d, func), wVBlankFunc, length ? length : 0x100); // all in golf's bank
 }
 
 // for the V-Blank functions that DMA an attribute map
@@ -1305,7 +1305,7 @@ void GolfHole::set_hole_vblank()
 		// the waving pin flag, 4 frames of 8
 		uint8_t counter = wram_.unk_1dc0b();
 		uint8_t frame = counter >= 0x18 ? 0x0c : counter >= 0x10 ? 0x08 : counter >= 0x08 ? 0x04 : 0x00;
-		routines_.copy(static_cast<uint16_t>(ADDR_GolfPinFlagGfx + frame * 16), wGolfPinFlagTiles, 4 * 16);
+		home::copy(gb_, ROM(gb_, GolfPinFlagGfx) + frame * 16, wGolfPinFlagTiles, 4 * 16);
 		wram_.unk_1dc0b() = static_cast<uint8_t>((wram_.unk_1dc0b() + 1) & 0x1f);
 		copy_vblank_func(ADDR_VBlank_1c9d1d + 0x0e, 0x2f);
 		break;

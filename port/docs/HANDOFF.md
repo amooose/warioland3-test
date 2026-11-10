@@ -121,6 +121,13 @@ scripting and expansion on top. The approach:
   help's). First report (2026-11-10): 1,932 labels, nearly all data read
   through a few generic readers: sprite tables (OAM_*), animated tiles,
   framesets, the audio engine's tables, block maps.
+  Converted since: the audio engine, animated tiles, menu and level object
+  sprites, decompress / copy / far copies, the state table, the block map
+  decompressors, golf, the OW common animations: 1,203 labels left
+  (2026-11-10). Under test RomPtr reads through the memory map as the asm
+  does, and marks the check unrealistic if its bank isn't the one mapped:
+  fuzzed copies can run into the MBC's registers and remap mid-routine
+  (a389464 failed the fuzz tier on that; fixed in the next commit).
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`.
 - **Progress (2026-10-31):** 3497 / 3497 routines are ported. While the
   port plays the recordings, the interpreter runs no instructions at all

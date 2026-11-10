@@ -51,8 +51,13 @@ void decompress_level_map(GB *gb, bool objmap, uint16_t routine)
 	uint8_t rom = mem.rom_bank();
 	rom_switch(gb, mem.temp_bank(), routine);
 
-	uint16_t src = static_cast<uint16_t>(mem[wCompressedLevelBlockMapPtr + 0] << 8
-		| mem[wCompressedLevelBlockMapPtr + 1]);
+	RomPtr src(gb, mem.temp_bank(), static_cast<uint16_t>(mem[wCompressedLevelBlockMapPtr + 0] << 8
+		| mem[wCompressedLevelBlockMapPtr + 1]));
+	auto next = [&] {
+		uint8_t v = *src;
+		++src;
+		return v;
+	};
 	uint8_t row_end = objmap ? (LEVEL_WIDTH >> 1) + 0xb0 - 1 : LEVEL_WIDTH;
 	uint8_t row_start = objmap ? 0xb0 : 0x00;
 	uint16_t dest = static_cast<uint16_t>(sLevelBlockObjectMap + row_start);
@@ -72,13 +77,13 @@ void decompress_level_map(GB *gb, bool objmap, uint16_t routine)
 			dest++;
 		}
 	};
-	while (uint8_t cmd = mem[src++]) {
+	while (uint8_t cmd = next()) {
 		if (cmd & 0x80) {
 			int n = (cmd & 0x7f) ? (cmd & 0x7f) : 256;
 			while (n--)
-				put(mem[src++]);
+				put(next());
 		} else {
-			mem.repeat_byte() = mem[src++];
+			mem.repeat_byte() = next();
 			while (cmd--)
 				put(mem.repeat_byte());
 		}

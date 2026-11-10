@@ -70,7 +70,7 @@ void update_golf_wario_animation(GB *gb)
 
 	bank = mem.rom_bank();
 	routines.switch_bank(mem.temp_bank());
-	load_golf_sprite(gb, wGolfWarioSprite);
+	load_golf_sprite(gb, wGolfWarioSprite, mem.temp_bank());
 	routines.switch_bank(bank);
 }
 

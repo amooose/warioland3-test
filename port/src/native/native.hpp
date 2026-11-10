@@ -146,6 +146,14 @@ private:
 	{
 		if (addr >= 0x8000) // a table copied to RAM
 			return gb_read(gb_, addr);
+		// Checked against the asm, which reads the bank mapped: the same bank
+		// unless garbage input remapped it mid-routine (a copy running into
+		// the MBC's registers), which play never does
+		if (gb_->test.active) {
+			if (addr >= 0x4000 && gb_->rom_bank % gb_->rom_banks != bank_ % gb_->rom_banks)
+				gb_->test.unrealistic = true;
+			return gb_read(gb_, addr);
+		}
 		size_t off = addr < 0x4000 ? addr : static_cast<size_t>(bank_ % gb_->rom_banks) * 0x4000 + (addr - 0x4000);
 		if (mapped_ && gb_->romx_reads && addr >= 0x4000) {
 			gb_->romx_reads[off]++;

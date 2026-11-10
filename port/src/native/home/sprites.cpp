@@ -198,14 +198,14 @@ bool update_golf_object_animation(GB *gb, uint16_t frameset, uint16_t duration, 
 	return false;
 }
 
-SpriteEnd load_golf_sprite(GB *gb, uint16_t obj)
+SpriteEnd load_golf_sprite(GB *gb, uint16_t obj, uint8_t bank)
 {
 	Memory mem(gb);
 	mem.cur_sprite_y_coord() = mem[obj];
 	mem.cur_sprite_x_coord() = mem[static_cast<uint16_t>(obj + 1)];
 	mem.cur_sprite_frame() = mem[static_cast<uint16_t>(obj + 2)];
 	mem.cur_sprite_attributes() = mem[static_cast<uint16_t>(obj + 3)];
-	return load_sprite(gb, static_cast<uint16_t>(mem[wGolfOAMPtr + 0] << 8 | mem[wGolfOAMPtr + 1]));
+	return load_sprite(gb, RomPtr(gb, bank, static_cast<uint16_t>(mem[wGolfOAMPtr + 0] << 8 | mem[wGolfOAMPtr + 1])));
 }
 
 void load_wario_gfx(GB *gb)
@@ -485,5 +485,5 @@ PORT_EX(UpdateGolfObjectAnimation, 0, 0)
 // hl = the golf object's sprite
 PORT_EX(LoadGolfSprite, 0, 0)
 {
-	set_sprite_regs(gb, load_golf_sprite(gb, REG_HL(gb)));
+	set_sprite_regs(gb, load_golf_sprite(gb, REG_HL(gb), static_cast<uint8_t>(gb->rom_bank))); // the bank mapped
 }

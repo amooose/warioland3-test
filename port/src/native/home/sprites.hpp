@@ -62,7 +62,7 @@ void load_wario_gfx(GB *gb);
 bool update_golf_object_animation(GB *gb, uint16_t frameset, uint16_t duration, uint8_t *new_duration = nullptr);
 // LoadGolfSprite: the golf object's 4 bytes at obj (y, x, frame,
 // attributes, as OAM takes them), from the OAM data at wGolfOAMPtr
-SpriteEnd load_golf_sprite(GB *gb, uint16_t obj);
+SpriteEnd load_golf_sprite(GB *gb, uint16_t obj, uint8_t bank); // wGolfOAMPtr's table, in bank
 // Func_2c30: starts the VDMA from src to wdc11, of w1dc13's length
 void start_golf_vdma(GB *gb, uint16_t src);
 // Func_2c46: 4 BG palettes from src to rBGPD

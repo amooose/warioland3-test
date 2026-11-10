@@ -7,6 +7,12 @@ namespace wl3::overworld {
 
 namespace {
 
+// the common animations' graphics, all in one bank
+void copy_gfx(Memory mem, uint16_t src, uint16_t dest, uint32_t count)
+{
+	home::copy(mem.gb(), RomPtr(mem.gb(), BANK_OverworldClouds1Gfx, src), dest, count);
+}
+
 constexpr uint16_t CLOUD_TILES = wTilemap + 0x24 * TILE_SIZE;
 constexpr uint16_t SEA_TILES = wTilemap + 0x2c * TILE_SIZE;
 
@@ -38,7 +44,7 @@ bool CommonAnimations::tick(uint16_t addr)
 void CommonAnimations::copy_tiles(uint16_t src, uint16_t dest, uint8_t dest_offset, int bit)
 {
 	uint16_t to = static_cast<uint16_t>((dest & 0xff00) | static_cast<uint8_t>(dest + dest_offset));
-	routines_.copy(src, to, 2 * TILE_SIZE);
+	copy_gfx(mem_, src, to, 2 * TILE_SIZE);
 	wram_.unk_2d031().set_bit(bit);
 }
 
@@ -108,10 +114,10 @@ void CommonAnimations::load_gfx()
 {
 	mem_[rVBK] = 1;
 	uint16_t clouds = static_cast<uint16_t>(ADDR_OverworldClouds1Gfx + wram_.cloud_type() * 0x200);
-	routines_.copy(clouds, v1Tiles2 + 0x70 * TILE_SIZE, 8 * TILE_SIZE);
-	routines_.copy(ADDR_OverworldSeaGfx, v1Tiles2 + 0x78 * TILE_SIZE, 4 * TILE_SIZE);
-	routines_.copy(clouds, CLOUD_TILES, 8 * TILE_SIZE);
-	routines_.copy(ADDR_OverworldSeaGfx, SEA_TILES, 4 * TILE_SIZE);
+	copy_gfx(mem_, clouds, v1Tiles2 + 0x70 * TILE_SIZE, 8 * TILE_SIZE);
+	copy_gfx(mem_, ADDR_OverworldSeaGfx, v1Tiles2 + 0x78 * TILE_SIZE, 4 * TILE_SIZE);
+	copy_gfx(mem_, clouds, CLOUD_TILES, 8 * TILE_SIZE);
+	copy_gfx(mem_, ADDR_OverworldSeaGfx, SEA_TILES, 4 * TILE_SIZE);
 	mem_[rVBK] = 0;
 }
 

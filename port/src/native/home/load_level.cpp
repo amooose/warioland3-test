@@ -21,7 +21,7 @@ public:
 	void load(); // LoadLevelBlockMapAndObjects
 	void reload_objects(); // ReloadLevelObjects
 	void reload_objects_bits(); // .DecompressLevelBlockMap_OnlyHighBit
-	void or_objects_bits(uint16_t src); // .Decompress
+	void or_objects_bits(RomPtr src); // .Decompress
 
 private:
 	void sram_switch(uint8_t bank)
@@ -111,13 +111,13 @@ void LevelLoader::reload_objects_bits()
 	sram_switch(BANK_sLevelBlockObjectMap); // BANK("SRAM1")
 	uint8_t rom = mem_.rom_bank();
 	rom_switch(mem_.temp_bank());
-	or_objects_bits(static_cast<uint16_t>(mem_[wCompressedLevelBlockMapPtr + 0] << 8
-		| mem_[wCompressedLevelBlockMapPtr + 1]));
+	or_objects_bits(RomPtr(gb_, mem_.temp_bank(), static_cast<uint16_t>(mem_[wCompressedLevelBlockMapPtr + 0] << 8
+		| mem_[wCompressedLevelBlockMapPtr + 1])));
 	rom_switch(rom);
 	sram_switch(sram);
 }
 
-void LevelLoader::or_objects_bits(uint16_t src)
+void LevelLoader::or_objects_bits(RomPtr src)
 {
 	uint16_t map = sLevelBlockObjectMap;
 	auto put = [&](uint8_t bit) {
@@ -131,17 +131,20 @@ void LevelLoader::or_objects_bits(uint16_t src)
 			sram_switch(static_cast<uint8_t>(mem_.sram_bank() + 1));
 		}
 	};
-	while (uint8_t cmd = mem_[src]) {
+	while (uint8_t cmd = *src) {
 		if (!(cmd & 0x80)) {
-			src++;
-			mem_.repeat_byte() = mem_[src++] & 0x80;
+			++src;
+			mem_.repeat_byte() = *src & 0x80;
+			++src;
 			while (cmd--)
 				put(mem_.repeat_byte());
 		} else {
 			int n = (cmd & 0x7f) ? (cmd & 0x7f) : 256;
-			src++;
-			while (n--)
-				put(mem_[src++] & 0x80);
+			++src;
+			while (n--) {
+				put(*src & 0x80);
+				++src;
+			}
 		}
 	}
 }
@@ -160,4 +163,4 @@ PORT_LOCAL_EX(ReloadLevelObjects, DecompressLevelBlockMap_OnlyHighBit, 0, ALL_RE
 	LevelLoader(gb).reload_objects_bits();
 }
 // de = the compressed data
-PORT_LOCAL_EX(ReloadLevelObjects, Decompress, 0, ALL_REGISTERS) { LevelLoader(gb).or_objects_bits(REG_DE(gb)); }
+PORT_LOCAL_EX(ReloadLevelObjects, Decompress, 0, ALL_REGISTERS) { LevelLoader(gb).or_objects_bits(wl3::RomPtr::mapped(gb, REG_DE(gb))); }
