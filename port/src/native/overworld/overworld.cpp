@@ -621,7 +621,7 @@ void Overworld::load_pals_for_scene()
 {
 	wram_.ow_exit_unlocked() = 0;
 	if (wram_.ow_scene_action() == UNLOCK_LEVEL) {
-		uint16_t side = mem_.word(static_cast<uint16_t>(ADDR_UnlockableConnections + wram_.ow_scene_map_side() * 2));
+		uint16_t side = ROM(gb_, UnlockableConnections).word(wram_.ow_scene_map_side() * 2);
 		uint8_t action = mem_[wOWSceneMapSide + 1]; // wOWSceneActionParam
 		if (mem_[static_cast<uint16_t>(side + action * 2)] >= OW_EXITS)
 			wram_.ow_exit_unlocked() = TRUE;

@@ -3,6 +3,9 @@
 
 namespace wl3::overworld {
 
+// the module's ROM data, all in its bank ($21) (RAM through the memory map)
+#define OW_ROM(addr) RomPtr(gb_, BANK_OWPals, static_cast<uint16_t>(addr))
+
 namespace {
 
 constexpr uint8_t FADE_BASE = 0, FADE_TARGET = 1, FADE_SIGN = 2, FADE_DIFF = 3,
@@ -142,7 +145,7 @@ bool Palettes::fade_in_level_name()
 		if (mem_.unk_2d0e4())
 			routines_.copy(ROM(gb_, Pals_852dd) + COLOR_SIZE, wTempPals1 + 7 * PAL_SIZE + COLOR_SIZE, 6);
 		else
-			routines_.copy((mem_.unk_2d011() ? ADDR_Pals_840c0 : ADDR_Pals_84000) + 7 * PAL_SIZE,
+			routines_.copy(OW_ROM((mem_.unk_2d011() ? ADDR_Pals_840c0 : ADDR_Pals_84000) + 7 * PAL_SIZE),
 				wTempPals1 + 7 * PAL_SIZE, PAL_SIZE);
 		config(wPalConfig1, wTempBGPals + 7 * PAL_SIZE, OBPI_AUTOINC | (7 * PAL_SIZE), 1);
 		++wram_.pal_config1_total_steps();
@@ -315,8 +318,8 @@ void Palettes::to_fade_structs(uint16_t src, uint16_t dest)
 	Byte count = mem_.unk_2d807();
 	count = FADE_COLOURS;
 	do {
-		uint8_t lo = mem_[src++];
-		uint8_t hi = mem_[src++];
+		uint8_t lo = OW_ROM(src++)[0]; // ROM palettes or wTempPals1
+		uint8_t hi = OW_ROM(src++)[0];
 		mem_[dest] = lo & 0x1f;
 		dest += FADE_LENGTH;
 		mem_[dest] = static_cast<uint8_t>(((hi << 8 | lo) >> 5) & 0x1f);
@@ -403,12 +406,12 @@ uint16_t Palettes::ow_pals(uint8_t which)
 void Palettes::load_base_and_target(uint8_t which)
 {
 	uint16_t entry = ow_pals(which);
-	uint16_t base = mem_.word(entry);
-	uint16_t target = mem_.word(static_cast<uint16_t>(entry + 2));
+	uint16_t base = OW_ROM(entry).word();
+	uint16_t target = OW_ROM(entry).word(2);
 	to_fade_structs(target, wFadePals + FADE_TARGET);
 	to_fade_structs(base, wFadePals + FADE_BASE);
 	init_fade_structs();
-	routines_.copy(base, wTempBGPals, 8 * PAL_SIZE);
+	routines_.copy(OW_ROM(base), wTempBGPals, 8 * PAL_SIZE);
 	mem_.day_night_transistion_steps() = TRANSITION_STEPS;
 	mem_.unk_2d809() = 0;
 }
@@ -428,7 +431,7 @@ void Palettes::transition_vblank()
 void Palettes::start_transition()
 {
 	transition_vblank();
-	routines_.copy(mem_.word(ow_pals(3)), wTempPals1, 8 * PAL_SIZE);
+	routines_.copy(OW_ROM(OW_ROM(ow_pals(3)).word()), wTempPals1, 8 * PAL_SIZE);
 	load_base_and_target(0);
 	next_transition();
 }
@@ -654,7 +657,7 @@ void Palettes::load_grey()
 		if (!collected(BLUE_BOOK) || !collected(MAGIC_WAND))
 			entry += 2;
 	}
-	routines_.copy(mem_.word(entry), wTempPals1, 8 * PAL_SIZE);
+	routines_.copy(OW_ROM(OW_ROM(entry).word()), wTempPals1, 8 * PAL_SIZE);
 	for (uint16_t i = 0; i < 6; i++)
 		mem_[wTempPals1 + 7 * PAL_SIZE + COLOR_SIZE + i] = 0;
 }

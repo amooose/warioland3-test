@@ -12,7 +12,7 @@ namespace wl3::overworld {
 uint16_t map_level_coords(GB *gb, uint8_t level)
 {
 	Memory mem(gb);
-	uint16_t side = mem.word(static_cast<uint16_t>(ADDR_MapLevelCoords + mem.cur_map_side() * 2));
+	uint16_t side = ROM(mem.gb(), MapLevelCoords).word(mem.cur_map_side() * 2);
 	return static_cast<uint16_t>(side + static_cast<uint8_t>(level * 2) * 2);
 }
 

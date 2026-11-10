@@ -233,7 +233,7 @@ void SaveScreen::draw_box(uint16_t attrmap, uint16_t tilemap)
 // wVBlankFunc
 void SaveScreen::set_vblank_func(uint16_t func, uint8_t size)
 {
-	routines_.copy(func, wVBlankFunc, size);
+	routines_.copy(RomPtr(gb_, BANK_VBlank_SaveScreen, func), wVBlankFunc, size); // both in its bank
 }
 
 // The game's progress, in SRAM and its backup, each with its checksum.

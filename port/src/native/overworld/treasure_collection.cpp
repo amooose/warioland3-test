@@ -321,7 +321,7 @@ void TreasureCollection::process_link_state()
 			advance_link_state();
 		break;
 	case 2: { // the linked cells
-		uint16_t page = mem_.word(static_cast<uint16_t>(ADDR_CollectionLinkTable + wram_.collection_page() * 2));
+		uint16_t page = ROM(gb_, CollectionLinkTable).word(wram_.collection_page() * 2);
 		uint16_t links = mem_.word(static_cast<uint16_t>(page + wram_.collection_cell() * 2));
 		if (mem_[links] == NO_LINK) {
 			advance_link_state();

@@ -105,7 +105,7 @@ void ActionHelp::init()
 		uint8_t level = wram_.power_up_level() & POWER_UP_MASK;
 		colour_slot(level, 0x03);
 		if (level >= power_up)
-			colour_slot(power_up, mem_[ADDR_PowerUpOBPals + power_up]);
+			colour_slot(power_up, ROM(gb_, PowerUpOBPals)[power_up]);
 	}
 
 	ram(rVBK) = 0;
@@ -262,7 +262,7 @@ void ActionHelp::select_power_up()
 	}
 	uint8_t picked = power_up;
 	if (level >= picked) {
-		uint8_t pals = mem_[ADDR_PowerUpOBPals + picked];
+		uint8_t pals = ROM(gb_, PowerUpOBPals)[picked];
 		routines_.call(ADDR_WaitNextHBlank);
 		colour_slot(picked, pals);
 	}

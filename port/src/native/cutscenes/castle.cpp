@@ -22,7 +22,7 @@ void Cutscenes::reveal_castle()
 	// .asm_9d302: BG palette 2 from pals
 	auto set_pal2 = [&](uint16_t pals) {
 		constexpr uint16_t PAL2 = wTempPals1 + 2 * PAL_SIZE;
-		routines_.copy(pals, PAL2, PAL_SIZE);
+		routines_.copy(RomPtr(gb_, BANK_Pals_9fc8b, pals), PAL2, PAL_SIZE); // all three in one bank
 		wram_.pal_config1_source_hi() = PAL2 >> 8;
 		wram_.pal_config1_source_lo() = PAL2 & 0xff;
 		wram_.pal_config1_index() = BGPI_AUTOINC | 2 * PAL_SIZE;

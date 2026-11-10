@@ -456,7 +456,7 @@ void Engine::execute_audio_mod_internal(uint8_t mod, uint8_t b, uint8_t c, uint8
 	wram_.sound_engine_param4() = d;
 	wram_.num_channels() = 0;
 
-	switch (mem_.word(static_cast<uint16_t>(ADDR_AudioModFunctionTable + mod * 2))) {
+	switch (ROM(gb_, AudioModFunctionTable).word(mod * 2)) {
 	case ADDR_AudioMod_Tempo:
 		if (wram_.sound_engine_param4()) {
 			wram_.sfx_tempo_mult() = wram_.sound_engine_param2();

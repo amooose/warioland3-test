@@ -100,7 +100,7 @@ void check_if_event_has_cutscene(GB *gb)
 	Memory mem(gb);
 	uint8_t event = mem.cur_event();
 	mem.event_with_cutscene() = 0;
-	uint16_t init = mem.word(static_cast<uint16_t>(ADDR_CutsceneInitFunctions + event * 2));
+	uint16_t init = ROM(mem.gb(), CutsceneInitFunctions).word(event * 2);
 	if (init != ADDR_NoInitCutscene)
 		mem.event_with_cutscene() = event;
 }

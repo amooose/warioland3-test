@@ -69,7 +69,7 @@ void Octohon::step(bool right)
 	uint8_t speed = ROM(gb_, Data_4a5a9)[index];
 	if (speed == 0x80) {
 		index = 0;
-		speed = mem_[ADDR_Data_4a5a9];
+		speed = ROM(gb_, Data_4a5a9)[0];
 	}
 	++index;
 	x() = static_cast<uint16_t>(right ? x() + speed : x() - speed);

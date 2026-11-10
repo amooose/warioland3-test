@@ -62,7 +62,7 @@ void Cutscenes::init()
 		unrealistic();
 		return;
 	}
-	uint16_t target = mem_.word(static_cast<uint16_t>(ADDR_CutsceneInitFunctions + event * 2));
+	uint16_t target = ROM(gb_, CutsceneInitFunctions).word(event * 2);
 	call_c(ADDR_CutsceneInitFunctions, event, target);
 }
 

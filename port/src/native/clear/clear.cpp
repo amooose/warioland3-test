@@ -99,19 +99,19 @@ void ClearScreen::draw_wario()
 
 void ClearScreen::update_object(MenuObject obj)
 {
-	obj.animate();
+	obj.animate_in(BANK__ClearScreenStateTable);
 	draw(obj);
 }
 
 void ClearScreen::animate_wario(Byte played, uint16_t next_frameset)
 {
 	MenuObject w = wario();
-	w.animate();
+	w.animate_in(BANK__ClearScreenStateTable);
 	if (played || !wram_.obj_anim_was_reset())
 		return;
 	played = TRUE;
 	w.set_frameset(next_frameset);
-	w.animate();
+	w.animate_in(BANK__ClearScreenStateTable);
 }
 
 void ClearScreen::stop_sfx()
@@ -122,7 +122,7 @@ void ClearScreen::stop_sfx()
 
 void ClearScreen::copy_vblank(uint16_t func, uint8_t size)
 {
-	routines_.copy(func, wVBlankFunc, size);
+	routines_.copy(RomPtr(gb_, BANK_VBlank_ClearScreen, func), wVBlankFunc, size); // both screens' functions in its bank
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ void ClearScreen::init()
 
 	if (wram_.power_up_level() & ACTION_HELP_LEVEL_CLEAR)
 		update_object(object(wMenuObj8));
-	wario().animate();
+	wario().animate_in(BANK__ClearScreenStateTable);
 	draw_wario();
 	if (wram_.level_end_screen() != LVLEND_NO_TREASURE)
 		update_object(object(wMenuObj1));
@@ -374,7 +374,7 @@ void ClearScreen::init_time_attack()
 
 	if (wram_.time_attack_result() == TIME_ATTACK_GOT_HIGH_SCORE)
 		update_object(object(wMenuObj8));
-	wario().animate();
+	wario().animate_in(BANK__ClearScreenStateTable);
 	draw_wario();
 	update_object(object(wMenuObj2));
 	update_object(object(wMenuObj3));
@@ -548,7 +548,7 @@ void ClearScreen::count_coins()
 	play_sfx(mem_, SFX_03A);
 	MenuObject pencil = object(wMenuObj1);
 	pencil.init(0x42, 0x60, ADDR_Frameset_d65f0);
-	pencil.animate();
+	pencil.animate_in(BANK__ClearScreenStateTable);
 	++wram_.sub_state();
 }
 
