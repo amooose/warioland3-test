@@ -46,7 +46,7 @@ constexpr uint8_t INVISIBLE = 15; // .Invisible
 
 class Hand : public Object {
 public:
-	using Object::Object;
+	explicit Hand(GB *gb) : Object(gb, BANK_HandFunc) {}
 
 	void init(); // HandFunc
 	void update(); // .Update

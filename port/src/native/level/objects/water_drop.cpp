@@ -15,7 +15,7 @@ constexpr uint8_t RISING = 0x5b;
 
 class WaterDrop : public Object {
 public:
-	using Object::Object;
+	explicit WaterDrop(GB *gb) : Object(gb, BANK_WaterDropFunc) {}
 
 	void init(); // WaterDropFunc
 	void update(); // .Func_49d83

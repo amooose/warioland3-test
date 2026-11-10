@@ -25,7 +25,7 @@ enum : uint8_t {
 
 class Webber : public Object {
 public:
-	using Object::Object;
+	explicit Webber(GB *gb) : Object(gb, BANK_WebberFunc) {}
 
 	void init(); // WebberFunc
 	void update(); // .Update

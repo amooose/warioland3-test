@@ -133,7 +133,7 @@ constexpr uint8_t NUM_GK_PHASES = sizeof(GK_PHASES) / sizeof(GK_PHASES[0]);
 
 class Shoot : public Object {
 public:
-	using Object::Object;
+	explicit Shoot(GB *gb) : Object(gb, BANK_ShootFunc) {}
 
 	void start(); // ShootFunc
 	void start_wait(); // .StartWait
@@ -174,7 +174,7 @@ private:
 
 class GKTortoise : public Object {
 public:
-	using Object::Object;
+	explicit GKTortoise(GB *gb) : Object(gb, BANK_ShootFunc) {}
 
 	void start(); // GKTortoiseFunc
 	void main(); // .Main

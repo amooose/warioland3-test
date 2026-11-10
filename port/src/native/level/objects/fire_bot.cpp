@@ -72,7 +72,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class FireBot : public Object {
 public:
-	using Object::Object;
+	explicit FireBot(GB *gb) : Object(gb, BANK_FireBotFunc) {}
 
 	void start() { set_update(INIT); } // FireBotFunc
 	void init(); // .Init

@@ -46,7 +46,7 @@ uint16_t word_at(Memory mem, uint16_t addr) { return static_cast<uint16_t>(mem[a
 
 class YellowBelly : public Object {
 public:
-	using Object::Object;
+	explicit YellowBelly(GB *gb) : Object(gb, BANK_YellowBellyBodyFunc) {}
 
 	void start(); // YellowBellyBodyFunc
 	void fade(uint16_t then, uint16_t sfx, uint16_t pals); // .Func_5139d / .Func_513bf / .Func_513d9
@@ -74,7 +74,7 @@ private:
 
 class YellowBellyHelper : public Object {
 public:
-	using Object::Object;
+	explicit YellowBellyHelper(GB *gb) : Object(gb, BANK_YellowBellyBodyFunc) {}
 
 	void arrow(bool left); // YellowBellyArrowFunc / .Right
 	void arrow_flying(bool left); // .Func_51a7d / .Func_51ad9

@@ -68,7 +68,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class BeamBot : public Object {
 public:
-	using Object::Object;
+	explicit BeamBot(GB *gb) : Object(gb, BANK_BeamBotFunc) {}
 
 	void start() { set_update(INIT); } // BeamBotFunc
 	void init(); // .Init

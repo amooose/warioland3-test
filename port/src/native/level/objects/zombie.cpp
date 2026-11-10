@@ -24,7 +24,7 @@ enum : uint8_t {
 
 class Zombie : public Object {
 public:
-	using Object::Object;
+	explicit Zombie(GB *gb) : Object(gb, BANK_ZombieFunc) {}
 
 	void start(); // ZombieFunc
 	void init(); // .Init

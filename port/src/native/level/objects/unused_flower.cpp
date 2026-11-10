@@ -15,7 +15,7 @@ constexpr uint16_t DESTROY = ADDR_UnusedFlowerProjectileCommonFunc + 0x85; // .D
 
 class UnusedFlower : public Object {
 public:
-	using Object::Object;
+	explicit UnusedFlower(GB *gb) : Object(gb, BANK_UnusedFlowerFunc) {}
 
 	void init(); // UnusedFlowerFunc
 	void grow(); // .Grow

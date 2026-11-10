@@ -38,7 +38,7 @@ constexpr uint16_t SKULL_KNOCKED_LEFT = SK(0x113); // .Func_553a0
 
 class Jamano : public Object {
 public:
-	using Object::Object;
+	explicit Jamano(GB *gb) : Object(gb, BANK_JamanoFunc) {}
 
 	void start(); // JamanoFunc
 	void reveal(); // .Func_54d7d
@@ -65,7 +65,7 @@ private:
 
 class JamanoHat : public Object {
 public:
-	using Object::Object;
+	explicit JamanoHat(GB *gb) : Object(gb, BANK_JamanoFunc) {}
 
 	void start(); // JamanoHatFunc
 	void flying(); // .Func_55125
@@ -73,7 +73,7 @@ public:
 
 class HatPlatform : public Object {
 public:
-	using Object::Object;
+	explicit HatPlatform(GB *gb) : Object(gb, BANK_JamanoFunc) {}
 
 	void start(); // HatPlatformFunc
 	void update(); // .Func_55194
@@ -84,7 +84,7 @@ private:
 
 class Skull : public Object {
 public:
-	using Object::Object;
+	explicit Skull(GB *gb) : Object(gb, BANK_JamanoFunc) {}
 
 	void spawner_start(); // SkullSpawnerFunc
 	void spawner_update(); // .Func_5522c

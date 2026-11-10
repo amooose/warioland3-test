@@ -14,7 +14,7 @@ constexpr uint16_t GO_RIGHT = ADDR_ElectricLampSparkFunc + 0x66; // .GoRight
 
 class ElectricLamp : public Object {
 public:
-	using Object::Object;
+	explicit ElectricLamp(GB *gb) : Object(gb, BANK_ElectricLampFunc) {}
 
 	void init(); // ElectricLampFunc
 	void discharged(); // .Discharged

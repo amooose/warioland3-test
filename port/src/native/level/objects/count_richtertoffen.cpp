@@ -69,7 +69,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class Count : public Object {
 public:
-	using Object::Object;
+	explicit Count(GB *gb) : Object(gb, BANK_CountRichtertoffenFunc) {}
 
 	void init(); // CountRichtertoffenFunc
 	void update(); // .Update

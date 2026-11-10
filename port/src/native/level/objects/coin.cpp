@@ -40,7 +40,7 @@ constexpr struct {
 
 class Coin : public Object {
 public:
-	using Object::Object;
+	explicit Coin(GB *gb) : Object(gb, BANK_CoinFunc) {}
 
 	void init(); // CoinFunc
 	void colour_coin(); // .ColourCoin

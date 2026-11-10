@@ -18,7 +18,7 @@ constexpr uint8_t LAP = 0xee; // var2 at the end of a lap
 
 class Octohon : public Object {
 public:
-	using Object::Object;
+	explicit Octohon(GB *gb) : Object(gb, BANK_SmallOctohonFunc) {}
 
 	void small(); // SmallOctohonFunc
 	void small_start(); // .Func_4a4d4

@@ -17,7 +17,7 @@ constexpr uint16_t SNOW_GONE = ADDR_FallingSnowFunc + 0xec; // .Func_496ae
 
 class FallingSnow : public Object {
 public:
-	using Object::Object;
+	explicit FallingSnow(GB *gb) : Object(gb, BANK_FallingSnowSpawnerFunc) {}
 
 	void spawner(); // FallingSnowSpawnerFunc
 	void spawner_wait(); // .Func_49544

@@ -58,7 +58,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class RoboMouse : public Object {
 public:
-	using Object::Object;
+	explicit RoboMouse(GB *gb) : Object(gb, BANK_RoboMouseFunc) {}
 
 	void init(); // RoboMouseFunc
 	void appear(); // .Func_488f7

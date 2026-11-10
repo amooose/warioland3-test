@@ -80,7 +80,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class Anonster : public Object {
 public:
-	using Object::Object;
+	explicit Anonster(GB *gb) : Object(gb, BANK_AnonsterFunc) {}
 
 	void start(); // AnonsterFunc
 	void enter(); // .Func_50024
@@ -123,7 +123,7 @@ private:
 
 class AnonsterHelper : public Object {
 public:
-	using Object::Object;
+	explicit AnonsterHelper(GB *gb) : Object(gb, BANK_AnonsterFunc) {}
 
 	void platforms(); // SilkPlatformsFunc
 	void create_platform(uint16_t params, uint16_t next); // .asm_50746

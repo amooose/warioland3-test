@@ -58,7 +58,7 @@ constexpr uint8_t DOLLBOY_DEFEAT_DURATION = 43; // falling off screen
 
 class DollBoy : public Object {
 public:
-	using Object::Object;
+	explicit DollBoy(GB *gb) : Object(gb, BANK_DollBoyFunc) {}
 
 	void start(); // DollBoyFunc
 	void init(); // .Init
@@ -88,7 +88,7 @@ private:
 
 class DollBoyHelper : public Object {
 public:
-	using Object::Object;
+	explicit DollBoyHelper(GB *gb) : Object(gb, BANK_DollBoyFunc) {}
 
 	void barrel(uint8_t part); // DollBoyBarrelFunc
 	void barrel_start_delay(); // .StartDelay

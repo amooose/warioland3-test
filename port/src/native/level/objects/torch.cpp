@@ -14,7 +14,7 @@ constexpr uint16_t EMBER_OUT = ADDR_TorchEmberCommonFunc + 0x41; // .Destroy
 
 class Torch : public Object {
 public:
-	using Object::Object;
+	explicit Torch(GB *gb) : Object(gb, BANK_TorchFunc) {}
 
 	void torch(); // TorchFunc
 	void no_embers(); // TorchNoEmbersFunc

@@ -75,7 +75,7 @@ constexpr uint16_t POTION_DROP_UPDATE = ADDR_InvisibilityPotionFunc_Drop + 0x11;
 
 class MadScienstein : public Object {
 public:
-	using Object::Object;
+	explicit MadScienstein(GB *gb) : Object(gb, BANK_MadSciensteinFunc) {}
 
 	void start() { set_update(INIT); } // MadSciensteinFunc
 	void init(); // .Init
@@ -100,7 +100,7 @@ private:
 // an invisibility potion
 class Potion : public Object {
 public:
-	using Object::Object;
+	explicit Potion(GB *gb) : Object(gb, BANK_MadSciensteinFunc) {}
 
 	void fly(uint16_t page); // InvisibilityPotionFunc
 	void fly_after(uint16_t move) { call_home(move); fly(wCurObjFlags & 0xff00); } // InvisibilityPotionFunc_Left / _Right

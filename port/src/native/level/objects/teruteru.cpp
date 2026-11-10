@@ -66,7 +66,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class Teruteru : public Object {
 public:
-	using Object::Object;
+	explicit Teruteru(GB *gb) : Object(gb, BANK_TeruteruFunc) {}
 
 	void start() { set_update(INIT); } // TeruteruFunc
 	void init(); // .Init

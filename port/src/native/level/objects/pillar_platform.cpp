@@ -19,7 +19,7 @@ constexpr uint8_t TOP = 2; // var1: the step it's on
 
 class PillarPlatform : public Object {
 public:
-	using Object::Object;
+	explicit PillarPlatform(GB *gb) : Object(gb, BANK_PillarPlatform1Func) {}
 
 	void init(uint8_t height); // PillarPlatformFunc
 	void init_offset(uint8_t height, int8_t dy); // PillarPlatform2Func, PillarPlatform3Func

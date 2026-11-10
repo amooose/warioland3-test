@@ -21,7 +21,7 @@ constexpr uint8_t AT_END = 3;
 
 class ZipLine : public Object {
 public:
-	using Object::Object;
+	explicit ZipLine(GB *gb) : Object(gb, BANK_ZipLineFunc) {}
 
 	void init(); // ZipLineFunc
 	void reset(); // .Func_49356

@@ -42,7 +42,7 @@ constexpr uint8_t OUT = 6; // the step it stops stinging
 
 class Nobiiru : public Object {
 public:
-	using Object::Object;
+	explicit Nobiiru(GB *gb) : Object(gb, BANK_NobiiruFunc) {}
 
 	void init(); // NobiiruFunc
 	void update(); // .Func_4380e

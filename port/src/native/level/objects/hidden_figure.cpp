@@ -100,7 +100,7 @@ constexpr uint8_t NUM_HAND_HANDLERS = sizeof(HAND_HANDLERS) / sizeof(HAND_HANDLE
 
 class HiddenFigure : public Object {
 public:
-	using Object::Object;
+	explicit HiddenFigure(GB *gb) : Object(gb, BANK_HiddenFigureFunc) {}
 
 	void start(); // HiddenFigureFunc
 	void wait_start(); // .Func_4cb9e

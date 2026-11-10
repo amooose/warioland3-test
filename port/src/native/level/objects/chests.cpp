@@ -11,7 +11,7 @@ constexpr uint16_t OPENING = ADDR_ChestFunc + 0x43; // .Open
 
 class Chest : public Object {
 public:
-	using Object::Object;
+	explicit Chest(GB *gb) : Object(gb, BANK_DeinitChest) {}
 
 	void chest(uint8_t treasure); // GreyChestFunc and the like
 	void init(); // ChestFunc

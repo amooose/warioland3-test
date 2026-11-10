@@ -14,7 +14,7 @@ constexpr uint16_t SINKING = ADDR_BigLeafFunc + 0xc2; // .Func_42d0e
 
 class BigLeaf : public Object {
 public:
-	using Object::Object;
+	explicit BigLeaf(GB *gb) : Object(gb, BANK_BigLeafSpawnerFunc) {}
 
 	void spawner(); // BigLeafSpawnerFunc
 	void spawn_set_1(); // .SpawnSet1

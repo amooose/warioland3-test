@@ -18,7 +18,7 @@ constexpr uint8_t SWOOPING = 0x2f;
 
 class Bird : public Object {
 public:
-	using Object::Object;
+	explicit Bird(GB *gb) : Object(gb, BANK_BirdFunc) {}
 
 	void start() { set_update(INIT); } // BirdFunc
 	void init(); // .Init

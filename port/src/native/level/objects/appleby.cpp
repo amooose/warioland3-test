@@ -17,7 +17,7 @@ constexpr uint16_t BOUNCE_RIGHT = ADDR_AppleFunc + 0xbf; // .Func_47bd8
 
 class Appleby : public Object {
 public:
-	using Object::Object;
+	explicit Appleby(GB *gb) : Object(gb, BANK_ApplebyFunc) {}
 
 	void init(); // ApplebyFunc
 	void update(); // .Update

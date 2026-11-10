@@ -21,7 +21,7 @@ constexpr uint8_t FAR_RIGHT = 0x2e;
 
 class SeeingEyeDoor : public Object {
 public:
-	using Object::Object;
+	explicit SeeingEyeDoor(GB *gb) : Object(gb, BANK_SeeingEyeDoorFunc) {}
 
 	void init(); // SeeingEyeDoorFunc
 	void check_distance(); // .CheckWarioDistance

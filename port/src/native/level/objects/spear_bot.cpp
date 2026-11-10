@@ -72,7 +72,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class SpearBot : public Object {
 public:
-	using Object::Object;
+	explicit SpearBot(GB *gb) : Object(gb, BANK_SpearBotFunc) {}
 
 	void start() { set_update(INIT); } // SpearBotFunc
 	void init(); // .Init

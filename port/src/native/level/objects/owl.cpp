@@ -15,7 +15,7 @@ constexpr uint8_t GRABBED = 0x18; // the state once Wario's let go of it
 
 class Owl : public Object {
 public:
-	using Object::Object;
+	explicit Owl(GB *gb) : Object(gb, BANK_OwlFunc) {}
 
 	void init(); // OwlFunc
 	void sleep(); // .Sleep

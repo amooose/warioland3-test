@@ -11,7 +11,7 @@ constexpr uint16_t UPDATE = ADDR_StoveFunc + 0x6f; // .Update
 
 class Stove : public Object {
 public:
-	using Object::Object;
+	explicit Stove(GB *gb) : Object(gb, BANK_StoveFunc) {}
 
 	void init(); // StoveFunc
 	void update(); // .Update

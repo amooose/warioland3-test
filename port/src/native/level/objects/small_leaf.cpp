@@ -13,7 +13,7 @@ constexpr uint16_t GONE = ADDR_SmallLeafFunc + 0x90; // .Update3
 
 class SmallLeaf : public Object {
 public:
-	using Object::Object;
+	explicit SmallLeaf(GB *gb) : Object(gb, BANK_SmallLeafFunc) {}
 
 	void init(); // SmallLeafFunc
 	// .Init: its update function, through h's page (wCurObj's from its callers)

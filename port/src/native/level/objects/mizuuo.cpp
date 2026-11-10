@@ -18,7 +18,7 @@ constexpr uint8_t SURFACE = 0x5f; // var1 at which it surfaces
 
 class Mizuuo : public Object {
 public:
-	using Object::Object;
+	explicit Mizuuo(GB *gb) : Object(gb, BANK_MizuuoFunc) {}
 
 	void init(); // MizuuoFunc
 	void swimming(); // .Update1

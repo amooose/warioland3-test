@@ -75,7 +75,7 @@ constexpr uint16_t DOUGHNUT_UP_UPDATE = ADDR_DoughnutFunc_Up + 0x11; // .Update
 
 class Doughnuteer : public Object {
 public:
-	using Object::Object;
+	explicit Doughnuteer(GB *gb) : Object(gb, BANK_DoughnuteerFunc) {}
 
 	void start() { set_update(INIT); } // DoughnuteerFunc
 	void init(); // .Init
@@ -98,7 +98,7 @@ private:
 
 class Doughnut : public Object {
 public:
-	using Object::Object;
+	explicit Doughnut(GB *gb) : Object(gb, BANK_DoughnuteerFunc) {}
 
 	void aim(); // DoughnutFunc
 	void destroy() { flags() = 0; } // DoughnutFunc_Destroy

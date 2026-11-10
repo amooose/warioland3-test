@@ -16,7 +16,7 @@ constexpr uint16_t SPLASHED = ADDR_TadpoleFunc + 0x115; // .Func_49fb5
 
 class Tadpole : public Object {
 public:
-	using Object::Object;
+	explicit Tadpole(GB *gb) : Object(gb, BANK_TadpoleSpawnerFunc) {}
 
 	void spawner(); // TadpoleSpawnerFunc
 	void spawner_wait(); // .Func_49e4b

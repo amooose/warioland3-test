@@ -17,7 +17,7 @@ constexpr uint16_t RISING = ADDR_TogebaFunc + 0x142; // .Func_48ecc
 
 class Togeba : public Object {
 public:
-	using Object::Object;
+	explicit Togeba(GB *gb) : Object(gb, BANK_TogebaFunc) {}
 
 	void init(); // TogebaFunc
 	void reset(); // .Func_48d9b

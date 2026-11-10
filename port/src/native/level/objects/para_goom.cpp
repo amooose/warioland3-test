@@ -79,7 +79,7 @@ constexpr uint8_t STING_TOP = 0xef; // the collision box top, parachute up
 
 class ParaGoom : public Object {
 public:
-	using Object::Object;
+	explicit ParaGoom(GB *gb) : Object(gb, BANK_ParaGoomFunc) {}
 
 	void start() { set_update(INIT); } // ParaGoomFunc
 	void init(); // .Init

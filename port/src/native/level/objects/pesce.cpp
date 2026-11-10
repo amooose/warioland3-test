@@ -34,7 +34,7 @@ uint16_t find_active(Memory mem, uint8_t id)
 
 class Pesce : public Object {
 public:
-	using Object::Object;
+	explicit Pesce(GB *gb) : Object(gb, BANK_PesceFunc) {}
 
 	void start(); // PesceFunc
 	void update(); // .Func_51e28
@@ -59,7 +59,7 @@ private:
 
 class PesceHelper : public Object {
 public:
-	using Object::Object;
+	explicit PesceHelper(GB *gb) : Object(gb, BANK_PesceFunc) {}
 
 	void current(); // StrongWaterCurrentFunc
 	void dragonfly_spawner(); // DragonflySpawnerFunc

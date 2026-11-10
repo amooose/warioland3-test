@@ -63,7 +63,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class Hebarii : public Object {
 public:
-	using Object::Object;
+	explicit Hebarii(GB *gb) : Object(gb, BANK_HebariiFunc) {}
 
 	void start() { set_update(INIT); } // HebariiFunc
 	void init(); // .Init

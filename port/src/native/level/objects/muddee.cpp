@@ -31,7 +31,7 @@ constexpr uint16_t TC_STOPPED = TC(0x64); // .Func_55de0
 
 class Muddee : public Object {
 public:
-	using Object::Object;
+	explicit Muddee(GB *gb) : Object(gb, BANK_MuddeeFunc) {}
 
 	void start(); // MuddeeFunc
 	void hidden(); // .Func_5564e
@@ -68,7 +68,7 @@ private:
 
 class Turtle : public Object {
 public:
-	using Object::Object;
+	explicit Turtle(GB *gb) : Object(gb, BANK_MuddeeFunc) {}
 
 	void start1(); // Turtle1Func
 	void start2(); // Turtle2Func

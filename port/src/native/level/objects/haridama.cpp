@@ -18,7 +18,7 @@ constexpr uint8_t FLOATING = 0x38;
 
 class Haridama : public Object {
 public:
-	using Object::Object;
+	explicit Haridama(GB *gb) : Object(gb, BANK_HaridamaFunc) {}
 
 	void start() { set_update(INIT); } // HaridamaFunc
 	void init(); // .Init

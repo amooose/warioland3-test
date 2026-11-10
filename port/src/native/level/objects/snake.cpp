@@ -15,7 +15,7 @@ constexpr uint8_t SNAKE_ID = 0x2d;
 
 class Snake : public Object {
 public:
-	using Object::Object;
+	explicit Snake(GB *gb) : Object(gb, BANK_SnakeFunc) {}
 
 	void start(); // SnakeFunc
 	void init(); // .Init

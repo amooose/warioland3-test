@@ -78,7 +78,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class Spearhead : public Object {
 public:
-	using Object::Object;
+	explicit Spearhead(GB *gb) : Object(gb, BANK_SpearheadFunc) {}
 
 	void start(); // SpearheadFunc
 	void init(); // .Init

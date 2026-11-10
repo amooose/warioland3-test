@@ -54,7 +54,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class Barrel : public Object {
 public:
-	using Object::Object;
+	explicit Barrel(GB *gb) : Object(gb, BANK_Barrel1Func) {}
 
 	void floating(); // Barrel1Func
 	void float_idle(); // .Update1

@@ -39,7 +39,7 @@ constexpr uint8_t IGAGURI_ATTACK_DURATION = 72;
 
 class Wolfenboss : public Object {
 public:
-	using Object::Object;
+	explicit Wolfenboss(GB *gb) : Object(gb, BANK_WolfenbossFunc) {}
 
 	void start(); // WolfenbossFunc
 	void whisp_waiting(); // .WhispWaiting
@@ -64,7 +64,7 @@ private:
 
 class WolfenbossHelper : public Object {
 public:
-	using Object::Object;
+	explicit WolfenbossHelper(GB *gb) : Object(gb, BANK_WolfenbossFunc) {}
 
 	void spiral(); // MagicSpiralFunc
 	void spiral_grow(); // .Grow

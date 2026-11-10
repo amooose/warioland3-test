@@ -70,7 +70,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class HammerBot : public Object {
 public:
-	using Object::Object;
+	explicit HammerBot(GB *gb) : Object(gb, BANK_HammerBotFunc) {}
 
 	void start() { set_update(INIT); } // HammerBotFunc
 	void init(); // .Init

@@ -48,7 +48,7 @@ constexpr uint8_t NUM_OWO_HANDLERS = sizeof(OWO_HANDLERS) / sizeof(OWO_HANDLERS[
 
 class Omodonmeka : public Object {
 public:
-	using Object::Object;
+	explicit Omodonmeka(GB *gb) : Object(gb, BANK_OmodonmekaFunc) {}
 
 	void start(); // OmodonmekaFunc
 	void got_on(uint16_t at); // .Func_42199, with hl = at

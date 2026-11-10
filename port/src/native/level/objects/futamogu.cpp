@@ -12,7 +12,7 @@ constexpr uint16_t UPDATE = ADDR_FutamoguFunc + 0x7f; // .Update
 
 class Futamogu : public Object {
 public:
-	using Object::Object;
+	explicit Futamogu(GB *gb) : Object(gb, BANK_FutamoguFunc) {}
 
 	void init(); // FutamoguFunc
 	void update(); // .Update

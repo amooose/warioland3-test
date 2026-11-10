@@ -51,7 +51,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class Rock : public Object {
 public:
-	using Object::Object;
+	explicit Rock(GB *gb) : Object(gb, BANK_RockFunc) {}
 
 	void init(); // RockFunc
 	void update(); // .Update

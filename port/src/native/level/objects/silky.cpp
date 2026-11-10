@@ -69,7 +69,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class Silky : public Object {
 public:
-	using Object::Object;
+	explicit Silky(GB *gb) : Object(gb, BANK_SilkyFunc) {}
 
 	void start() { set_update(INIT); } // SilkyFunc
 	void init(); // .Init

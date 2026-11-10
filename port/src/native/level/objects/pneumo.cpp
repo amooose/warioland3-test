@@ -21,7 +21,7 @@ enum : uint8_t {
 
 class Pneumo : public Object {
 public:
-	using Object::Object;
+	explicit Pneumo(GB *gb) : Object(gb, BANK_PneumoFunc) {}
 
 	void init(); // PneumoFunc
 	void update(); // .Update

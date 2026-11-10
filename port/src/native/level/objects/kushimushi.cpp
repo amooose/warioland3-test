@@ -35,7 +35,7 @@ constexpr Leg HORIZONTAL_LEGS[] = {
 
 class Kushimushi : public Object {
 public:
-	using Object::Object;
+	explicit Kushimushi(GB *gb) : Object(gb, BANK_KushimushiVerticalFunc) {}
 
 	void init_vertical(); // KushimushiVerticalFunc
 	void init_horizontal(); // KushimushiHorizontalFunc

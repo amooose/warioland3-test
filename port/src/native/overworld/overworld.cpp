@@ -646,8 +646,8 @@ void Overworld::load_map_side_pals(bool scene)
 	}
 	if (wram_.unk_2d011())
 		bg = static_cast<uint16_t>(bg + 24 * PAL_SIZE); // night
-	routines_.load_pals_to_temp_pals1(bg);
-	routines_.load_pals_to_temp_pals2(static_cast<uint16_t>(ADDR_Pals_84900 + side * 8 * PAL_SIZE));
+	routines_.load_pals_to_temp_pals1(RomPtr(gb_, BANK_Pals_84000, bg)); // bank21's palettes
+	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_84900) + side * 8 * PAL_SIZE);
 	if (scene && wram_.ow_exit_unlocked())
 		routines_.call(ADDR_LoadGreyOWPals);
 }

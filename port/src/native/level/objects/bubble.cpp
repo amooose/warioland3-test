@@ -19,7 +19,7 @@ constexpr uint8_t SWAY_RIGHT_START = 0x50;
 
 class Bubble : public Object {
 public:
-	using Object::Object;
+	explicit Bubble(GB *gb) : Object(gb, BANK_BubbleHoleFunc) {}
 
 	void hole(); // BubbleHoleFunc
 	void hole_update(); // .Update

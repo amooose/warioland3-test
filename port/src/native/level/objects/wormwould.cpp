@@ -31,7 +31,7 @@ constexpr uint8_t WORMWOULD_UNDERGROUND_DURATION = 30;
 
 class Wormwould : public Object {
 public:
-	using Object::Object;
+	explicit Wormwould(GB *gb) : Object(gb, BANK_WormwouldFunc) {}
 
 	void start(); // WormwouldFunc
 	void init(); // .Init
@@ -54,7 +54,7 @@ private:
 
 class WormwouldHelper : public Object {
 public:
-	using Object::Object;
+	explicit WormwouldHelper(GB *gb) : Object(gb, BANK_WormwouldFunc) {}
 
 	void rock_rolling(uint16_t then, uint16_t move); // RollingRockFunc_Left / _Right
 	void rock(uint16_t page); // RollingRockFunc

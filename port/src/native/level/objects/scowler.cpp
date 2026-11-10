@@ -33,7 +33,7 @@ constexpr uint16_t INK_VANISH = ADDR_InkFunc + 0x72; // .Func_54bf8
 
 class Scowler : public Object {
 public:
-	using Object::Object;
+	explicit Scowler(GB *gb) : Object(gb, BANK_ScowlerFunc) {}
 
 	void start(); // ScowlerFunc
 	void begin(); // .Func_54520
@@ -63,7 +63,7 @@ private:
 
 class ScowlerHelper : public Object {
 public:
-	using Object::Object;
+	explicit ScowlerHelper(GB *gb) : Object(gb, BANK_ScowlerFunc) {}
 
 	void ring_spawner(); // FloatingRingSpawnerFunc
 	void ring(); // FloatingRingFunc

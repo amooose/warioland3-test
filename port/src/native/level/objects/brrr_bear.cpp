@@ -67,7 +67,7 @@ constexpr uint8_t NUM_HANDLERS = sizeof(HANDLERS) / sizeof(HANDLERS[0]);
 
 class BrrrBear : public Object {
 public:
-	using Object::Object;
+	explicit BrrrBear(GB *gb) : Object(gb, BANK_BrrrBearFunc) {}
 
 	void start() { set_update(INIT); } // BrrrBearFunc
 	void init(); // .Init

@@ -14,7 +14,7 @@ constexpr uint16_t VANISHING = ADDR_PrinceFroggyFunc + 0x15c; // .Func_44220
 
 class PrinceFroggy : public Object {
 public:
-	using Object::Object;
+	explicit PrinceFroggy(GB *gb) : Object(gb, BANK_GreyPrinceFroggyFunc) {}
 
 	void grey(); // GreyPrinceFroggyFunc
 	void red(); // RedPrinceFroggyFunc

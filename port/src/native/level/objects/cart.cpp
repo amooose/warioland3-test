@@ -15,7 +15,7 @@ constexpr uint16_t VARIABLE_MOVING = ADDR_CartVariableFunc + 0x63; // .Moving
 
 class Cart : public Object {
 public:
-	using Object::Object;
+	explicit Cart(GB *gb) : Object(gb, BANK_CartFunc) {}
 
 	void init(); // CartFunc
 	void waiting(); // .Waiting
