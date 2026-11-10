@@ -350,7 +350,7 @@ static void apply_vblank(GB *gb, uint16_t bg, uint16_t ob)
 	gb_call(gb, bg);
 	gb_call(gb, ob);
 	gb->cpu.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-	gb_call(gb, hTransferVirtualOAM);
+	transfer_virtual_oam(gb);
 }
 
 PORT_LOCAL_EX(VBlank_88d, asm_8a9, 0, 0)

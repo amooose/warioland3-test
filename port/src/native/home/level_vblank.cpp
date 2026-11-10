@@ -22,7 +22,7 @@ public:
 		mem_[rSCY] = static_cast<uint8_t>(scy + shake);
 		mem_[rSCX] = mem_[wSCX];
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-		gb_call(gb_, hTransferVirtualOAM);
+		transfer_virtual_oam(gb_);
 	}
 
 	// called during level V-Blank: the pending DMA, or the tile queue (the

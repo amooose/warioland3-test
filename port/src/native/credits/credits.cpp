@@ -19,7 +19,6 @@ public:
 	// step 1); hTransferVirtualOAM (a = wVirtualOAM's page) at the end.
 	void port_VBlank_160439__Func()
 	{
-		uint16_t base = cpu_.pc;
 		mem_[rSCY] = mem_[wSCY];
 		mem_[rSCX] = mem_[wSCX];
 		uint8_t step = mem_[wcee4];
@@ -52,7 +51,7 @@ public:
 			}
 		}
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-		gb_call_ret(gb_, hTransferVirtualOAM, static_cast<uint16_t>(base + 0x6b));
+		transfer_virtual_oam(gb_);
 		RET();
 	}
 };

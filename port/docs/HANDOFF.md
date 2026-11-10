@@ -1390,6 +1390,16 @@ go through the CPU. After it: 57 hooks CPU-dispatched in play (26 by native
 call, 35 by jump, 1 interrupt), 358 direct. A direct call never reaches the
 routine's address, so code that keys on PC (the trace's LY site) needs
 trace_entry (native.hpp) in the plain function.
+V-Blank (2026-11-10): transfer_virtual_oam (native.hpp) runs the OAM DMA
+RAM hook directly, and VBlank runs the copied wVBlankFunc's hook directly
+(ram_run_vblank_func) when it returns normally. A direct entry must still do
+what a CPU dispatch does: the token 4 cycles (the OAM idle counted on them;
+an H-Blank DMA moves on them), the depth guard and the step budget. VBlank's
+eight pushes stay: the function runs 16 bytes lower under them, and fuzzed
+code reads below sp (the one-byte VRAM diff when they were locals). Bulk
+regex rewrites: check they didn't rewrite the new wrapper's own fallback
+(transfer_virtual_oam calling itself became a tail-call loop that hung the
+fuzz tier for hours while the quick tier passed).
 To find what reads a register: poison it, relax the contracts, run the
 full tier. Stop if the build fails: ctest happily runs the old binary.
 Routines nothing references and whose callers' hooks have their own copies

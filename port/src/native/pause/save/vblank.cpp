@@ -14,22 +14,20 @@ public:
 
 	// The save screens' V-Blank functions, as copied to wVBlankFunc (see
 	// ram_code.c), plain over memory: the V-Blank handler pushes and pops
-	// every register around them. Their calls return to cpu_.pc + n, the
-	// block's start wherever it runs from.
-	void transfer_oam(uint16_t ret)
+	// every register around them.
+	void transfer_oam()
 	{
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-		gb_call_ret(gb_, hTransferVirtualOAM, ret);
+		transfer_virtual_oam(gb_);
 		RET();
 	}
 
-	void port_VBlank_Saving__Func() { transfer_oam(static_cast<uint16_t>(cpu_.pc + 0x05)); }
+	void port_VBlank_Saving__Func() { transfer_oam(); }
 
 	// VBlank_SaveScreen.Func: the queued tile (wcee4 bit 7; its big-endian
 	// address in wBGMapTileVRAM0Queue): tile $02, palette 5
 	void port_VBlank_SaveScreen__Func()
 	{
-		uint16_t base = cpu_.pc;
 		if (mem_[wcee4] & 0x80) {
 			uint16_t at = static_cast<uint16_t>(mem_[wBGMapTileVRAM0Queue] << 8 | mem_[wBGMapTileVRAM0Queue + 1]);
 			mem_[rVBK] = 1; // BANK("VRAM1")
@@ -38,7 +36,7 @@ public:
 			mem_[at] = 0x02;
 			mem_[wcee4] &= 0x7f;
 		}
-		transfer_oam(static_cast<uint16_t>(base + 0x22));
+		transfer_oam();
 	}
 };
 

@@ -123,6 +123,13 @@ private:
 // Every register: for an entry point whose callers use none after it.
 #define ALL_REGISTERS (R_A | R_F | R_B | R_C | R_D | R_E | R_H | R_L)
 
+// hTransferVirtualOAM (a = wVirtualOAM's page), as a direct call
+inline void transfer_virtual_oam(GB *gb)
+{
+	if (!ram_transfer_virtual_oam(gb))
+		gb_call(gb, hTransferVirtualOAM);
+}
+
 // A direct call into the routine at addr (in the bank mapped now), which the
 // CPU never reaches: lets the per-frame trace's PC callback see the entry as
 // if it had (trace.c's sites, which hand the native code the asm's LY read

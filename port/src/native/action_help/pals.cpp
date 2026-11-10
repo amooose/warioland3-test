@@ -121,7 +121,6 @@ public:
 	// (a = wVirtualOAM's page).
 	void port_VBlank_1fb6b7__Func()
 	{
-		uint16_t base = cpu_.pc;
 		if (mem_[wIsDMATransferPending]) {
 			mem_[rROMB0 + 0x100] = mem_[wPendingDMASourceBank];
 			mem_[rVDMA_SRC_HIGH] = mem_[wPendingDMASourceBank + 1];
@@ -135,7 +134,7 @@ public:
 		mem_[rSCY] = mem_[wSCY];
 		mem_[rSCX] = mem_[wSCX];
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-		gb_call_ret(gb_, hTransferVirtualOAM, static_cast<uint16_t>(base + 0x33));
+		transfer_virtual_oam(gb_);
 		RET();
 	}
 };

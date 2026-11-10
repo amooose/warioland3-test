@@ -13,15 +13,13 @@ public:
 	using AsmModule::AsmModule;
 
 	// VBlank_TimeAttackDescription.Func, as copied to wVBlankFunc (see
-	// ram_code.c). Its call returns to base + n, the block's start wherever it
-	// runs from.
+	// ram_code.c)
 	void port_VBlank_TimeAttackDescription__Func()
 	{
-		uint16_t base = cpu_.pc;
 		wr8(rSCY, rd8(wSCY));
 		wr8(rSCX, rd8(wSCX));
 		cpu_.a = (uint8_t)(wVirtualOAM >> 8);
-		gb_call_ret(gb_, hTransferVirtualOAM, (uint16_t)(base + 0x0f));
+		transfer_virtual_oam(gb_);
 	}
 };
 

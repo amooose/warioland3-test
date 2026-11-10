@@ -73,7 +73,6 @@ public:
 	// hTransferVirtualOAM (a = wVirtualOAM's page).
 	void port_VBlank_Title__Func()
 	{
-		uint16_t base = cpu_.pc;
 		uint8_t bank = mem_[wROMBank];
 		bankswitch(BANK_TitleScreenBoxTilemap);
 		if (mem_[wcee4] & 0x80) {
@@ -87,7 +86,7 @@ public:
 		mem_[rSCY] = mem_[wSCY];
 		mem_[rSCX] = mem_[wSCX];
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-		gb_call_ret(gb_, hTransferVirtualOAM, static_cast<uint16_t>(base + 0x4b));
+		transfer_virtual_oam(gb_);
 		RET();
 	}
 };

@@ -61,14 +61,31 @@ static bool hcall_func(GB *gb)
 // jr nz, .loop / ret, the DMA running while it waits
 static const uint8_t push_oam_code[] = {0xe0, 0x46, 0x3e, 0x28, 0x3d, 0x20, 0xfd, 0xc9};
 
-static bool transfer_virtual_oam(GB *gb)
+// The DMA and the time the asm's ld a, n and loop take, less the 4 cycles
+// cpu_step charges a RAM hook it dispatches
+static bool oam_dma(GB *gb)
 {
 	if (!ram_is(gb, hTransferVirtualOAM, push_oam_code, NULL, sizeof(push_oam_code)))
 		return false;
 	wr8(gb, rDMA, gb->cpu.a);
 	gb->cpu.a = 0;
 	gb->cpu.f = (uint8_t)(FLAG_Z | FLAG_N | (gb->cpu.f & FLAG_C)); // the last dec a
-	idle(gb, 8 + 40 * 16 - 4); // ld a, n and the loop, as the asm takes
+	idle(gb, 8 + 40 * 16 - 4);
+	return true;
+}
+
+bool ram_transfer_virtual_oam(GB *gb)
+{
+	if (!oam_dma(gb))
+		return false;
+	idle(gb, 4); // no dispatch charges them here
+	return true;
+}
+
+static bool transfer_virtual_oam(GB *gb)
+{
+	if (!oam_dma(gb))
+		return false;
 	RET();
 	return true;
 }
@@ -122,25 +139,62 @@ static void find_copied_funcs(void)
 	}
 }
 
-static bool copied_func(GB *gb)
+// the native routine of the ROM block copied to pc, or NULL
+static Hook *copied_hook(GB *gb, uint16_t pc)
 {
 	if (ncopied < 0)
 		find_copied_funcs();
 	for (int i = 0; i < ncopied; i++) {
 		const CopiedFunc *c = &copied[i];
-		if (c->off + (size_t)c->len > gb->rom_size ||
-			!ram_is(gb, gb->cpu.pc, gb->rom + c->off, NULL, c->len))
+		if (c->off + (size_t)c->len > gb->rom_size || !ram_is(gb, pc, gb->rom + c->off, NULL, c->len))
 			continue;
 		Hook *h = hook_at(c->bank, c->addr);
-		if (!h)
-			continue;
-		h->calls++;
-		h->fn(gb);
-		if (!(h->flags & HOOK_MANUAL_RET))
-			RET();
+		if (h)
+			return h;
+	}
+	return NULL;
+}
+
+static bool copied_func(GB *gb)
+{
+	Hook *h = copied_hook(gb, gb->cpu.pc);
+	if (!h)
+		return false;
+	h->calls++;
+	h->fn(gb);
+	if (!(h->flags & HOOK_MANUAL_RET))
+		RET();
+	return true;
+}
+
+bool ram_run_vblank_func(GB *gb)
+{
+	Hook *h = copied_hook(gb, wVBlankFunc);
+	if (!h || (h->flags & HOOK_MANUAL_RET))
+		return false;
+	// As cpu_step would dispatch it: the same guards, and the token 4
+	// cycles a native routine is charged (the hardware moves on: an
+	// H-Blank DMA it started copies its next chunk on time)
+	if (gb->test.active && gb->call_depth >= 256) {
+		gb->test.unrealistic = true;
+		gb->test.crashed = true;
 		return true;
 	}
-	return false;
+	if (gb->test.budget && --gb->test.budget == 0)
+		gb->test.out_of_budget(gb);
+	// it runs at wVBlankFunc (the blocks find their own addresses from pc)
+	uint16_t pc = gb->cpu.pc;
+	gb->cpu.pc = wVBlankFunc;
+	if (gb->pc_cb)
+		gb->pc_cb(gb);
+	h->by_direct++;
+	gb->call_depth++;
+	h->fn(gb);
+	gb->call_depth--;
+	gb->cpu.pc = pc;
+	if (!gb->no_tick)
+		gb_tick(gb, 4);
+	return true;
 }
 
 static bool vblank_code(GB *gb)

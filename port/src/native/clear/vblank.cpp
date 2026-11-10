@@ -31,23 +31,22 @@ public:
 		mem_[at] = last;
 	}
 
-	void transfer_oam(uint16_t ret)
+	void transfer_oam()
 	{
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-		gb_call_ret(gb_, hTransferVirtualOAM, ret);
+		transfer_virtual_oam(gb_);
 		RET();
 	}
 
 	// VBlank_ClearScreen.Func: the scroll, and tile $71's rows rotated
 	void port_VBlank_ClearScreen__Func()
 	{
-		uint16_t base = cpu_.pc;
 		mem_[rSCY] = mem_[wSCY];
 		mem_[rSCX] = mem_[wSCX];
 		mem_[rVBK] = 0;
 		rotate_tile_plane(v0Tiles2 + 0x71 * TILE_SIZE + (TILE_SIZE - 2));
 		rotate_tile_plane(v0Tiles2 + 0x71 * TILE_SIZE + (TILE_SIZE - 1));
-		transfer_oam(static_cast<uint16_t>(base + 0x36));
+		transfer_oam();
 	}
 
 	// the queue's next (big-endian address, byte) entry at at
@@ -62,7 +61,6 @@ public:
 	// (wcee4 bit 7): an attribute (with its low bits set) or two tiles
 	void port_VBlank_MusicalCoinsScreen__Func()
 	{
-		uint16_t base = cpu_.pc;
 		mem_[rSCY] = mem_[wSCY];
 		mem_[rSCX] = mem_[wSCX];
 		uint8_t queued = mem_[wcee4];
@@ -75,7 +73,7 @@ public:
 			}
 			mem_[wcee4] &= 0x7f;
 		}
-		transfer_oam(static_cast<uint16_t>(base + 0x3d));
+		transfer_oam();
 	}
 };
 
