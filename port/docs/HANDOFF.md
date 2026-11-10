@@ -131,7 +131,7 @@ scripting and expansion on top. The approach:
   Then (134707c): the object and particle framesets and sprites, copy /
   decompress / palette loaders by label (ROM(gb, Label) overloads), the
   room header, block function table, palette cycle, object group data and
-  OW scene params: 740 labels left. Next batch: the far loaders
+  OW scene params: 740 labels left; then f9c6afa: 531; then the Wario and treasure palettes, copy_bc by label and the movement tables (bank $18): 486. Next batch: the far loaders
   (copy_far_bytes, load_far_tiles, load_far_pals_*, load_far_bg_map) by
   their bank argument, event treasures, the treasure gfx, and the menu /
   Wario animation steppers given their frameset's bank (-1 = the bank

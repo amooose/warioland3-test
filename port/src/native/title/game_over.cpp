@@ -139,7 +139,7 @@ void GameOver::load_gfx()
 {
 	ram(rVBK) = 0;
 	routines_.decompress(ROM(gb_, GameOverGfx), v0Tiles0);
-	routines_.copy_bc(ADDR_WarioSleepGfx, v0Tiles0, 0x80 * TILE_SIZE, BANK_WarioSleepGfx);
+	routines_.copy_bc(ROM(gb_, WarioSleepGfx), v0Tiles0, 0x80 * TILE_SIZE, BANK_WarioSleepGfx);
 }
 
 void GameOver::load_tilemap()
@@ -157,9 +157,9 @@ void GameOver::load_hidden_figure_gfx()
 	routines_.copy_short(ROM(gb_, Pals_db040), wTempPals2 + 3 * 8, 5 * 8);
 
 	ram(rVBK) = VRAM1;
-	routines_.copy_bc(ADDR_HiddenFigure2Gfx, v1Tiles0, 0x180 * TILE_SIZE);
+	routines_.copy_bc(ROM(gb_, HiddenFigure2Gfx), v1Tiles0, 0x180 * TILE_SIZE);
 	ram(rVBK) = 0;
-	routines_.copy_bc(ADDR_HiddenFigure1Gfx, v0Tiles0, 0x180 * TILE_SIZE);
+	routines_.copy_bc(ROM(gb_, HiddenFigure1Gfx), v0Tiles0, 0x180 * TILE_SIZE);
 
 	ram(rVBK) = VRAM1;
 	routines_.decompress(ROM(gb_, HiddenFigure2Map), v1BGMap0);

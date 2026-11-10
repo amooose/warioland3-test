@@ -50,6 +50,15 @@ uint16_t apply_ob_pal_in_hblank(GB *gb, uint16_t src)
 	return src;
 }
 
+RomPtr apply_ob_pal_in_hblank(GB *gb, RomPtr src)
+{
+	Memory mem(gb);
+	wait_hblank(gb);
+	for (int i = 0; i < PAL_SIZE; i++, ++src)
+		mem[rOBPD] = *src;
+	return src;
+}
+
 // The level's treasure (wLevelEndScreen's) index, and its palette in
 // TreasurePals by the colour wLevelTreasurePals gives it; with WRAM bank
 // wLevelTreasurePals mapped.
@@ -153,10 +162,11 @@ void set_wario_pal(GB *gb, uint16_t pals)
 	uint8_t bank = mem.rom_bank();
 	bankswitch(gb, BANK_WarioDefaultPal, ADDR_SetWarioPal); // BANK("Wario Palettes")
 	mem.call_func_bank() = BANK_WarioDefaultPal;
-	hcall(gb, ADDR_CopyHLToDE_Short, [&] { copy_short(gb, pals, wTempPals2, 2 * PAL_SIZE); });
+	RomPtr src(gb, BANK_WarioDefaultPal, pals);
+	hcall(gb, ADDR_CopyHLToDE_Short, [&] { copy_short(gb, src, wTempPals2, 2 * PAL_SIZE); });
 	mem[rOBPI] = OBPI_AUTOINC | 0;
 	for (int i = 0; i < 2; i++)
-		pals = apply_ob_pal_in_hblank(gb, pals);
+		src = apply_ob_pal_in_hblank(gb, src);
 	bankswitch(gb, bank, ADDR_SetWarioPal);
 }
 
@@ -170,7 +180,7 @@ void load_collected_treasure_pal_clear_screen(GB *gb)
 	bankswitch(gb, BANK_TreasurePals, ADDR_LoadCollectedTreasurePal_ClearScreen);
 	// an unneeded farcall, the bank being mapped
 	farcall(gb, BANK_TreasurePals, ADDR_CopyHLToDE_Short,
-		[&] { copy_short(gb, pal.pals, wTempPals2 + 7 * PAL_SIZE, PAL_SIZE); });
+		[&] { copy_short(gb, RomPtr(gb, BANK_TreasurePals, pal.pals), wTempPals2 + 7 * PAL_SIZE, PAL_SIZE); });
 	bankswitch(gb, bank, ADDR_LoadCollectedTreasurePal_ClearScreen);
 	mem[rWBK] = wram_bank;
 }
@@ -186,9 +196,9 @@ void load_collected_treasure_pal_level(GB *gb)
 	uint8_t offset = static_cast<uint8_t>(pal.index * 8);
 	uint16_t dest = static_cast<uint16_t>(((wTempPals2 + 4 * PAL_SIZE) & 0xff00)
 		| static_cast<uint8_t>((wTempPals2 + 4 * PAL_SIZE) + offset));
-	farcall(gb, BANK_TreasurePals, ADDR_CopyHLToDE_Short, [&] { copy_short(gb, pal.pals, dest, PAL_SIZE); });
+	farcall(gb, BANK_TreasurePals, ADDR_CopyHLToDE_Short, [&] { copy_short(gb, RomPtr(gb, BANK_TreasurePals, pal.pals), dest, PAL_SIZE); });
 	mem[rOBPI] = static_cast<uint8_t>(OBPI_AUTOINC | (4 * PAL_SIZE) | offset);
-	apply_ob_pal_in_hblank(gb, pal.pals);
+	apply_ob_pal_in_hblank(gb, RomPtr(gb, BANK_TreasurePals, pal.pals));
 	bankswitch(gb, bank, ADDR_LoadCollectedTreasurePal_Level);
 	mem[rWBK] = wram_bank;
 }

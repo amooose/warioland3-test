@@ -671,6 +671,10 @@ public:
 
 	// --- movement tables ---
 
+	// a movement table's byte: the tables are read with the movement
+	// routines' bank mapped (all in one)
+	uint8_t movement_byte(uint16_t addr) { return RomPtr(gb_, BANK__ApplyObjYMovement, addr)[0]; }
+
 	// A movement table's next entry for the index (an 8-bit add, within
 	// the table's page). At the $80 end the last entry repeats, or with
 	// loop the table starts over; otherwise the index goes on.
@@ -678,12 +682,12 @@ public:
 	{
 		uint16_t page = table & 0xff00;
 		uint8_t c = static_cast<uint8_t>(rd8(index) + static_cast<uint8_t>(table));
-		uint8_t v = rd8(static_cast<uint16_t>(page | c));
+		uint8_t v = movement_byte(static_cast<uint16_t>(page | c));
 		if (v == 0x80) {
 			if (!loop)
-				return rd8(static_cast<uint16_t>(page | static_cast<uint8_t>(c - 1)));
+				return movement_byte(static_cast<uint16_t>(page | static_cast<uint8_t>(c - 1)));
 			wr8(index, 0);
-			v = rd8(table);
+			v = movement_byte(table);
 		}
 		wr8(index, static_cast<uint8_t>(rd8(index) + 1));
 		return v;
@@ -753,14 +757,14 @@ public:
 		if (d)
 			return;
 		uint16_t p = static_cast<uint16_t>(mem_.cur_obj_var3() << 8 | mem_.cur_obj_var2());
-		uint8_t duration = rd8(p++);
+		uint8_t duration = movement_byte(p++);
 		if (!duration) {
 			p = start;
-			duration = rd8(p++);
+			duration = movement_byte(p++);
 		}
 		mem_.cur_obj_var1() = duration;
-		uint8_t dy = rd8(p++);
-		uint8_t dx = rd8(p++);
+		uint8_t dy = movement_byte(p++);
+		uint8_t dx = movement_byte(p++);
 		mem_.cur_obj_var2() = static_cast<uint8_t>(p);
 		mem_.cur_obj_var3() = static_cast<uint8_t>(p >> 8);
 		add_signed_at(wCurObjYPos, dy);

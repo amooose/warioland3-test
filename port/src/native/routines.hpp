@@ -104,6 +104,15 @@ public:
 			copy();
 	}
 
+	void copy_bc(RomPtr src, uint16_t dest, uint16_t count, uint8_t bank = 0)
+	{
+		auto copy = [&] { home::copy(gb_, src, dest, count ? count : 0x10000); };
+		if (bank)
+			home::farcall(gb_, bank, ADDR_CopyHLToDE_BC, copy);
+		else
+			copy();
+	}
+
 	void copy_short(uint16_t src, uint16_t dest, uint8_t count, uint8_t bank = 0)
 	{
 		auto copy = [&] { home::copy_short(gb_, src, dest, count); };

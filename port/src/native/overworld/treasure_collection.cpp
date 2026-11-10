@@ -102,7 +102,7 @@ void TreasureCollection::init()
 	decompress(BANK_TreasureCollectionGfx, ADDR_TreasureCollectionGfx, v0Tiles2);
 	load_page_gfx();
 	mem_[rVBK] = 1;
-	routines_.copy_bc(ADDR_NumbersGfx, v1Tiles1 + 0x20 * TILE_SIZE, 0x14 * TILE_SIZE);
+	routines_.copy_bc(ROM(gb_, NumbersGfx), v1Tiles1 + 0x20 * TILE_SIZE, 0x14 * TILE_SIZE);
 	mem_[rVBK] = 0;
 	decompress(BANK_TreasureCollectionAttrmap, ADDR_TreasureCollectionAttrmap, wAttrmap);
 	decompress(BANK_TreasureCollectionTilemap, ADDR_TreasureCollectionTilemap, wTilemap);

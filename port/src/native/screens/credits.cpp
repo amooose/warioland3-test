@@ -98,7 +98,7 @@ void Credits::load_gfx()
 {
 	mem_[rVBK] = VRAM1;
 	routines_.in_bank(BANK_PrologueGfx, ADDR_Decompress, [&] { home::decompress(gb_, ROM(gb_, PrologueGfx), v0Tiles0); });
-	routines_.copy_bc(ADDR_MusicBoxGfx, v1Tiles1, 0x30 * TILE_SIZE, BANK_MusicBoxGfx);
+	routines_.copy_bc(ROM(gb_, MusicBoxGfx), v1Tiles1, 0x30 * TILE_SIZE, BANK_MusicBoxGfx);
 	mem_[rVBK] = 0;
 	routines_.decompress(ROM(gb_, CreditsFontGfx), v0Tiles0);
 	routines_.decompress(ROM(gb_, CreditsMusicBoxGfx), v0Tiles0);
