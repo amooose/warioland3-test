@@ -1400,6 +1400,20 @@ code reads below sp (the one-byte VRAM diff when they were locals). Bulk
 regex rewrites: check they didn't rewrite the new wrapper's own fallback
 (transfer_virtual_oam calling itself became a tail-call loop that hung the
 fuzz tier for hours while the quick tier passed).
+gb_tail_jump (cpu.c, 2026-11-10): the asm's jp at a routine's end, from a
+hook that returns normally. A ROM target whose hook returns runs directly,
+RAM code ram_tail_jump knows (OAM DMA, copied V-Blank functions, the tile
+copy loops) runs natively, anything else runs on the CPU at the same sp
+until its ret pops the hook's return address (sp is put back, nothing
+written). With it LevelVBlankFunc, ProcessLevelTileQueue_VRAM1, every
+copied V-Blank .Func, the room/level loaders and ProcessBlock return
+normally, and VBlank's call wVBlankFunc is push ret / gb_tail_jump / pop.
+Left manual: Func_33f8 / Func_3407 (homejp into object states that end in
+jp HomeJumpRet; those states need plain versions first), the frame loop,
+Start / Init. Fuzzer rule that came with it: a hook the CPU dispatches during
+a check adds its declared clobbers to what isn't compared
+(test.nested_clobbers): a non-manual routine's check now runs the RAM code
+it jumps to, and fuzzed code there can call clobbering hooks.
 To find what reads a register: poison it, relax the contracts, run the
 full tier. Stop if the build fails: ctest happily runs the old binary.
 Routines nothing references and whose callers' hooks have their own copies

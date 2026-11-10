@@ -57,7 +57,7 @@ private:
 	void reset(uint8_t rom, uint8_t f)
 	{
 		gb_push16(gb_, static_cast<uint16_t>(rom << 8 | f));
-		gb_->cpu.pc = ADDR_Init;
+		gb_tail_jump(gb_, ADDR_Init);
 	}
 	void wait_next_hblank()
 	{
@@ -171,7 +171,6 @@ void RoomLoader::load_block_function_table()
 	if (group_2)
 		switch_bank(BANK_BlockFunctionTablePointers);
 	switch_bank(rom);
-	gb_->cpu.pc = gb_pop16(gb_); // ret
 }
 
 // a level's header: its rooms' headers in bank $30 or $31
@@ -232,7 +231,6 @@ void RoomLoader::load()
 	uint8_t right = limit(mem_[wRoomRightXLimit], 3, 0xb0);
 	mem_[wc0c7] = right ? right : 0xff;
 	mem_[wc0c6] = limit(mem_[wRoomLeftXLimit], 3, 0xb0);
-	gb_->cpu.pc = gb_pop16(gb_); // ret
 }
 
 } // namespace
@@ -247,8 +245,8 @@ PORT_EX(LoadRoomMainTiles, 0, ALL_REGISTERS) { RoomLoader(gb).load_main_tiles();
 PORT_EX(LoadRoomSpecialTiles, 0, ALL_REGISTERS) { RoomLoader(gb).load_special_tiles(); }
 PORT_EX(LoadRoomPalettes, 0, ALL_REGISTERS) { RoomLoader(gb).load_palettes(); }
 PORT_EX(UpdateRoomAnimatedPals, 0, ALL_REGISTERS) { wl3::home::update_room_animated_pals(gb); }
-PORT_EX(LoadBlockFunctionTable, HOOK_MANUAL_RET, ALL_REGISTERS) { RoomLoader(gb).load_block_function_table(); }
-PORT_EX(LoadRoom, HOOK_MANUAL_RET, ALL_REGISTERS) { RoomLoader(gb).load(); }
+PORT_EX(LoadBlockFunctionTable, 0, ALL_REGISTERS) { RoomLoader(gb).load_block_function_table(); }
+PORT_EX(LoadRoom, 0, ALL_REGISTERS) { RoomLoader(gb).load(); }
 
 namespace wl3::home {
 void update_room_animated_pals(GB *gb) { RoomLoader(gb).update_animated_pals(); }

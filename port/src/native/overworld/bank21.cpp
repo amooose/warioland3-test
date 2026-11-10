@@ -44,7 +44,7 @@ public:
 			mem_[rBGPD] = mem_[static_cast<uint16_t>(wTempBGPals + i)];
 		mem_[rVBK] = 0;
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-		JUMP_TO(hTransferVirtualOAM);
+		gb_tail_jump(gb_, hTransferVirtualOAM);
 	}
 };
 
@@ -72,4 +72,4 @@ static void apply_pal_config(GB *gb, uint16_t config)
 PORT(ApplyPalConfig_Bank21) { apply_pal_config(gb, REG_HL(gb)); }
 PORT(ApplyPalConfig1) { apply_pal_config(gb, wPalConfig1); }
 PORT(ApplyPalConfig2) { apply_pal_config(gb, wPalConfig2); }
-PORT_LOCAL_EX(VBlank_OWPalTransition, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { OverworldBank21(gb).port_VBlank_OWPalTransition__Func(); }
+PORT_LOCAL_EX(VBlank_OWPalTransition, Func, 0, ALL_REGISTERS & ~R_A) { OverworldBank21(gb).port_VBlank_OWPalTransition__Func(); }

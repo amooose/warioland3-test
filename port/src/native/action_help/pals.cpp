@@ -135,7 +135,6 @@ public:
 		mem_[rSCX] = mem_[wSCX];
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
 		transfer_virtual_oam(gb_);
-		RET();
 	}
 };
 
@@ -145,7 +144,7 @@ public:
 
 using wl3::action_help::ActionHelpPals;
 
-PORT_LOCAL_EX(VBlank_1fb6b7, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { ActionHelpPals(gb).port_VBlank_1fb6b7__Func(); }
+PORT_LOCAL_EX(VBlank_1fb6b7, Func, 0, ALL_REGISTERS) { ActionHelpPals(gb).port_VBlank_1fb6b7__Func(); }
 
 // unreferenced: hl = a sprite's y (on the BG map), x, frame and attributes,
 // drawn from OAM_1e6bab

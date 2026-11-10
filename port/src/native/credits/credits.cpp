@@ -52,7 +52,6 @@ public:
 		}
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
 		transfer_virtual_oam(gb_);
-		RET();
 	}
 };
 
@@ -62,4 +61,4 @@ public:
 
 using wl3::credits::CreditsCredits;
 
-PORT_LOCAL_EX(VBlank_160439, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { CreditsCredits(gb).port_VBlank_160439__Func(); }
+PORT_LOCAL_EX(VBlank_160439, Func, 0, ALL_REGISTERS) { CreditsCredits(gb).port_VBlank_160439__Func(); }

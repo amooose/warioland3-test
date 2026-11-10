@@ -19,7 +19,6 @@ public:
 	{
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
 		transfer_virtual_oam(gb_);
-		RET();
 	}
 
 	void port_VBlank_Saving__Func() { transfer_oam(); }
@@ -46,5 +45,5 @@ public:
 
 using wl3::pause::PauseSaveVblank;
 
-PORT_LOCAL_EX(VBlank_Saving, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { PauseSaveVblank(gb).port_VBlank_Saving__Func(); }
-PORT_LOCAL_EX(VBlank_SaveScreen, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { PauseSaveVblank(gb).port_VBlank_SaveScreen__Func(); }
+PORT_LOCAL_EX(VBlank_Saving, Func, 0, ALL_REGISTERS) { PauseSaveVblank(gb).port_VBlank_Saving__Func(); }
+PORT_LOCAL_EX(VBlank_SaveScreen, Func, 0, ALL_REGISTERS) { PauseSaveVblank(gb).port_VBlank_SaveScreen__Func(); }

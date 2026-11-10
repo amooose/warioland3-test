@@ -740,7 +740,7 @@ PORT_EX(GolfBuildingStateTable, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 
 // VBlank_1c84e0.Func, run from wVBlankFunc (see ram_code.c): sets the golf
 // RAM bank and the scroll, then the OAM DMA.
-PORT_LOCAL_EX(VBlank_1c84e0, Func, HOOK_MANUAL_RET, 0)
+PORT_LOCAL_EX(VBlank_1c84e0, Func, 0, 0)
 {
 	wl3::Memory mem(gb);
 	gb->cpu.a = 0x01; // BANK("Golf RAM")
@@ -748,7 +748,7 @@ PORT_LOCAL_EX(VBlank_1c84e0, Func, HOOK_MANUAL_RET, 0)
 	gb->cpu.a = mem[wSCX];
 	mem[rSCX] = gb->cpu.a;
 	gb->cpu.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-	JUMP_TO(hTransferVirtualOAM);
+	gb_tail_jump(gb, hTransferVirtualOAM);
 }
 
 // The routines implemented inside this module (they have no hooks).

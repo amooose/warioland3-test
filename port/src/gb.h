@@ -193,6 +193,11 @@ typedef struct GB {
 		// Stops native code that loops forever on garbage input.
 		uint64_t budget;
 		void (*out_of_budget)(struct GB *gb);
+		// The registers hooks the CPU dispatched during the check may
+		// clobber (their contracts): the native routine's results there
+		// aren't the asm's, so they aren't compared. Reached that way, a
+		// hook runs code the routine doesn't (fuzzed RAM code, say).
+		unsigned nested_clobbers;
 		// Offsets into this struct of the RAM bytes read, if read_log_cap.
 		uint32_t *read_log;
 		int read_log_len, read_log_cap;
@@ -272,6 +277,13 @@ void gb_call(GB *gb, uint16_t addr);
 // that returns (not HOOK_MANUAL_RET): no CPU dispatch, return address or
 // stack, as a direct call. False if there's none (then use gb_call_ret).
 bool gb_call_native(GB *gb, uint16_t addr);
+// The asm's jp addr at the end of a routine, from a hook that returns
+// normally: what runs there returns for it. A ROM routine with a native
+// routine that returns, or RAM code ram_tail_jump knows, runs directly;
+// anything else runs on the CPU at this sp until its ret pops the hook's
+// return address, which the hook's own return then pops again (sp is put
+// back; nothing is written). No stack is used that the asm doesn't.
+void gb_tail_jump(GB *gb, uint16_t addr);
 // gb_call, but pushing ret as the return address, as the asm's own call
 // would: for callees that may look at the stack. ret is where the asm's call
 // instruction returns to; it is never executed here.

@@ -161,13 +161,17 @@ static bool copied_func(GB *gb)
 	if (!h)
 		return false;
 	h->calls++;
+	if (gb->test.active)
+		gb->test.nested_clobbers |= h->clobbers;
 	h->fn(gb);
 	if (!(h->flags & HOOK_MANUAL_RET))
 		RET();
 	return true;
 }
 
-bool ram_run_vblank_func(GB *gb)
+// The V-Blank function copied to wVBlankFunc, when its ROM block has a
+// native routine that returns, run as cpu_step would dispatch it
+static bool run_vblank_func(GB *gb)
 {
 	Hook *h = copied_hook(gb, wVBlankFunc);
 	if (!h || (h->flags & HOOK_MANUAL_RET))
@@ -197,11 +201,10 @@ bool ram_run_vblank_func(GB *gb)
 	return true;
 }
 
-static bool vblank_code(GB *gb)
+// The tile copy loop at pc, if it's there: run, and the address of the jp
+// or ret that ends it in *end. False, doing nothing, if pc holds other code.
+static bool tile_copy(GB *gb, uint16_t pc, uint16_t *end_out)
 {
-	uint16_t pc = gb->cpu.pc;
-	if (pc == wVBlankFunc && copied_func(gb))
-		return true;
 	int n = 0;
 	while (n < 0x100 && ram_is(gb, (uint16_t)(pc + n * 7), tile_copy_code, NULL, sizeof(tile_copy_code)))
 		n++;
@@ -220,11 +223,48 @@ static bool vblank_code(GB *gb)
 		gb->cpu.c = alu_inc(gb, gb->cpu.c);
 	}
 	SET_HL(gb, hl);
-	if (*op == 0xc9) {
-		RET();
+	*end_out = end;
+	return true;
+}
+
+// the jp at end's target, or -1 for a ret
+static int tile_copy_exit(GB *gb, uint16_t end)
+{
+	if (ram_byte(gb, end) == 0xc9)
+		return -1;
+	return ram_byte(gb, (uint16_t)(end + 1)) | ram_byte(gb, (uint16_t)(end + 2)) << 8;
+}
+
+static bool vblank_code(GB *gb)
+{
+	uint16_t pc = gb->cpu.pc, end;
+	if (pc == wVBlankFunc && copied_func(gb))
 		return true;
-	}
-	JUMP_TO(ram_byte(gb, (uint16_t)(end + 1)) | ram_byte(gb, (uint16_t)(end + 2)) << 8);
+	if (!tile_copy(gb, pc, &end))
+		return false;
+	int to = tile_copy_exit(gb, end);
+	if (to < 0)
+		RET();
+	else
+		JUMP_TO(to);
+	return true;
+}
+
+bool ram_tail_jump(GB *gb, uint16_t addr)
+{
+	if (addr == hTransferVirtualOAM)
+		return ram_transfer_virtual_oam(gb);
+	if (addr == wVBlankFunc && run_vblank_func(gb))
+		return true;
+	uint16_t end;
+	if ((addr != wVBlankFunc && addr != wVBlankFunc + 0x10 && addr != wVBlankFuncExtended) ||
+		!tile_copy(gb, addr, &end))
+		return false;
+	if (!gb->no_tick)
+		gb_tick(gb, 4); // the dispatch's token cycles, as cpu_step charges
+	int to = tile_copy_exit(gb, end);
+	if (to >= 0)
+		gb_tail_jump(gb, (uint16_t)to);
 	return true;
 }
 

@@ -4,7 +4,7 @@
 #include "../routines.hpp"
 
 // _InitBestTimeList.func, as copied to wVBlankFunc (see ram_code.c)
-PORT_LOCAL_EX(_InitBestTimeList, func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A)
+PORT_LOCAL_EX(_InitBestTimeList, func, 0, ALL_REGISTERS & ~R_A)
 {
 	wl3::Memory mem(gb);
 	mem[rWBK] = 0x02;
@@ -12,5 +12,5 @@ PORT_LOCAL_EX(_InitBestTimeList, func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A)
 	mem[rSCX] = mem[wSCX];
 	mem[rVBK] = 0;
 	gb->cpu.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-	JUMP_TO(hTransferVirtualOAM);
+	gb_tail_jump(gb, hTransferVirtualOAM);
 }

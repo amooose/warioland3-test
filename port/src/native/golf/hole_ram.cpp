@@ -27,7 +27,7 @@ public:
 	void transfer_oam()
 	{
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-		JUMP_TO(hTransferVirtualOAM);
+		gb_tail_jump(gb_, hTransferVirtualOAM);
 	}
 
 	// ld a, BANK("Golf RAM") / ldh [rWBK], a (vbk: and to rVBK)
@@ -183,13 +183,13 @@ public:
 
 using wl3::golf::GolfHoleRam;
 
-PORT_LOCAL_EX(VBlank_1c9d1d, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9d1d__Func(); }
-PORT_LOCAL_EX(VBlank_1c9e8d, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9e8d__Func(); }
-PORT_LOCAL_EX(VBlank_1c9eb3, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9eb3__Func(); }
-PORT_LOCAL_EX(VBlank_1c9ef1, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9ef1__Func(); }
-PORT_LOCAL_EX(VBlank_1c9f36, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9f36__Func(); }
-PORT_LOCAL_EX(VBlank_1c9f7a, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9f7a__Func(); }
-PORT_LOCAL_EX(VBlank_1c9fe1, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9fe1__Func(); }
-PORT_LOCAL_EX(VBlank_1c9ffa, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9ffa__Func(); }
-PORT_LOCAL_EX(VBlank_1ca033, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1ca033__Func(); }
-PORT_LOCAL_EX(VBlank_1ca056, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1ca056__Func(); }
+PORT_LOCAL_EX(VBlank_1c9d1d, Func, 0, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9d1d__Func(); }
+PORT_LOCAL_EX(VBlank_1c9e8d, Func, 0, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9e8d__Func(); }
+PORT_LOCAL_EX(VBlank_1c9eb3, Func, 0, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9eb3__Func(); }
+PORT_LOCAL_EX(VBlank_1c9ef1, Func, 0, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9ef1__Func(); }
+PORT_LOCAL_EX(VBlank_1c9f36, Func, 0, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9f36__Func(); }
+PORT_LOCAL_EX(VBlank_1c9f7a, Func, 0, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9f7a__Func(); }
+PORT_LOCAL_EX(VBlank_1c9fe1, Func, 0, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9fe1__Func(); }
+PORT_LOCAL_EX(VBlank_1c9ffa, Func, 0, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1c9ffa__Func(); }
+PORT_LOCAL_EX(VBlank_1ca033, Func, 0, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1ca033__Func(); }
+PORT_LOCAL_EX(VBlank_1ca056, Func, 0, ALL_REGISTERS & ~R_A) { GolfHoleRam(gb).port_VBlank_1ca056__Func(); }

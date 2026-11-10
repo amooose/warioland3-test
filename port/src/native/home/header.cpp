@@ -45,10 +45,12 @@ public:
 			push_af();
 			cpu_.a = rd8(rVBK);
 			push_af();
-			// The pushes stay: the function runs under them, 16 bytes lower
-			// on the stack, and code that reads below sp sees them
-			if (!ram_run_vblank_func(gb_))
-				gb_call_ret(gb_, wVBlankFunc, ADDR_VBlank + 0x1b);
+			// call wVBlankFunc. The pushes stay, and so does the return
+			// address: the function runs under them, and code that reads
+			// below sp sees them.
+			gb_push16(gb_, ADDR_VBlank + 0x1b);
+			gb_tail_jump(gb_, wVBlankFunc);
+			gb_pop16(gb_);
 			pop_af();
 			wr8(rVBK, cpu_.a);
 			pop_af();

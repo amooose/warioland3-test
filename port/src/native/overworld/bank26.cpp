@@ -169,7 +169,7 @@ public:
 		cpu_.f = FLAG_Z; // xor a
 		wr8(rVBK, 0);
 		cpu_.a = (uint8_t)(wVirtualOAM >> 8);
-		JUMP_TO(hTransferVirtualOAM);
+		gb_tail_jump(gb_, hTransferVirtualOAM);
 	}
 };
 
@@ -198,4 +198,4 @@ PORT_EX(LoadLevelTreasureData, 0, ALL_REGISTERS & ~(R_A | R_F))
 PORT_EX(Func_9ab1c, 0, ALL_REGISTERS) { OverworldBank26(gb).func_9ab1c(); }
 PORT_EX(GetLevelTimeAttackScore, 0, ALL_REGISTERS) { OverworldBank26(gb).get_level_time_attack_score(); }
 PORT_EX(Func_9aab5, 0, ALL_REGISTERS) { OverworldBank26(gb).func_9aab5(); }
-PORT_LOCAL_EX(VBlank_TreasureCollection, Func, HOOK_MANUAL_RET, 0) { OverworldBank26(gb).port_VBlank_TreasureCollection__Func(); }
+PORT_LOCAL_EX(VBlank_TreasureCollection, Func, 0, 0) { OverworldBank26(gb).port_VBlank_TreasureCollection__Func(); }

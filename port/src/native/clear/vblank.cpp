@@ -35,7 +35,6 @@ public:
 	{
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
 		transfer_virtual_oam(gb_);
-		RET();
 	}
 
 	// VBlank_ClearScreen.Func: the scroll, and tile $71's rows rotated
@@ -83,5 +82,5 @@ public:
 
 using wl3::clear::ClearVblank;
 
-PORT_LOCAL_EX(VBlank_ClearScreen, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { ClearVblank(gb).port_VBlank_ClearScreen__Func(); }
-PORT_LOCAL_EX(VBlank_MusicalCoinsScreen, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { ClearVblank(gb).port_VBlank_MusicalCoinsScreen__Func(); }
+PORT_LOCAL_EX(VBlank_ClearScreen, Func, 0, ALL_REGISTERS) { ClearVblank(gb).port_VBlank_ClearScreen__Func(); }
+PORT_LOCAL_EX(VBlank_MusicalCoinsScreen, Func, 0, ALL_REGISTERS) { ClearVblank(gb).port_VBlank_MusicalCoinsScreen__Func(); }

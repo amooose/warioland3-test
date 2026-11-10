@@ -237,6 +237,8 @@ int cpu_step(GB *gb)
 		else if (entry == ENTRY_IRQ)
 			hook->by_irq++;
 		entry = ENTRY_OTHER;
+		if (gb->test.active)
+			gb->test.nested_clobbers |= hook->clobbers;
 		hook->fn(gb);
 		if (!(hook->flags & HOOK_MANUAL_RET))
 			PC = gb_pop16(gb);
@@ -292,6 +294,44 @@ bool gb_call_native(GB *gb, uint16_t addr)
 	prev_pc = PREV_NATIVE;
 	PC = saved_pc;
 	return true;
+}
+
+void gb_tail_jump(GB *gb, uint16_t addr)
+{
+	if (addr >= 0x8000 ? ram_tail_jump(gb, addr) : gb_call_native(gb, addr))
+		return;
+	uint16_t saved_sp = SP;
+	uint16_t saved_pc = PC;
+	PC = addr;
+	entry = ENTRY_OTHER;
+	prev_pc = PREV_NATIVE;
+	came_from_wram = false;
+	if (gb->test.active && gb->call_depth >= 256) {
+		gb->test.unrealistic = true;
+		gb->test.crashed = true;
+	}
+	gb->call_depth++;
+	while (SP <= saved_sp && !gb->test.crashed) {
+		// a reset (a tail jump to Init): as call_ret drops the native frames
+		if (PC == ADDR_InitWithoutDemoPowerUpReset && gb->reset_unwind && !gb->test.active) {
+			gb->call_depth = 0;
+			longjmp(*(jmp_buf *)gb->reset_unwind, 1);
+		}
+		if (gb->test.budget && --gb->test.budget == 0)
+			gb->test.out_of_budget(gb);
+		int cycles = cpu_step(gb);
+		if (!gb->no_tick)
+			gb_tick(gb, cycles);
+	}
+	gb->call_depth--;
+	// Anything but a ret of the hook's return address (a pop or add sp past
+	// it) leaves the caller somewhere native code can't follow
+	if (gb->test.active && SP != (uint16_t)(saved_sp + 2)) {
+		gb->test.unrealistic = true;
+		gb->test.crashed = true;
+	}
+	SP = saved_sp;
+	PC = saved_pc;
 }
 
 void gb_call(GB *gb, uint16_t addr)

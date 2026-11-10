@@ -36,7 +36,7 @@ public:
 			// wBGMapAddressQueue
 			SET_HL(gb_, wBGMapAddressQueue);
 			SET_BC(gb_, wBGMapTileVRAM0Queue);
-			JUMP_TO(wVBlankFunc + 0x10);
+			gb_tail_jump(gb_, wVBlankFunc + 0x10);
 			return;
 		}
 		// wPendingDMASourceBank, then the source, destination bank and
@@ -58,7 +58,6 @@ public:
 		SET_HL(gb_, wSCYShake);
 		cpu_.a = 0;
 		cpu_.f = FLAG_Z;
-		RET();
 	}
 
 	// called within level V-Blank: the RAM code at wVBlankFuncExtended
@@ -69,7 +68,7 @@ public:
 		mem_[rVBK] = cpu_.a;
 		SET_HL(gb_, wBGMapAddressQueue);
 		SET_BC(gb_, wBGMapTileVRAM1Queue);
-		JUMP_TO(wVBlankFuncExtended);
+		gb_tail_jump(gb_, wVBlankFuncExtended);
 	}
 
 	void port_ClearLevelTileQueue()
@@ -87,6 +86,6 @@ public:
 
 using wl3::home::HomeLevelVblank;
 
-PORT_EX(LevelVBlankFunc, HOOK_MANUAL_RET, 0) { HomeLevelVblank(gb).port_LevelVBlankFunc(); }
-PORT_EX(ProcessLevelTileQueue_VRAM1, HOOK_MANUAL_RET, 0) { HomeLevelVblank(gb).port_ProcessLevelTileQueue_VRAM1(); }
+PORT_EX(LevelVBlankFunc, 0, 0) { HomeLevelVblank(gb).port_LevelVBlankFunc(); }
+PORT_EX(ProcessLevelTileQueue_VRAM1, 0, 0) { HomeLevelVblank(gb).port_ProcessLevelTileQueue_VRAM1(); }
 PORT_EX(ClearLevelTileQueue, 0, 0) { HomeLevelVblank(gb).port_ClearLevelTileQueue(); }

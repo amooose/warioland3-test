@@ -87,7 +87,6 @@ public:
 		mem_[rSCX] = mem_[wSCX];
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
 		transfer_virtual_oam(gb_);
-		RET();
 	}
 };
 
@@ -122,4 +121,4 @@ PORT_EX(AdjustJapaneseTimeAttackDescriptionWindow, 0, ALL_REGISTERS & ~(R_A | R_
 		gb->cpu.f = flags::and_(gb->cpu.a);
 	}
 }
-PORT_LOCAL_EX(VBlank_Title, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { TitleRaster(gb).port_VBlank_Title__Func(); }
+PORT_LOCAL_EX(VBlank_Title, Func, 0, ALL_REGISTERS) { TitleRaster(gb).port_VBlank_Title__Func(); }

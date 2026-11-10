@@ -51,7 +51,7 @@ public:
 		bankswitch(rom);
 		mem[rVBK] = 0;
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-		JUMP_TO(hTransferVirtualOAM);
+		gb_tail_jump(gb_, hTransferVirtualOAM);
 	}
 };
 
@@ -63,4 +63,4 @@ using wl3::overworld::OverworldBank27;
 
 PORT_EX(PrologueFunc, 0, ALL_REGISTERS) { OverworldBank27(gb).port_PrologueFunc(); }
 PORT_EX(VBlank_Cutscene, 0, ALL_REGISTERS) { OverworldBank27(gb).port_VBlank_Cutscene(); }
-PORT_LOCAL_EX(VBlank_Cutscene, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { OverworldBank27(gb).vblank_func(); }
+PORT_LOCAL_EX(VBlank_Cutscene, Func, 0, ALL_REGISTERS & ~R_A) { OverworldBank27(gb).vblank_func(); }

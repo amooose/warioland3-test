@@ -16,7 +16,7 @@ namespace {
 void transfer_oam(GB *gb)
 {
 	gb->cpu.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-	JUMP_TO(hTransferVirtualOAM);
+	gb_tail_jump(gb, hTransferVirtualOAM);
 }
 
 // the HDMA in wHDMA, from wHDMABank (cleared): to the VRAM bank given
@@ -91,8 +91,8 @@ PORT_COVERED(Func_ad016);
 PORT_COVERED(Func_aca63);
 PORT_COVERED(Func_ad329);
 PORT_COVERED(Func_ad33c);
-PORT_LOCAL_EX(VBlank_PrologueEpilogue, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { prologue_epilogue_vblank(gb); }
-PORT_LOCAL_EX(_GolfBuilding, func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { golf_building_vblank(gb); }
+PORT_LOCAL_EX(VBlank_PrologueEpilogue, Func, 0, ALL_REGISTERS & ~R_A) { prologue_epilogue_vblank(gb); }
+PORT_LOCAL_EX(_GolfBuilding, func, 0, ALL_REGISTERS & ~R_A) { golf_building_vblank(gb); }
 
 // Unreferenced in the original, so unreachable: nothing to run. Marked for
 // the progress report.

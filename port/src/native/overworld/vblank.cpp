@@ -53,7 +53,7 @@ private:
 	void transfer_oam()
 	{
 		gb_->cpu.a = static_cast<uint8_t>(wVirtualOAM >> 8);
-		gb_->cpu.pc = hTransferVirtualOAM;
+		gb_tail_jump(gb_, hTransferVirtualOAM);
 	}
 
 	GB *gb_;
@@ -136,8 +136,8 @@ void OverworldVblank::ow_scene()
 
 using wl3::overworld::OverworldVblank;
 
-PORT_LOCAL_EX(VBlank_Overworld, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { OverworldVblank(gb).overworld(); }
-PORT_LOCAL_EX(VBlank_OWScene, Func, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { OverworldVblank(gb).ow_scene(); }
+PORT_LOCAL_EX(VBlank_Overworld, Func, 0, ALL_REGISTERS & ~R_A) { OverworldVblank(gb).overworld(); }
+PORT_LOCAL_EX(VBlank_OWScene, Func, 0, ALL_REGISTERS & ~R_A) { OverworldVblank(gb).ow_scene(); }
 
 // Only C++ modules set these now.
 PORT_COVERED(VBlank_Overworld);

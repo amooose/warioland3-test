@@ -60,7 +60,7 @@ bool LevelLoader::maps(uint8_t &rom, uint16_t &header)
 		| ((ADDR_LevelBlockAndObjectMaps & 0xfff) + (de & 0xfff) > 0xfff ? FLAG_H : 0)
 		| (ADDR_LevelBlockAndObjectMaps + de > 0xffff ? FLAG_C : 0));
 	gb_push16(gb_, static_cast<uint16_t>(rom << 8 | f));
-	gb_->cpu.pc = ADDR_InvalidLevelData;
+	gb_tail_jump(gb_, ADDR_InvalidLevelData);
 	return false;
 }
 
@@ -88,7 +88,6 @@ void LevelLoader::load()
 	rom_switch(rom);
 	if (!(mem_[wceef] & 0x3c))
 		Routines(gb_).call(ADDR_DecompressLevelObjectMap);
-	gb_->cpu.pc = gb_pop16(gb_); // ret
 }
 
 void LevelLoader::reload_objects()
@@ -100,7 +99,6 @@ void LevelLoader::reload_objects()
 	read_block_map_header(header);
 	rom_switch(rom);
 	reload_objects_bits();
-	gb_->cpu.pc = gb_pop16(gb_); // ret
 }
 
 // almost identical to DecompressLevelBlockMap, but only ors in the
@@ -155,8 +153,8 @@ void LevelLoader::or_objects_bits(uint16_t src)
 using wl3::home::LevelLoader;
 
 PORT_EX(InvalidLevelData, HOOK_MANUAL_RET, ALL_REGISTERS) { gb->cpu.pc = ADDR_Init; }
-PORT_EX(LoadLevelBlockMapAndObjects, HOOK_MANUAL_RET, ALL_REGISTERS) { LevelLoader(gb).load(); }
-PORT_EX(ReloadLevelObjects, HOOK_MANUAL_RET, ALL_REGISTERS) { LevelLoader(gb).reload_objects(); }
+PORT_EX(LoadLevelBlockMapAndObjects, 0, ALL_REGISTERS) { LevelLoader(gb).load(); }
+PORT_EX(ReloadLevelObjects, 0, ALL_REGISTERS) { LevelLoader(gb).reload_objects(); }
 PORT_LOCAL_EX(ReloadLevelObjects, DecompressLevelBlockMap_OnlyHighBit, 0, ALL_REGISTERS)
 {
 	LevelLoader(gb).reload_objects_bits();

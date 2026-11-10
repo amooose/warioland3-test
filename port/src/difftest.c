@@ -320,6 +320,7 @@ static CheckResult check_once(const GB *base, Hook *h, Report *r, const char **w
 	nat->test.out_of_budget = native_out_of_budget;
 	volatile bool native_stuck = false; // set across the longjmp
 	volatile unsigned clobbers = h->clobbers;
+	nat->test.nested_clobbers = 0;
 	hooks_set_enabled(true);
 	if (setjmp(native_escape)) {
 		native_stuck = true;
@@ -341,6 +342,7 @@ static CheckResult check_once(const GB *base, Hook *h, Report *r, const char **w
 		}
 	}
 	hooks_set_enabled(false);
+	clobbers |= nat->test.nested_clobbers;
 	native_accesses = native_budget - nat->test.budget;
 
 	// Reference run: the original asm, from the same state. It runs until it

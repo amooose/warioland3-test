@@ -229,18 +229,17 @@ void BlockFuncs::run_block_function(uint16_t func)
 	routines_.call(func);
 }
 
-// jp hl, so it returns to the caller
+// jp hl, so what runs there returns to the caller
 void BlockFuncs::process_block()
 {
 	uint16_t func = block_function();
 	if (gb_->rom_bank == BANK_ProcessBlock && dispatch(func)) {
 		run(next_);
-		cpu_.pc = gb_pop16(gb_);
 		return;
 	}
 	cpu_.a = static_cast<uint8_t>(func); // what jp hl runs may read it
 	leave();
-	cpu_.pc = func;
+	gb_tail_jump(gb_, func);
 }
 
 void BlockFuncs::run(uint16_t func)
@@ -1418,7 +1417,7 @@ using wl3::level::Progress;
 // chain ends in Free, Solid, Func_1808c, Func_18064 or Func_18078, which set
 // them, or Fire's ret, which is exact. So the hooks that only jump on
 // clobber them; the rest stay exact.
-PORT_EX(ProcessBlock, HOOK_MANUAL_RET, ALL_REGISTERS & ~R_A) { BlockFuncs(gb).process_block(); }
+PORT_EX(ProcessBlock, 0, ALL_REGISTERS & ~R_A) { BlockFuncs(gb).process_block(); }
 PORT_EX(BlockFunc_Free, 0, ALL_REGISTERS & ~R_A) { BlockFuncs(gb).free(); }
 PORT_EX(BlockFunc_Solid, 0, ALL_REGISTERS & ~R_A) { BlockFuncs(gb).solid(); }
 PORT_EX(BlockFunc_Water, HOOK_MANUAL_RET, ALL_REGISTERS) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Water); b.jump_on(); }

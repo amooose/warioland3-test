@@ -34,7 +34,6 @@ public:
 		mem_[rSCX] = mem_[wSCX];
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
 		transfer_virtual_oam(gb_);
-		RET();
 	}
 };
 
@@ -44,4 +43,4 @@ public:
 
 using wl3::language_selection::LanguageSelectionVblank;
 
-PORT_LOCAL_EX(VBlank_LanguageSelection, Func, HOOK_MANUAL_RET, ALL_REGISTERS) { LanguageSelectionVblank(gb).port_VBlank_LanguageSelection__Func(); }
+PORT_LOCAL_EX(VBlank_LanguageSelection, Func, 0, ALL_REGISTERS) { LanguageSelectionVblank(gb).port_VBlank_LanguageSelection__Func(); }

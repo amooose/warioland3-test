@@ -56,7 +56,7 @@ void RoomGfx::load()
 {
 	uint16_t data = Word(gb_, table_entry(ADDR_RoomBlockAndGfxData, mem_[wRoom]));
 	if (data >> 8 == 0xff) { // debug_assert_not $ff
-		gb_->cpu.pc = ADDR_Init;
+		gb_tail_jump(gb_, ADDR_Init);
 		return;
 	}
 	uint8_t function_table = mem_[data + 0];
@@ -78,7 +78,6 @@ void RoomGfx::load()
 	routines_.call(ADDR_LoadRoomSpecialTiles);
 	mem_[wPaletteBank] = LEVEL_PALETTES;
 	routines_.call(ADDR_LoadRoomPalettes);
-	gb_->cpu.pc = gb_pop16(gb_); // ret
 }
 
 void RoomGfx::init_animated_tiles()
@@ -223,7 +222,7 @@ uint16_t wario_bg_ptr(GB *gb)
 using wl3::level::RoomGfx;
 
 // (or a jump to Init for a room without data)
-PORT_EX(LoadRoomGfx, HOOK_MANUAL_RET, ALL_REGISTERS) { RoomGfx(gb).load(); }
+PORT_EX(LoadRoomGfx, 0, ALL_REGISTERS) { RoomGfx(gb).load(); }
 
 // de = 2 * the group, hl at its gfx byte; a = 0, f = Z
 PORT_EX(InitRoomAnimatedTiles, 0, ALL_REGISTERS) { RoomGfx(gb).init_animated_tiles(); }
