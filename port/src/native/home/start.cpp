@@ -4,6 +4,7 @@
 // callers (see src/native/asm_module.hpp).
 #include "../asm_module.hpp"
 #include "memory.hpp"
+#include "../audio/audio.hpp"
 
 namespace wl3::home {
 
@@ -47,65 +48,33 @@ public:
 		CALL(PlayNewMusic_SetNoise);
 	}
 
-	// handle playing SFX and music. The audio entry points leave bc and de as
-	// the engine's loops did (see src/native/audio): nothing after HandleSound
-	// reads them before setting them (the main loop goes on to UpdateJoypad).
+	// handle playing SFX and music: the SFX and music IDs requested this
+	// frame ($ff: turn it off), then the engine's update. The game loop reads
+	// no register after.
 	void port_HandleSound()
 	{
-		cpu_.a = alu_.and_(rd8(wSoundMuted), rd8(wSoundMuted));
-		if (cpu_.a)
+		Memory mem(gb_);
+		if (mem[wSoundMuted])
 			return;
-		cpu_.a = rd8(hSFXID);
-		SET_HL(gb_, hSFXID + 1);
-		alu_.cp(cpu_.a, 0xff);
-		bool play = true;
-		if (cpu_.f & FLAG_Z) {
-			SET_BC(gb_, SOUND_OFF);
-		} else {
-			// .valid_sfx
-			cpu_.c = rd8(hSFXID + 1);
-			cpu_.b = cpu_.a;
-			cpu_.a = alu_.or_(cpu_.a, cpu_.c);
-			play = cpu_.a != 0;
-		}
-		if (play) {
-			// .got_sfx
-			cpu_.a = 0;
-			cpu_.f = FLAG_Z; // xor a
-			wr8(hSFXID + 1, 0);
-			wr8(hSFXID + 0, 0);
-			SET_HL(gb_, hSFXID);
-			CALL(PlaySFX);
-		}
-
-		// .music
-		cpu_.a = rd8(hMusicID);
-		SET_HL(gb_, hMusicID + 1);
-		alu_.cp(cpu_.a, 0xff);
-		if (cpu_.f & FLAG_Z) {
-			SET_BC(gb_, SOUND_OFF);
-			cpu_.a = 0;
-			cpu_.f = FLAG_Z; // xor a
-			wr8(hMusicID + 1, 0);
-			wr8(hMusicID + 0, 0);
-			SET_HL(gb_, hMusicID);
-			CALL(PlayNewMusic);
-		} else {
-			// .valid_music
-			cpu_.c = rd8(hMusicID + 1);
-			cpu_.b = cpu_.a;
-			cpu_.a = alu_.or_(cpu_.a, cpu_.c);
-			if (cpu_.a) {
-				cpu_.a = 0;
-				cpu_.f = FLAG_Z; // xor a
-				wr8(hMusicID + 1, 0);
-				wr8(hMusicID + 0, 0);
-				SET_HL(gb_, hMusicID);
-				CALL(PlayNewMusic_SetNoise);
+		auto take = [&](uint16_t at) {
+			uint16_t id = static_cast<uint16_t>(mem[at] << 8 | mem[at + 1]);
+			if (id) {
+				mem[at + 1] = 0;
+				mem[at + 0] = 0;
 			}
-		}
-		// .update
-		CALL(UpdateAudio);
+			return id;
+		};
+		uint16_t sfx = take(hSFXID);
+		if (sfx >> 8 == 0xff)
+			audio::play_sfx(gb_, SOUND_OFF);
+		else if (sfx)
+			audio::play_sfx(gb_, sfx);
+		uint16_t music = take(hMusicID);
+		if (music >> 8 == 0xff)
+			audio::play_new_music(gb_, SOUND_OFF);
+		else if (music)
+			audio::play_new_music_set_noise(gb_, music);
+		audio::update(gb_);
 	}
 
 	// The main game loop (InitWithoutDemoPowerUpReset.GameLoop), one game
@@ -290,7 +259,7 @@ using wl3::home::HomeStart;
 
 PORT_EX(UnreferencedMuteSound, 0, 0) { HomeStart(gb).port_UnreferencedMuteSound(); }
 PORT_EX(UnreferencedUnmuteSound, 0, R_B | R_C | R_D | R_E) { HomeStart(gb).port_UnreferencedUnmuteSound(); }
-PORT_EX(HandleSound, 0, R_B | R_C | R_D | R_E) { HomeStart(gb).port_HandleSound(); }
+PORT_EX(HandleSound, 0, ALL_REGISTERS) { HomeStart(gb).port_HandleSound(); }
 // The game loop and the boot code read memory only: no register is live
 // at .GameLoop or after the halt (UpdateJoypad and HandleSound set what
 // they pass on), and Start reads only a.

@@ -4,6 +4,7 @@
 // returns what it returns.
 #pragma once
 
+#include "audio/audio.hpp"
 #include "home/fades.hpp"
 #include "home/memory.hpp"
 #include "home/pals.hpp"
@@ -111,13 +112,12 @@ public:
 		home::load_pals_to_temp_pals2(gb_, pals);
 	}
 
-	void play_new_music(uint16_t music)
-	{
-		SET_BC(gb_, music);
-		call(ADDR_PlayNewMusic);
-	}
+	void play_new_music(uint16_t music) { audio::play_new_music(gb_, music); }
 
-	// a = mod, b = value, d = SFX channels, e = music channels
+	// a = mod, b = value, d = SFX channels, e = music channels. Still through
+	// the register-level hook: the original also stores the caller's
+	// leftover c in wSoundEngineParam1, a byte nothing reads before writing
+	// it, but the traces compare it, and the leftover c varies (Action Help).
 	void execute_audio_mod(uint8_t mod, uint8_t value, uint8_t sfx_channels, uint8_t music_channels)
 	{
 		gb_->cpu.a = mod;

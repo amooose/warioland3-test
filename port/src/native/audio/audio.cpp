@@ -1,5 +1,6 @@
 // The audio entry points (src/home/audio.asm), and the way the original
 // calls into the engine around them (src/home/audio_functions.asm).
+#include "audio.hpp"
 #include "engine.hpp"
 
 using wl3::Byte;
@@ -73,8 +74,8 @@ public:
 	void switch_back() { map_rom_bank(wram_.audio_bank_backup()); }
 
 	// ReturnFromAudioJump: runs a deferred update, then maps the caller's
-	// bank back.
-	void finish(Engine &engine)
+	// bank back. plain: the caller passed no c, 0 (see audio.hpp)
+	void finish(Engine &engine, bool plain = false)
 	{
 		Byte flags = wram_.audio_engine_flags();
 		while (flags.bit(AUDIOENG_HAS_CALLBACK_F)) {
@@ -86,7 +87,7 @@ public:
 					gb_->test.unrealistic = true;
 				break;
 			}
-			engine.update(gb_->cpu.c);
+			engine.update(plain ? 0 : gb_->cpu.c);
 		}
 		switch_back();
 		flags.reset_bit(AUDIOENG_HAS_BACKUP_BANK_F);
@@ -122,14 +123,14 @@ private:
 
 // An entry point through PrepareAudioJump_NoCallback; returns whether the
 // engine ran.
-template <class Body> bool engine_call(GB *gb, uint16_t trampoline, Body body)
+template <class Body> bool engine_call(GB *gb, uint16_t trampoline, Body body, bool plain = false)
 {
 	AudioCall call(gb, trampoline);
 	bool ran = call.prepare();
 	if (ran) {
 		Engine engine(gb);
 		body(engine);
-		call.finish(engine);
+		call.finish(engine, plain);
 	}
 	call.leave();
 	return ran;
@@ -409,3 +410,52 @@ PORT_COVERED(_SetMusicFadeOut);
 PORT_COVERED(_TurnMusicOff);
 PORT_COVERED(_TurnOffSFXID);
 PORT_COVERED(_UpdateAudio);
+
+namespace wl3::audio {
+
+void play_sfx(GB *gb, uint16_t id)
+{
+	engine_call(gb, ADDR_AudioFunc_PlaySFX, [&](Engine &e) { e.play_sfx(id); }, true);
+}
+
+void play_new_music(GB *gb, uint16_t id)
+{
+	engine_call(gb, ADDR_AudioFunc_PlayNewMusic, [&](Engine &e) { e.play_new_music(id); }, true);
+}
+
+void play_new_music_set_noise(GB *gb, uint16_t id)
+{
+	engine_call(gb, ADDR_AudioFunc_PlayNewMusic_SetNoise, [&](Engine &e) { e.play_new_music_set_noise(id); }, true);
+}
+
+void turn_off_sfx(GB *gb, uint16_t id)
+{
+	engine_call(gb, ADDR_AudioFunc_TurnOffSFXID, [&](Engine &e) { e.turn_off_sfx(id); }, true);
+}
+
+void turn_music_off(GB *gb)
+{
+	engine_call(gb, ADDR_AudioFunc_TurnMusicOff, [](Engine &e) { e.turn_music_off(); }, true);
+}
+
+void update(GB *gb)
+{
+	AudioCall call(gb, ADDR_AudioFunc_UpdateAudio);
+	if (call.prepare_with_callback()) {
+		Engine engine(gb);
+		engine.update(0);
+		call.finish(engine, true);
+	}
+	call.leave();
+}
+
+void execute_audio_mod(GB *gb, uint8_t mod, uint8_t value, uint8_t sfx_channels, uint8_t music_channels)
+{
+	Memory mem(gb);
+	mem[hffac] = mod;
+	engine_call(gb, ADDR_AudioFunc_ExecuteAudioMod, [&](Engine &e) {
+		e.execute_audio_mod(mod, value, 0, sfx_channels, music_channels);
+	}, true);
+}
+
+} // namespace wl3::audio
