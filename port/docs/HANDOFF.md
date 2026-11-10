@@ -1374,6 +1374,14 @@ UpdateJoypad directly), and engine::run_main_state replaces
 MainStateTable's rst JumpTable (the index is wState * 2 in 8 bits). The
 frame boundary stays as it was: the GameLoop hook runs one frame and halts
 the CPU, so savestates and the traces still sync at .GameLoop.
+Stage 5 (no address dispatch in the game build): tools/hook_report.sh
+(after the quick tier) replays each recording's trace check with
+--hook-report and lists the hooks the game still reaches, with how: by a
+native call by address, a jump (JUMP_TO, manual ret, fallthrough) or an
+interrupt. First run (2026-11-10, 13 recordings): 415 hooks, 383 by native
+call, 35 by jump (the frame loop's parts, the screens' V-Blank functions),
+1 interrupt (VBlankVector). A hook nothing reaches in play is fuzz-only:
+its register glue can move under WL3_INTERPRETER.
 To find what reads a register: poison it, relax the contracts, run the
 full tier. Stop if the build fails: ctest happily runs the old binary.
 Routines nothing references and whose callers' hooks have their own copies

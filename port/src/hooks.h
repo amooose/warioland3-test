@@ -52,6 +52,10 @@ typedef struct {
 	unsigned clobbers; // registers (R_* in ported.h) the difftest ignores
 	bool enabled;
 	uint64_t calls;
+	// how calls reached it: by a native call by address (gb_call_ret), or
+	// by the CPU at an interrupt vector; the rest by a jump, a ret or
+	// falling through (JUMP_TO, HOOK_MANUAL_RET hooks)
+	uint64_t by_call, by_irq;
 } Hook;
 
 // The labels come from the disassembly's .sym file, built into the
@@ -79,6 +83,9 @@ Hook *hook_find_any(GB *gb, uint16_t pc);
 Hook *hook_at(int bank, uint16_t addr);
 int hook_count(void);
 Hook *hook_get(int i);
+// Writes every hook that ran, with its counts, most called first (the
+// routines the game still reaches by address; see docs/HANDOFF.md).
+bool hooks_write_report(const char *path);
 // Disable all hooks (pure interpreter), or re-enable them.
 void hooks_set_enabled(bool enabled);
 

@@ -190,6 +190,34 @@ Hook *hook_get(int i)
 	return &hooks[i];
 }
 
+static int by_calls(const void *a, const void *b)
+{
+	const Hook *x = *(const Hook *const *)a, *y = *(const Hook *const *)b;
+	return x->calls < y->calls ? 1 : x->calls > y->calls ? -1 : strcmp(x->name, y->name);
+}
+
+bool hooks_write_report(const char *path)
+{
+	FILE *f = fopen(path, "w");
+	if (!f)
+		return false;
+	static const Hook *ran[MAX_HOOKS];
+	int n = 0;
+	for (int i = 0; i < nhooks; i++)
+		if (hooks[i].calls)
+			ran[n++] = &hooks[i];
+	qsort(ran, (size_t)n, sizeof(ran[0]), by_calls);
+	fprintf(f, "# hook calls by_call by_jump by_irq\n");
+	for (int i = 0; i < n; i++) {
+		const Hook *h = ran[i];
+		fprintf(f, "%s %llu %llu %llu %llu\n", h->name, (unsigned long long)h->calls,
+			(unsigned long long)h->by_call, (unsigned long long)(h->calls - h->by_call - h->by_irq),
+			(unsigned long long)h->by_irq);
+	}
+	fclose(f);
+	return true;
+}
+
 void hooks_set_enabled(bool enabled)
 {
 	all_enabled = enabled;

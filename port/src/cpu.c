@@ -37,6 +37,9 @@ static inline bool wram_code(uint16_t pc)
 // which return into it).
 static bool came_from_wram;
 static uint16_t prev_pc;
+// How the next instruction was reached, for the hook counts (Hook.by_call)
+enum { ENTRY_OTHER, ENTRY_CALL, ENTRY_IRQ };
+static int entry;
 #define PREV_NATIVE 0xffff // the previous code was native (a hook, gb_call_ret)
 #if WL3_INTERPRETER
 static uint16_t wram_rets[8];
@@ -137,6 +140,7 @@ static int service_interrupts(GB *gb)
 			gb->cpu.ime = false;
 			gb_push16(gb, PC);
 			PC = (uint16_t)(0x40 + i * 8);
+			entry = ENTRY_IRQ;
 			return 20;
 		}
 	}
@@ -228,6 +232,11 @@ int cpu_step(GB *gb)
 		history[idx].a = A;
 #endif
 		hook->calls++;
+		if (entry == ENTRY_CALL)
+			hook->by_call++;
+		else if (entry == ENTRY_IRQ)
+			hook->by_irq++;
+		entry = ENTRY_OTHER;
 		hook->fn(gb);
 		if (!(hook->flags & HOOK_MANUAL_RET))
 			PC = gb_pop16(gb);
@@ -241,6 +250,7 @@ int cpu_step(GB *gb)
 		prev_pc = PREV_NATIVE;
 		cycles = 4;
 	} else {
+		entry = ENTRY_OTHER;
 		cycles = no_native_routine(gb);
 	}
 
@@ -268,6 +278,7 @@ static bool call_ret(GB *gb, uint16_t addr, uint16_t ret, bool may_unwind)
 	uint16_t saved_pc = PC;
 	gb_push16(gb, ret);
 	PC = addr;
+	entry = ENTRY_CALL;
 	prev_pc = PREV_NATIVE;
 	came_from_wram = false;
 	// Under test, a push below the stack's bottom is unrealistic (see

@@ -378,6 +378,8 @@ static void usage(const char *argv0)
 		"                        every game frame against the trace\n"
 		"  --asm-profile PATH    with --trace-check: write what still ran as asm\n"
 		"  --trace               print CPU state every frame\n"
+		"  --hook-report PATH    at exit, write how often each hook ran and how it\n"
+		"                        was reached (by a native call, a jump or an interrupt)\n"
 		"  --break LABEL         print recent instructions whenever LABEL is reached\n"
 		"  --watch LABEL         print the byte at LABEL every frame (repeatable)\n"
 		"\n"
@@ -441,6 +443,15 @@ static bool check_rom(const GB *gb, const char *path)
 	return false;
 }
 
+// --hook-report: written at exit, however the run ends
+static const char *hook_report_path;
+
+static void write_hook_report(void)
+{
+	if (!hooks_write_report(hook_report_path))
+		fprintf(stderr, "can't write %s\n", hook_report_path);
+}
+
 static bool parse_frame_file(char *spec, FrameFile *out)
 {
 	char *colon = strchr(spec, ':');
@@ -500,6 +511,7 @@ int main(int argc, char **argv)
 		}
 		else if (!strcmp(a, "--fuzz-verbose")) fuzz_verbose = true;
 		else if (!strcmp(a, "--trace")) fe.trace = true;
+		else if (!strcmp(a, "--hook-report") && next) hook_report_path = argv[++i];
 		else if (!strcmp(a, "--break") && next) break_sym = argv[++i];
 		else if (!strcmp(a, "--watch") && next && fe.nwatch < 16) fe.watch_names[fe.nwatch++] = argv[++i];
 		else if (!strcmp(a, "--wav") && next) {
@@ -546,6 +558,8 @@ int main(int argc, char **argv)
 	ported_register_all();
 	ram_hooks_register_all();
 	hooks_init(&gb);
+	if (hook_report_path)
+		atexit(write_hook_report);
 	// Ported routines take no emulated time, so with them the game spends
 	// less time on slow frames and loading than the original does, and
 	// button presses at fixed frame numbers land at different moments.
