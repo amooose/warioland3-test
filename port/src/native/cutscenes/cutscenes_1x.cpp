@@ -282,7 +282,7 @@ void Cutscenes::open_tree_mouth()
 		Byte f = wram_.unk_2d014(); // .Func_9dc0e
 		if (f >= 0x44)
 			f = 0x40;
-		uint8_t dy = mem_[static_cast<uint16_t>(ADDR_Cutscene24Func + 0x87 + f)];
+		uint8_t dy = ROM(gb_, Cutscene24Func)[0x87 + f];
 		Byte y = mem_.scene_obj2_y_coord();
 		y += dy;
 		if (y >= 0x88)

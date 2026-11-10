@@ -150,7 +150,7 @@ void RailDemo::fall()
 	Byte step = wario_var();
 	if (step != 0x27)
 		++step;
-	wario().y() += mem_[static_cast<uint16_t>(ADDR_JumpVelTable_Normal + step)];
+	wario().y() += ROM(gb_, JumpVelTable_Normal)[step];
 	if (step < 0x18 || wario().y() < 0x40)
 		return;
 	land();

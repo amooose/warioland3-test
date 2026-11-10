@@ -218,7 +218,7 @@ uint8_t Cutscenes::octohon_step()
 		index = 0;
 		++i;
 	}
-	uint8_t dx = mem_[static_cast<uint16_t>(ADDR_Cutscene44Func + 0x11c + index)];
+	uint8_t dx = ROM(gb_, Cutscene44Func)[0x11c + index];
 	Byte x = mem_.scene_obj3_x_coord();
 	x += dx;
 	return x;

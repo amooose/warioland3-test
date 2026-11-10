@@ -22,7 +22,7 @@ void Demo::dec_twice_odd(Byte value)
 uint8_t Demo::jump_velocity(Byte step)
 {
 	++step;
-	return mem_[static_cast<uint16_t>(ADDR_JumpVelTable_Normal + step)];
+	return ROM(gb_, JumpVelTable_Normal)[step];
 }
 
 uint8_t Demo::jump_wario()
@@ -147,7 +147,7 @@ uint8_t Demo::capped_velocity()
 	++step;
 	if (step >= 0x28)
 		step = 0x27;
-	return mem_[static_cast<uint16_t>(ADDR_JumpVelTable_Normal + step)];
+	return ROM(gb_, JumpVelTable_Normal)[step];
 }
 
 uint8_t Demo::jump_wario_capped()

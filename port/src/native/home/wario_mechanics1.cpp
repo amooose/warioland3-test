@@ -45,7 +45,7 @@ namespace {
 uint8_t walk_velocity(Memory mem)
 {
 	uint8_t index = mem.walk_vel_index();
-	uint8_t vel = mem[static_cast<uint16_t>(ADDR_WalkVelTable + index)];
+	uint8_t vel = ROM(mem.gb(), WalkVelTable)[index];
 	mem.walk_vel_index() = index == 0x1b ? (index & 0xfc) : static_cast<uint8_t>(index + 1);
 	return vel;
 }

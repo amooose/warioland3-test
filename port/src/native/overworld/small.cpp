@@ -74,7 +74,7 @@ void draw_coin_count(GB *gb)
 		static_cast<uint8_t>(mem[wNumCoins + 1] >> 4), static_cast<uint8_t>(mem[wNumCoins + 1] & 0x0f)};
 	uint16_t dest = v0Tiles1 + 0xa * TILE_SIZE;
 	for (uint8_t digit : digits) {
-		home::copy(gb, static_cast<uint16_t>(ADDR_NumbersGfx + digit * 0x20), dest, 0x20);
+		home::copy(gb, ROM(gb, NumbersGfx) + (digit * 0x20), dest, 0x20);
 		dest += 0x20;
 	}
 }

@@ -479,7 +479,7 @@ void Cutscenes::demons_blood()
 		Byte f = wram_.unk_2d014(); // .Func_9e1f4
 		if (f >= 0x2c)
 			f = 0x28;
-		uint8_t dy = mem_[static_cast<uint16_t>(ADDR_Cutscene3cFunc + 0x94 + f)];
+		uint8_t dy = ROM(gb_, Cutscene3cFunc)[0x94 + f];
 		Byte y = mem_.scene_obj3_y_coord();
 		y += dy;
 		if (y < 0x58)

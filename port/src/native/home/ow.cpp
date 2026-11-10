@@ -52,15 +52,16 @@ int update_ow_animation(GB *gb, uint8_t bank, uint16_t duration, uint16_t frames
 		uint16_t offset_addr = static_cast<uint16_t>(duration + 1);
 		uint8_t offset = mem[offset_addr];
 		uint16_t entry = static_cast<uint16_t>(frameset + offset);
-		uint8_t frame = mem[entry];
+		auto rom = [&](uint16_t addr) { return RomPtr(gb, bank, addr)[0]; }; // the frameset, in bank
+		uint8_t frame = rom(entry);
 		if (frame == 0xff) { // the end: start over
 			mem.ow_animation_finished() = frame;
 			entry = frameset;
-			frame = mem[frameset];
+			frame = rom(frameset);
 			offset = 0;
 		}
 		mem[offset_addr] = static_cast<uint8_t>(offset + 2);
-		mem[duration] = static_cast<uint8_t>(mem[static_cast<uint16_t>(entry + 1)] - 1);
+		mem[duration] = static_cast<uint8_t>(rom(static_cast<uint16_t>(entry + 1)) - 1);
 		mem[ow_frame_addr(duration)] = frame;
 		return static_cast<int>(frame);
 	});

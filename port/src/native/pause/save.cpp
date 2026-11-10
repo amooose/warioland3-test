@@ -221,9 +221,10 @@ void SaveScreen::load_gfx() // LoadSaveScreenGfx
 void SaveScreen::draw_box(uint16_t attrmap, uint16_t tilemap)
 {
 	mem_[rVBK] = BANK_v1Tiles0; // BANK("VRAM1")
-	routines_.decompress(attrmap, v0BGMap0);
+	// both boxes' maps are in one bank
+	routines_.decompress(RomPtr(gb_, BANK_SaveInProgressBoxAttrmap, attrmap), v0BGMap0);
 	mem_[rVBK] = 0;
-	routines_.decompress(tilemap, v0BGMap0);
+	routines_.decompress(RomPtr(gb_, BANK_SaveInProgressBoxAttrmap, tilemap), v0BGMap0);
 }
 
 // ---- vblank.asm ----

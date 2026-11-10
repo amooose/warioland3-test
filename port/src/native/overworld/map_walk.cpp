@@ -448,7 +448,7 @@ void MapWalk::load_map_level_from_level_index()
 		wram_.ow_level() = 0x80;
 		return;
 	}
-	uint8_t first = mem_[static_cast<uint16_t>(ADDR_MapSideInitialLevels + side)];
+	uint8_t first = ROM(gb_, MapSideInitialLevels)[side];
 	wram_.ow_level() = static_cast<uint8_t>(level + first);
 }
 

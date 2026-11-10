@@ -181,7 +181,7 @@ void LeadOverallsDemo::fall_off()
 	Byte step = wario_var();
 	if (step != 0x27)
 		++step;
-	wario().y() += mem_[static_cast<uint16_t>(ADDR_JumpVelTable_Normal + step)];
+	wario().y() += ROM(gb_, JumpVelTable_Normal)[step];
 	dec_twice_odd(enemy().x());
 	if (wario().y() < 0x40)
 		return;

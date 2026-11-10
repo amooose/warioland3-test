@@ -80,11 +80,11 @@ void Credits::init()
 	set_music_box(0x5b, 0x18, ADDR_Frameset_161cc4, ADDR_OAM_1617e8, BANK_OAM_1617e8);
 	wram_.credits_music_box_var() = 0;
 	MenuObject box = music_box();
-	box.animate();
+	box.animate_in(BANK__CreditsStateTable);
 	box.load_sprite(ROM(gb_, OAM_1617e8), false);
 	MenuObject key = winding_key();
 	key.init(0x5b, 0x18, ADDR_Frameset_161caf);
-	key.animate();
+	key.animate_in(BANK__CreditsStateTable);
 	key.load_sprite(ROM(gb_, OAM_1617e8), false);
 	routines_.clear_unused_virtual_oam();
 
@@ -139,10 +139,10 @@ void Credits::show()
 	}
 
 	MenuObject box = music_box();
-	box.animate();
+	box.animate_in(BANK__CreditsStateTable);
 	box.load_sprite(ROM(gb_, OAM_1617e8), false);
 	MenuObject key = winding_key();
-	key.animate();
+	key.animate_in(BANK__CreditsStateTable);
 	key.load_sprite(ROM(gb_, OAM_1617e8), false);
 	routines_.clear_unused_virtual_oam();
 
@@ -229,7 +229,7 @@ update_anims:
 	animate_music_box();
 	wram_.credits_music_box_animation_ended() = wram_.obj_anim_was_reset();
 	if (!(wram_.credits_music_box_var() == 0x03 && (wram_.global_counter() & 0x03)))
-		winding_key().animate();
+		winding_key().animate_in(BANK__CreditsStateTable);
 
 add_sprites:
 	draw_music_box();
@@ -273,7 +273,7 @@ void Credits::wind_key(bool slowly)
 	MenuObject key = winding_key();
 	if (key.y() != 0x80 && !(slowly && (wram_.global_counter() & 0x01)))
 		--key.y();
-	key.animate();
+	key.animate_in(BANK__CreditsStateTable);
 	key.load_sprite(ROM(gb_, OAM_1617e8), false);
 	routines_.clear_unused_virtual_oam();
 

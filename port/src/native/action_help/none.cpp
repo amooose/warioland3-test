@@ -168,7 +168,7 @@ void NoPowerUpDemo::paragoom_falls()
 	++step;
 	if (step >= 0x28)
 		step = 0x27;
-	obj.y() += mem_[static_cast<uint16_t>(ADDR_JumpVelTable_Normal + step)];
+	obj.y() += ROM(gb_, JumpVelTable_Normal)[step];
 	if (obj.y() < 0x80)
 		return;
 

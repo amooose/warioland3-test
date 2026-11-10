@@ -123,7 +123,7 @@ void VampireDemo::flap_up(uint8_t fast_from, uint8_t to)
 void VampireDemo::glide()
 {
 	drift_left();
-	wario().y() += mem_[static_cast<uint16_t>(ADDR_JumpVelTable_Normal + wario_var())];
+	wario().y() += ROM(gb_, JumpVelTable_Normal)[wario_var()];
 	if (++wario_var() < 0x27)
 		return;
 	wario_var() = 0;
@@ -151,7 +151,7 @@ void VampireDemo::land()
 	Byte step = wario_var();
 	if (step != 0x27)
 		++step;
-	if ((wario().y() += mem_[static_cast<uint16_t>(ADDR_JumpVelTable_Normal + step)]) < 0x40)
+	if ((wario().y() += ROM(gb_, JumpVelTable_Normal)[step]) < 0x40)
 		return;
 	wario().y() = 0x40;
 	wario_var() = 0;

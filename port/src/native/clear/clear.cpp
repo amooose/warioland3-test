@@ -247,7 +247,7 @@ void ClearScreen::set_treasure_transition_param()
 		return;
 	}
 	uint8_t index = static_cast<uint8_t>((wram_.level() >> 3) * 4 + screen - 1);
-	uint8_t treasure = mem_[static_cast<uint16_t>(ADDR_LevelTreasureIDs_WithoutTemple + index)];
+	uint8_t treasure = ROM(gb_, LevelTreasureIDs_WithoutTemple)[index];
 	wram_.transition_param() = treasure;
 	static constexpr uint8_t POWER_UPS[][2] = {
 		{LEAD_OVERALLS_T, LEAD_OVERALLS},
@@ -594,8 +594,8 @@ void ClearScreen::pencil_scribbles()
 {
 	MenuObject pencil = object(wMenuObj1);
 	uint8_t step = wram_.timer();
-	pencil.y() += mem_[static_cast<uint16_t>(ADDR_PencilScribbleXOffsets + step)];
-	pencil.x() += mem_[static_cast<uint16_t>(ADDR_PencilScribbleYOffsets + step)];
+	pencil.y() += ROM(gb_, PencilScribbleXOffsets)[step];
+	pencil.x() += ROM(gb_, PencilScribbleYOffsets)[step];
 	draw_pencil();
 	update_coin_box();
 
@@ -609,7 +609,7 @@ void ClearScreen::pencil_scribbles()
 		return;
 	// the level's square takes its colour
 	uint8_t level = wram_.all_musical_coins_level();
-	uint8_t pal = mem_[static_cast<uint16_t>(ADDR_MusicalCoinLevelBGPals + level)];
+	uint8_t pal = ROM(gb_, MusicalCoinLevelBGPals)[level];
 	uint8_t column;
 	uint8_t row = level_row(level, column);
 	uint16_t addr = static_cast<uint16_t>(v0BGMap0 + (9 + row) * TILEMAP_WIDTH + 8 + column);
@@ -656,7 +656,7 @@ void ClearScreen::draw_coin_flags()
 		for (int bit = 0; bit < 8; bit++) {
 			++level;
 			if (flags & (1 << bit))
-				mem_[dest] = mem_[static_cast<uint16_t>(ADDR_MusicalCoinLevelBGPals + level)];
+				mem_[dest] = ROM(gb_, MusicalCoinLevelBGPals)[level];
 			// five squares a row
 			uint8_t e = static_cast<uint8_t>(dest + 1);
 			if ((e & 0x1f) == 13)
@@ -666,7 +666,7 @@ void ClearScreen::draw_coin_flags()
 	}
 	// the byte after the flags, as the original checks it
 	if (mem_[static_cast<uint16_t>(wMusicalCoinFlags + NUM_LEVELS / 8)] & 0x01)
-		mem_[dest] = mem_[static_cast<uint16_t>(ADDR_MusicalCoinLevelBGPals + level)];
+		mem_[dest] = ROM(gb_, MusicalCoinLevelBGPals)[level];
 	mem_[rVBK] = 0;
 }
 

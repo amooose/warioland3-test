@@ -334,7 +334,7 @@ void PauseMenu::load_gfx()
 	uint16_t gfx = transformation_frameset(ADDR_ActionHelpOwlGfx, ADDR_ActionHelpRailGfx,
 		ADDR_ActionHelpVampireGfx, 0);
 	if (gfx)
-		routines_.copy_bc(gfx, v0Tiles0, 0x20 * TILE_SIZE);
+		routines_.copy_bc(RomPtr(gb_, BANK_ActionHelpOwlGfx, gfx), v0Tiles0, 0x20 * TILE_SIZE); // the three in one bank
 }
 
 // the menu, or in time attack, with the best and current times
@@ -343,9 +343,9 @@ void PauseMenu::draw_maps()
 	bool ta = time_attack();
 	uint16_t dest = ta ? v0BGMap1 : v1BGMap1;
 	mem_[rVBK] = VRAM1;
-	routines_.decompress(ta ? ADDR_TimeAttackPauseMenuAttrmap : ADDR_PauseMenuAttrmap, dest);
+	routines_.decompress(ta ? ROM(gb_, TimeAttackPauseMenuAttrmap) : ROM(gb_, PauseMenuAttrmap), dest);
 	mem_[rVBK] = 0;
-	routines_.decompress(ta ? ADDR_TimeAttackPauseMenuTilemap : ADDR_PauseMenuTilemap, dest);
+	routines_.decompress(ta ? ROM(gb_, TimeAttackPauseMenuTilemap) : ROM(gb_, PauseMenuTilemap), dest);
 	if (!ta)
 		return;
 	uint16_t best = static_cast<uint16_t>(wLevelTimeAttackScores + (wram_.level() >> 3) * 2);

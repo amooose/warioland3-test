@@ -66,7 +66,7 @@ void Octohon::big() { set_up(BIG_START, 0x08, 0xf7, 0x08); }
 void Octohon::step(bool right)
 {
 	Byte index = var2();
-	uint8_t speed = mem_[static_cast<uint16_t>(ADDR_Data_4a5a9 + index)];
+	uint8_t speed = ROM(gb_, Data_4a5a9)[index];
 	if (speed == 0x80) {
 		index = 0;
 		speed = mem_[ADDR_Data_4a5a9];

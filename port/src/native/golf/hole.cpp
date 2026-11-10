@@ -146,13 +146,13 @@ void GolfHole::show_flag_and_par()
 		number = static_cast<uint8_t>(wram_.golf_par() - 1);
 	}
 	auto tiles = [](uint8_t tile) { return static_cast<uint16_t>(v1Tiles0 + tile * 0x10); };
-	routines_.copy(static_cast<uint16_t>(ADDR_GolfFlagNumbersGfx + static_cast<uint8_t>(number << 4 | number >> 4)),
+	routines_.copy(ROM(gb_, GolfFlagNumbersGfx) + (static_cast<uint8_t>(number << 4 | number >> 4)),
 		tiles(0x01), 0x10);
 
 	uint8_t par = static_cast<uint8_t>(wram_.golf_par() - 1);
 	uint8_t par_gfx = static_cast<uint8_t>((par << 4 | par >> 4) - 2 * 0x10);
 	for (uint8_t tile : {0x2b, 0x4b, 0x6b, 0x8b})
-		routines_.copy(static_cast<uint16_t>(ADDR_GolfParNumbersGfx + par_gfx), tiles(tile), 0x10);
+		routines_.copy(ROM(gb_, GolfParNumbersGfx) + (par_gfx), tiles(tile), 0x10);
 
 	if (wram_.unk_1d800() != 0x02) {
 		uint16_t flag = ADDR_GolfHoleFlagGfx;
@@ -190,8 +190,8 @@ void GolfHole::print_stroke_number()
 {
 	uint8_t stroke = wram_.golf_stroke();
 	uint8_t tens = static_cast<uint8_t>(stroke / 10), ones = static_cast<uint8_t>(stroke % 10);
-	routines_.copy(static_cast<uint16_t>(ADDR_GolfStrokeNumbersGfx + tens * 2 * 16), w1db90, 2 * 16);
-	routines_.copy(static_cast<uint16_t>(ADDR_GolfStrokeNumbersGfx + ones * 2 * 16), w1db90 + 2 * 16, 2 * 16);
+	routines_.copy(ROM(gb_, GolfStrokeNumbersGfx) + (tens * 2 * 16), w1db90, 2 * 16);
+	routines_.copy(ROM(gb_, GolfStrokeNumbersGfx) + (ones * 2 * 16), w1db90 + 2 * 16, 2 * 16);
 }
 
 // ---------------------------------------------------------------------------

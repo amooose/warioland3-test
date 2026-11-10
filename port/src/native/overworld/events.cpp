@@ -163,7 +163,7 @@ void Events::show_missing_treasure_indicators()
 	if (!wram_.missing_treasure_indicators_enabled())
 		return;
 	mem_.unk_2dffd() = wram_.ow_level();
-	wram_.ow_level() = mem_[static_cast<uint16_t>(ADDR_MapSideInitialLevels + wram_.cur_map_side())];
+	wram_.ow_level() = ROM(gb_, MapSideInitialLevels)[wram_.cur_map_side()];
 	uint8_t count;
 	switch (wram_.next_map_side()) {
 	case WEST: count = NUM_WEST_LEVELS; break;

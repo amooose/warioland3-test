@@ -172,7 +172,7 @@ void TreasureCollection::apply_page_pals()
 			mem_[static_cast<uint16_t>(attr_top + 1 + TILEMAP_WIDTH)] = 0x04;
 			mem_[static_cast<uint16_t>(attr_top + TILEMAP_WIDTH)] = 0x04;
 		} else {
-			uint8_t pal = mem_[static_cast<uint16_t>(ADDR_TreasureOBPals + treasure)];
+			uint8_t pal = ROM(gb_, TreasureOBPals)[treasure];
 			mem_[attr_bottom] = pal;
 			mem_[static_cast<uint16_t>(attr_bottom + 1)] = pal;
 			mem_[attr_top] = pal;

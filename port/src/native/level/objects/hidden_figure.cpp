@@ -212,9 +212,10 @@ uint8_t HiddenFigure::next_offset(Byte index, uint16_t offsets)
 {
 	uint8_t c = static_cast<uint8_t>(index + offsets);
 	uint16_t page = offsets & 0xff00;
-	uint8_t a = mem_[page | c];
+	RomPtr table(gb_, BANK_HiddenFigureFunc, page); // the offsets, in its own bank
+	uint8_t a = table[c];
 	if (a == 0x80)
-		return mem_[page | static_cast<uint8_t>(c - 1)];
+		return table[static_cast<uint8_t>(c - 1)];
 	++index;
 	return a;
 }
