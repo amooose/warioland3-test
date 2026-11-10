@@ -32,10 +32,10 @@ public:
 	void level_scroll_horizontal(); // LevelScroll_Horizontal
 
 private:
-	bool config_bit(int n) const { return mem_[wCameraConfigFlags] & (1 << n); }
+	bool config_bit(int n) const { return mem_.camera_config_flags() & (1 << n); }
 	// the camera's spacing on Wario's side
-	uint8_t spacing() const { return mem_[mem_[wDirection] ? wCamRightSpacing : wCamLeftSpacing]; }
-	bool transitions() const { return (mem_[wCameraConfigFlags] & CAM_SCROLLING_MASK) >= CAM_TRANSITIONS; }
+	uint8_t spacing() const { return mem_[mem_.direction() ? wCamRightSpacing : wCamLeftSpacing]; }
+	bool transitions() const { return (mem_.camera_config_flags() & CAM_SCROLLING_MASK) >= CAM_TRANSITIONS; }
 	// the lowest y scroll, the bottom block row's
 	uint8_t lower_y_scroll() const { return config_bit(CAM_BORDER_DOWN_F) ? SCROLL_DOWN_MAX_BORDER : SCROLL_DOWN_MAX; }
 	uint8_t right_x_scroll() const { return config_bit(CAM_BORDER_RIGHT_F) ? SCROLL_RIGHT_MAX_BORDER : SCROLL_RIGHT_MAX; }
@@ -63,31 +63,31 @@ private:
 
 void Camera::scroll_right(uint8_t by)
 {
-	mem_[wScrollRightEdge] = 0;
-	uint8_t right = static_cast<uint8_t>(mem_[wRoomRightXLimit] - 1);
+	mem_.scroll_right_edge() = 0;
+	uint8_t right = static_cast<uint8_t>(mem_.room_right_x_limit() - 1);
 	add_scroll(wCameraSCX, by);
 	uint8_t max = right_x_scroll();
 	if (mem_[wCameraSCX + 0] >= right && mem_[wCameraSCX + 1] >= max) { // at the most it scrolls
 		mem_[wCameraSCX + 1] = max;
-		mem_[wScrollRightEdge] = 1;
+		mem_.scroll_right_edge() = 1;
 		return;
 	}
 	// .not_on_limit: Wario at the room's left: the camera follows him back
-	if (mem_[wWarioXPos + 0] != mem_[wRoomLeftXLimit])
+	if (mem_.wario_x().hi() != mem_.room_left_x_limit())
 		return;
 	uint8_t c = static_cast<uint8_t>(spacing() - 8);
 	if (config_bit(CAM_BORDER_LEFT_F))
 		c = static_cast<uint8_t>(c + CAMERA_BORDER_LEFT_W);
-	if (mem_[wWarioXPos + 1] >= c)
+	if (mem_.wario_x().lo() >= c)
 		return; // nothing to do
 	mem_[wCameraSCX + 1] = config_bit(CAM_BORDER_LEFT_F) ? CAMERA_BORDER_LEFT_W : 0;
-	mem_[wScrollRightEdge] = 2;
+	mem_.scroll_right_edge() = 2;
 }
 
 void Camera::scroll_left(uint8_t by)
 {
-	mem_[wScrollLeftEdge] = 0;
-	uint8_t left = mem_[wRoomLeftXLimit];
+	mem_.scroll_left_edge() = 0;
+	uint8_t left = mem_.room_left_x_limit();
 	add_scroll(wCameraSCX, -by);
 	uint8_t min = config_bit(CAM_BORDER_LEFT_F) ? CAMERA_BORDER_LEFT_W + 0x10 : 0x10;
 	// (16 pixels on, at the room's left: only the high byte's equality
@@ -97,73 +97,73 @@ void Camera::scroll_left(uint8_t by)
 	if (hi == left && static_cast<uint8_t>(ahead) < min) { // at the room's left
 		mem_[wCameraSCX + 0] = left;
 		mem_[wCameraSCX + 1] = static_cast<uint8_t>(min - 0x10);
-		mem_[wScrollLeftEdge] = 1;
+		mem_.scroll_left_edge() = 1;
 		return;
 	}
 	// .not_on_limit: Wario at the room's right: the camera follows him back
-	uint8_t right = static_cast<uint8_t>(mem_[wRoomRightXLimit] - 1);
-	if (mem_[wWarioXPos + 0] != right)
+	uint8_t right = static_cast<uint8_t>(mem_.room_right_x_limit() - 1);
+	if (mem_.wario_x().hi() != right)
 		return;
 	uint8_t c = static_cast<uint8_t>(-(SCREEN_WIDTH_PX + 8 - spacing()));
 	if (config_bit(CAM_BORDER_RIGHT_F))
 		c = static_cast<uint8_t>(c - CAMERA_BORDER_RIGHT_W);
-	if (mem_[wWarioXPos + 1] < c)
+	if (mem_.wario_x().lo() < c)
 		return; // nothing to do
-	mem_[wScrollLeftEdge] = 2;
+	mem_.scroll_left_edge() = 2;
 	mem_[wCameraSCX + 0] = right;
 	mem_[wCameraSCX + 1] = right_x_scroll();
 }
 
 void Camera::scroll_down(uint8_t by)
 {
-	uint8_t lower = static_cast<uint8_t>(mem_[wRoomLowerYLimit] - 1);
+	uint8_t lower = static_cast<uint8_t>(mem_.room_lower_y_limit() - 1);
 	add_scroll(wCameraSCY, by);
 	uint8_t max = lower_y_scroll();
 	if (mem_[wCameraSCY + 0] >= lower && mem_[wCameraSCY + 1] >= max) { // at the most it scrolls
 		mem_[wCameraSCY + 1] = max;
-		mem_[wScrollDownEdge] = 1;
+		mem_.scroll_down_edge() = 1;
 		return;
 	}
 	// .not_on_limit: Wario at the room's top: the camera follows him back
 	if (transitions())
 		return;
-	uint8_t upper = mem_[wRoomUpperYLimit];
-	if (mem_[wWarioYPos + 0] >= upper) {
-		if (mem_[wWarioYPos + 0] != upper)
+	uint8_t upper = mem_.room_upper_y_limit();
+	if (mem_.wario_y().hi() >= upper) {
+		if (mem_.wario_y().hi() != upper)
 			return;
-		uint8_t c = static_cast<uint8_t>(mem_[wPrevWarioScreenYPos] - 0x10);
+		uint8_t c = static_cast<uint8_t>(mem_.prev_wario_screen_y_pos() - 0x10);
 		if (config_bit(CAM_BORDER_UP_F))
 			c = static_cast<uint8_t>(c + CAMERA_BORDER_UPPER_H);
-		if (mem_[wWarioYPos + 1] >= c)
+		if (mem_.wario_y().lo() >= c)
 			return; // nothing to do
 	}
 	mem_[wCameraSCY + 1] = config_bit(CAM_BORDER_UP_F) ? CAMERA_BORDER_UPPER_H : 0;
 	mem_[wCameraSCY + 0] = upper;
-	mem_[wScrollDownEdge] = 2;
+	mem_.scroll_down_edge() = 2;
 }
 
 void Camera::scroll_up(uint8_t by)
 {
-	uint8_t upper = mem_[wRoomUpperYLimit];
+	uint8_t upper = mem_.room_upper_y_limit();
 	add_scroll(wCameraSCY, -by);
 	uint8_t min = config_bit(CAM_BORDER_UP_F) ? CAMERA_BORDER_UPPER_H + 0x10 : 0x10;
 	if (near_limit(wCameraSCY, upper, min)) { // at the room's top
 		mem_[wCameraSCY + 0] = upper;
 		mem_[wCameraSCY + 1] = static_cast<uint8_t>(min - 0x10);
-		mem_[wScrollUpEdge] = 1;
+		mem_.scroll_up_edge() = 1;
 		return;
 	}
 	// .not_on_limit: Wario at the room's bottom: the camera follows him back
 	if (transitions())
 		return;
-	if (mem_[wWarioYPos + 0] != static_cast<uint8_t>(mem_[wRoomLowerYLimit] - 1))
+	if (mem_.wario_y().hi() != static_cast<uint8_t>(mem_.room_lower_y_limit() - 1))
 		return;
-	uint8_t c = static_cast<uint8_t>(-(SCREEN_HEIGHT_PX + 0x10 - mem_[wPrevWarioScreenYPos]));
+	uint8_t c = static_cast<uint8_t>(-(SCREEN_HEIGHT_PX + 0x10 - mem_.prev_wario_screen_y_pos()));
 	if (config_bit(CAM_BORDER_DOWN_F))
 		c = static_cast<uint8_t>(c - CAMERA_BORDER_LOWER_H);
-	if (mem_[wWarioYPos + 1] < c)
+	if (mem_.wario_y().lo() < c)
 		return;
-	mem_[wScrollUpEdge] = 2;
+	mem_.scroll_up_edge() = 2;
 	mem_[wCameraSCY + 1] = lower_y_scroll();
 }
 
@@ -171,11 +171,11 @@ void Camera::scroll_up(uint8_t by)
 // wc08a / wc08c and the shake)
 void Camera::set_wario_screen_pos()
 {
-	bool hidden_figure = mem_[wCameraConfigFlags] == HIDDEN_FIGURE_CAMCONFIG;
-	uint8_t scy = hidden_figure ? static_cast<uint8_t>(mem_[wc08a] + mem_[wSCYShake]) : mem_[wSCY];
-	mem_[wWarioScreenYPos] = static_cast<uint8_t>(mem_[wWarioYPos + 1] + OAM_Y_OFS - scy);
+	bool hidden_figure = mem_.camera_config_flags() == HIDDEN_FIGURE_CAMCONFIG;
+	uint8_t scy = hidden_figure ? static_cast<uint8_t>(mem_.unk_c08a() + mem_.scy_shake()) : mem_.scy();
+	mem_.wario_screen_y_pos() = static_cast<uint8_t>(mem_.wario_y().lo() + OAM_Y_OFS - scy);
 	uint8_t scx = mem_[hidden_figure ? wc08c : wSCX];
-	mem_[wWarioScreenXPos] = static_cast<uint8_t>(mem_[wWarioXPos + 1] + OAM_X_OFS - scx);
+	mem_.wario_screen_x_pos() = static_cast<uint8_t>(mem_.wario_x().lo() + OAM_X_OFS - scx);
 }
 
 // scrolls; with no edge reached, the edge's row or column is to be drawn;
@@ -184,7 +184,7 @@ void Camera::scroll_and_flag(void (Camera::*scroll)(uint8_t), uint8_t by, uint16
 {
 	(this->*scroll)(by);
 	if (!mem_[edge])
-		mem_[wLevelEdgeUpdateFlags] = mem_[wLevelEdgeUpdateFlags] | (1 << flag_bit);
+		mem_.level_edge_update_flags() = mem_.level_edge_update_flags() | (1 << flag_bit);
 	mem_[delta] = 0;
 }
 
@@ -201,11 +201,11 @@ void Camera::level_scroll_vertical()
 {
 	auto down = [&](uint8_t by) { scroll_and_flag(&Camera::scroll_down, by, wScrollDownEdge, LEVEL_EDGE_UPDATE_DOWN_F, wCameraYDelta); };
 	auto up = [&](uint8_t by) { scroll_and_flag(&Camera::scroll_up, by, wScrollUpEdge, LEVEL_EDGE_UPDATE_UP_F, wCameraYDelta); };
-	uint8_t delta = mem_[wCameraYDelta];
-	uint8_t prev = mem_[wPrevWarioScreenYPos], now = mem_[wWarioScreenYPos];
+	uint8_t delta = mem_.camera_y_delta();
+	uint8_t prev = mem_.prev_wario_screen_y_pos(), now = mem_.wario_screen_y_pos();
 	if (delta) {
 		// a pixel faster while Wario's moving further from the camera
-		mem_[wc0d4] = 0;
+		mem_.unk_c0d4() = 0;
 		if (!(delta & 0x80))
 			down(static_cast<uint8_t>(delta + (prev < now)));
 		else
@@ -214,9 +214,9 @@ void Camera::level_scroll_vertical()
 	}
 
 	// .no_y_offset: in water, jumping or on a ladder, it stays
-	if (mem_[wWaterInteraction] || mem_[wJumpVelIndex])
+	if (mem_.water_interaction() || mem_.jump_vel_index())
 		return;
-	uint8_t state = mem_[wWarioState];
+	uint8_t state = mem_.wario_state();
 	if (state == WST_LADDER_SCRATCHING || (state >= WST_LADDER_CLIMBING && state <= WST_LADDER_SLIDING))
 		return;
 	if (count_up_was_zero(wc0d4))
@@ -224,7 +224,7 @@ void Camera::level_scroll_vertical()
 
 	// towards Wario: 7 pixels at a time off slopes, from 8 away
 	uint8_t distance = prev < now ? static_cast<uint8_t>(now - prev) : static_cast<uint8_t>(prev - now);
-	if (!mem_[wWarioSlopeInteraction]) {
+	if (!mem_.wario_slope_interaction()) {
 		if (distance < 8)
 			return; // less than 8 pixels
 		distance = 7;
@@ -241,10 +241,10 @@ void Camera::level_scroll_horizontal()
 {
 	auto right = [&](uint8_t by) { scroll_and_flag(&Camera::scroll_right, by, wScrollRightEdge, LEVEL_EDGE_UPDATE_RIGHT_F, wCameraXDelta); };
 	auto left = [&](uint8_t by) { scroll_and_flag(&Camera::scroll_left, by, wScrollLeftEdge, LEVEL_EDGE_UPDATE_LEFT_F, wCameraXDelta); };
-	uint8_t delta = mem_[wCameraXDelta];
-	uint8_t space = spacing(), now = mem_[wWarioScreenXPos];
+	uint8_t delta = mem_.camera_x_delta();
+	uint8_t space = spacing(), now = mem_.wario_screen_x_pos();
 	if (delta) {
-		mem_[wc0d5] = 0;
+		mem_.unk_c0d5() = 0;
 		bool going_left = delta & 0x80;
 		uint8_t by = going_left ? static_cast<uint8_t>(-delta) : delta;
 		if (space != now) {
@@ -261,7 +261,7 @@ void Camera::level_scroll_horizontal()
 
 	// .no_x_offset: towards the spacing a pixel at a time (not while Flat
 	// Wario's jumping)
-	if (mem_[wTransformation] == TRANSFORMATION_FLAT_WARIO && mem_[wJumpVelTable])
+	if (mem_.transformation() == TRANSFORMATION_FLAT_WARIO && mem_.jump_vel_table())
 		return; // jumping
 	if (count_up_was_zero(wc0d5))
 		return;

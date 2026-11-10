@@ -116,8 +116,8 @@ void ClearScreen::animate_wario(Byte played, uint16_t next_frameset)
 
 void ClearScreen::stop_sfx()
 {
-	mem_[hSFXID + 0] = 0xff;
-	mem_[hSFXID + 1] = 0x00;
+	mem_.sfx().hi() = 0xff;
+	mem_.sfx().lo() = 0x00;
 }
 
 void ClearScreen::copy_vblank(uint16_t func, uint8_t size)

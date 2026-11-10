@@ -113,15 +113,15 @@ private:
 
 void DollBoy::start()
 {
-	mem_[wIsBossBattle] = TRUE;
+	mem_.is_boss_battle() = TRUE;
 	flags() &= ~OBJFLAG_INVISIBLE;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	substate() = (substate() & OBJSUBFLAGS_MASK) | 0x5 | OBJSUBFLAG_HDIR;
 	set_update(INIT);
-	mem_[wCurObjCollBoxRight] = 11;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-12);
-	mem_[wCurObjCollBoxBottom] = 0;
-	mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-28);
+	mem_.cur_obj_coll_box_right() = 11;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-12);
+	mem_.cur_obj_coll_box_bottom() = 0;
+	mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-28);
 	set_frameset(ADDR_Frameset_69632);
 	state_duration() = DOLLBOY_START_DELAY;
 }
@@ -134,12 +134,12 @@ void DollBoy::init()
 	if (--state_duration())
 		return;
 	set_update(BARREL_PHASE);
-	mem_[wDollBoyNoFlashingBarrel] = TRUE;
+	mem_.doll_boy_no_flashing_barrel() = TRUE;
 	var1() = 0;
-	mem_[wDollBoyFallImmediatelyMiddleBarrel] = 0;
-	mem_[wDollBoyHammerRange] = 0;
-	mem_[wDollBoyActiveBarrels] = DOLLBOY_BARREL1 | DOLLBOY_BARREL2 | DOLLBOY_BARREL3;
-	mem_[wBossState] = BOSS_REGULAR;
+	mem_.doll_boy_fall_immediately_middle_barrel() = 0;
+	mem_.doll_boy_hammer_range() = 0;
+	mem_.doll_boy_active_barrels() = DOLLBOY_BARREL1 | DOLLBOY_BARREL2 | DOLLBOY_BARREL3;
+	mem_.boss_state() = BOSS_REGULAR;
 	home::update_level_music(gb_);
 }
 
@@ -175,9 +175,9 @@ void DollBoy::barrel_phase()
 {
 	switch (var1()) {
 	case 0x00:
-		if (mem_[wTransformation] == TRANSFORMATION_BOUNCY_WARIO) {
+		if (mem_.transformation() == TRANSFORMATION_BOUNCY_WARIO) {
 			set_update(DO_NOTHING);
-			mem_[wBossState] = 0;
+			mem_.boss_state() = 0;
 			return;
 		}
 		if (substate() == (0x2 | OBJSUBFLAG_HDIR)) { // on the floor
@@ -205,7 +205,7 @@ void DollBoy::barrel_phase()
 		}
 		if (state_duration() != 0x13)
 			return;
-		Byte range = mem_[wDollBoyHammerRange];
+		Byte range = mem_.doll_boy_hammer_range();
 		if (range == HAMMER_LONG)
 			range = 0;
 		++range;
@@ -225,10 +225,10 @@ void DollBoy::barrel_phase()
 	}
 	// waits on the barrels still under the one attacked
 	uint8_t height = substate() & 0x0f;
-	uint8_t barrels = mem_[wDollBoyActiveBarrels];
+	uint8_t barrels = mem_.doll_boy_active_barrels();
 	if (height == 0x4) {
 		if (barrels == (DOLLBOY_BARREL1 | DOLLBOY_BARREL2)) { // the bottom barrel
-			mem_[wDollBoyFallImmediatelyMiddleBarrel] = TRUE;
+			mem_.doll_boy_fall_immediately_middle_barrel() = TRUE;
 			fall(34, 42, 46, ADDR_Data_60ba0);
 		} else if (barrels == (DOLLBOY_BARREL1 | DOLLBOY_BARREL3)) { // the middle one
 			fall_wait_1_barrel();
@@ -243,7 +243,7 @@ void DollBoy::barrel_phase()
 	}
 	if (barrels == DOLLBOY_BARREL1)
 		fall_wait_1_barrel();
-	else if (barrels == DOLLBOY_BARREL3 || mem_[wDollBoyFallImmediatelyMiddleBarrel])
+	else if (barrels == DOLLBOY_BARREL3 || mem_.doll_boy_fall_immediately_middle_barrel())
 		fall_immediately();
 	else
 		fall_wait_1_barrel();
@@ -275,16 +275,16 @@ void DollBoy::set_stunned()
 // red, until it's over (green again near the end); then faces Wario
 void DollBoy::update_stunned()
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_unk1()) {
 		apply_y_movement(ADDR_FallingYVel_Light);
 		return;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	if (--state_duration()) {
 		if (state_duration() == 10)
 			copy_pals(ADDR_DollBoyGreenPals);
@@ -292,7 +292,7 @@ void DollBoy::update_stunned()
 	}
 	state() = 0;
 	bool right = facing_right();
-	bool left_of_wario = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	bool left_of_wario = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	uint16_t frameset;
 	uint8_t duration;
 	if (!right) {
@@ -329,7 +329,7 @@ void DollBoy::show_stars(uint16_t frameset, uint16_t params)
 {
 	set_update(HIT_WARIO);
 	var3() = 0;
-	mem_[wBossState] = 0;
+	mem_.boss_state() = 0;
 	stop_sfx(mem_);
 	set_frameset(frameset);
 	state_duration() = 1;
@@ -339,22 +339,22 @@ void DollBoy::show_stars(uint16_t frameset, uint16_t params)
 // a step, bouncy as the foot comes down; turns at walls
 void DollBoy::walk()
 {
-	if (mem_[wCurObjFramesetOffset] == 0x06 && frame_duration() == 0x01)
+	if (mem_.cur_obj_frameset_offset() == 0x06 && frame_duration() == 0x01)
 		play_sfx(SFX_0A2);
 	bool right = facing_right();
 	uint16_t y_pos = static_cast<uint16_t>(y() - 4);
 	uint16_t x_pos = static_cast<uint16_t>(right ? x() + 11 : x() - 12);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4()) {
 		set_frameset(right ? ADDR_Frameset_6965f : ADDR_Frameset_6966a);
 		state_duration() = DOLLBOY_TURN_DELAY;
 		var3() = 0;
 		return;
 	}
-	if (mem_[wCurObjFramesetOffset] < 0x06)
+	if (mem_.cur_obj_frameset_offset() < 0x06)
 		return;
 	set_interaction(OBJ_INTERACTION_BOUNCY);
 	call_home(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
@@ -382,7 +382,7 @@ void DollBoy::switch_direction()
 		return;
 	}
 	uint8_t x_screen = screen_x();
-	uint8_t wario_y = mem_[wWarioScreenYPos];
+	uint8_t wario_y = mem_.wario_screen_y_pos();
 	uint8_t own_y = screen_y();
 	if (x_screen >= 0x78 || x_screen < 0x18 || wario_y < 0x28 || own_y >= 0xa0) {
 		walk();
@@ -487,16 +487,16 @@ void DollBoy::hit_wario()
 		--state_duration();
 		play_sfx(SFX_049);
 	}
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_unk1()) {
 		apply_y_movement(ADDR_FallingYVel_Light);
 		return;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	set_update(WAIT_THEN_DO_NOTHING);
 	state_duration() = DOLLBOY_AFTER_HIT_DELAY;
 }
@@ -515,9 +515,9 @@ void DollBoy::defeated()
 	no_actions();
 	if (screen_y() >= 0xd0) {
 		flags() = 0;
-		mem_[wBossState] = BOSS_DEFEATED;
+		mem_.boss_state() = BOSS_DEFEATED;
 		home::update_level_music(gb_);
-		mem_[wIsBossBattle] = 0;
+		mem_.is_boss_battle() = 0;
 		ground_shake();
 		return;
 	}
@@ -538,11 +538,11 @@ void DollBoy::update_remaining_parts()
 {
 	if (substate() == 1)
 		return;
-	uint8_t part = mem_[wCurObjId] & 0x0f;
-	uint8_t parts = mem_[wDollBoyRemainingParts];
+	uint8_t part = mem_.cur_obj_id() & 0x0f;
+	uint8_t parts = mem_.doll_boy_remaining_parts();
 	if (!(parts & part))
 		return;
-	mem_[wDollBoyRemainingParts] = static_cast<uint8_t>(~part & parts);
+	mem_.doll_boy_remaining_parts() = static_cast<uint8_t>(~part & parts);
 	var1() = 0x08;
 	--substate();
 }
@@ -560,9 +560,9 @@ void DollBoyHelper::barrel(uint8_t part)
 	substate() = (substate() & ~OBJSUBFLAG_UNINITIALISED) | (1 << OBJSUBFLAG_UNK_4_F);
 	set_update(BARREL_START_DELAY);
 	set_frameset(ADDR_Frameset_6969f);
-	mem_[wCurObjCollBoxRight] = 7;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-8);
-	mem_[wCurObjCollBoxBottom] = 0;
+	mem_.cur_obj_coll_box_right() = 7;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-8);
+	mem_.cur_obj_coll_box_bottom() = 0;
 	var1() = 0;
 }
 
@@ -570,7 +570,7 @@ void DollBoyHelper::barrel(uint8_t part)
 void DollBoyHelper::barrel_start_delay()
 {
 	frame_duration() = 2;
-	if (!mem_[wDollBoyNoFlashingBarrel])
+	if (!mem_.doll_boy_no_flashing_barrel())
 		return;
 	set_update(BARREL_MAIN);
 }
@@ -591,7 +591,7 @@ void DollBoyHelper::end_flashing()
 {
 	set_frameset(ADDR_Frameset_6969f);
 	set_update(BARREL_MAIN);
-	mem_[wDollBoyNoFlashingBarrel] = TRUE;
+	mem_.doll_boy_no_flashing_barrel() = TRUE;
 }
 
 // one barrel at a time flashes (when it's the last, or not level with
@@ -604,17 +604,17 @@ void DollBoyHelper::barrel_main()
 		DollBoy(gb_).update_remaining_parts();
 		if (var1() == 0x08)
 			return;
-		if ((mem_[wCurObjId] & 0x03) != (mem_[wGlobalCounter] & 0x03))
+		if ((mem_.cur_obj_id() & 0x03) != (mem_.global_counter() & 0x03))
 			return;
-		if (!mem_[wDollBoyNoFlashingBarrel])
+		if (!mem_.doll_boy_no_flashing_barrel())
 			return;
-		uint8_t barrels = mem_[wDollBoyActiveBarrels];
+		uint8_t barrels = mem_.doll_boy_active_barrels();
 		if (barrels != DOLLBOY_BARREL1 && barrels != DOLLBOY_BARREL2 && barrels != DOLLBOY_BARREL3) {
-			uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+			uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 			if (dy < 8 || dy >= static_cast<uint8_t>(-8))
 				return;
 		}
-		mem_[wDollBoyNoFlashingBarrel] = 0;
+		mem_.doll_boy_no_flashing_barrel() = 0;
 		state_duration() = static_cast<uint8_t>(BARREL_FLASH_DELAY + (mem_[rDIV] & 0x03));
 		var1() = 0x01;
 		return;
@@ -628,13 +628,13 @@ void DollBoyHelper::barrel_main()
 		state() = 0;
 		return;
 	case 0x02: {
-		if (mem_[wTransformation] == TRANSFORMATION_BOUNCY_WARIO) {
+		if (mem_.transformation() == TRANSFORMATION_BOUNCY_WARIO) {
 			state_duration() = 0;
 			var1() = 0;
 			end_flashing();
 			return;
 		}
-		if ((flags() & (1 << OBJFLAG_ON_SCREEN_F)) && !(mem_[wGlobalCounter] & 0x07))
+		if ((flags() & (1 << OBJFLAG_ON_SCREEN_F)) && !(mem_.global_counter() & 0x07))
 			play_sfx(SFX_06A);
 		if (state() == 0x05) { // attacked
 			substate() &= OBJSUBFLAGS_MASK;
@@ -643,7 +643,7 @@ void DollBoyHelper::barrel_main()
 			set_frameset(ADDR_Frameset_6969f);
 			set_update(ADDR_Func_3317);
 			play_sfx(SFX_017);
-			uint8_t id = mem_[wCurObjId];
+			uint8_t id = mem_.cur_obj_id();
 			uint8_t knocked, remaining;
 			if (id == DOLL_BOY_BARREL1) {
 				knocked = DOLLBOY_BARREL1;
@@ -655,9 +655,9 @@ void DollBoyHelper::barrel_main()
 				knocked = DOLLBOY_BARREL3;
 				remaining = DOLLBOY_BARREL1 | DOLLBOY_BARREL2 | DOLLBOY_DOLL;
 			}
-			mem_[wDollBoyActiveBarrels] &= static_cast<uint8_t>(0xff ^ knocked);
-			mem_[wDollBoyRemainingParts] = remaining;
-			mem_[wDollBoyNoFlashingBarrel] = TRUE;
+			mem_.doll_boy_active_barrels() &= static_cast<uint8_t>(0xff ^ knocked);
+			mem_.doll_boy_remaining_parts() = remaining;
+			mem_.doll_boy_no_flashing_barrel() = TRUE;
 			return;
 		}
 		if (--state_duration())
@@ -675,7 +675,7 @@ void DollBoyHelper::barrel_main()
 	default:
 		return;
 	}
-	if (mem_[wCurObjId] == DOLL_BOY_BARREL1 && mem_[wDollBoyActiveBarrels] == (DOLLBOY_BARREL1 | DOLLBOY_BARREL2))
+	if (mem_.cur_obj_id() == DOLL_BOY_BARREL1 && mem_.doll_boy_active_barrels() == (DOLLBOY_BARREL1 | DOLLBOY_BARREL2))
 		barrel_fall(0x1a, 0x1e, ADDR_Data_60b80);
 	else
 		barrel_fall(0x0a, 0x0e, ADDR_Data_60880);
@@ -691,7 +691,7 @@ void DollBoyHelper::hammer()
 void DollBoyHelper::hammer_init()
 {
 	set_update(HAMMER_UPDATE);
-	uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+	uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 	if (dy < 0xec)
 		return;
 	++var1();
@@ -701,7 +701,7 @@ void DollBoyHelper::hammer_init()
 void DollBoyHelper::hammer_update()
 {
 	if (state()) {
-		bool left = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+		bool left = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 		set_update(left ? HAMMER_HIT_LEFT : HAMMER_HIT_RIGHT);
 		var3() = 0;
 		play_sfx(SFX_049);
@@ -714,7 +714,7 @@ void DollBoyHelper::hammer_update()
 	}
 	apply_y_movement(ADDR_Data_60860);
 	uint16_t movement;
-	switch (static_cast<uint8_t>(mem_[wDollBoyHammerRange])) {
+	switch (static_cast<uint8_t>(mem_.doll_boy_hammer_range())) {
 	case HAMMER_SHORT: movement = ADDR_Data_60ae0; break;
 	case HAMMER_MID_SHORT: movement = ADDR_Data_60b00; break;
 	case HAMMER_MID_LONG: movement = ADDR_Data_60b30; break;
@@ -733,8 +733,8 @@ void DollBoyHelper::hammer_hit(uint16_t move)
 void DollBoyHelper::platform()
 {
 	set_update(PLATFORM_MOVE_DOWN);
-	var2() = mem_[wCurObjYPos + 0];
-	var3() = mem_[wCurObjYPos + 1];
+	var2() = mem_.cur_obj_y().lo();
+	var3() = mem_.cur_obj_y().hi();
 	platform_down();
 }
 
@@ -752,7 +752,7 @@ void DollBoyHelper::platform_down()
 		return;
 	}
 	flags() &= ~OBJFLAG_STEPPED;
-	if (!(mem_[wGlobalCounter] & 1))
+	if (!(mem_.global_counter() & 1))
 		return;
 	move_wario(ADDR_MoveWarioDown, 1);
 	home::handle_downwards_floor_transition(gb_);
@@ -763,7 +763,7 @@ void DollBoyHelper::platform_down()
 void DollBoyHelper::platform_up()
 {
 	one_way_platform();
-	if (mem_[wCurObjYPos + 0] == var2() && mem_[wCurObjYPos + 1] == var3()) {
+	if (mem_.cur_obj_y().lo() == var2() && mem_.cur_obj_y().hi() == var3()) {
 		set_update(PLATFORM_MOVE_DOWN);
 		state() = 0;
 		state_duration() = HAMMER_PLATFORM_DURATION;
@@ -774,7 +774,7 @@ void DollBoyHelper::platform_up()
 		return;
 	}
 	flags() &= ~OBJFLAG_STEPPED;
-	if (!(mem_[wGlobalCounter] & 1))
+	if (!(mem_.global_counter() & 1))
 		return;
 	move_wario(ADDR_MoveWarioUp, 1);
 	home::handle_upwards_floor_transition(gb_);

@@ -96,7 +96,7 @@ private:
 
 bool BeamBot::wario_to_right() const
 {
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	return static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 }
 
@@ -120,7 +120,7 @@ void BeamBot::update()
 
 bool BeamBot::shaken()
 {
-	if (mem_[wGroundShakeCounter] < 0x10)
+	if (mem_.ground_shake_counter() < 0x10)
 		return false;
 	state() = static_cast<uint8_t>(0x08 | (mem_[rDIV] & 1));
 	return true;
@@ -128,29 +128,29 @@ bool BeamBot::shaken()
 
 void BeamBot::small_box()
 {
-	mem_[wCurObjCollBoxRight] = 0x05;
-	mem_[wCurObjCollBoxLeft] = 0xfa;
+	mem_.cur_obj_coll_box_right() = 0x05;
+	mem_.cur_obj_coll_box_left() = 0xfa;
 }
 
 // slowly along the floor; at a block's edge it marks time (half speed
 // animation) until its time's up; at a wall it turns
 void BeamBot::walk()
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_down()) {
 		state() = 0x11;
 		return;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	bool right = facing_right();
-	uint8_t in_block = mem_[wCurObjXPos + 0] & 0x0f;
+	uint8_t in_block = mem_.cur_obj_x().lo() & 0x0f;
 	if (right ? in_block + 5 >= 0x10 : in_block < 6) {
 		if (!(block_beside(right) & 0x0f)) { // .asm_4685f
-			if (!(mem_[wGlobalCounter] & 1))
+			if (!(mem_.global_counter() & 1))
 				++frame_duration();
 			if (!--state_duration())
 				state() = 0x13;
@@ -159,10 +159,10 @@ void BeamBot::walk()
 	}
 	uint16_t y_pos = static_cast<uint16_t>(y() - 4);
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 5) : static_cast<uint16_t>(x() - 6);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4()) {
 		state() = 0x13;
 		return;
@@ -188,7 +188,7 @@ void BeamBot::hit(uint8_t s)
 
 void BeamBot::stunned(uint8_t s)
 {
-	mem_[wCurObjAction] = 0x8f;
+	mem_.cur_obj_action() = 0x8f;
 	hit(s);
 	state_duration() = 4;
 	var2() = 0x02;
@@ -272,10 +272,10 @@ void BeamBot::run(uint16_t handler)
 	case WALKING: // fires when Wario's level and ahead; turns if he's behind
 		if (shaken())
 			return;
-		if (mem_[wTransformation] != TRANSFORMATION_SPLIT && (flags() & OBJFLAG_ON_SCREEN)) {
-			uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+		if (mem_.transformation() != TRANSFORMATION_SPLIT && (flags() & OBJFLAG_ON_SCREEN)) {
+			uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 			if (dy < 0x1c || dy >= 0xe4) {
-				uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+				uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 				bool near_right = dx >= 0xb8, near_left = dx < 0x48;
 				if (near_right || near_left) {
 					if (facing_right() != near_right) {
@@ -324,7 +324,7 @@ void BeamBot::run(uint16_t handler)
 		flags() &= ~(1 << OBJFLAG_GRABBED_F);
 		[[fallthrough]];
 	case DAZED:
-		if (mem_[wGroundShakeCounter] >= 0x10) {
+		if (mem_.ground_shake_counter() >= 0x10) {
 			state() = 0x1c;
 			return;
 		}
@@ -376,7 +376,7 @@ void BeamBot::run(uint16_t handler)
 		grab(0x49);
 		[[fallthrough]];
 	case HELD_49: // carried facing the way Wario does
-		if (mem_[wDirection]) {
+		if (mem_.direction()) {
 			call_home(ADDR_Func_3353);
 			return;
 		}
@@ -387,7 +387,7 @@ void BeamBot::run(uint16_t handler)
 		grab(0x48);
 		[[fallthrough]];
 	case HELD_48:
-		if (!mem_[wDirection]) {
+		if (!mem_.direction()) {
 			call_home(ADDR_Func_3362);
 			return;
 		}
@@ -395,7 +395,7 @@ void BeamBot::run(uint16_t handler)
 		run(GRAB_49);
 		return;
 	case STATE_42:
-		mem_[wCurObjAction] = 0x9f;
+		mem_.cur_obj_action() = 0x9f;
 		state() = 0x42;
 		var3() = 0;
 		set_interaction(OBJ_INTERACTION_00);

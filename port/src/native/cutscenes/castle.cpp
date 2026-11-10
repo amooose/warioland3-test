@@ -53,7 +53,7 @@ void Cutscenes::reveal_castle()
 		wait(30);
 		break;
 	case 6: // .Func_9d2e9
-		if (mem_[wSceneObj2Frame] != 0x04)
+		if (mem_.scene_obj2_frame() != 0x04)
 			break;
 		set_state(wSceneObj2, 0x03);
 		advance();
@@ -121,8 +121,8 @@ void Cutscenes::summon_sun()
 	case 2: { // .Func_9d48f: together, on odd frames
 		if (!(frame() & 1))
 			break;
-		uint8_t y = ++mem_[wSceneObj2YCoord]; // .Func_9d4a4
-		--mem_[wSceneObj3YCoord];
+		uint8_t y = ++mem_.scene_obj2_y_coord(); // .Func_9d4a4
+		--mem_.scene_obj3_y_coord();
 		if (y != 0x5a)
 			break;
 		play_sfx(mem_, SFX_CLICK);
@@ -145,8 +145,8 @@ void Cutscenes::summon_sun()
 		wait(60);
 		break;
 	case 8: // .Func_9d4bd: the new palettes, BG and OB
-		mem_[wSceneObj2State] = 0;
-		mem_[wSceneObj3State] = 0;
+		mem_.scene_obj2_state() = 0;
+		mem_.scene_obj3_state() = 0;
 		copy_far(BANK_Pals_b8340, ADDR_Pals_b8340, wTempPals1, 8 * PAL_SIZE);
 		set_bg_pals_to_load();
 		copy_far(BANK_Pals_b8340, ADDR_Pals_b8340, wTempPals2, 8 * PAL_SIZE);
@@ -162,7 +162,7 @@ void Cutscenes::summon_sun()
 		wait(20);
 		break;
 	case 11: { // .Func_9d504: the owl down, every 4 frames, then every 8
-		Byte y = mem_[wSceneObj5];
+		Byte y = mem_.scene_obj5();
 		uint8_t mask = y < 0x44 ? 0x03 : 0x07;
 		if (wram_.unk_2d014() & mask)
 			break;
@@ -175,7 +175,7 @@ void Cutscenes::summon_sun()
 		if (frame() < 0x1e)
 			break;
 		set_state(wSceneObj5, 0x01);
-		mem_[wSceneObj5] = mem_[wSceneObj5]; // add [hl] with a = 0
+		mem_.scene_obj5() = mem_.scene_obj5(); // add [hl] with a = 0
 		advance();
 		break;
 	case 13: // .Func_9d531
@@ -196,11 +196,11 @@ void Cutscenes::summon_sun()
 // (state 2) or perched (state 1, a hoot when its frame goes back to 1)
 void Cutscenes::draw_owl()
 {
-	uint8_t state = mem_[wSceneObj5State];
+	uint8_t state = mem_.scene_obj5_state();
 	if (!state)
 		return;
 	uint16_t obj = animate(wSceneObj5State, frameset(ADDR_Func_9f244 + 0x1e, state), 0x1a); // Func_9f0b5
-	uint8_t now = mem_[wSceneObj5State];
+	uint8_t now = mem_.scene_obj5_state();
 	if (now == 0x02) { // .Func_9f26b
 		if (wram_.ow_animation_finished() == 0xff)
 			play_sfx(mem_, SFX_FLAP);

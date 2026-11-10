@@ -95,9 +95,9 @@ void Muddee::start()
 	set_update(HIDDEN);
 	substate() = (substate() & ~OBJSUBFLAG_UNINITIALISED) | (1 << OBJSUBFLAG_UNK_4_F);
 	substate() = (substate() & OBJSUBFLAGS_MASK) | 0x05;
-	mem_[wCurObjCollBoxRight] = 0x07;
-	mem_[wCurObjCollBoxLeft] = 0xf8;
-	mem_[wCurObjCollBoxBottom] = 0x07;
+	mem_.cur_obj_coll_box_right() = 0x07;
+	mem_.cur_obj_coll_box_left() = 0xf8;
+	mem_.cur_obj_coll_box_bottom() = 0x07;
 	set_frameset(ADDR_Frameset_69d73);
 	state_duration() = 0x3c;
 	var2() = 0x70;
@@ -111,9 +111,9 @@ void Muddee::hidden()
 {
 	no_actions();
 	flicker();
-	if (mem_[wMuddeeAmbushState] != 1)
+	if (mem_.muddee_ambush_state() != 1)
 		return;
-	mem_[wIsBossBattle] = TRUE;
+	mem_.is_boss_battle() = TRUE;
 	set_update(SURFACING);
 	copy_and_apply_ob_pals(ADDR_Pals_55e46, wTempPals2 + PAL_SIZE * 6, 1, 6);
 }
@@ -134,18 +134,18 @@ void Muddee::lurking()
 {
 	no_actions();
 	flicker();
-	if (mem_[wWarioXPos + 0] >= 0x09 && mem_[wWarioXPos + 1] >= 0x40)
+	if (mem_.wario_x().hi() >= 0x09 && mem_.wario_x().lo() >= 0x40)
 		return;
-	uint8_t dy = static_cast<uint8_t>(screen_y() - mem_[wWarioScreenYPos]);
+	uint8_t dy = static_cast<uint8_t>(screen_y() - mem_.wario_screen_y_pos());
 	if (dy < 0x48 || dy >= 0x96)
 		return;
 	set_update(LEAPING);
 	set_frameset(ADDR_Frameset_69cf2);
 	var3() = 0;
 	flags() &= ~OBJFLAG_INVISIBLE;
-	mem_[wBossState] = BOSS_REGULAR;
+	mem_.boss_state() = BOSS_REGULAR;
 	home::update_level_music(gb_);
-	mem_[w1d147] = 0;
+	mem_.unk_1d147() = 0;
 	spawn_stingers();
 }
 
@@ -182,7 +182,7 @@ void Muddee::fighting()
 		}
 		set_interaction(type);
 	}
-	uint8_t hit_state = mem_[w1d147];
+	uint8_t hit_state = mem_.unk_1d147();
 	if (!hit_state) {
 		switch (var1()) {
 		case 0: swim_up(); return;
@@ -202,7 +202,7 @@ void Muddee::fighting()
 		return;
 	}
 	play_sfx(SFX_VANISH);
-	mem_[w1d147] = 0x02;
+	mem_.unk_1d147() = 0x02;
 	uint8_t type = interaction();
 	if (type == 0x48)
 		set_frameset(ADDR_Frameset_69d48);
@@ -230,7 +230,7 @@ void Muddee::hit()
 		var1() = 0x14;
 		set_update(DEFEATED);
 		substate() &= 0x80;
-		if (static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a))
+		if (static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a))
 			substate() &= ~(1 << 7);
 		else
 			substate() |= 1 << 7;
@@ -238,19 +238,19 @@ void Muddee::hit()
 		flags() |= OBJFLAG_PRIORITY;
 		set_block_object(0x07);
 		stop_music2(mem_);
-		mem_[wMuddeeAmbushState] = 2;
+		mem_.muddee_ambush_state() = 2;
 		return;
 	}
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	hpos_block_unk1();
-	if (!mem_[wIsInWaterOrSand]) {
+	if (!mem_.is_in_water_or_sand()) {
 		apply_y_movement(ADDR_Data_60d40);
 		return;
 	}
-	mem_[w1d147] = 0;
+	mem_.unk_1d147() = 0;
 	set_frameset(ADDR_Frameset_69dc0);
 	state_duration() = 0x2c;
 	var1() = 0x04;
@@ -272,10 +272,10 @@ void Muddee::pos_to_h(int dy, int dx)
 {
 	uint16_t y_pos = static_cast<uint16_t>(y() + dy);
 	uint16_t x_pos = static_cast<uint16_t>(x() + dx);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 }
 
 // slow in the first round (substate 5)
@@ -287,11 +287,11 @@ void Muddee::move(uint16_t normal, uint16_t slow)
 
 bool Muddee::wario_left() const
 {
-	uint8_t hi = mem_[wCurObjXPos + 1];
-	uint8_t w_hi = mem_[wWarioXPos + 0];
+	uint8_t hi = mem_.cur_obj_x().hi();
+	uint8_t w_hi = mem_.wario_x().hi();
 	if (w_hi != hi)
 		return w_hi < hi;
-	return mem_[wWarioXPos + 1] < static_cast<uint8_t>(mem_[wCurObjXPos + 0]);
+	return mem_.wario_x().lo() < static_cast<uint8_t>(mem_.cur_obj_x().lo());
 }
 
 void Muddee::next(uint8_t move, uint16_t frameset, uint8_t offset)
@@ -330,7 +330,7 @@ void Muddee::swim_down()
 		return;
 	pos_to_h(0x30, 0);
 	hpos_block_unk1();
-	if (!mem_[wIsInWaterOrSand] && !level_with_wario()) {
+	if (!mem_.is_in_water_or_sand() && !level_with_wario()) {
 		move(ADDR_MoveObjectDown, ADDR_MoveObjectDown_Slow);
 		return;
 	}
@@ -382,11 +382,11 @@ void Muddee::sink()
 // along the floor under Wario, then more stingers
 void Muddee::follow()
 {
-	uint8_t lo = mem_[wCurObjXPos + 0], hi = mem_[wCurObjXPos + 1];
+	uint8_t lo = mem_.cur_obj_x().lo(), hi = mem_.cur_obj_x().hi();
 	uint16_t y_pos = static_cast<uint16_t>(y() - 0x40);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	uint8_t w_hi = mem_[wWarioXPos + 0], w_lo = mem_[wWarioXPos + 1];
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	uint8_t w_hi = mem_.wario_x().hi(), w_lo = mem_.wario_x().lo();
 	int dir = w_hi < hi ? -1 : w_hi > hi ? 1 : w_lo < lo ? -1 : w_lo > lo ? 1 : 0;
 	if (!dir) {
 		set_frameset(ADDR_Frameset_69d04);
@@ -396,8 +396,8 @@ void Muddee::follow()
 		return;
 	}
 	uint16_t x_pos = static_cast<uint16_t>(x() + (dir > 0 ? 0x08 : -0x08));
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		return;
 	call_home(dir > 0 ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
@@ -434,7 +434,7 @@ void Muddee::charge()
 // frames, then a pause
 void Muddee::charging()
 {
-	if (var3() != 0xff && !frame_duration() && mem_[wCurObjFramesetOffset] == 0x18 && ++var3() == 0x03) {
+	if (var3() != 0xff && !frame_duration() && mem_.cur_obj_frameset_offset() == 0x18 && ++var3() == 0x03) {
 		var3() = 0xff;
 		set_frameset(ADDR_Frameset_69cf2);
 		state_duration() = 0x3c;
@@ -467,7 +467,7 @@ void Muddee::charging()
 	} else {
 		pos_to_h(0x30, 0);
 		hpos_block_unk1();
-		if (!mem_[wIsInWaterOrSand]) {
+		if (!mem_.is_in_water_or_sand()) {
 			call_home(ADDR_MoveObjectDown_Slow);
 			return;
 		}
@@ -493,7 +493,7 @@ void Muddee::defeated()
 
 void Muddee::sfx_0c1()
 {
-	if (!(mem_[wGlobalCounter] & 0x0f))
+	if (!(mem_.global_counter() & 0x0f))
 		play_sfx(SFX_0C1);
 }
 
@@ -502,7 +502,7 @@ void Muddee::swim_sfx()
 {
 	uint8_t round = substate() & 0x0f;
 	uint8_t mask = round == 0x05 ? 0x1f : round == 0x04 ? 0x0f : 0x07;
-	if (!(mem_[wGlobalCounter] & mask))
+	if (!(mem_.global_counter() & mask))
 		play_sfx(SFX_085);
 }
 
@@ -511,23 +511,23 @@ void Muddee::set_frameset_raw(uint16_t frameset, uint8_t offset, uint8_t duratio
 	mem_[wCurObjFramesetPtr + 0] = static_cast<uint8_t>(frameset);
 	mem_[wCurObjFramesetPtr + 1] = static_cast<uint8_t>(frameset >> 8);
 	frame_duration() = 0;
-	mem_[wCurObjFramesetOffset] = offset;
+	mem_.cur_obj_frameset_offset() = offset;
 	state_duration() = duration;
 }
 
 bool Muddee::above_wario() const
 {
-	return static_cast<uint8_t>(screen_y() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a);
+	return static_cast<uint8_t>(screen_y() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a);
 }
 
 bool Muddee::level_with_wario() const
 {
-	return (screen_y() & 0xf8) == (static_cast<uint8_t>(mem_[wWarioScreenYPos] - 0x10) & 0xf8);
+	return (screen_y() & 0xf8) == (static_cast<uint8_t>(mem_.wario_screen_y_pos() - 0x10) & 0xf8);
 }
 
 void Muddee::flicker()
 {
-	if (mem_[wGlobalCounter] & 0x03)
+	if (mem_.global_counter() & 0x03)
 		flags() &= ~(1 << 4);
 	else
 		flags() |= 1 << 4;
@@ -535,16 +535,16 @@ void Muddee::flicker()
 
 void Turtle::init_box()
 {
-	mem_[wCurObjCollBoxRight] = 0x0a;
-	mem_[wCurObjCollBoxLeft] = 0xf5;
-	mem_[wCurObjCollBoxBottom] = 0x04;
+	mem_.cur_obj_coll_box_right() = 0x0a;
+	mem_.cur_obj_coll_box_left() = 0xf5;
+	mem_.cur_obj_coll_box_bottom() = 0x04;
 	set_frameset(ADDR_Frameset_69d5c);
 }
 
 // the turtle Muddee hides under
 void Turtle::start1()
 {
-	mem_[wMuddeeAmbushState] = 0;
+	mem_.muddee_ambush_state() = 0;
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(T1_WAITING);
 	substate() = (substate() & ~OBJSUBFLAG_UNINITIALISED) | (1 << OBJSUBFLAG_UNK_4_F);
@@ -589,8 +589,7 @@ void Turtle::carry_wario(uint16_t flags_addr)
 	if (!(mem_[flags_addr] & OBJFLAG_STEPPED))
 		return;
 	mem_[flags_addr] &= ~OBJFLAG_STEPPED;
-	routines_.farcall(BANK_Func_19706, ADDR_Func_19706);
-	if (gb_->cpu.b)
+	if (wario_bottom_collision(true))
 		return;
 	move_wario(ADDR_MoveWarioRight, 0x01);
 }
@@ -600,7 +599,7 @@ void Turtle::swimming1()
 {
 	one_way_platform();
 	paddle_sfx();
-	if (!(mem_[wGlobalCounter] & 1))
+	if (!(mem_.global_counter() & 1))
 		return;
 	if (--state_duration()) {
 		move_right();
@@ -621,7 +620,7 @@ void Turtle::stopped1()
 	state_duration() = 0x28;
 	var1() = 0x40;
 	set_update(T1_DIVING);
-	mem_[wMuddeeAmbushState] = 1;
+	mem_.muddee_ambush_state() = 1;
 }
 
 void Turtle::diving()
@@ -643,7 +642,7 @@ void Turtle::diving()
 void Turtle::under()
 {
 	no_actions();
-	if (mem_[wMuddeeAmbushState] != 2)
+	if (mem_.muddee_ambush_state() != 2)
 		return;
 	set_frameset(ADDR_Frameset_69d5c);
 	state_duration() = 0x3c;
@@ -656,14 +655,14 @@ void Turtle::under()
 void Turtle::resurfacing()
 {
 	one_way_platform();
-	if (!(mem_[wGlobalCounter] & 1))
+	if (!(mem_.global_counter() & 1))
 		return;
 	if (state_duration()) {
 		if (--state_duration())
 			return;
-		mem_[wBossState] = BOSS_DEFEATED;
+		mem_.boss_state() = BOSS_DEFEATED;
 		home::update_level_music(gb_);
-		mem_[wIsBossBattle] = 0;
+		mem_.is_boss_battle() = 0;
 		return;
 	}
 	if (--var1()) {
@@ -679,13 +678,13 @@ void Turtle::swimming()
 {
 	one_way_platform();
 	paddle_sfx();
-	if (!(mem_[wGlobalCounter] & 1))
+	if (!(mem_.global_counter() & 1))
 		return;
 	uint16_t x_pos = static_cast<uint16_t>(x() + 0x30);
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4()) {
 		set_update(TC_STOPPED);
 		return;
@@ -696,7 +695,7 @@ void Turtle::swimming()
 
 void Turtle::paddle_sfx()
 {
-	if (!frame_duration() && mem_[wCurObjFramesetOffset] == 0x04)
+	if (!frame_duration() && mem_.cur_obj_frameset_offset() == 0x04)
 		play_sfx(SFX_084);
 }
 

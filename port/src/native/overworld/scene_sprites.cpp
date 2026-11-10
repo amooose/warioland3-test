@@ -178,7 +178,7 @@ void SceneSprites::run(const void *machine_ptr, uint16_t state_addr)
 		break;
 	}
 
-	if (anim.next != STAY && mem_[wOWAnimationFinished] == 0xff) { // SetObjStateIfAnimationIsFinished
+	if (anim.next != STAY && mem_.ow_animation_finished() == 0xff) { // SetObjStateIfAnimationIsFinished
 		uint16_t duration = static_cast<uint16_t>(obj | 0x04); // set 2, l
 		mem_[duration] = 0;
 		mem_[static_cast<uint16_t>(duration + 1)] = 0; // frameset offset
@@ -191,7 +191,7 @@ void SceneSprites::run(const void *machine_ptr, uint16_t state_addr)
 		home::load_ow_sprite_with_scroll(gb_, anim.oam_bank, anim.oam, obj);
 	else
 		home::load_ow_sprite(gb_, anim.oam_bank, anim.oam, obj);
-	if (mem_[wOWAnimationFinished] == 0xff) {
+	if (mem_.ow_animation_finished() == 0xff) {
 		if (anim.special == Special::SFX_0F3_AT_END)
 			play_sfx(mem_, SFX_0F3);
 		else if (anim.special == Special::SFX_0F4_AT_END)
@@ -204,8 +204,8 @@ void SceneSprites::run(const void *machine_ptr, uint16_t state_addr)
 void SceneSprites::carry(uint16_t obj, uint16_t phase_addr)
 {
 	Byte phase = mem_[phase_addr];
-	uint8_t frame = mem_[wSceneWarioFrame];
-	switch (mem_[wSceneWarioState]) {
+	uint8_t frame = mem_.scene_wario_frame();
+	switch (mem_.scene_wario_state()) {
 	case SCENEWARIO_CARRY_WALK: { // .asm_ac254
 		if (phase > 1)
 			return;
@@ -228,8 +228,8 @@ void SceneSprites::carry(uint16_t obj, uint16_t phase_addr)
 		if (frame != HANDS[i].frame)
 			return;
 		phase = i == 2 ? 0x80 : static_cast<uint8_t>(p + 1);
-		mem_[obj] = static_cast<uint8_t>(mem_[wSceneWarioYCoord] + HANDS[i].dy);
-		mem_[obj + 1] = static_cast<uint8_t>(mem_[wSceneWarioXCoord] + HANDS[i].dx);
+		mem_[obj] = static_cast<uint8_t>(mem_.scene_wario_y_coord() + HANDS[i].dy);
+		mem_[obj + 1] = static_cast<uint8_t>(mem_.scene_wario_x_coord() + HANDS[i].dx);
 		return;
 	}
 	default:

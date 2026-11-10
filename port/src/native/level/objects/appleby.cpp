@@ -43,9 +43,9 @@ void Appleby::init()
 	set_frameset(ADDR_Frameset_689e9);
 	state_duration() = 5;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 7;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-8);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-1);
+	mem_.cur_obj_coll_box_right() = 7;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-8);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-1);
 }
 
 void Appleby::update()
@@ -113,10 +113,10 @@ void Appleby::aim()
 		--state_duration();
 		return;
 	}
-	uint8_t below = static_cast<uint8_t>(static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a) - static_cast<uint8_t>(screen_y() + 0x2a));
+	uint8_t below = static_cast<uint8_t>(static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a) - static_cast<uint8_t>(screen_y() + 0x2a));
 	if (below < 0x04 || below >= 0x46)
 		return;
-	uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+	uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 	if (dx < 0x40) {
 		substate() &= ~OBJSUBFLAG_HDIR;
 		set_frameset(ADDR_Frameset_68a1f);
@@ -176,7 +176,7 @@ void Appleby::roll_start(bool right)
 {
 	set_update(right ? ROLL_RIGHT : ROLL_LEFT);
 	uint8_t apple_x = static_cast<uint8_t>(screen_x() + 0x2a);
-	uint8_t wario_x = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario_x = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	uint8_t from = right ? wario_x : apple_x, to = right ? apple_x : wario_x;
 	if (from < to || static_cast<uint8_t>(from - to) < 0x10)
 		return;
@@ -188,7 +188,7 @@ void Appleby::roll_start(bool right)
 // collected, bounced off when hit
 void Appleby::roll(bool right, bool fast)
 {
-	bool odd = mem_[wGlobalCounter] & 1;
+	bool odd = mem_.global_counter() & 1;
 	if (fast || (right ? odd : !odd)) {
 		uint16_t step = var2();
 		x() = static_cast<uint16_t>(right ? x() + step : x() - step);
@@ -202,7 +202,7 @@ void Appleby::roll(bool right, bool fast)
 		apply_y_movement(ADDR_Data_60670);
 		return;
 	}
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	set_update(static_cast<uint8_t>(screen_x() + 0x2a) < wario ? BOUNCE_LEFT : BOUNCE_RIGHT);
 	var3() = 0;
 }
@@ -230,6 +230,6 @@ PORT_LOCAL_EX(AppleFunc, Update1_Right, 0, ALL_REGISTERS) { Appleby(gb).roll_sta
 // the asm tests the Z flag it's entered with (NZ from UpdateObject's
 // `or BANK`) where it means var1
 PORT_LOCAL_EX(AppleFunc, Update2_Left, 0, ALL_REGISTERS) { Appleby(gb).roll(false, !(gb->cpu.f & FLAG_Z)); }
-PORT_LOCAL_EX(AppleFunc, Update2_Right, 0, ALL_REGISTERS) { Appleby(gb).roll(true, wl3::Memory(gb)[wCurObjVar1]); }
+PORT_LOCAL_EX(AppleFunc, Update2_Right, 0, ALL_REGISTERS) { Appleby(gb).roll(true, wl3::Memory(gb).cur_obj_var1()); }
 PORT_LOCAL_EX(AppleFunc, Func_47bd3, 0, ALL_REGISTERS) { Appleby(gb).bounce(false); }
 PORT_LOCAL_EX(AppleFunc, Func_47bd8, 0, ALL_REGISTERS) { Appleby(gb).bounce(true); }

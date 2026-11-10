@@ -74,7 +74,7 @@ public:
 	void run(uint16_t handler);
 
 private:
-	bool blind() const { return mem_[wTransformation] == TRANSFORMATION_BLIND; }
+	bool blind() const { return mem_.transformation() == TRANSFORMATION_BLIND; }
 	void hover(); // .Func_44a97
 	void hovering(); // .Func_44ac1
 	void settle(); // .asm_44b4c
@@ -115,8 +115,8 @@ void Teruteru::update()
 
 void Teruteru::set_box(uint8_t top, uint8_t bottom)
 {
-	mem_[wCurObjCollBoxTop] = top;
-	mem_[wCurObjCollBoxBottom] = bottom;
+	mem_.cur_obj_coll_box_top() = top;
+	mem_.cur_obj_coll_box_bottom() = bottom;
 }
 
 void Teruteru::hover()
@@ -134,9 +134,9 @@ void Teruteru::hover()
 void Teruteru::hovering()
 {
 	if (!blind()) {
-		uint8_t below = static_cast<uint8_t>(static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a) - static_cast<uint8_t>(screen_y() + 0x2a));
+		uint8_t below = static_cast<uint8_t>(static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a) - static_cast<uint8_t>(screen_y() + 0x2a));
 		if (below >= 0x18 && below < 0x80) {
-			uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+			uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 			if (dx >= 0xe8 || dx < 0x18) {
 				state() = 0x2d;
 				set_frameset(ADDR_Frameset_68b84);
@@ -173,7 +173,7 @@ void Teruteru::settle()
 
 void Teruteru::stunned(uint8_t s)
 {
-	mem_[wCurObjAction] = 0x8f;
+	mem_.cur_obj_action() = 0x8f;
 	state() = s;
 	set_frameset(ADDR_Frameset_68ba5);
 	state_duration() = 4;
@@ -241,14 +241,14 @@ void Teruteru::run(uint16_t handler)
 	case ON_WARIO: // on his head while he's blind
 		no_actions();
 		if (!blind()) {
-			run(mem_[wDirection] ? STUNNED_39 : STUNNED_38);
+			run(mem_.direction() ? STUNNED_39 : STUNNED_38);
 			return;
 		}
 		flags() &= ~OBJFLAG_INVISIBLE;
 		{
-			uint16_t wario_y = static_cast<uint16_t>((mem_[wWarioYPos + 0] << 8 | mem_[wWarioYPos + 1]) - 0x0c);
+			uint16_t wario_y = static_cast<uint16_t>(mem_.wario_y() - 0x0c);
 			y() = wario_y;
-			x() = static_cast<uint16_t>(mem_[wWarioXPos + 0] << 8 | mem_[wWarioXPos + 1]);
+			x() = mem_.wario_x();
 		}
 		return;
 	case SWOOP_START:
@@ -268,7 +268,7 @@ void Teruteru::run(uint16_t handler)
 			return;
 		}
 		{
-			uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+			uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 			uint8_t ghost = static_cast<uint8_t>(screen_x() + 0x2a);
 			if (ghost < wario)
 				move_right();
@@ -286,11 +286,11 @@ void Teruteru::run(uint16_t handler)
 			settle();
 		return;
 	case RESET: // facing Wario
-		mem_[wCurObjCollBoxRight] = 0x06;
-		mem_[wCurObjCollBoxLeft] = 0xf9;
+		mem_.cur_obj_coll_box_right() = 0x06;
+		mem_.cur_obj_coll_box_left() = 0xf9;
 		set_box(0xec, 0xf1);
 		{
-			uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+			uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 			if (static_cast<uint8_t>(screen_x() + 0x2a) < wario)
 				substate() |= OBJSUBFLAG_HDIR;
 			else
@@ -331,7 +331,7 @@ void Teruteru::run(uint16_t handler)
 		run(DAZED);
 		return;
 	case DAZED:
-		if (mem_[wGroundShakeCounter] >= 0x10) {
+		if (mem_.ground_shake_counter() >= 0x10) {
 			state() = 0x1c;
 			return;
 		}
@@ -369,7 +369,7 @@ void Teruteru::run(uint16_t handler)
 		run(HELD_49);
 		return;
 	case HELD_49: // carried facing the way Wario does
-		if (mem_[wDirection]) {
+		if (mem_.direction()) {
 			call_home(ADDR_Func_3353);
 			return;
 		}
@@ -381,7 +381,7 @@ void Teruteru::run(uint16_t handler)
 		run(HELD_48);
 		return;
 	case HELD_48:
-		if (!mem_[wDirection]) {
+		if (!mem_.direction()) {
 			call_home(ADDR_Func_3362);
 			return;
 		}
@@ -389,7 +389,7 @@ void Teruteru::run(uint16_t handler)
 		run(GRAB_49);
 		return;
 	case STATE_42:
-		mem_[wCurObjAction] = 0x9f;
+		mem_.cur_obj_action() = 0x9f;
 		state() = 0x42;
 		var3() = 0;
 		set_interaction(OBJ_INTERACTION_00);

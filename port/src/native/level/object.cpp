@@ -9,10 +9,10 @@ namespace wl3::level {
 
 void Object::set_coll_box(uint8_t top, uint8_t bottom, uint8_t left, uint8_t right)
 {
-	mem_[wCurObjCollBoxTop] = top;
-	mem_[wCurObjCollBoxBottom] = bottom;
-	mem_[wCurObjCollBoxLeft] = left;
-	mem_[wCurObjCollBoxRight] = right;
+	mem_.cur_obj_coll_box_top() = top;
+	mem_.cur_obj_coll_box_bottom() = bottom;
+	mem_.cur_obj_coll_box_left() = left;
+	mem_.cur_obj_coll_box_right() = right;
 }
 
 void Object::set_frameset(uint16_t frameset)
@@ -24,7 +24,7 @@ void Object::call_home(uint16_t routine)
 {
 	if (object_state(gb_, routine))
 		return;
-	bool odd = mem_[wGlobalCounter] & 1;
+	bool odd = mem_.global_counter() & 1;
 	switch (routine) {
 	case ADDR_MoveObjectLeft: move_left(); break;
 	case ADDR_MoveObjectRight: move_right(); break;

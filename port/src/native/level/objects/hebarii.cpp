@@ -90,14 +90,14 @@ void Hebarii::init()
 {
 	flags() &= ~OBJFLAG_INVISIBLE;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 5;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-7);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-12);
+	mem_.cur_obj_coll_box_right() = 5;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-7);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-12);
 	set_update(ATTACHED);
 	set_frameset(ADDR_Frameset_683e4);
 	state_duration() = 20;
 	var1() = 0;
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	if (static_cast<uint8_t>(screen_x() + 0x2a) < wario)
 		substate() |= OBJSUBFLAG_HDIR;
 	else
@@ -107,13 +107,13 @@ void Hebarii::init()
 // on the ceiling, until a strong ground shake or a hit
 void Hebarii::attached()
 {
-	if (mem_[wGroundShakeCounter] >= 0x10) { // drops
+	if (mem_.ground_shake_counter() >= 0x10) { // drops
 		set_update(DETACHED);
 		set_frameset(ADDR_Frameset_683f8);
-		mem_[wCurObjCollBoxRight] = 5;
-		mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-6);
-		mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-1);
-		mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-14);
+		mem_.cur_obj_coll_box_right() = 5;
+		mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-6);
+		mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-1);
+		mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-14);
 		set_interaction(OBJ_INTERACTION_01);
 		state() = OBJSTATE_SPECIAL_1;
 		var3() = 0;
@@ -173,20 +173,20 @@ void Hebarii::crawl()
 		var1() = 0x01;
 		return;
 	}
-	if (mem_[wGlobalCounter] & 0b11)
+	if (mem_.global_counter() & 0b11)
 		return;
 	bool right = facing_right();
 	uint16_t y_pos = static_cast<uint16_t>(y() - 18);
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 9) : static_cast<uint16_t>(x() - 11);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	bool turn = !hpos_block_unk4(); // no ceiling ahead
 	if (!turn) {
 		y_pos = static_cast<uint16_t>(y() - 8);
-		mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
+		mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+		mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
 		turn = hpos_block_unk4(); // a wall
 	}
 	if (turn)
@@ -217,7 +217,7 @@ void Hebarii::knocked(uint16_t frameset, uint16_t routine)
 
 void Hebarii::wobble(uint8_t s)
 {
-	mem_[wCurObjAction] = 15 | (1 << 7);
+	mem_.cur_obj_action() = 15 | (1 << 7);
 	state() = s;
 	set_frameset(ADDR_Frameset_683fb);
 	state_duration() = 4;
@@ -263,27 +263,27 @@ void Hebarii::run(uint16_t handler)
 	switch (handler) {
 	case VANISH: call_home(ADDR_VanishObject2); return;
 	case FALL: // until it lands (lost in water)
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		if (!hpos_block_unk1()) {
-			if (mem_[wIsInWaterOrSand]) {
+			if (mem_.is_in_water_or_sand()) {
 				call_home(ADDR_VanishObject2);
 				return;
 			}
 			apply_y_movement(ADDR_FallingYVel_Light);
 			return;
 		}
-		mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-		mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+		mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+		mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 		state() = OBJSTATE_WALK;
 		set_frameset(ADDR_Frameset_683fb);
 		state_duration() = 160;
 		set_interaction(OBJ_INTERACTION_00);
 		return;
 	case WALKING: // a while on the floor, then gone
-		if (mem_[wGroundShakeCounter] >= 0x10) {
+		if (mem_.ground_shake_counter() >= 0x10) {
 			state() = static_cast<uint8_t>((OBJSTATE_WOBBLE_LEFT_START & ~1) | (mem_[rDIV] & 1));
 			return;
 		}
@@ -330,7 +330,7 @@ void Hebarii::run(uint16_t handler)
 		grab(OBJSTATE_49);
 		[[fallthrough]];
 	case STATE_49: // carried facing the way Wario does
-		if (mem_[wDirection]) {
+		if (mem_.direction()) {
 			call_home(ADDR_Func_3353);
 			return;
 		}
@@ -341,7 +341,7 @@ void Hebarii::run(uint16_t handler)
 		grab(OBJSTATE_48);
 		[[fallthrough]];
 	case STATE_48:
-		if (!mem_[wDirection]) {
+		if (!mem_.direction()) {
 			call_home(ADDR_Func_3362);
 			return;
 		}
@@ -349,7 +349,7 @@ void Hebarii::run(uint16_t handler)
 		run(STATE_19);
 		return;
 	case STATE_12:
-		mem_[wCurObjAction] = 31 | (1 << 7);
+		mem_.cur_obj_action() = 31 | (1 << 7);
 		state() = OBJSTATE_42;
 		var3() = 0;
 		return;
@@ -372,7 +372,7 @@ void Hebarii::spike()
 	if (--state_duration())
 		return;
 	state_duration() = 100;
-	uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+	uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 	if (dx < 0x18 || dx >= 0xe8) {
 		set_update(SPIKE_DOWN);
 		return;
@@ -390,14 +390,14 @@ void Hebarii::spike_fall(bool lateral)
 		call_home(facing_right() ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	call_home(ADDR_MoveObjectDown_Slow);
 	if (--state_duration() && !state()) {
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		if (!hpos_block_unk1())
 			return;
-		mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-		mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+		mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+		mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	}
 	set_update(SPIKE_GONE);
 	set_frameset(ADDR_Frameset_6840d);

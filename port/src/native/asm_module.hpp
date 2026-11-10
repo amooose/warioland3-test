@@ -137,16 +137,16 @@ protected:
 	{
 		wr8(hSFXID + 0, static_cast<uint8_t>(sfx >> 8));
 		cpu_.a = static_cast<uint8_t>(sfx);
-		wr8(hSFXID + 1, cpu_.a);
+		mem_.sfx().lo() = cpu_.a;
 	}
 	void bankswitch(uint8_t bank)
 	{
-		wr8(wROMBank, bank);
+		mem_.rom_bank() = bank;
 		wr8(rROMB0 + 0x100, bank);
 	}
 	void sramswitch(uint8_t bank)
 	{
-		wr8(wSRAMBank, bank);
+		mem_.sram_bank() = bank;
 		wr8(rRAMB + 0x100, bank);
 	}
 	// push af / pop af, on the real stack
@@ -167,14 +167,14 @@ protected:
 	// wDMASourceBank/Ptr = gfx, call LoadWarioGfx
 	void load_gfx(uint8_t bank, uint16_t ptr)
 	{
-		wr8(wDMASourceBank, bank);
+		mem_.dma_source_bank() = bank;
 		wr8(wDMASourcePtr + 0, static_cast<uint8_t>(ptr >> 8));
 		st(wDMASourcePtr + 1, static_cast<uint8_t>(ptr));
 		home::load_wario_gfx(gb_);
 	}
 	void set_oam(uint8_t bank, uint16_t ptr)
 	{
-		wr8(wWarioOAMBank, bank);
+		mem_.wario_oam_bank() = bank;
 		wr8(wWarioOAMPtr + 0, static_cast<uint8_t>(ptr >> 8));
 		st(wWarioOAMPtr + 1, static_cast<uint8_t>(ptr));
 	}
@@ -188,24 +188,24 @@ protected:
 	// bottom -1, left -9, right 9, top -27 (a = -27)
 	void coll_box_blrt()
 	{
-		wr8(wCollisionBoxBottom, static_cast<uint8_t>(-1));
-		wr8(wCollisionBoxLeft, static_cast<uint8_t>(-9));
-		wr8(wCollisionBoxRight, 9);
+		mem_.collision_box_bottom() = static_cast<uint8_t>(-1);
+		mem_.collision_box_left() = static_cast<uint8_t>(-9);
+		mem_.collision_box_right() = 9;
 		st(wCollisionBoxTop, static_cast<uint8_t>(-27));
 	}
 	// bottom -1, top -27, left -9, right 9 (a = 9)
 	void coll_box_btlr()
 	{
-		wr8(wCollisionBoxBottom, static_cast<uint8_t>(-1));
-		wr8(wCollisionBoxTop, static_cast<uint8_t>(-27));
-		wr8(wCollisionBoxLeft, static_cast<uint8_t>(-9));
+		mem_.collision_box_bottom() = static_cast<uint8_t>(-1);
+		mem_.collision_box_top() = static_cast<uint8_t>(-27);
+		mem_.collision_box_left() = static_cast<uint8_t>(-9);
 		st(wCollisionBoxRight, 9);
 	}
 	void update_pos_y()
 	{
-		wr8(wWarioYPos + 0, rd8(hYPosHi));
+		wr8(wWarioYPos + 0, mem_.y_pos_hi());
 		cpu_.a = rd8(hYPosHi + 1);
-		wr8(wWarioYPos + 1, cpu_.a);
+		mem_.wario_y().lo() = cpu_.a;
 		SET_HL(gb_, hYPosHi + 1);
 		SET_DE(gb_, wWarioYPos + 1);
 	}
@@ -221,8 +221,8 @@ protected:
 	// ld a, [wSFXLoopCounter] / sub 1 / ...: the sfx every reload frames
 	void sfx_loop(uint8_t reload, uint16_t sfx)
 	{
-		cpu_.a = alu_.sub(rd8(wSFXLoopCounter), 1);
-		wr8(wSFXLoopCounter, cpu_.a);
+		cpu_.a = alu_.sub(mem_.sfx_loop_counter(), 1);
+		mem_.sfx_loop_counter() = cpu_.a;
 		if (!CF)
 			return;
 		st(wSFXLoopCounter, reload);
@@ -240,16 +240,16 @@ protected:
 	}
 	void center_on_ladder()
 	{
-		cpu_.a = alu_.and_(rd8(wWarioXPos + 1), 0xf0);
+		cpu_.a = alu_.and_(mem_.wario_x().lo(), 0xf0);
 		cpu_.a = alu_.add(cpu_.a, 0x08);
-		wr8(wWarioXPos + 1, cpu_.a);
+		mem_.wario_x().lo() = cpu_.a;
 	}
 	// ld hl, wWarioStateCounter / inc [hl] / ld a, [hl]
 	uint8_t inc_counter()
 	{
 		SET_HL(gb_, wWarioStateCounter);
-		cpu_.a = alu_.inc(rd8(wWarioStateCounter));
-		wr8(wWarioStateCounter, cpu_.a);
+		cpu_.a = alu_.inc(mem_.wario_state_counter());
+		mem_.wario_state_counter() = cpu_.a;
 		return cpu_.a;
 	}
 	bool facing_right() { return ld_and(wDirection); }
@@ -270,8 +270,8 @@ protected:
 	void reset_anim()
 	{
 		xor_a();
-		wr8(wFrameDuration, 0);
-		wr8(wAnimationFrame, 0);
+		mem_.frame_duration() = 0;
+		mem_.animation_frame() = 0;
 	}
 	void touch_states(uint8_t t, uint8_t ca94)
 	{
@@ -281,8 +281,8 @@ protected:
 	}
 	void flip_dir()
 	{
-		cpu_.a = alu_.xor_(rd8(wDirection), 0x1);
-		wr8(wDirection, cpu_.a);
+		cpu_.a = alu_.xor_(mem_.direction(), 0x1);
+		mem_.direction() = cpu_.a;
 	}
 	bool flip_dir_and()
 	{

@@ -33,9 +33,9 @@ void SmallLeaf::init()
 {
 	flags() = (flags() & ~OBJFLAG_INVISIBLE) | OBJFLAG_NO_COLLISION;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 0x06;
-	mem_[wCurObjCollBoxLeft] = 0xf9;
-	mem_[wCurObjCollBoxBottom] = 0xf3;
+	mem_.cur_obj_coll_box_right() = 0x06;
+	mem_.cur_obj_coll_box_left() = 0xf9;
+	mem_.cur_obj_coll_box_bottom() = 0xf3;
 	reset();
 }
 

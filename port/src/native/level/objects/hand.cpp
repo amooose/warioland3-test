@@ -64,9 +64,9 @@ void Hand::init()
 	flags() |= OBJFLAG_NO_COLLISION;
 	set_update(UPDATE);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-12);
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-6);
-	mem_[wCurObjCollBoxRight] = 5;
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-12);
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-6);
+	mem_.cur_obj_coll_box_right() = 5;
 	state_duration() = 50;
 	var1() = 0;
 }
@@ -75,10 +75,9 @@ void Hand::init()
 void Hand::apply_offset(uint16_t page, uint8_t dy)
 {
 	uint16_t y_pos = static_cast<uint16_t>(mem_.word(static_cast<uint16_t>(page | OBJ_Y_POS)) - dy);
-	mem_[wWarioYPos + 1] = static_cast<uint8_t>(y_pos);
-	mem_[wWarioYPos + 0] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[wWarioXPos + 1] = mem_[static_cast<uint16_t>(page | OBJ_X_POS)];
-	mem_[wWarioXPos + 0] = mem_[static_cast<uint16_t>(page | (OBJ_X_POS + 1))];
+	mem_.wario_y() = y_pos;
+	mem_.wario_x().lo() = mem_[static_cast<uint16_t>(page | OBJ_X_POS)];
+	mem_.wario_x().hi() = mem_[static_cast<uint16_t>(page | (OBJ_X_POS + 1))];
 }
 
 void Hand::update()
@@ -133,14 +132,14 @@ void Hand::step(uint8_t index)
 				apply_offset(wCurObj & 0xff00, 7);
 		} else if (time < 49) {
 			uint8_t top = static_cast<uint8_t>(screen_y() - 4);
-			if (mem_[wWarioScreenYPos] < top) {
+			if (mem_.wario_screen_y_pos() < top) {
 				--state_duration();
 				return;
 			}
 		}
 	}
 	no_actions();
-	if (index == RISE && mem_[wIsInSand]) {
+	if (index == RISE && mem_.is_in_sand()) {
 		state_duration() = 50;
 		return;
 	}
@@ -152,7 +151,7 @@ void Hand::step(uint8_t index)
 	if (index == RISE)
 		play_sfx(SFX_081);
 	if (index == DOWN && state() == HOLDING) {
-		mem_[wAutoMoveState] = 0;
+		mem_.auto_move_state() = 0;
 		state() = 0;
 	}
 }

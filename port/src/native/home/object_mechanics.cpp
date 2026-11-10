@@ -10,44 +10,44 @@ namespace wl3::home {
 void move_object_x(GB *gb, int dx)
 {
 	Memory mem(gb);
-	mem.word(wCurObjXPos) = static_cast<uint16_t>(mem.word(wCurObjXPos) + dx);
+	mem.cur_obj_x() = static_cast<uint16_t>(mem.cur_obj_x() + dx);
 }
 
 void move_object_y(GB *gb, int dy)
 {
 	Memory mem(gb);
-	mem.word(wCurObjYPos) = static_cast<uint16_t>(mem.word(wCurObjYPos) + dy);
+	mem.cur_obj_y() = static_cast<uint16_t>(mem.cur_obj_y() + dy);
 }
 
 void set_object_frameset_ptr(GB *gb, uint16_t frameset)
 {
 	Memory mem(gb);
 	mem.word(wCurObjFramesetPtr) = frameset;
-	mem[wCurObjFrameDuration] = 0;
-	mem[wCurObjFramesetOffset] = 0;
+	mem.cur_obj_frame_duration() = 0;
+	mem.cur_obj_frameset_offset() = 0;
 }
 
 // UpdateObjSprite, plain: see object_mechanics.hpp
 void update_obj_sprite(GB *gb, uint16_t id, uint16_t pos)
 {
 	Memory mem(gb);
-	uint8_t bank = mem[wROMBank];
+	uint8_t bank = mem.rom_bank();
 	uint8_t v = mem[id];
 	bankswitch(gb, static_cast<uint8_t>((((v << 4) | (v >> 4)) & 0x7) | BANK_OAM_180000), ADDR_UpdateObjSprite);
 	uint8_t y = mem[pos], x = mem[pos + 1], frame = mem[pos + 2];
-	mem[wCurSpriteYCoord] = y;
-	mem[wCurSpriteXCoord] = x;
-	mem[wCurSpriteFrame] = frame;
+	mem.cur_sprite_y_coord() = y;
+	mem.cur_sprite_x_coord() = x;
+	mem.cur_sprite_frame() = frame;
 	// the OAM pointer plus frame * 2 (an 8-bit add a)
 	uint16_t entry = static_cast<uint16_t>(mem.word(pos + 3) + static_cast<uint8_t>(frame * 2));
 	uint16_t data = mem.word(entry);
-	uint16_t oam = static_cast<uint16_t>((wVirtualOAM & 0xff00) | mem[wVirtualOAMByteSize]);
+	uint16_t oam = static_cast<uint16_t>((wVirtualOAM & 0xff00) | mem.virtual_oam_byte_size());
 	while ((oam & 0xff) < (wVirtualOAMEnd & 0xff) && mem[data] != 0x80) {
 		mem[oam++] = static_cast<uint8_t>(mem[data++] + y); // SPRITEOAMSTRUCT_YCOORD
 		mem[oam++] = static_cast<uint8_t>(mem[data++] + x); // SPRITEOAMSTRUCT_XCOORD
 		mem[oam++] = mem[data++]; // SPRITEOAMSTRUCT_TILE_ID
 		mem[oam++] = mem[data]; // SPRITEOAMSTRUCT_ATTRIBUTES
-		mem[wVirtualOAMByteSize] = static_cast<uint8_t>(oam);
+		mem.virtual_oam_byte_size() = static_cast<uint8_t>(oam);
 		data++;
 	}
 	bankswitch(gb, bank, ADDR_UpdateObjSprite);
@@ -56,22 +56,22 @@ void update_obj_sprite(GB *gb, uint16_t id, uint16_t pos)
 void update_object_animation(GB *gb)
 {
 	Memory mem(gb);
-	uint8_t duration = mem[wCurObjFrameDuration];
-	mem[wCurObjFrameDuration] = static_cast<uint8_t>(duration - 1);
+	uint8_t duration = mem.cur_obj_frame_duration();
+	mem.cur_obj_frame_duration() = static_cast<uint8_t>(duration - 1);
 	if (duration) // sub 1 / ret nc
 		return;
-	uint8_t bank = mem[wROMBank];
+	uint8_t bank = mem.rom_bank();
 	bankswitch(gb, BANK_Frameset_68000, ADDR_UpdateObjectAnimation);
 	uint16_t frameset = mem.word(wCurObjFramesetPtr);
-	auto entry = static_cast<uint16_t>(frameset + mem[wCurObjFramesetOffset]);
+	auto entry = static_cast<uint16_t>(frameset + mem.cur_obj_frameset_offset());
 	if (mem[entry] != 0xff) {
-		mem[wCurObjFrame] = mem[entry];
-		mem[wCurObjFramesetOffset] = static_cast<uint8_t>(mem[wCurObjFramesetOffset] + 2);
-		mem[wCurObjFrameDuration] = mem[static_cast<uint16_t>(entry + 1)];
+		mem.cur_obj_frame() = mem[entry];
+		mem.cur_obj_frameset_offset() = static_cast<uint8_t>(mem.cur_obj_frameset_offset() + 2);
+		mem.cur_obj_frame_duration() = mem[static_cast<uint16_t>(entry + 1)];
 	} else { // .reset
-		mem[wCurObjFramesetOffset] = 2;
-		mem[wCurObjFrame] = mem[frameset];
-		mem[wCurObjFrameDuration] = mem[static_cast<uint16_t>(frameset + 1)];
+		mem.cur_obj_frameset_offset() = 2;
+		mem.cur_obj_frame() = mem[frameset];
+		mem.cur_obj_frame_duration() = mem[static_cast<uint16_t>(frameset + 1)];
 	}
 	bankswitch(gb, bank, ADDR_HomeJumpRet);
 }
@@ -79,26 +79,26 @@ void update_object_animation(GB *gb)
 void update_object_frame(GB *gb)
 {
 	Memory mem(gb);
-	if (mem[wCurObjFrameDuration]) // sub 1 / ret nc
+	if (mem.cur_obj_frame_duration()) // sub 1 / ret nc
 		return;
-	uint8_t bank = mem[wROMBank];
+	uint8_t bank = mem.rom_bank();
 	bankswitch(gb, BANK_Frameset_68000, ADDR_UpdateObjectFrame);
 	uint16_t frameset = mem.word(wCurObjFramesetPtr);
-	uint8_t frame = mem[static_cast<uint16_t>(frameset + mem[wCurObjFramesetOffset])];
-	mem[wCurObjFrame] = frame == 0xff ? mem[frameset] : frame;
+	uint8_t frame = mem[static_cast<uint16_t>(frameset + mem.cur_obj_frameset_offset())];
+	mem.cur_obj_frame() = frame == 0xff ? mem[frameset] : frame;
 	bankswitch(gb, bank, ADDR_HomeJumpRet);
 }
 
 void set_one_way_platform_action(GB *gb)
 {
 	Memory mem(gb);
-	if (mem[wCurObjFlags] & OBJFLAG_STEPPED)
+	if (mem.cur_obj_flags() & OBJFLAG_STEPPED)
 		return;
 	// wCurObjCollBoxTop + wCurObjScreenYPos + $2a + 3, against Wario's + $2a
-	auto top = static_cast<uint8_t>(mem[wCurObjScreenYPos] + 0x2a + 3 + mem[wCurObjCollBoxTop]);
-	if (static_cast<uint8_t>(mem[wWarioScreenYPos] + 0x2a) < top)
+	auto top = static_cast<uint8_t>(mem.cur_obj_screen_y_pos() + 0x2a + 3 + mem.cur_obj_coll_box_top());
+	if (static_cast<uint8_t>(mem.wario_screen_y_pos() + 0x2a) < top)
 		return; // Wario is over the collision box
-	mem[wCurObjAction] = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
+	mem.cur_obj_action() = (1 << NO_ACTIONS_F) | 1; // no_actions_for 1
 }
 
 namespace {
@@ -115,7 +115,7 @@ public:
 	// ld a, BANK(target) / bankswitch
 	void homejp(uint8_t bank)
 	{
-		cpu_.a = rd8(wROMBank);
+		cpu_.a = mem_.rom_bank();
 		push_af();
 		cpu_.a = bank;
 		bankswitch(bank);
@@ -268,7 +268,7 @@ void move_slow(GB *gb, bool x, int d)
 {
 	// ld a, [wGlobalCounter] / rra: right and down on even frames, left
 	// and up on odd ones
-	bool odd = wl3::Memory(gb)[wGlobalCounter] & 1;
+	bool odd = wl3::Memory(gb).global_counter() & 1;
 	if (odd == (d < 0)) {
 		if (x)
 			wl3::home::move_object_x(gb, d);
@@ -277,7 +277,7 @@ void move_slow(GB *gb, bool x, int d)
 	}
 }
 
-uint8_t var2(GB *gb) { return wl3::Memory(gb)[wCurObjVar2]; }
+uint8_t var2(GB *gb) { return wl3::Memory(gb).cur_obj_var2(); }
 
 } // namespace
 

@@ -42,9 +42,9 @@ void PrinceFroggy::set_up(uint16_t update)
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(update);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 0x03;
-	mem_[wCurObjCollBoxLeft] = 0xec;
-	mem_[wCurObjCollBoxBottom] = 0x00;
+	mem_.cur_obj_coll_box_right() = 0x03;
+	mem_.cur_obj_coll_box_left() = 0xec;
+	mem_.cur_obj_coll_box_bottom() = 0x00;
 }
 
 void PrinceFroggy::grey()
@@ -75,7 +75,7 @@ void PrinceFroggy::hit(uint16_t page_, uint16_t routine)
 // a strong ground shake knocks it over
 void PrinceFroggy::shaken()
 {
-	if (mem_[wGroundShakeCounter] < 0x10)
+	if (mem_.ground_shake_counter() < 0x10)
 		return;
 	state() = 0x1b;
 	var3() = 0;
@@ -188,7 +188,7 @@ void PrinceFroggy::sit(uint16_t state_addr)
 	state_duration() = 73;
 	flags() &= ~OBJFLAG_NO_COLLISION;
 	set_interaction(OBJ_INTERACTION_PRINCE_FROGGY);
-	mem_[wCurObjCollBoxTop] = 0xe6;
+	mem_.cur_obj_coll_box_top() = 0xe6;
 }
 
 void PrinceFroggy::vanishing()

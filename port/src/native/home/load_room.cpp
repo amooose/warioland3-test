@@ -45,8 +45,8 @@ private:
 	void far_copy(uint16_t bank_var, uint16_t src, uint16_t dest, uint32_t count)
 	{
 		uint8_t bank = mem_[bank_var];
-		mem_[wTempBank] = bank;
-		uint8_t rom = mem_[wROMBank];
+		mem_.temp_bank() = bank;
+		uint8_t rom = mem_.rom_bank();
 		switch_bank(bank);
 		copy(gb_, src, dest, count);
 		switch_bank(rom);
@@ -74,37 +74,37 @@ private:
 
 void RoomLoader::load_block_tiles()
 {
-	uint16_t src = pointer(ADDR_RoomBlockTilesPointers, mem_[wRoomBlockFunctionTable]);
+	uint16_t src = pointer(ADDR_RoomBlockTilesPointers, mem_.room_block_function_table());
 	far_copy(wRoomBlockFunctionTableBank, src, wRoomBlockTiles, 4 * NUM_ROOM_BLOCK_TYPES);
 }
 
 void RoomLoader::load_tile_map()
 {
-	uint16_t src = pointer(ADDR_RoomBlockAttributePointers, mem_[wRoomTileMap]);
-	uint8_t bank = mem_[wc0d0];
-	mem_[wTempBank] = bank;
+	uint16_t src = pointer(ADDR_RoomBlockAttributePointers, mem_.room_tile_map());
+	uint8_t bank = mem_.unk_c0d0();
+	mem_.temp_bank() = bank;
 	farcall(gb_, bank, ADDR_Decompress, [&] { decompress(gb_, src, wRoomBlockAttributes); });
 }
 
 void RoomLoader::load_main_tiles()
 {
-	uint16_t src = pointer(ADDR_LevelMainTilesPointers, mem_[wRoomMainTiles]);
+	uint16_t src = pointer(ADDR_LevelMainTilesPointers, mem_.room_main_tiles());
 	far_copy(wRoomMainTilesBank, src, v0Tiles2, 0x800);
 }
 
 void RoomLoader::load_special_tiles()
 {
 	mem_[rVBK] = 1;
-	uint16_t src = pointer(ADDR_SpecialTilesPointers, mem_[wRoomSpecialTiles]);
+	uint16_t src = pointer(ADDR_SpecialTilesPointers, mem_.room_special_tiles());
 	far_copy(wRoomSpecialTilesBank, src, v0Tiles2, 0x800);
 	mem_[rVBK] = 0;
 }
 
 void RoomLoader::load_palettes()
 {
-	uint16_t src = pointer(ADDR_RoomPals, mem_[wRoomPalettes]);
-	uint8_t bank = mem_[wPaletteBank];
-	mem_[wTempBank] = bank;
+	uint16_t src = pointer(ADDR_RoomPals, mem_.room_palettes());
+	uint8_t bank = mem_.palette_bank();
+	mem_.temp_bank() = bank;
 	farcall(gb_, bank, ADDR_LoadPalsToTempPals1, [&] { load_pals_to_temp_pals1(gb_, src); });
 }
 
@@ -115,21 +115,21 @@ void RoomLoader::update_animated_pals()
 {
 	if (mem_[rLY] >= LY_VBLANK - 8)
 		return;
-	uint8_t duration = mem_[wRoomPalCycleDuration];
+	uint8_t duration = mem_.room_pal_cycle_duration();
 	if (!duration)
 		return;
-	uint8_t count = static_cast<uint8_t>(mem_[wRoomPalCycleCounter] + 1);
-	mem_[wRoomPalCycleCounter] = count;
+	uint8_t count = static_cast<uint8_t>(mem_.room_pal_cycle_counter() + 1);
+	mem_.room_pal_cycle_counter() = count;
 	if (count < duration)
 		return;
-	mem_[wRoomPalCycleCounter] = 0;
+	mem_.room_pal_cycle_counter() = 0;
 	uint16_t cycle = static_cast<uint16_t>(mem_[wRoomPalCyclePtr + 0] << 8 | mem_[wRoomPalCyclePtr + 1]);
-	uint8_t index = static_cast<uint8_t>(mem_[wRoomPalCycleIndex] + 1);
+	uint8_t index = static_cast<uint8_t>(mem_.room_pal_cycle_index() + 1);
 	if (index >= ROOM_PALCYCLE_LENGTH)
 		index = 0;
-	mem_[wRoomPalCycleIndex] = index;
+	mem_.room_pal_cycle_index() = index;
 
-	uint8_t rom = mem_[wROMBank];
+	uint8_t rom = mem_.rom_bank();
 	switch_bank(BANK_RoomPalCycles);
 	uint8_t pal = mem_[static_cast<uint16_t>(cycle + index)];
 	uint16_t pals = Word(gb_, static_cast<uint16_t>(ADDR_RoomPals + pal * 2));
@@ -151,10 +151,10 @@ void RoomLoader::update_animated_pals()
 // the room's block functions: from its table in group 1 or 2's bank
 void RoomLoader::load_block_function_table()
 {
-	uint8_t table = mem_[wRoomBlockFunctionTable];
+	uint8_t table = mem_.room_block_function_table();
 	uint8_t offset = static_cast<uint8_t>(table * 2);
 	uint16_t at = static_cast<uint16_t>(ADDR_BlockFunctionTablePointers + offset);
-	uint8_t rom = mem_[wROMBank];
+	uint8_t rom = mem_.rom_bank();
 	switch_bank(BANK_BlockFunctionTablePointers);
 	uint16_t src = Word(gb_, at);
 	if (src >> 8 == 0xff) { // .reset; push af saved add a / add hl, de's flags
@@ -176,13 +176,13 @@ void RoomLoader::load_block_function_table()
 // a level's header: its rooms' headers in bank $30 or $31
 void RoomLoader::load()
 {
-	mem_[wPrevWarioScreenYPos] = 0x70;
-	mem_[wCamRightSpacing] = 0x58;
-	mem_[wCamLeftSpacing] = 0x58; // $58 - ($58 - $58)
+	mem_.prev_wario_screen_y_pos() = 0x70;
+	mem_.cam_right_spacing() = 0x58;
+	mem_.cam_left_spacing() = 0x58; // $58 - ($58 - $58)
 
-	uint8_t rom = mem_[wROMBank];
+	uint8_t rom = mem_.rom_bank();
 	switch_bank(BANK_LevelHeaders);
-	uint8_t level = mem_[wLevel];
+	uint8_t level = mem_.level();
 	uint16_t rooms = Word(gb_, static_cast<uint16_t>(ADDR_LevelHeaders + level * 2));
 	if (rooms >> 8 == 0xff) {
 		reset(rom, 0); // the flags of add $58
@@ -190,34 +190,34 @@ void RoomLoader::load()
 	}
 	switch_bank(rom);
 
-	level = mem_[wLevel];
-	rom = mem_[wROMBank];
+	level = mem_.level();
+	rom = mem_.rom_bank();
 	switch_bank(level < THE_GRASSLANDS_NIGHT_1 ? 0x30 : 0x31);
-	uint16_t header = Word(gb_, static_cast<uint16_t>(rooms + static_cast<uint8_t>(mem_[wLevelRoomID] * 2)));
+	uint16_t header = Word(gb_, static_cast<uint16_t>(rooms + static_cast<uint8_t>(mem_.level_room_id() * 2)));
 	if (header >> 8 == 0xff) {
 		reset(rom, flags::cp(level, THE_GRASSLANDS_NIGHT_1));
 		return;
 	}
-	mem_[wWarioSpawnPos] = mem_[header + 0];
+	mem_.wario_spawn_pos() = mem_[header + 0];
 	uint8_t y_limits = mem_[header + 1];
-	mem_[wRoomUpperYLimit] = y_limits >> 4;
-	mem_[wRoomLowerYLimit] = y_limits & 0x0f;
+	mem_.room_upper_y_limit() = y_limits >> 4;
+	mem_.room_lower_y_limit() = y_limits & 0x0f;
 	uint8_t x_limits = mem_[header + 2];
-	mem_[wRoomLeftXLimit] = x_limits >> 4;
-	mem_[wRoomRightXLimit] = x_limits & 0x0f;
-	mem_[wCameraConfigFlags] = mem_[header + 3];
+	mem_.room_left_x_limit() = x_limits >> 4;
+	mem_.room_right_x_limit() = x_limits & 0x0f;
+	mem_.camera_config_flags() = mem_[header + 3];
 
-	mem_[wObjectGroup] = mem_[header + 4];
+	mem_.object_group() = mem_[header + 4];
 	uint8_t wbk = mem_[rWBK]; // push_wram
 	mem_[rWBK] = LEVEL_OBJECTS_WRAM;
 	routines_.farcall(BANK_LoadObjectGroupData, ADDR_LoadObjectGroupData);
 	mem_[rWBK] = wbk; // pop_wram
 
-	mem_[wAnimatedTilesGroup] = mem_[header + 5];
+	mem_.animated_tiles_group() = mem_[header + 5];
 	routines_.farcall(BANK_InitRoomAnimatedTiles, ADDR_InitRoomAnimatedTiles);
-	mem_[wRoomPalCycle] = mem_[header + 6];
+	mem_.room_pal_cycle() = mem_[header + 6];
 	routines_.farcall(BANK_InitRoomAnimatedPals, ADDR_InitRoomAnimatedPals);
-	mem_[wRoom] = mem_[header + 7];
+	mem_.room() = mem_[header + 7];
 	routines_.farcall(BANK_LoadRoomGfx, ADDR_LoadRoomGfx);
 	switch_bank(rom);
 
@@ -225,12 +225,12 @@ void RoomLoader::load()
 	auto limit = [](uint8_t blocks, int shift, uint8_t base) {
 		return static_cast<uint8_t>((blocks << shift) + base);
 	};
-	uint8_t lower = limit(mem_[wRoomLowerYLimit], 4, 0xa0);
-	mem_[wc0c4] = lower ? lower : 0xff;
-	mem_[wc0c5] = limit(mem_[wRoomUpperYLimit], 4, 0xa0);
-	uint8_t right = limit(mem_[wRoomRightXLimit], 3, 0xb0);
-	mem_[wc0c7] = right ? right : 0xff;
-	mem_[wc0c6] = limit(mem_[wRoomLeftXLimit], 3, 0xb0);
+	uint8_t lower = limit(mem_.room_lower_y_limit(), 4, 0xa0);
+	mem_.unk_c0c4() = lower ? lower : 0xff;
+	mem_.unk_c0c5() = limit(mem_.room_upper_y_limit(), 4, 0xa0);
+	uint8_t right = limit(mem_.room_right_x_limit(), 3, 0xb0);
+	mem_.unk_c0c7() = right ? right : 0xff;
+	mem_.unk_c0c6() = limit(mem_.room_left_x_limit(), 3, 0xb0);
 }
 
 } // namespace

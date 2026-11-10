@@ -57,17 +57,17 @@ public:
 void Small::fire()
 {
 	start(FIRE_UPDATE, ADDR_Frameset_69c0a);
-	mem_[wCurObjCollBoxRight] = 0x07;
-	mem_[wCurObjCollBoxLeft] = 0xf8;
-	mem_[wCurObjCollBoxBottom] = 0x00;
+	mem_.cur_obj_coll_box_right() = 0x07;
+	mem_.cur_obj_coll_box_left() = 0xf8;
+	mem_.cur_obj_coll_box_bottom() = 0x00;
 }
 
 void Small::key()
 {
 	start(KEY_UPDATE, ADDR_Frameset_6804f);
-	mem_[wCurObjCollBoxRight] = 4;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-5);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-4);
+	mem_.cur_obj_coll_box_right() = 4;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-5);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-4);
 }
 
 // gone once collected
@@ -84,9 +84,9 @@ void Small::key_update()
 void Small::kobatto()
 {
 	start(KOBATTO_UPDATE, ADDR_Frameset_69041);
-	mem_[wCurObjCollBoxRight] = 6;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-7);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-4);
+	mem_.cur_obj_coll_box_right() = 6;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-7);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-4);
 	var1() = 0x01;
 	var2() = ADDR_Data_60ec9 & 0xff;
 	var3() = ADDR_Data_60ec9 >> 8;
@@ -111,19 +111,19 @@ void Small::wall_crack_update()
 void Small::musical_coin()
 {
 	start(MUSICAL_COIN_UPDATE, ADDR_Frameset_68036);
-	mem_[wCurObjCollBoxRight] = 1;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-17);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-7);
+	mem_.cur_obj_coll_box_right() = 1;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-17);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-7);
 }
 
 // raised out of the way once the minigame's cleared
 void Small::clear_gate(uint16_t frameset)
 {
 	start(CLEAR_GATE_UPDATE, frameset);
-	mem_[wCurObjCollBoxRight] = 0x05;
-	mem_[wCurObjCollBoxLeft] = 0xea;
-	mem_[wCurObjCollBoxBottom] = 0xfe;
-	if (!mem_[wIsMinigameCleared])
+	mem_.cur_obj_coll_box_right() = 0x05;
+	mem_.cur_obj_coll_box_left() = 0xea;
+	mem_.cur_obj_coll_box_bottom() = 0xfe;
+	if (!mem_.is_minigame_cleared())
 		return;
 	var2() = 32;
 	call_home(ADDR_MoveObjectUpByVar2);
@@ -132,9 +132,9 @@ void Small::clear_gate(uint16_t frameset)
 void Small::water_spark()
 {
 	start(WATER_SPARK_IDLE, ADDR_Frameset_69b1e);
-	mem_[wCurObjCollBoxRight] = 0x06;
-	mem_[wCurObjCollBoxLeft] = 0xf9;
-	mem_[wCurObjCollBoxBottom] = 0xfd;
+	mem_.cur_obj_coll_box_right() = 0x06;
+	mem_.cur_obj_coll_box_left() = 0xf9;
+	mem_.cur_obj_coll_box_bottom() = 0xfd;
 }
 
 // until something sets its state
@@ -162,15 +162,15 @@ void Small::spark()
 	start(SPARK_UPDATE, ADDR_Frameset_69bd9);
 	state_duration() = 0x28;
 	var1() = 0x01;
-	mem_[wCurObjCollBoxRight] = 0x02;
-	mem_[wCurObjCollBoxLeft] = 0xfc;
-	mem_[wCurObjCollBoxBottom] = 0xfb;
+	mem_.cur_obj_coll_box_right() = 0x02;
+	mem_.cur_obj_coll_box_left() = 0xfc;
+	mem_.cur_obj_coll_box_bottom() = 0xfb;
 }
 
 // back and forth (or up and down), $50 steps each way, every other frame
 void Small::spark_update()
 {
-	if (mem_[wGlobalCounter] & 1)
+	if (mem_.global_counter() & 1)
 		return;
 	bool forward = var1();
 	if (!--state_duration()) {
@@ -178,7 +178,7 @@ void Small::spark_update()
 		var1() = forward ? 0 : 1;
 		return;
 	}
-	bool horizontal = mem_[wCurObjId] == SPARK_HORIZONTAL;
+	bool horizontal = mem_.cur_obj_id() == SPARK_HORIZONTAL;
 	if (forward)
 		horizontal ? move_right() : move_up();
 	else
@@ -188,9 +188,9 @@ void Small::spark_update()
 // StarsFunc_WithYOffset: at Wario, 4 pixels lower
 void Small::stars_at_wario()
 {
-	uint16_t wario_y = static_cast<uint16_t>(mem_[wWarioYPos + 0] << 8 | mem_[wWarioYPos + 1]);
+	uint16_t wario_y = mem_.wario_y();
 	y() = static_cast<uint16_t>(wario_y + 4);
-	x() = static_cast<uint16_t>(mem_[wWarioXPos + 0] << 8 | mem_[wWarioXPos + 1]);
+	x() = mem_.wario_x();
 	stars_start();
 }
 
@@ -220,22 +220,22 @@ void Small::vanishing()
 // gone for good once its torches are lit
 void Small::flame_block()
 {
-	if (mem_[wFlameBlockCleared]) {
+	if (mem_.flame_block_cleared()) {
 		flags() = 0;
 		return;
 	}
 	start(FLAME_BLOCK_UPDATE, ADDR_Frameset_695de);
-	mem_[wCurObjCollBoxRight] = 13;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-14);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-1);
+	mem_.cur_obj_coll_box_right() = 13;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-14);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-1);
 }
 
 void Small::flame_block_update()
 {
-	uint8_t lit = mem_[wNumLitTorches];
+	uint8_t lit = mem_.num_lit_torches();
 	if (lit != NUM_FLAME_BLOCK_TORCHES)
 		return;
-	mem_[wFlameBlockCleared] = lit;
+	mem_.flame_block_cleared() = lit;
 	set_frameset(ADDR_Frameset_695e7);
 	state_duration() = 159;
 	set_update(FLAME_BLOCK_DESTROY);
@@ -264,8 +264,8 @@ void Small::muddee_stinger_update()
 {
 	frame_duration() = 0x02;
 	if (state() == 0x0a)
-		mem_[w1d147] = 0x01;
-	if (mem_[w1d147]) {
+		mem_.unk_1d147() = 0x01;
+	if (mem_.unk_1d147()) {
 		flags() = 0;
 		return;
 	}
@@ -287,7 +287,7 @@ void Small::muddee_stinger_update()
 		no_actions();
 		return;
 	}
-	uint16_t offsets = mem_[wCurObjId] == MUDDEE_STINGER2 ? ADDR_Data_4cb0d : ADDR_Data_4caed;
+	uint16_t offsets = mem_.cur_obj_id() == MUDDEE_STINGER2 ? ADDR_Data_4cb0d : ADDR_Data_4caed;
 	uint16_t offset = static_cast<uint16_t>(offsets + frame * 2);
 	y() = static_cast<uint16_t>(muddee_y + static_cast<int8_t>(mem_[offset]));
 	x() = static_cast<uint16_t>(muddee_x + static_cast<int8_t>(mem_[static_cast<uint16_t>(offset + 1)]));
@@ -323,7 +323,7 @@ PORT_EX(StarsFunc_WithYOffset, 0, ALL_REGISTERS) { Small(gb).stars_at_wario(); }
 PORT_EX(StarsFunc_SetFlags, 0, ALL_REGISTERS) { Small(gb).stars_start(); }
 PORT_EX(StarsFunc, 0, ALL_REGISTERS) { Small(gb).stars(); }
 PORT_EX(Func_4c860, 0, ALL_REGISTERS) { Small(gb).vanishing(); }
-PORT_EX(DummyObjectFunc, 0, ALL_REGISTERS) { wl3::Memory mem(gb); mem[wCurObjFlags] = 0; }
+PORT_EX(DummyObjectFunc, 0, ALL_REGISTERS) { wl3::Memory mem(gb); mem.cur_obj_flags() = 0; }
 PORT_EX(FlameBlockFunc, 0, ALL_REGISTERS) { Small(gb).flame_block(); }
 PORT_LOCAL_EX(FlameBlockFunc, Update, 0, ALL_REGISTERS) { Small(gb).flame_block_update(); }
 PORT_LOCAL_EX(FlameBlockFunc, Detroy, 0, ALL_REGISTERS) { Small(gb).flame_block_destroy(); }

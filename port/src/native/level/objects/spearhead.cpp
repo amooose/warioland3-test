@@ -105,7 +105,7 @@ private:
 
 bool Spearhead::wario_to_right() const
 {
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	return static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 }
 
@@ -120,7 +120,7 @@ void Spearhead::init()
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(UPDATE);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	run((mem_[wDayNight] & 1) ? H_SLEEP_START : H_DEFAULT);
+	run((mem_.day_night() & 1) ? H_SLEEP_START : H_DEFAULT);
 }
 
 void Spearhead::update()
@@ -135,7 +135,7 @@ void Spearhead::update()
 
 bool Spearhead::shaken()
 {
-	if (mem_[wGroundShakeCounter] < 0x10)
+	if (mem_.ground_shake_counter() < 0x10)
 		return false;
 	state() = static_cast<uint8_t>((OBJSTATE_WOBBLE_LEFT_START & ~1) | (mem_[rDIV] & 1));
 	return true;
@@ -143,29 +143,29 @@ bool Spearhead::shaken()
 
 bool Spearhead::on_floor()
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_down()) {
 		state() = OBJSTATE_STANDING_FALL_START;
 		return false;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	return true;
 }
 
 void Spearhead::box(bool right)
 {
-	mem_[wCurObjCollBoxRight] = right ? 9 : 6;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(right ? -7 : -10);
+	mem_.cur_obj_coll_box_right() = right ? 9 : 6;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(right ? -7 : -10);
 }
 
 void Spearhead::small_box()
 {
-	mem_[wCurObjCollBoxRight] = 5;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-6);
+	mem_.cur_obj_coll_box_right() = 5;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-6);
 }
 
 void Spearhead::land(uint8_t interaction, uint8_t s, uint16_t left, uint16_t right, uint8_t duration)
@@ -218,7 +218,7 @@ void Spearhead::wobble(uint16_t at, uint8_t s)
 void Spearhead::rolled()
 {
 	frame_duration() = 0;
-	mem_[wCurObjFramesetOffset] = 0;
+	mem_.cur_obj_frameset_offset() = 0;
 	var2() = 0x02;
 }
 
@@ -252,9 +252,9 @@ void Spearhead::run(uint16_t handler)
 			substate() &= ~OBJSUBFLAG_HDIR;
 		else
 			substate() |= OBJSUBFLAG_HDIR;
-		uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+		uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 		if (dy < 32 || dy >= 0xe0) {
-			uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+			uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 			if (dx >= 0xe0 || dx < 32) {
 				state() = OBJSTATE_SPECIAL_3;
 				if (facing_right()) {
@@ -323,7 +323,7 @@ void Spearhead::run(uint16_t handler)
 		if (!on_floor())
 			return;
 		bool right = facing_right();
-		uint8_t in_block = mem_[wCurObjXPos + 0] & 0x0f;
+		uint8_t in_block = mem_.cur_obj_x().lo() & 0x0f;
 		if (right ? in_block + 9 >= 0x10 : in_block < 10) {
 			if (!(block_beside(right) & 0x0f)) {
 				state() = OBJSTATE_TURN_AROUND_START;
@@ -332,10 +332,10 @@ void Spearhead::run(uint16_t handler)
 		}
 		uint16_t y_pos = static_cast<uint16_t>(y() - 4);
 		uint16_t x_pos = static_cast<uint16_t>(right ? x() + 9 : x() - 10);
-		mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-		mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-		mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+		mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+		mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+		mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+		mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 		if (hpos_block_unk4()) {
 			state() = OBJSTATE_TURN_AROUND_START;
 			return;
@@ -380,7 +380,7 @@ void Spearhead::run(uint16_t handler)
 		flags() &= ~(1 << OBJFLAG_GRABBED_F);
 		[[fallthrough]];
 	case H_STATE3F:
-		if (mem_[wGroundShakeCounter] >= 0x10) {
+		if (mem_.ground_shake_counter() >= 0x10) {
 			state() = OBJSTATE_1C;
 			return;
 		}
@@ -429,7 +429,7 @@ void Spearhead::run(uint16_t handler)
 		return;
 	case H_WOBBLE_LEFT_START:
 	case H_WOBBLE_RIGHT_START:
-		mem_[wCurObjAction] = 15 | (1 << 7);
+		mem_.cur_obj_action() = 15 | (1 << 7);
 		wobble(wCurObjState, handler == H_WOBBLE_LEFT_START ? OBJSTATE_WOBBLE_LEFT : OBJSTATE_WOBBLE_RIGHT);
 		return;
 	case H_STATE0B:
@@ -443,7 +443,7 @@ void Spearhead::run(uint16_t handler)
 	case H_STATE3B:
 	case H_STATE3C:
 		frame_duration() = 0;
-		mem_[wCurObjFramesetOffset] = 0;
+		mem_.cur_obj_frameset_offset() = 0;
 		var2_move(handler == H_STATE3B ? ADDR_Func_32bd : ADDR_Func_32ae, OBJSTATE_TURN_AROUND_START);
 		return;
 	case H_STATE29:
@@ -475,7 +475,7 @@ void Spearhead::run(uint16_t handler)
 		grab(OBJSTATE_49);
 		[[fallthrough]];
 	case H_STATE49: // carried, turning with Wario
-		if (mem_[wDirection]) {
+		if (mem_.direction()) {
 			call_home(ADDR_Func_3353);
 			return;
 		}
@@ -486,7 +486,7 @@ void Spearhead::run(uint16_t handler)
 		grab(OBJSTATE_48);
 		[[fallthrough]];
 	case H_STATE48:
-		if (!mem_[wDirection]) {
+		if (!mem_.direction()) {
 			call_home(ADDR_Func_3362);
 			return;
 		}
@@ -494,7 +494,7 @@ void Spearhead::run(uint16_t handler)
 		run(H_STATE19);
 		return;
 	case H_STATE12:
-		mem_[wCurObjAction] = 31 | (1 << 7);
+		mem_.cur_obj_action() = 31 | (1 << 7);
 		state() = OBJSTATE_42;
 		var3() = 0;
 		set_interaction(OBJ_INTERACTION_00);

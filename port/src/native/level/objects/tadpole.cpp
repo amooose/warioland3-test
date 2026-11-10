@@ -29,7 +29,7 @@ public:
 
 private:
 	void knocked(uint16_t routine); // .asm_49f1c
-	void hold() { mem_[wCurObjAction] = 0x81; }
+	void hold() { mem_.cur_obj_action() = 0x81; }
 };
 
 } // namespace
@@ -46,10 +46,10 @@ void Tadpole::spawner_wait()
 {
 	hold();
 	frame_duration() = 2;
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	if (static_cast<uint8_t>(screen_x() + 0x2a) < wario)
 		return;
-	uint8_t below = static_cast<uint8_t>(screen_y() - mem_[wWarioScreenYPos]);
+	uint8_t below = static_cast<uint8_t>(screen_y() - mem_.wario_screen_y_pos());
 	if (below >= 0x50 || below < 0x28)
 		return;
 	set_update(SPAWNER_DONE);
@@ -134,12 +134,12 @@ void Tadpole::leaping()
 		set_frameset(ADDR_Frameset_69a1d);
 		return;
 	}
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	hpos_block_unk1();
-	if (!mem_[wIsInWaterOrSand]) {
+	if (!mem_.is_in_water_or_sand()) {
 		apply_y_movement(ADDR_Data_60a40);
 		call_home(ADDR_MoveObjectLeft_Fast);
 		return;

@@ -54,52 +54,52 @@ uint16_t RoomGfx::table_entry(uint16_t table, uint8_t index)
 // and its palettes; a room without data ($ff) resets the game
 void RoomGfx::load()
 {
-	uint16_t data = Word(gb_, table_entry(ADDR_RoomBlockAndGfxData, mem_[wRoom]));
+	uint16_t data = Word(gb_, table_entry(ADDR_RoomBlockAndGfxData, mem_.room()));
 	if (data >> 8 == 0xff) { // debug_assert_not $ff
 		gb_tail_jump(gb_, ADDR_Init);
 		return;
 	}
 	uint8_t function_table = mem_[data + 0];
-	mem_[wRoomBlockFunctionTable] = function_table;
-	mem_[wRoomTileMap] = mem_[data + 1];
-	mem_[wRoomMainTiles] = mem_[data + 2];
-	mem_[wRoomSpecialTiles] = mem_[data + 3];
-	mem_[wRoomPalettes] = mem_[data + 4];
+	mem_.room_block_function_table() = function_table;
+	mem_.room_tile_map() = mem_[data + 1];
+	mem_.room_main_tiles() = mem_[data + 2];
+	mem_.room_special_tiles() = mem_[data + 3];
+	mem_.room_palettes() = mem_[data + 4];
 
 	// the function table's bank: one per 6 tables
-	mem_[wRoomBlockFunctionTableBank] = static_cast<uint8_t>(LEVEL_DATA_1 + function_table / 6);
+	mem_.room_block_function_table_bank() = static_cast<uint8_t>(LEVEL_DATA_1 + function_table / 6);
 	routines_.call(ADDR_Func_298d);
 	routines_.call(ADDR_LoadBlockFunctionTable);
-	mem_[wc0d0] = mem_[wRoomBlockFunctionTableBank];
+	mem_.unk_c0d0() = mem_.room_block_function_table_bank();
 	routines_.call(ADDR_LoadRoomTileMap);
-	mem_[wRoomMainTilesBank] = static_cast<uint8_t>((mem_[wRoomMainTiles] >> 3) + ROOM_MAIN_TILES_1);
+	mem_.room_main_tiles_bank() = static_cast<uint8_t>((mem_.room_main_tiles() >> 3) + ROOM_MAIN_TILES_1);
 	routines_.call(ADDR_LoadRoomMainTiles);
-	mem_[wRoomSpecialTilesBank] = static_cast<uint8_t>((mem_[wRoomSpecialTiles] >> 3) + ROOM_SPECIAL_TILES_1);
+	mem_.room_special_tiles_bank() = static_cast<uint8_t>((mem_.room_special_tiles() >> 3) + ROOM_SPECIAL_TILES_1);
 	routines_.call(ADDR_LoadRoomSpecialTiles);
-	mem_[wPaletteBank] = LEVEL_PALETTES;
+	mem_.palette_bank() = LEVEL_PALETTES;
 	routines_.call(ADDR_LoadRoomPalettes);
 }
 
 void RoomGfx::init_animated_tiles()
 {
-	uint16_t entry = table_entry(ADDR_AnimatedTilesGroups, mem_[wAnimatedTilesGroup]);
-	mem_[wAnimatedTilesFrameDuration] = mem_[entry];
-	mem_[wAnimatedTilesGfx] = mem_[entry + 1];
-	mem_[wAnimatedTilesFrame] = 0;
-	mem_[wAnimatedTilesFrameCount] = 0;
+	uint16_t entry = table_entry(ADDR_AnimatedTilesGroups, mem_.animated_tiles_group());
+	mem_.animated_tiles_frame_duration() = mem_[entry];
+	mem_.animated_tiles_gfx() = mem_[entry + 1];
+	mem_.animated_tiles_frame() = 0;
+	mem_.animated_tiles_frame_count() = 0;
 }
 
 void RoomGfx::init_animated_pals()
 {
-	uint16_t entry = table_entry(ADDR_RoomPalCycles, mem_[wRoomPalCycle]);
+	uint16_t entry = table_entry(ADDR_RoomPalCycles, mem_.room_pal_cycle());
 	uint8_t lo = mem_[entry], hi = mem_[entry + 1];
 	mem_[wRoomPalCyclePtr + 1] = lo;
 	mem_[wRoomPalCyclePtr + 0] = hi;
 	uint16_t cycle = static_cast<uint16_t>((mem_[entry] | hi << 8) + ROOM_PALCYCLE_LENGTH);
 	uint8_t duration = mem_[cycle];
-	mem_[wRoomPalCycleDuration] = duration;
-	mem_[wRoomPalCycleCounter] = duration >> 1;
-	mem_[wRoomPalCycleIndex] = 0;
+	mem_.room_pal_cycle_duration() = duration;
+	mem_.room_pal_cycle_counter() = duration >> 1;
+	mem_.room_pal_cycle_index() = 0;
 }
 
 // wait_not_hblank / wait_hblank, letting emulated time pass as the asm's
@@ -122,28 +122,28 @@ void RoomGfx::update_animated_tiles()
 		gb_->cpu.f = flags::cp(ly, LY_VBLANK - 20);
 		return;
 	}
-	uint8_t duration = mem_[wAnimatedTilesFrameDuration];
+	uint8_t duration = mem_.animated_tiles_frame_duration();
 	if (!duration) {
 		gb_->cpu.a = 0;
 		gb_->cpu.f = flags::and_(0);
 		return;
 	}
-	uint8_t count = static_cast<uint8_t>(mem_[wAnimatedTilesFrameCount] + 1);
-	mem_[wAnimatedTilesFrameCount] = count;
+	uint8_t count = static_cast<uint8_t>(mem_.animated_tiles_frame_count() + 1);
+	mem_.animated_tiles_frame_count() = count;
 	gb_->cpu.b = duration;
 	if (count < duration) {
 		gb_->cpu.a = count;
 		gb_->cpu.f = flags::cp(count, duration);
 		return;
 	}
-	mem_[wAnimatedTilesFrameCount] = 0;
+	mem_.animated_tiles_frame_count() = 0;
 	uint16_t src = static_cast<uint16_t>(
-		static_cast<uint8_t>(mem_[wAnimatedTilesGfx] * 2 + (ADDR_AnimatedTilesGfx >> 8)) << 8
+		static_cast<uint8_t>(mem_.animated_tiles_gfx() * 2 + (ADDR_AnimatedTilesGfx >> 8)) << 8
 		| (ADDR_AnimatedTilesGfx & 0xff));
-	uint8_t frame = static_cast<uint8_t>(mem_[wAnimatedTilesFrame] + 1);
+	uint8_t frame = static_cast<uint8_t>(mem_.animated_tiles_frame() + 1);
 	if (frame == 4)
 		frame = 0;
-	mem_[wAnimatedTilesFrame] = frame;
+	mem_.animated_tiles_frame() = frame;
 	// swap a / add a (x3): the frame's $80 bytes in, with the last add's
 	// carry as d
 	uint8_t swapped = static_cast<uint8_t>(frame << 4 | frame >> 4);
@@ -182,38 +182,48 @@ void RoomGfx::bg_ptr(uint16_t y, uint16_t x)
 	hl = static_cast<uint16_t>(sum);
 	SET_DE(gb_, de);
 	SET_HL(gb_, hl);
-	mem_[wBGPtr + 0] = static_cast<uint8_t>(hl >> 8);
-	mem_[wBGPtr + 1] = static_cast<uint8_t>(hl);
+	mem_.bg_pointer() = hl;
 	gb_->cpu.a = static_cast<uint8_t>(hl);
 }
 
 void RoomGfx::block_bg_ptr()
 {
-	uint16_t y = static_cast<uint16_t>(mem_[wBlockYPos + 0] << 8 | mem_[wBlockYPos + 1]);
-	uint16_t x = static_cast<uint16_t>(mem_[wBlockXPos + 0] << 8 | mem_[wBlockXPos + 1]);
+	uint16_t y = mem_.block_y();
+	uint16_t x = mem_.block_x();
 	bg_ptr(y, x);
 }
 
 // Wario's: 24 pixels above his position
 void RoomGfx::wario_bg_ptr()
 {
-	uint16_t y = static_cast<uint16_t>((mem_[wWarioYPos + 0] << 8 | mem_[wWarioYPos + 1]) - 0x18);
-	uint16_t x = static_cast<uint16_t>(mem_[wWarioXPos + 0] << 8 | mem_[wWarioXPos + 1]);
+	uint16_t y = static_cast<uint16_t>(mem_.wario_y() - 0x18);
+	uint16_t x = mem_.wario_x();
 	bg_ptr(y, x);
 }
 
 } // namespace
 
-uint16_t wario_bg_ptr(GB *gb)
+uint16_t block_bg_ptr(GB *gb)
 {
 	Memory mem(gb);
-	uint16_t y = static_cast<uint16_t>((mem[wWarioYPos + 0] << 8 | mem[wWarioYPos + 1]) - 0x18);
-	uint16_t x = static_cast<uint16_t>(mem[wWarioXPos + 0] << 8 | mem[wWarioXPos + 1]);
+	uint16_t y = mem.block_y();
+	uint16_t x = mem.block_x();
 	uint16_t row = static_cast<uint16_t>((y >> 3) << 5);
 	uint16_t offset = static_cast<uint16_t>((row & 0x00ff) | (row & ((TILEMAP_WIDTH * TILEMAP_HEIGHT - 1) & 0xff00)));
 	auto ptr = static_cast<uint16_t>((v0BGMap0 & 0xff00) + ((x >> 3) & (TILEMAP_WIDTH - 1)) + offset);
-	mem[wBGPtr + 0] = static_cast<uint8_t>(ptr >> 8);
-	mem[wBGPtr + 1] = static_cast<uint8_t>(ptr);
+	mem.bg_pointer() = ptr;
+	return ptr;
+}
+
+uint16_t wario_bg_ptr(GB *gb)
+{
+	Memory mem(gb);
+	uint16_t y = static_cast<uint16_t>(mem.wario_y() - 0x18);
+	uint16_t x = mem.wario_x();
+	uint16_t row = static_cast<uint16_t>((y >> 3) << 5);
+	uint16_t offset = static_cast<uint16_t>((row & 0x00ff) | (row & ((TILEMAP_WIDTH * TILEMAP_HEIGHT - 1) & 0xff00)));
+	auto ptr = static_cast<uint16_t>((v0BGMap0 & 0xff00) + ((x >> 3) & (TILEMAP_WIDTH - 1)) + offset);
+	mem.bg_pointer() = ptr;
 	return ptr;
 }
 

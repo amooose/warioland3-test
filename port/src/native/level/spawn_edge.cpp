@@ -23,7 +23,7 @@ public:
 private:
 	void sram_switch(uint8_t bank)
 	{
-		mem_[wSRAMBank] = bank;
+		mem_.sram_bank() = bank;
 		mem_[rRAMB + 0x100] = bank;
 	}
 	int start();
@@ -38,10 +38,10 @@ private:
 // (-1 if it has)
 int EdgeSpawner::start()
 {
-	if (mem_[wLevelEndScreen])
+	if (mem_.level_end_screen())
 		return -1; // the level ended
 	home::BlockPtr block = home::block_ptr(gb_, wBlockPos);
-	sram_switch(mem_[wBlockPtrBank]);
+	sram_switch(mem_.block_ptr_bank());
 	return block.ptr;
 }
 
@@ -77,8 +77,8 @@ void EdgeSpawner::spawn_row()
 		block = static_cast<uint16_t>(block + 0x100); // inc h
 		if (block >> 8 == 0xc0) {
 			block = static_cast<uint16_t>((sLevelBlockObjectMap & 0xff00) | (block & 0xff));
-			uint8_t bank = static_cast<uint8_t>(mem_[wBlockPtrBank] + 1);
-			mem_[wBlockPtrBank] = bank;
+			uint8_t bank = static_cast<uint8_t>(mem_.block_ptr_bank() + 1);
+			mem_.block_ptr_bank() = bank;
 			sram_switch(bank);
 		}
 	}

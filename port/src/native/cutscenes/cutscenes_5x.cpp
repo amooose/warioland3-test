@@ -29,7 +29,7 @@ void Cutscenes::mix_chemicals()
 	case 1: { // .Func_9e688: down on even frames
 		if (frame() & 1)
 			break;
-		uint8_t y = ++mem_[wSceneObj2YCoord];
+		uint8_t y = ++mem_.scene_obj2_y_coord();
 		if (y == 0x45) {
 			play_sfx(mem_, SFX_112); // Func_9ce1f
 			break;
@@ -43,13 +43,13 @@ void Cutscenes::mix_chemicals()
 		advance();
 		break;
 	case 3: // .Func_9e6a7
-		if (mem_[wSceneObj2Frame] != 0x04)
+		if (mem_.scene_obj2_frame() != 0x04)
 			break;
 		play_sfx(mem_, SFX_0A1);
 		advance();
 		break;
 	case 4: // .Func_9e6b8
-		if (!mem_[wSceneObj2State])
+		if (!mem_.scene_obj2_state())
 			advance();
 		break;
 	case 5: // .Func_9e6c0
@@ -59,7 +59,7 @@ void Cutscenes::mix_chemicals()
 		loop_sound(wSceneObj3Unk7, 0x10, SFX_01F); // .Func_9e6d7
 		if (frame() & 0x03)
 			break;
-		if (++mem_[wSceneObj3YCoord] == 0x78)
+		if (++mem_.scene_obj3_y_coord() == 0x78)
 			advance();
 		break;
 	case 7:
@@ -88,8 +88,8 @@ void Cutscenes::draw_func_9f8da()
 		// .Func_9f912: when it ends, state 0 (and nothing to draw)
 		if (!next_state_when_done(obj, 0x00))
 			draw(obj, ADDR_OAM_bf2ab);
-		Byte flipped = mem_[wSceneObj2Unk7];
-		if (flipped || mem_[wSceneObj2Frame] != 0x07)
+		Byte flipped = mem_.scene_obj2_unk7();
+		if (flipped || mem_.scene_obj2_frame() != 0x07)
 			continue;
 		wram_.lcdc_flags_to_flip() = LCDC_BG_MAP;
 		flipped = 0x01;
@@ -130,7 +130,7 @@ void Cutscenes::cut_balloon()
 	case 4: { // .Func_9e308: up on even frames
 		if (frame() & 1)
 			break;
-		uint8_t y = --mem_[wSceneObj3YCoord];
+		uint8_t y = --mem_.scene_obj3_y_coord();
 		if (y == 0x6b) {
 			play_sfx(mem_, SFX_112); // Func_9ce1f
 			break;
@@ -152,7 +152,7 @@ void Cutscenes::cut_balloon()
 	case 7: // .Func_9e338: up, 3 frames out of 4
 		if (!(frame() & 0x03))
 			break;
-		if (--mem_[wSceneObj2YCoord] == 0x20)
+		if (--mem_.scene_obj2_y_coord() == 0x20)
 			advance();
 		break;
 	case 8:
@@ -202,17 +202,17 @@ void Cutscenes::reveal_dark_room()
 		advance();
 		break;
 	case 4: // .Func_9e747
-		if (mem_[wSceneObj2State] == 0x02)
+		if (mem_.scene_obj2_state() == 0x02)
 			advance();
 		break;
 	case 5: // .Func_9e750
-		if (mem_[wSceneObj2State] == 0x01)
+		if (mem_.scene_obj2_state() == 0x01)
 			advance();
 		break;
 	case 6: // .Func_9e759
 		if (frame() < 0x14)
 			break;
-		mem_[wSceneObj2State] = 0;
+		mem_.scene_obj2_state() = 0;
 		wram_.collection_row() = 0x08;
 		copy_far(BANK_Pals_b8800, ADDR_Pals_b8800, wTempPals1, 8 * PAL_SIZE);
 		set_bg_pals_to_load();
@@ -247,15 +247,15 @@ void Cutscenes::reveal_dark_room()
 void Cutscenes::draw_func_9f91f()
 {
 	for (;;) {
-		uint8_t s = mem_[wSceneObj2State];
+		uint8_t s = mem_.scene_obj2_state();
 		if (!s)
 			return;
 		uint16_t obj = animate(wSceneObj2State, frameset(ADDR_Func_9f91f + 0x30, s));
-		uint8_t now = mem_[wSceneObj2State];
+		uint8_t now = mem_.scene_obj2_state();
 		if (now == 0x01 || now == 0x02) {
 			// .Func_9f953
-			uint8_t frame = mem_[wSceneObj2Frame];
-			Byte heard = mem_[wSceneObj2Unk7];
+			uint8_t frame = mem_.scene_obj2_frame();
+			Byte heard = mem_.scene_obj2_unk7();
 			bool key = frame == 0x02 || frame == 0x04 || frame == 0x05;
 			if (heard) {
 				if (!key)
@@ -306,7 +306,7 @@ void Cutscenes::summon_moon()
 		routines_.farcall(BANK_Func_84fff, ADDR_Func_84fff);
 		break;
 	case 3: { // .Func_9e7ef: down
-		uint8_t y = ++mem_[wSceneObj2YCoord];
+		uint8_t y = ++mem_.scene_obj2_y_coord();
 		if (y == 0x2c) {
 			play_sfx(mem_, SFX_112); // Func_9ce1f
 			break;
@@ -322,7 +322,7 @@ void Cutscenes::summon_moon()
 		advance();
 		break;
 	case 5: // .Func_9e80e
-		if (mem_[wSceneObj2State] != 0x03)
+		if (mem_.scene_obj2_state() != 0x03)
 			break;
 		set_state(wSceneObj3, 0x02);
 		play_sfx(mem_, SFX_105);
@@ -384,11 +384,11 @@ void Cutscenes::move_debris()
 // rumbling in states 1 and 2
 void Cutscenes::draw_func_9f9f5()
 {
-	uint8_t state = mem_[wSceneObj3State];
+	uint8_t state = mem_.scene_obj3_state();
 	if (!state)
 		return;
 	uint16_t obj = animate(wSceneObj3State, frameset(ADDR_Func_9f9f5 + 0x1d, state), 0x1a);
-	uint8_t now = mem_[wSceneObj3State];
+	uint8_t now = mem_.scene_obj3_state();
 	if (now == 0x01)
 		periodic_sound(wSceneObj3Unk7, 0x1b, SFX_135); // .Func_9fa1b
 	else if (now == 0x02)
@@ -421,8 +421,8 @@ void Cutscenes::crater_hole()
 	auto debris = [&] {
 		place(wSceneObj10, 0x48, 0x54, 0x03);
 		place(wSceneObj11, 0x44, 0x58, 0x03);
-		mem_[wSceneObj12YCoord] = 0x01;
-		mem_[wSceneObj12XCoord] = 0x01;
+		mem_.scene_obj12_y_coord() = 0x01;
+		mem_.scene_obj12_x_coord() = 0x01;
 		play_sfx(mem_, SFX_132);
 		advance();
 	};
@@ -454,11 +454,11 @@ void Cutscenes::crater_hole()
 		advance();
 		break;
 	case 7: // .Func_9e8d6
-		if (mem_[wSceneObj2State] == 0x01)
+		if (mem_.scene_obj2_state() == 0x01)
 			debris();
 		break;
 	case 9: // .Func_9e905
-		if (mem_[wSceneObj2State] != 0x01)
+		if (mem_.scene_obj2_state() != 0x01)
 			break;
 		wram_.collection_row() = 0x08;
 		set_state(wSceneObj3, 0x02);
@@ -502,13 +502,13 @@ void Cutscenes::drill_holes()
 	auto debris = [&](uint8_t dx) {
 		place(wSceneObj10, 0x4c, 0x40, 0x03);
 		place(wSceneObj11, 0x4c, 0x48, 0x03);
-		mem_[wSceneObj12YCoord] = 0x01;
-		mem_[wSceneObj12XCoord] = 0x01;
+		mem_.scene_obj12_y_coord() = 0x01;
+		mem_.scene_obj12_x_coord() = 0x01;
 		advance();
 		if (!dx)
 			return;
-		mem_[wSceneObj10XCoord] += dx; // .asm_9ea52
-		mem_[wSceneObj11XCoord] += dx;
+		mem_.scene_obj10_x_coord() += dx; // .asm_9ea52
+		mem_.scene_obj11_x_coord() += dx;
 	};
 	// a pixel every 4 frames
 	auto every_4 = [&](uint16_t coord, uint8_t d, uint8_t to) {
@@ -542,7 +542,7 @@ void Cutscenes::drill_holes()
 	case 4: // .Func_9e9cb: left on even frames
 		if (frame() & 1)
 			break;
-		if (--mem_[wSceneObj2XCoord] == 0x44)
+		if (--mem_.scene_obj2_x_coord() == 0x44)
 			advance();
 		break;
 	case 5: // .Func_9e9da
@@ -559,7 +559,7 @@ void Cutscenes::drill_holes()
 		advance();
 		break;
 	case 7: // .Func_9e9f6
-		mem_[wSceneObj3State] = 0;
+		mem_.scene_obj3_state() = 0;
 		debris(0);
 		break;
 	case 8: // .Func_9ea1b
@@ -579,7 +579,7 @@ void Cutscenes::drill_holes()
 			advance();
 		break;
 	case 13: // .Func_9ea49
-		mem_[wSceneObj4State] = 0;
+		mem_.scene_obj4_state() = 0;
 		debris(0x10);
 		break;
 	case 14: // .Func_9ea61
@@ -593,7 +593,7 @@ void Cutscenes::drill_holes()
 			advance();
 		break;
 	case 19: // .Func_9ea74
-		mem_[wSceneObj5State] = 0;
+		mem_.scene_obj5_state() = 0;
 		debris(0x20);
 		break;
 	case 20: // .Func_9ea7f
@@ -606,7 +606,7 @@ void Cutscenes::drill_holes()
 		wait(30);
 		break;
 	case 23: // .Func_9ea93: off to the right
-		if (++mem_[wSceneObj2XCoord] == 0x90)
+		if (++mem_.scene_obj2_x_coord() == 0x90)
 			advance();
 		break;
 	case 24:

@@ -450,7 +450,10 @@ void TopBar::animate(uint8_t state, uint16_t duration)
 		uint8_t next = state == 6 ? 0x07 : state == 8 ? 0x05 : 0;
 		if (!next || wram_.ow_animation_finished() != 0xff)
 			return;
-		hl = static_cast<uint16_t>(REG_HL(gb_) | 1 << 2);
+		// UpdateOWAnimation leaves hl at the object's start: its frame's
+		// 8-byte block (the frame is 2 below the duration, in its page)
+		uint16_t frame_at = static_cast<uint16_t>(((hl - 1) & 0xff00) | static_cast<uint8_t>(hl - 2));
+		hl = static_cast<uint16_t>((frame_at & 0xfff8) | 1 << 2);
 		uint8_t low = static_cast<uint8_t>(hl);
 		uint16_t page = hl & 0xff00;
 		mem_[hl] = 0;

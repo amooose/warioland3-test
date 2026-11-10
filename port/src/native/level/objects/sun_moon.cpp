@@ -63,7 +63,7 @@ public:
 	void shot_gone(); // .Update
 
 private:
-	uint16_t wario_x() const { return static_cast<uint16_t>(mem_[wWarioXPos + 0] << 8 | mem_[wWarioXPos + 1]); }
+	uint16_t wario_x() const { return mem_.wario_x(); }
 	void hpos(int dy, int dx);
 	void set_following(uint16_t frameset);
 	void following();
@@ -81,9 +81,9 @@ void SunMoon::init()
 	set_frameset(k_.right);
 	set_update(static_cast<uint16_t>(k_.routine + CHECK_DIRECTION));
 	substate() = (substate() & ~OBJSUBFLAG_UNINITIALISED) | (1 << OBJSUBFLAG_UNK_4_F);
-	mem_[wCurObjCollBoxRight] = 7;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-8);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-4);
+	mem_.cur_obj_coll_box_right() = 7;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-8);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-4);
 	flags() |= OBJFLAG_NO_COLLISION;
 }
 
@@ -91,7 +91,7 @@ void SunMoon::check_direction()
 {
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(static_cast<uint16_t>(k_.routine + UPDATE));
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	bool right = static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 	if (right)
 		substate() |= OBJSUBFLAG_HDIR;
@@ -130,10 +130,10 @@ void SunMoon::hpos(int dy, int dx)
 {
 	uint16_t y_pos = static_cast<uint16_t>(y() + dy);
 	uint16_t x_pos = static_cast<uint16_t>(x() + dx);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 }
 
 void SunMoon::set_following(uint16_t frameset)
@@ -147,7 +147,7 @@ void SunMoon::set_following(uint16_t frameset)
 void SunMoon::following()
 {
 	follow();
-	if (mem_[wJoypadPressed] & (0xff ^ (PAD_SELECT | PAD_START)))
+	if (mem_.joypad_pressed() & (0xff ^ (PAD_SELECT | PAD_START)))
 		state_duration() = 50;
 	if (state_duration()) {
 		--state_duration();
@@ -155,10 +155,10 @@ void SunMoon::following()
 	}
 	if (!(flags() & OBJFLAG_ON_SCREEN))
 		return;
-	uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+	uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 	if (dx >= 64 && dx < static_cast<uint8_t>(-64))
 		return;
-	uint8_t below = static_cast<uint8_t>(static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a) - static_cast<uint8_t>(screen_y() + 0x2a));
+	uint8_t below = static_cast<uint8_t>(static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a) - static_cast<uint8_t>(screen_y() + 0x2a));
 	if (below >= 43)
 		return;
 	state_duration() = 82;
@@ -188,8 +188,8 @@ void SunMoon::shooting()
 {
 	follow_x();
 	hpos(0, 0);
-	mem_[wc1ca] = 0;
-	if (!hpos_block_unk1() || mem_[wc1ca]) {
+	mem_.unk_c1ca() = 0;
+	if (!hpos_block_unk1() || mem_.unk_c1ca()) {
 		apply_y_movement(ADDR_Data_60690);
 	}
 	if (!--state_duration()) {
@@ -229,7 +229,7 @@ void SunMoon::follow()
 		}
 	}
 	uint16_t level = static_cast<uint16_t>(y() + 0x2a);
-	uint16_t wario_y = static_cast<uint16_t>(mem_[wWarioYPos + 0] << 8 | mem_[wWarioYPos + 1]);
+	uint16_t wario_y = mem_.wario_y();
 	if (wario_y < level)
 		move_up_();
 	else if (wario_y > level)
@@ -255,8 +255,8 @@ void SunMoon::move_x(bool right)
 	if (hpos_block_unk4())
 		return;
 	uint16_t y_pos = static_cast<uint16_t>(y() - 20);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
 	if (hpos_block_unk4())
 		return;
 	right ? move_right_by_var2() : move_left_by_var2();
@@ -265,8 +265,8 @@ void SunMoon::move_x(bool right)
 void SunMoon::move_down_()
 {
 	hpos(0, 0);
-	mem_[wc1ca] = 0;
-	if (hpos_block_unk1() && !mem_[wc1ca])
+	mem_.unk_c1ca() = 0;
+	if (hpos_block_unk1() && !mem_.unk_c1ca())
 		return;
 	move_down_by_var2();
 }

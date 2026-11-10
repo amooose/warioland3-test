@@ -92,8 +92,8 @@ void SceneInit::north(uint8_t param, uint8_t c)
 			place(wSceneObj15, {0x56, 0x1c, 0x19});
 			place(wSceneObj14, {0x36, 0x50, 0x1b});
 			if (wram_.unk_2d011()) {
-				mem_[wSceneObj15State] = 0x18;
-				mem_[wSceneObj14State] = 0x1a;
+				mem_.scene_obj15_state() = 0x18;
+				mem_.scene_obj14_state() = 0x1a;
 			}
 		}
 		place(wSceneObj13, {0x84, 0x82, 0x00}); // Func_b4082
@@ -122,7 +122,7 @@ void SceneInit::north(uint8_t param, uint8_t c)
 			place(wSceneObj1, {0x51, SCREEN_WIDTH_PX, 0x0f});
 		place(wSceneObj2, {0x59, 0x2d, 0x1d});
 		if (c != DONE)
-			mem_[wSceneObj2State] = 0;
+			mem_.scene_obj2_state() = 0;
 		return;
 	case NOWFUNC_FALL_LEAVES: // Func_b40ff
 		if (!c)
@@ -131,9 +131,9 @@ void SceneInit::north(uint8_t param, uint8_t c)
 			place(wSceneObj6, {0x38, 0x15, 0x14});
 			place(wSceneObj7, {0x41, 0x19, 0x14});
 		} else {
-			mem_[w2d12c] = 0x01;
+			mem_.unk_2d12c() = 0x01;
 			place(wSceneObj6, {0x48, 0x14, 0x11});
-			mem_[w2d12e] = 0x04;
+			mem_.unk_2d12e() = 0x04;
 			place(wSceneObj7, {0x38, 0x0f, 0x10});
 		}
 		return;
@@ -147,7 +147,7 @@ void SceneInit::north(uint8_t param, uint8_t c)
 		if (!(c & 0x80))
 			return;
 		place(wSceneObj5, {0x00, 0x70, 0x1f});
-		mem_[wSceneObj5Attributes] = PALETTES[param - NOWFUNC_CRAYON_RED];
+		mem_.scene_obj5_attributes() = PALETTES[param - NOWFUNC_CRAYON_RED];
 		place(wSceneObj1, {0x00, 0x70, 0x21});
 		return;
 	}
@@ -190,9 +190,9 @@ void SceneInit::bottom_bar()
 	routines_.in_bank(BANK_VBlank_Overworld, ADDR_VBlank_Overworld, [&] { set_vblank_overworld(gb_); });
 	decompress(BANK_OverworldBottomBarTreasuresTilemap, ADDR_OverworldBottomBarTreasuresTilemap, v0BGMap1, false);
 	decompress(BANK_OverworldBottomBarTreasuresAttrmap, ADDR_OverworldBottomBarTreasuresAttrmap, v1BGMap1, true);
-	mem_[wWX] = 0;
+	mem_.wx() = 0;
 	mem_[rWX] = 0;
-	mem_[wWY] = SCREEN_HEIGHT_PX;
+	mem_.wy() = SCREEN_HEIGHT_PX;
 	mem_[rWY] = SCREEN_HEIGHT_PX;
 	wram_.bottom_bar_action() = BOTBAR_CLOSED;
 	// the empty treasure's tiles
@@ -215,9 +215,9 @@ void SceneInit::top_bar()
 	place(wSceneObj5, {0x00, 0x60, 0x00});
 	routines_.in_bank(BANK_VBlank_Overworld, ADDR_VBlank_Overworld, [&] { set_vblank_overworld(gb_); });
 	routines_.in_bank(BANK_DrawCoinCount, ADDR_DrawCoinCount, [&] { draw_coin_count(gb_); });
-	mem_[wSceneObj6State] = 0;
-	mem_[wSceneObj7State] = 0;
-	mem_[wSceneObj2State] = 0;
+	mem_.scene_obj6_state() = 0;
+	mem_.scene_obj7_state() = 0;
+	mem_.scene_obj2_state() = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +249,7 @@ void SceneInit::west(uint8_t param, uint8_t c)
 		if (!static_cast<uint8_t>(c * 2) || wram_.cur_event())
 			return;
 		place(wSceneObj7, {0x3b, 0x80, 0x00});
-		mem_[wSceneObj8State] = wram_.unk_2d011() ? 0x08 : 0x06;
+		mem_.scene_obj8_state() = wram_.unk_2d011() ? 0x08 : 0x06;
 		return;
 	case WOWFUNC_MAGIC_SEED: // Func_b438f
 		if (!c)
@@ -263,7 +263,7 @@ void SceneInit::west(uint8_t param, uint8_t c)
 			place(wSceneObj1, {0x32, SCREEN_WIDTH_PX, 0x12});
 		place(wSceneObj5, {0x3a, 0x2e, 0x13});
 		if (c != DONE) {
-			mem_[wSceneObj5State] = 0;
+			mem_.scene_obj5_state() = 0;
 			mem_[wAttrmap + 5 * TILEMAP_WIDTH + 16] &= ~(1 << B_BG_PRIO);
 			mem_[wAttrmap + 6 * TILEMAP_WIDTH + 16] &= ~(1 << B_BG_PRIO);
 			mem_[wAttrmap + 7 * TILEMAP_WIDTH + 0] &= ~(1 << B_BG_PRIO);
@@ -305,8 +305,8 @@ void SceneInit::west(uint8_t param, uint8_t c)
 			tiles(ADDR_Data_8556e);
 			return;
 		}
-		mem_[wSceneObj6State] = 0;
-		++mem_[wSceneObj6YCoord];
+		mem_.scene_obj6_state() = 0;
+		++mem_.scene_obj6_y_coord();
 		return;
 	default:
 		unrealistic();
@@ -347,14 +347,14 @@ void SceneInit::south(uint8_t param, uint8_t c)
 	case SOWFUNC_YELLOW_MUSIC_BOX: // Func_b4509
 		place(wSceneObj6, {0x3d, 0x31, 0x07});
 		if (c == DONE)
-			mem_[wSceneObj6State] += 2;
+			mem_.scene_obj6_state() += 2;
 		return;
 	case SOWFUNC_CANYON_THUNDER: // Func_b4520
 		if (c == PLAY) {
 			place(wSceneObj2, {0x48, 0x38, 0x00});
 			place(wSceneObj10, {0x3d, 0x2f, 0x00});
 			place(wSceneObj5, THUNDER_CLOUD);
-			mem_[wSceneObj5State] = 0;
+			mem_.scene_obj5_state() = 0;
 			gfx(BANK_OverworldThunderGfx, ADDR_OverworldThunderGfx, 0x00); // LoadOverworldThunderGfx
 		} else if (c == DONE) {
 			tiles(ADDR_Data_855b2);
@@ -368,7 +368,7 @@ void SceneInit::south(uint8_t param, uint8_t c)
 				return;
 			place(wSceneObj15, {0x29, 0x78, 0x1f});
 			if (wram_.unk_2d011())
-				mem_[wSceneObj15State] = 0x1e;
+				mem_.scene_obj15_state() = 0x1e;
 			return;
 		}
 		if (!(c & 0x80))
@@ -396,7 +396,7 @@ void SceneInit::south(uint8_t param, uint8_t c)
 			place(wSceneObj1, {0x37, SCREEN_WIDTH_PX, 0x16});
 		place(wSceneObj7, SNAKE_PLACE);
 		if (c != DONE)
-			mem_[wSceneObj7State] = 0;
+			mem_.scene_obj7_state() = 0;
 		return;
 	case SOWFUNC_EARTHQUAKE: // Func_b461b
 	case SOWFUNC_GREEN_MUSIC_BOX: { // Func_b4637
@@ -423,8 +423,8 @@ void SceneInit::south(uint8_t param, uint8_t c)
 		place(wSceneObj14, {0x25, 0x70, 0x20});
 		if (c == PLAY || !wram_.unk_2d011())
 			return;
-		mem_[wSceneObj14XCoord] = 0x80;
-		mem_[wSceneObj14YCoord] = 0x15;
+		mem_.scene_obj14_x_coord() = 0x80;
+		mem_.scene_obj14_y_coord() = 0x15;
 		return;
 	default:
 		unrealistic();
@@ -451,8 +451,8 @@ void SceneInit::east(uint8_t param, uint8_t c)
 		if (c == PLAY) {
 			place(wSceneObj1, {0x64, 0xe8, 0x01});
 		} else if (c == DONE) { // the frozen sea
-			mem_[w2d03e] = 0;
-			mem_[w2d046] = 0;
+			mem_.unk_2d03e() = 0;
+			mem_.unk_2d046() = 0;
 			home::copy_far_bytes(gb_, BANK_OWSceneFreezeSeaTilemap, ADDR_OWSceneFreezeSeaTilemap + 10 * TILEMAP_WIDTH + 15, wTilemap + 10 * TILEMAP_WIDTH + 15, 0x91);
 			home::copy_far_bytes(gb_, BANK_OWSceneFreezeSeaAttrmap, ADDR_OWSceneFreezeSeaAttrmap + 15, wAttrmap + 10 * TILEMAP_WIDTH + 15, 0x91);
 		}
@@ -475,11 +475,11 @@ void SceneInit::east(uint8_t param, uint8_t c)
 		if (wram_.temp_ow_scene_action() != UNLOCK_LEVEL) { // .Func_b4757: the castle
 			place(wSceneObj7, {0x28, 0x28, 0x12});
 			if (!wram_.unk_2d011())
-				mem_[wSceneObj7State] = 0x13;
+				mem_.scene_obj7_state() = 0x13;
 		}
 		if (c == PLAY) {
 			place(wSceneObj1, {0x3f, 0x1c, 0x00});
-			mem_[wSceneObj7State] = 0;
+			mem_.scene_obj7_state() = 0;
 			gfx(BANK_OverworldExplosion2Gfx, ADDR_OverworldExplosion2Gfx, 0x00); // LoadOverworldExplosion2Gfx
 			return;
 		}
@@ -523,7 +523,7 @@ void SceneInit::east(uint8_t param, uint8_t c)
 			return;
 		place(wSceneObj5, {0x60, 0x88, 0x19});
 		if (c & 0x80)
-			mem_[wSceneObj5State] = 0;
+			mem_.scene_obj5_state() = 0;
 		return;
 	case EOWFUNC_RAISE_PIPE: // Func_b4832
 		if (!c)
@@ -531,7 +531,7 @@ void SceneInit::east(uint8_t param, uint8_t c)
 		place(wSceneObj8, PIPE);
 		if (c == DONE)
 			return;
-		mem_[wSceneObj8YCoord] += 0x08;
+		mem_.scene_obj8_y_coord() += 0x08;
 		place(wSceneObj2, {0x40, 0x7c, 0x21});
 		priority(wAttrmap + 7 * TILEMAP_WIDTH + 14, 3);
 		priority(wAttrmap + 8 * TILEMAP_WIDTH + 14, 3);

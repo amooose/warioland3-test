@@ -32,6 +32,9 @@ uint8_t check_block(GB *gb, uint8_t points);
 // _ProcessBlockOnLeft / _ProcessBlockOnRight: the block beside wBlockPtr's;
 // when that wraps its low byte around, b as it was (the asm leaves b)
 uint8_t check_block_beside(GB *gb, bool right);
+// Func_19706 / Func_19713: Wario's bottom-right / bottom-left collision,
+// checked as Wario (breaking what he breaks)
+uint8_t check_wario_bottom(GB *gb, bool right);
 
 // The same, for register-level code (the Wario states, through AsmModule's
 // centre_collision() etc.): the result in b and the registers the asm

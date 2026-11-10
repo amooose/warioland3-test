@@ -13,8 +13,8 @@ namespace {
 void decompress_far(GB *gb, uint8_t bank, uint16_t gfx, uint16_t dest)
 {
 	Memory mem(gb);
-	mem[wTempBank] = bank;
-	mem[hCallFuncBank] = bank;
+	mem.temp_bank() = bank;
+	mem.call_func_bank() = bank;
 	home::hcall(gb, ADDR_Decompress, [&] { home::decompress(gb, gfx, dest); });
 }
 

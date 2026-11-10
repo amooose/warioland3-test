@@ -8,7 +8,7 @@ void bankswitch(GB *gb, uint8_t bank, uint16_t home_routine)
 	uint16_t pc = gb->cpu.pc;
 	gb->cpu.pc = home_routine;
 	Memory mem(gb);
-	mem[wROMBank] = bank;
+	mem.rom_bank() = bank;
 	mem[rROMB0 + 0x100] = bank;
 	gb->cpu.pc = pc;
 }
@@ -38,8 +38,8 @@ uint8_t copy(GB *gb, uint16_t src, uint16_t dest, uint32_t count)
 void far_copy(GB *gb, uint16_t src, uint16_t dest, uint32_t count)
 {
 	Memory mem(gb);
-	uint8_t bank = mem[wROMBank];
-	bankswitch(gb, mem[wTempBank], ADDR_FarCopyHLToDE_BC2);
+	uint8_t bank = mem.rom_bank();
+	bankswitch(gb, mem.temp_bank(), ADDR_FarCopyHLToDE_BC2);
 	copy(gb, src, dest, count);
 	bankswitch(gb, bank, ADDR_FarCopyHLToDE_BC2);
 }
@@ -69,8 +69,8 @@ DecompressEnd decompress(GB *gb, uint16_t src, uint16_t dest)
 DecompressEnd far_decompress(GB *gb, uint16_t src, uint16_t dest)
 {
 	Memory mem(gb);
-	uint8_t bank = mem[wROMBank];
-	bankswitch(gb, mem[wTempBank], ADDR_FarDecompress);
+	uint8_t bank = mem.rom_bank();
+	bankswitch(gb, mem.temp_bank(), ADDR_FarDecompress);
 	DecompressEnd end = decompress(gb, src, dest);
 	bankswitch(gb, bank, ADDR_FarDecompress);
 	return end;
@@ -80,7 +80,7 @@ void clear_virtual_oam(GB *gb)
 {
 	fill(gb, wVirtualOAM, 0, OAM_SIZE);
 	Memory mem(gb);
-	mem[wVirtualOAMByteSize] = 0;
+	mem.virtual_oam_byte_size() = 0;
 }
 
 // A sprite at a time. As in the asm, a remainder under 4 would clear 256
@@ -88,7 +88,7 @@ void clear_virtual_oam(GB *gb)
 int clear_unused_virtual_oam(GB *gb)
 {
 	Memory mem(gb);
-	uint8_t used = mem[wVirtualOAMByteSize];
+	uint8_t used = mem.virtual_oam_byte_size();
 	int sprites = 0;
 	if (used < OAM_SIZE) {
 		sprites = (OAM_SIZE - used) >> 2;
@@ -96,7 +96,7 @@ int clear_unused_virtual_oam(GB *gb)
 			sprites = 256;
 		fill(gb, static_cast<uint16_t>((wVirtualOAM & 0xff00) | used), 0, static_cast<uint32_t>(sprites * 4));
 	}
-	mem[wVirtualOAMByteSize] = 0;
+	mem.virtual_oam_byte_size() = 0;
 	return sprites;
 }
 
@@ -117,7 +117,7 @@ void clear_bg_map1(GB *gb)
 void clear_vram(GB *gb)
 {
 	Memory mem(gb);
-	if (!mem[hCGB])
+	if (!mem.cgb())
 		return;
 	mem[rVBK] = BANK_v1Tiles0;
 	fill(gb, 0x8000, 0, 0x2000);
@@ -142,13 +142,13 @@ bool disable_lcd(GB *gb)
 	if (!(mem[rLCDC] & LCDC_ON))
 		return false;
 	uint8_t ie = mem[rIE];
-	mem[wTempIE] = ie;
+	mem.temp_ie() = ie;
 	mem[rIE] = static_cast<uint8_t>(ie & ~IE_VBLANK);
 	while (mem[rLY] != LY_VBLANK + 1)
 		idle(gb, 32);
 	mem[rLCDC] = static_cast<uint8_t>(mem[rLCDC] & ~LCDC_ON);
 	mem[rIF] = 0;
-	mem[rIE] = mem[wTempIE];
+	mem[rIE] = mem.temp_ie();
 	return true;
 }
 
@@ -240,7 +240,7 @@ PORT_EX(CopyHLToDE, 0, 0)
 // before switching back.
 static void far_copy_regs(GB *gb)
 {
-	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t bank = wl3::Memory(gb).rom_bank();
 	uint16_t hl = REG_HL(gb), de = REG_DE(gb);
 	uint32_t n = bc_count(gb);
 	far_copy(gb, hl, de, n);
@@ -268,7 +268,7 @@ PORT_EX(Decompress, 0, 0)
 
 PORT_EX(FarDecompress, 0, 0)
 {
-	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t bank = wl3::Memory(gb).rom_bank();
 	decompressed(gb, far_decompress(gb, REG_HL(gb), REG_BC(gb)));
 	gb->cpu.a = bank; // pop af: the entry's flags too
 }
@@ -284,7 +284,7 @@ PORT_EX(ClearVirtualOAM, 0, 0)
 
 PORT_EX(ClearUnusedVirtualOAM, 0, 0)
 {
-	uint8_t used = wl3::Memory(gb)[wVirtualOAMByteSize];
+	uint8_t used = wl3::Memory(gb).virtual_oam_byte_size();
 	int sprites = clear_unused_virtual_oam(gb);
 	SET_HL(gb, static_cast<uint16_t>(((wVirtualOAM & 0xff00) | used) + sprites * 4));
 	if (sprites)
@@ -335,7 +335,7 @@ PORT_EX(ClearVRAM, 0, 0)
 {
 	clear_vram(gb);
 	gb->cpu.a = 0;
-	if (!wl3::Memory(gb)[hCGB]) {
+	if (!wl3::Memory(gb).cgb()) {
 		gb->cpu.f = FLAG_Z | FLAG_H; // and a
 		return;
 	}
@@ -362,6 +362,6 @@ PORT_EX(DisableLCD, 0, 0)
 		gb->cpu.f = static_cast<uint8_t>((gb->cpu.f & FLAG_C) | FLAG_Z | FLAG_H); // bit
 		return;
 	}
-	gb->cpu.a = wl3::Memory(gb)[wTempIE];
+	gb->cpu.a = wl3::Memory(gb).temp_ie();
 	gb->cpu.f = FLAG_Z; // xor a
 }

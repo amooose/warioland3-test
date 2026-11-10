@@ -27,13 +27,13 @@ public:
 	// address in wBGMapTileVRAM0Queue): tile $02, palette 5
 	void port_VBlank_SaveScreen__Func()
 	{
-		if (mem_[wcee4] & 0x80) {
-			uint16_t at = static_cast<uint16_t>(mem_[wBGMapTileVRAM0Queue] << 8 | mem_[wBGMapTileVRAM0Queue + 1]);
+		if (mem_.unk_cee4() & 0x80) {
+			uint16_t at = static_cast<uint16_t>(mem_.bg_map_tile_vram0_queue() << 8 | mem_[wBGMapTileVRAM0Queue + 1]);
 			mem_[rVBK] = 1; // BANK("VRAM1")
 			mem_[at] = 0x05; // pal
 			mem_[rVBK] = 0;
 			mem_[at] = 0x02;
-			mem_[wcee4] &= 0x7f;
+			mem_.unk_cee4() &= 0x7f;
 		}
 		transfer_oam();
 	}

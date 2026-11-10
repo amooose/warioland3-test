@@ -24,11 +24,11 @@ void transfer_oam(GB *gb)
 void hdma(GB *gb, int vram_bank)
 {
 	Memory mem(gb);
-	uint8_t bank = mem[wHDMABank];
+	uint8_t bank = mem.hdma_bank();
 	if (!bank)
 		return;
-	mem[wHDMABank] = 0;
-	uint8_t rom = mem[wROMBank];
+	mem.hdma_bank() = 0;
+	uint8_t rom = mem.rom_bank();
 	Routines(gb).switch_bank(bank);
 	if (vram_bank >= 0)
 		mem[rVBK] = mem[static_cast<uint16_t>(vram_bank)];
@@ -44,24 +44,24 @@ void prologue_epilogue_vblank(GB *gb)
 {
 	Memory mem(gb);
 	mem[rWBK] = 0x02; // BANK("WRAM2")
-	mem[rSCY] = mem[wSCY];
-	mem[rSCX] = mem[wSCX];
+	mem[rSCY] = mem.scy();
+	mem[rSCX] = mem.scx();
 	hdma(gb, wHDMADestVRAMBank);
-	if (uint8_t lo = mem[wPendingCharDest]) {
-		mem[wPendingCharDest] = 0;
+	if (uint8_t lo = mem.pending_char_dest()) {
+		mem.pending_char_dest() = 0;
 		uint16_t dest = static_cast<uint16_t>(mem[wPendingCharDest + 1] << 8 | lo);
 		mem[dest] = mem[wPendingCharDest + 2]; // wPendingCharTile
 		mem[rVBK] = 0x01; // BANK("VRAM1")
 		mem[dest] = mem[wPendingCharDest + 3]; // wPendingCharAttr
 	}
 	mem[rVBK] = 0;
-	if (mem[wPalConfig1])
+	if (mem.pal_config1())
 		home::apply_pal_config(gb, wPalConfig1);
-	if (mem[wPalConfig2])
+	if (mem.pal_config2())
 		home::apply_pal_config(gb, wPalConfig2);
-	if (uint8_t flip = mem[wLCDCFlagsToFlip]) {
+	if (uint8_t flip = mem.lcdc_flags_to_flip()) {
 		mem[rLCDC] = static_cast<uint8_t>(mem[rLCDC] ^ flip);
-		mem[wLCDCFlagsToFlip] = 0;
+		mem.lcdc_flags_to_flip() = 0;
 	}
 	transfer_oam(gb);
 }
@@ -71,8 +71,8 @@ void golf_building_vblank(GB *gb)
 {
 	Memory mem(gb);
 	mem[rWBK] = 2; // BANK("WRAM2")
-	mem[rSCY] = mem[wSCY];
-	mem[rSCX] = mem[wSCX];
+	mem[rSCY] = mem.scy();
+	mem[rSCX] = mem.scx();
 	hdma(gb, -1);
 	mem[rVBK] = 0;
 	transfer_oam(gb);

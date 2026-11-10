@@ -56,7 +56,7 @@ private:
 
 bool Zombie::wario_to_right() const
 {
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	return static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 }
 
@@ -64,8 +64,8 @@ void Zombie::start()
 {
 	no_actions();
 	set_update(INIT);
-	mem_[wCurObjCollBoxRight] = 3;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-4);
+	mem_.cur_obj_coll_box_right() = 3;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-4);
 	flags() |= OBJFLAG_NO_COLLISION;
 	state_duration() = 0;
 }
@@ -87,17 +87,17 @@ void Zombie::init()
 // the edge of its block with nothing beyond (ProcessBlockOn*), or a wall
 bool Zombie::blocked(bool right)
 {
-	uint8_t in_block = mem_[wCurObjXPos + 0] & 0x0f;
+	uint8_t in_block = mem_.cur_obj_x().lo() & 0x0f;
 	if (right ? in_block + 3 >= 16 : in_block < 4) {
 		if (!(block_beside(right) & 0x0f))
 			return true;
 	}
 	uint16_t y_pos = static_cast<uint16_t>(y() - 4);
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 3) : static_cast<uint16_t>(x() - 4);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	return hpos_block_unk4();
 }
 
@@ -107,10 +107,10 @@ void Zombie::underground()
 {
 	no_actions();
 	frame_duration() = 2;
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_down()) {
 		flags() = 0;
 		return;
@@ -125,10 +125,10 @@ void Zombie::underground()
 		--state_duration();
 		return;
 	}
-	uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+	uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 	if (dy >= 24 && dy < static_cast<uint8_t>(-24))
 		return;
-	uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+	uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 	if (dx >= static_cast<uint8_t>(-32) || dx < 32)
 		return;
 	if (dx < static_cast<uint8_t>(-64) && dx >= 64)
@@ -159,20 +159,20 @@ void Zombie::start_rise()
 // its collision box grows as it rises
 void Zombie::rising()
 {
-	if (mem_[wTransformation] == TRANSFORMATION_ZOMBIE_WARIO)
+	if (mem_.transformation() == TRANSFORMATION_ZOMBIE_WARIO)
 		no_actions();
 	uint8_t time = --state_duration();
 	if (time == 12) {
-		mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-12);
+		mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-12);
 		return;
 	}
 	if (time == 6) {
-		mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-18);
+		mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-18);
 		return;
 	}
 	if (time)
 		return;
-	mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-24);
+	mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-24);
 	set_update(ON_SURFACE);
 	state() = 0;
 	set_walking();
@@ -190,7 +190,7 @@ void Zombie::on_surface()
 {
 	uint8_t s = state();
 	if (s) {
-		bool zombie = mem_[wTransformation] == TRANSFORMATION_ZOMBIE_WARIO;
+		bool zombie = mem_.transformation() == TRANSFORMATION_ZOMBIE_WARIO;
 		if (!zombie && s == 0x0a) {
 			vanish();
 			return;
@@ -238,9 +238,9 @@ void Zombie::set_turn(uint16_t frameset)
 // he's behind)
 void Zombie::walking()
 {
-	uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+	uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 	if (dy < 32 || dy >= static_cast<uint8_t>(-32)) {
-		uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+		uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 		bool right = facing_right();
 		uint16_t frameset = 0;
 		if (dx >= static_cast<uint8_t>(-48)) { // Wario's close to its right
@@ -270,17 +270,17 @@ void Zombie::walking()
 // fast along the floor; off an edge, it goes headless (and under)
 void Zombie::walk_on()
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_down()) {
 		state_duration() = 0x30;
 		set_update(HEADLESS);
 		return;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	bool right = facing_right();
 	if (blocked(right)) {
 		set_turn(right ? ADDR_Frameset_68d2b : ADDR_Frameset_68d24);
@@ -318,7 +318,7 @@ void Zombie::throwing()
 
 void Zombie::flicker()
 {
-	if (!(mem_[wGlobalCounter] & 1))
+	if (!(mem_.global_counter() & 1))
 		flags() ^= OBJFLAG_INVISIBLE;
 }
 

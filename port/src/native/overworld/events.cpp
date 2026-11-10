@@ -38,9 +38,9 @@ Events::Found Events::event_with_treasure(uint8_t treasure)
 void Events::load_event_treasures(uint8_t event)
 {
 	uint16_t entry = static_cast<uint16_t>(ADDR_EventTreasures + event * 3);
-	mem_[w2dfff] = mem_[entry];
-	mem_[w2dffe] = mem_[entry + 1];
-	mem_[w2dffd] = mem_[entry + 2];
+	mem_.unk_2dfff() = mem_[entry];
+	mem_.unk_2dffe() = mem_[entry + 1];
+	mem_.unk_2dffd() = mem_[entry + 2];
 }
 
 // CheckIfEventIsUnlocked: whether the event's treasures are all collected
@@ -161,7 +161,7 @@ void Events::show_missing_treasure_indicators()
 {
 	if (!wram_.missing_treasure_indicators_enabled())
 		return;
-	mem_[w2dffd] = wram_.ow_level();
+	mem_.unk_2dffd() = wram_.ow_level();
 	wram_.ow_level() = mem_[static_cast<uint16_t>(ADDR_MapSideInitialLevels + wram_.cur_map_side())];
 	uint8_t count;
 	switch (wram_.next_map_side()) {
@@ -170,15 +170,15 @@ void Events::show_missing_treasure_indicators()
 	case EAST: count = NUM_EAST_LEVELS; break;
 	default: count = NUM_NORTH_LEVELS; break;
 	}
-	mem_[w2dfff] = count;
-	mem_[w2dffe] = 0;
+	mem_.unk_2dfff() = count;
+	mem_.unk_2dffe() = 0;
 	bool skip = !wram_.ow_level(); // the temple
 	do {
 		if (!skip) {
 			routines_.farcall(BANK_GetOWLevelCollectedTreasures, ADDR_GetOWLevelCollectedTreasures);
 			if ((wram_.key_and_treasure_flags() & TREASURES_MASK) != TREASURES_MASK) {
 				// .PlaceTreasureMissingIndicator
-				uint16_t coords = map_level_coords(gb_, mem_[w2dffe]);
+				uint16_t coords = map_level_coords(gb_, mem_.unk_2dffe());
 				wram_.owy_coord1() = mem_[coords];
 				wram_.owx_coord1() = mem_[coords + 1];
 				uint16_t tile = home::ow_coord_in_tilemap(gb_, wOWCoords1);
@@ -188,9 +188,9 @@ void Events::show_missing_treasure_indicators()
 		}
 		skip = false;
 		++wram_.ow_level();
-		++mem_[w2dffe];
-	} while (mem_[w2dffe] != mem_[w2dfff]);
-	wram_.ow_level() = mem_[w2dffd];
+		++mem_.unk_2dffe();
+	} while (mem_.unk_2dffe() != mem_.unk_2dfff());
+	wram_.ow_level() = mem_.unk_2dffd();
 }
 
 // ---------------------------------------------------------------------------

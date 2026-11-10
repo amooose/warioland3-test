@@ -23,7 +23,7 @@ uint8_t block_coord(uint8_t hi, uint8_t lo)
 
 void sram_switch(Memory mem, uint8_t bank)
 {
-	mem[wSRAMBank] = bank;
+	mem.sram_bank() = bank;
 	mem[rRAMB + 0x100] = bank;
 }
 
@@ -32,7 +32,7 @@ void rom_switch(GB *gb, uint8_t bank, uint16_t routine)
 	Memory mem(gb);
 	uint16_t pc = gb->cpu.pc;
 	gb->cpu.pc = routine; // home code
-	mem[wROMBank] = bank;
+	mem.rom_bank() = bank;
 	mem[rROMB0 + 0x100] = bank;
 	gb->cpu.pc = pc;
 }
@@ -46,10 +46,10 @@ void rom_switch(GB *gb, uint8_t bank, uint16_t routine)
 void decompress_level_map(GB *gb, bool objmap, uint16_t routine)
 {
 	Memory mem(gb);
-	uint8_t sram = mem[wSRAMBank];
+	uint8_t sram = mem.sram_bank();
 	sram_switch(mem, BANK_sLevelBlockObjectMap); // BANK("SRAM1")
-	uint8_t rom = mem[wROMBank];
-	rom_switch(gb, mem[wTempBank], routine);
+	uint8_t rom = mem.rom_bank();
+	rom_switch(gb, mem.temp_bank(), routine);
 
 	uint16_t src = static_cast<uint16_t>(mem[wCompressedLevelBlockMapPtr + 0] << 8
 		| mem[wCompressedLevelBlockMapPtr + 1]);
@@ -66,7 +66,7 @@ void decompress_level_map(GB *gb, bool objmap, uint16_t routine)
 			dest = static_cast<uint16_t>(((dest & 0xff00) + 0x100) | row_start); // the next row
 			if (dest >> 8 == 0xc0) { // past SRAM: the next bank's
 				dest = static_cast<uint16_t>((0xa000) | row_start);
-				sram_switch(mem, static_cast<uint8_t>(mem[wSRAMBank] + 1));
+				sram_switch(mem, static_cast<uint8_t>(mem.sram_bank() + 1));
 			}
 		} else if (objmap) {
 			dest++;
@@ -78,9 +78,9 @@ void decompress_level_map(GB *gb, bool objmap, uint16_t routine)
 			while (n--)
 				put(mem[src++]);
 		} else {
-			mem[wRepeatByte] = mem[src++];
+			mem.repeat_byte() = mem[src++];
 			while (cmd--)
-				put(mem[wRepeatByte]);
+				put(mem.repeat_byte());
 		}
 	}
 	rom_switch(gb, rom, routine);
@@ -100,8 +100,8 @@ BlockPtr block_ptr(GB *gb, uint16_t pos, uint8_t *x)
 		bank++;
 		page = static_cast<uint8_t>(page - 0x20);
 	}
-	mem[wBlockPtr + 0] = page;
-	mem[wBlockPtrBank] = bank;
+	mem.block_pointer().hi() = page;
+	mem.block_ptr_bank() = bank;
 	// (x is read after the writes above, as the asm does)
 	uint8_t x_hi = mem[pos + 2], x_lo = mem[pos + 3];
 	if (x) {
@@ -109,7 +109,7 @@ BlockPtr block_ptr(GB *gb, uint16_t pos, uint8_t *x)
 		x[1] = x_lo;
 	}
 	uint8_t column = block_coord(x_hi, x_lo);
-	mem[wBlockPtr + 1] = column;
+	mem.block_pointer().lo() = column;
 	return {static_cast<uint16_t>(page << 8 | column), bank};
 }
 
@@ -120,8 +120,7 @@ uint16_t block_bg_map_address(GB *gb, uint16_t ptr)
 	uint16_t row = static_cast<uint16_t>((static_cast<uint8_t>((ptr >> 8) - 0xa0) << 6) & 0x3ff);
 	uint16_t bg = static_cast<uint16_t>(((v0BGMap0 >> 8) << 8 | ((ptr & 0x0f) * 2)) + row);
 	Memory mem(gb);
-	mem[wBGPtr + 0] = static_cast<uint8_t>(bg >> 8);
-	mem[wBGPtr + 1] = static_cast<uint8_t>(bg);
+	mem.bg_pointer() = bg;
 	return bg;
 }
 
@@ -146,7 +145,7 @@ PORT(GetBlockPtr)
 
 PORT_EX(DecompressLevelBlockMap, 0, ALL_REGISTERS)
 {
-	if (!(wl3::Memory(gb)[wceef] & 0x3c))
+	if (!(wl3::Memory(gb).unk_ceef() & 0x3c))
 		decompress_level_map(gb, false, ADDR_DecompressLevelBlockMap);
 }
 

@@ -49,8 +49,8 @@ private:
 void Snake::start()
 {
 	set_update(INIT);
-	var2() = mem_[wCurObjYPos + 0]; // its start
-	var3() = mem_[wCurObjYPos + 1];
+	var2() = mem_.cur_obj_y().lo(); // its start
+	var3() = mem_.cur_obj_y().hi();
 }
 
 void Snake::init()
@@ -58,7 +58,7 @@ void Snake::init()
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(UPDATE);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	if (static_cast<uint8_t>(screen_x() + 0x2a) < wario) {
 		substate() |= OBJSUBFLAG_HDIR;
 		set_frameset(ADDR_Frameset_6881d);
@@ -68,15 +68,15 @@ void Snake::init()
 	}
 	state_duration() = 0x78;
 	var1() = 0;
-	mem_[wCurObjCollBoxRight] = 0xff;
-	mem_[wCurObjCollBoxLeft] = 0xf1;
-	mem_[wCurObjCollBoxBottom] = 0x0f;
+	mem_.cur_obj_coll_box_right() = 0xff;
+	mem_.cur_obj_coll_box_left() = 0xf1;
+	mem_.cur_obj_coll_box_bottom() = 0x0f;
 }
 
 void Snake::update()
 {
 	one_way_platform();
-	mem_[wCurObjCollBoxBottom] = 0x0f;
+	mem_.cur_obj_coll_box_bottom() = 0x0f;
 	face_wario();
 	uint8_t s = state();
 	if (s) {
@@ -130,8 +130,8 @@ void Snake::carry_wario(bool up)
 		return;
 	}
 	flags() &= ~OBJFLAG_STEPPED;
-	mem_[wCurObjCollBoxBottom] = 0;
-	if (!(mem_[wGlobalCounter] & 1))
+	mem_.cur_obj_coll_box_bottom() = 0;
+	if (!(mem_.global_counter() & 1))
 		return;
 	move_wario(up ? ADDR_MoveWarioUp : ADDR_MoveWarioDown, 1);
 	call_home(up ? ADDR_HandleUpwardsFloorTransition : ADDR_HandleDownwardsFloorTransition);
@@ -171,7 +171,7 @@ void Snake::looking()
 
 void Snake::breath_sfx()
 {
-	if (mem_[wCurObjFramesetOffset] == 0x0a && !frame_duration())
+	if (mem_.cur_obj_frameset_offset() == 0x0a && !frame_duration())
 		play_sfx(SFX_08A);
 }
 
@@ -278,10 +278,10 @@ void Snake::face_wario()
 			set_frameset(open ? ADDR_Frameset_68852 : ADDR_Frameset_68804);
 		return;
 	}
-	uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+	uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 	if (dy >= 0x28 && dy < 0xe8)
 		return;
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	bool wario_right = static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 	if (wario_right == facing_right())
 		return;
@@ -314,7 +314,7 @@ void Snake::fire()
 // OBJ_UNK_01/02) is breathing (mode 6)
 void Snake::fire_update()
 {
-	uint8_t unk01 = mem_[wCurObjUnk01], unk02 = mem_[wCurObjUnk02];
+	uint8_t unk01 = mem_.cur_obj_unk01(), unk02 = mem_.cur_obj_unk02();
 	for (int n = 0; n < NUM_OBJECTS; n++) {
 		uint16_t obj = static_cast<uint16_t>(wObj1 + n * OBJ_STRUCT_LENGTH);
 		if (mem_[static_cast<uint16_t>(obj + OBJ_UNK_02)] != unk02)

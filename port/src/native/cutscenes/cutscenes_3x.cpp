@@ -14,12 +14,12 @@ void Cutscenes::init_raise_ice_blocks()
 	cutscenes::clear_temp_pals(gb_);
 	place(wSceneObj2, 88, 98, 0x03);
 	place(wSceneObj3, 88, 70, 0x01);
-	mem_[wSceneObj4YCoord] = 72;
-	mem_[wSceneObj4XCoord] = 82;
-	mem_[wSceneObj5YCoord] = 68;
-	mem_[wSceneObj5XCoord] = 70;
-	mem_[wSceneObj6YCoord] = 60;
-	mem_[wSceneObj6XCoord] = 52;
+	mem_.scene_obj4_y_coord() = 72;
+	mem_.scene_obj4_x_coord() = 82;
+	mem_.scene_obj5_y_coord() = 68;
+	mem_.scene_obj5_x_coord() = 70;
+	mem_.scene_obj6_y_coord() = 60;
+	mem_.scene_obj6_x_coord() = 52;
 	draw_func_9f5a0();
 }
 
@@ -61,7 +61,7 @@ void Cutscenes::raise_ice_blocks()
 	case 5: // .Func_9df62
 	case 7:
 	case 9:
-		if (mem_[wSceneObj2State] == 0x03)
+		if (mem_.scene_obj2_state() == 0x03)
 			advance();
 		break;
 	case 10: // .Func_9df6b
@@ -70,7 +70,7 @@ void Cutscenes::raise_ice_blocks()
 	case 11: { // .Func_9df70: up a pixel every 8 frames, letting the bubbles go
 		if (wram_.unk_2d014() & 0x07)
 			break;
-		uint8_t y = --mem_[wSceneObj3YCoord];
+		uint8_t y = --mem_.scene_obj3_y_coord();
 		uint16_t bubble = y == 0x48 ? wSceneObj4State : y == 0x44 ? wSceneObj5State : y == 0x3c ? wSceneObj6State : 0;
 		if (bubble) {
 			mem_[bubble] = 0x04;
@@ -103,8 +103,8 @@ void Cutscenes::draw_func_9f5a0()
 			uint16_t obj = animate(state, frameset(ADDR_Func_9f5a0 + 0x3d, s));
 			if (mem_[state] == 0x02) {
 				// .Func_9f5e5
-				uint8_t frame = mem_[wSceneObj2Frame];
-				Byte hit = mem_[wSceneObj2Unk7];
+				uint8_t frame = mem_.scene_obj2_frame();
+				Byte hit = mem_.scene_obj2_unk7();
 				if (!hit) {
 					if (frame == 0x03) {
 						play_sfx(mem_, SFX_0BA);
@@ -140,7 +140,7 @@ void Cutscenes::torch_forest()
 		break;
 	case 1: // .Func_9de1b
 		place(wSceneObj2, 192, 50, 0x01);
-		mem_[wSceneObj1YCoord] = 3;
+		mem_.scene_obj1_y_coord() = 3;
 		advance();
 		break;
 	case 2: // .Func_9de33
@@ -158,11 +158,11 @@ void Cutscenes::torch_forest()
 	}
 	// Func_9f508
 	draw_shadow(wSceneObj2, wCurSceneObj, 0x03, 0x05); // Func_9fb97
-	uint8_t state = mem_[wSceneObj2State];
+	uint8_t state = mem_.scene_obj2_state();
 	if (!state)
 		return;
 	uint16_t obj = animate(wSceneObj2State, frameset(ADDR_Func_9f508 + 0x1f, state));
-	if (mem_[wSceneObj2State] == 0x01)
+	if (mem_.scene_obj2_state() == 0x01)
 		loop_sound(wSceneObj2Unk7, 0x0e, SFX_01E); // .Func_9f52e
 	draw(obj, ADDR_OAM_be2d9);
 }
@@ -187,12 +187,12 @@ void Cutscenes::reveal_warped_void()
 		if (frame() < 0x1e)
 			break;
 		place(wSceneObj2, 152, 72, 0x01);
-		mem_[wSceneObj1YCoord] = 1;
+		mem_.scene_obj1_y_coord() = 1;
 		play_sfx(mem_, SFX_112); // Func_9ce1f
 		advance();
 		break;
 	case 2: // .Func_9de87
-		if (--mem_[wSceneObj2YCoord] == 0x78)
+		if (--mem_.scene_obj2_y_coord() == 0x78)
 			advance();
 		break;
 	case 3: // .Func_9de92
@@ -200,19 +200,19 @@ void Cutscenes::reveal_warped_void()
 		advance();
 		break;
 	case 4: // .Func_9de9d
-		if (mem_[wSceneObj2Frame] != 0x01)
+		if (mem_.scene_obj2_frame() != 0x01)
 			break;
 		play_sfx(mem_, SFX_SWITCH);
 		advance();
 		break;
 	case 5: // .Func_9deae
-		if (mem_[wSceneObj2Frame] != 0x05)
+		if (mem_.scene_obj2_frame() != 0x05)
 			break;
 		play_sfx(mem_, SFX_106);
 		advance();
 		break;
 	case 6: // .Func_9debf
-		if (mem_[wSceneObj2State] == 0x03)
+		if (mem_.scene_obj2_state() == 0x03)
 			advance();
 		break;
 	case 7: // .Func_9dec8
@@ -222,7 +222,7 @@ void Cutscenes::reveal_warped_void()
 		fade_in();
 		break;
 	case 9: // .Func_9decd
-		mem_[wSceneObj2State] = 0;
+		mem_.scene_obj2_state() = 0;
 		advance();
 		break;
 	case 10:
@@ -235,11 +235,11 @@ void Cutscenes::reveal_warped_void()
 	// Func_9f547: state 2 on to 3, which hums
 	draw_shadow(wSceneObj2, wCurSceneObj, 0x01, 0x00); // Func_9fb4c
 	for (;;) {
-		uint8_t s = mem_[wSceneObj2State];
+		uint8_t s = mem_.scene_obj2_state();
 		if (!s)
 			break;
 		uint16_t obj = animate(wSceneObj2State, frameset(ADDR_Func_9f547 + 0x35, s));
-		uint8_t now = mem_[wSceneObj2State];
+		uint8_t now = mem_.scene_obj2_state();
 		if (now == 0x02 && next_state_when_done(obj, 0x03))
 			continue;
 		if (now == 0x03)
@@ -270,7 +270,7 @@ void Cutscenes::raise_pipe()
 		advance();
 		break;
 	case 2: // .Func_9dff1
-		if (++mem_[wSceneObj2YCoord] != 0x50)
+		if (++mem_.scene_obj2_y_coord() != 0x50)
 			break;
 		play_sfx(mem_, SFX_CLICK);
 		advance();
@@ -292,11 +292,11 @@ void Cutscenes::raise_pipe()
 		return;
 	}
 	// Func_9f607: a sound when state 2's animation ends
-	uint8_t state = mem_[wSceneObj2State];
+	uint8_t state = mem_.scene_obj2_state();
 	if (!state)
 		return;
 	uint16_t obj = animate(wSceneObj2State, frameset(ADDR_Func_9f607 + 0x19, state));
-	if (mem_[wSceneObj2State] == 0x02 && wram_.ow_animation_finished() == 0xff) // .Func_9f629
+	if (mem_.scene_obj2_state() == 0x02 && wram_.ow_animation_finished() == 0xff) // .Func_9f629
 		play_sfx(mem_, SFX_085);
 	draw(obj, ADDR_OAM_be8fe);
 }
@@ -322,7 +322,7 @@ void Cutscenes::init_remove_warps()
 // vanish one by one
 void Cutscenes::remove_warps()
 {
-	if (mem_[wSceneObj7State] == 0x03) // .Func_9e153
+	if (mem_.scene_obj7_state() == 0x03) // .Func_9e153
 		loop_sound(wSceneObj7Unk7, 0x1b, SFX_080);
 	static constexpr uint16_t WARPS[4] = {wSceneObj4, wSceneObj5, wSceneObj6, wSceneObj7};
 	uint8_t step = wram_.unk_2d013();
@@ -366,9 +366,9 @@ void Cutscenes::remove_warps()
 	case 4: { // .Func_9e098: the switch down and right, on even frames
 		if (frame() & 1)
 			break;
-		Byte y = mem_[wSceneObj2YCoord];
+		Byte y = mem_.scene_obj2_y_coord();
 		y -= 2;
-		++mem_[wSceneObj2XCoord];
+		++mem_.scene_obj2_x_coord();
 		if (y == 0x50) {
 			play_sfx(mem_, SFX_SWITCH);
 			break;
@@ -387,8 +387,8 @@ void Cutscenes::remove_warps()
 		if (frame() < 0x8c)
 			break;
 		wram_.collection_row() = 0x08;
-		mem_[wSceneObj3State] = 0;
-		mem_[wSceneObj2State] = 0;
+		mem_.scene_obj3_state() = 0;
+		mem_.scene_obj2_state() = 0;
 		stop_sfx();
 		for (uint16_t warp : WARPS)
 			set_state(warp, 0x03);
@@ -456,7 +456,7 @@ void Cutscenes::demons_blood()
 	case 2: { // .Func_9e1a8: down on odd frames
 		if (!(frame() & 1))
 			break;
-		uint8_t y = ++mem_[wSceneObj2YCoord];
+		uint8_t y = ++mem_.scene_obj2_y_coord();
 		if (y == 0x27) {
 			play_sfx(mem_, SFX_112); // Func_9ce1f
 			break;
@@ -472,7 +472,7 @@ void Cutscenes::demons_blood()
 		advance();
 		break;
 	case 4: // .Func_9e1cb
-		if (mem_[wSceneObj2State] == 0x03)
+		if (mem_.scene_obj2_state() == 0x03)
 			advance();
 		break;
 	case 5: { // .Func_9e1d4: the drop falls by .data_9e205's speeds, to y $58
@@ -480,7 +480,7 @@ void Cutscenes::demons_blood()
 		if (f >= 0x2c)
 			f = 0x28;
 		uint8_t dy = mem_[static_cast<uint16_t>(ADDR_Cutscene3cFunc + 0x94 + f)];
-		Byte y = mem_[wSceneObj3YCoord];
+		Byte y = mem_.scene_obj3_y_coord();
 		y += dy;
 		if (y < 0x58)
 			break;
@@ -491,7 +491,7 @@ void Cutscenes::demons_blood()
 		break;
 	}
 	case 6: // .Func_9e231
-		if (!mem_[wSceneObj3State])
+		if (!mem_.scene_obj3_state())
 			advance();
 		break;
 	case 7: // .Func_9e239
@@ -502,7 +502,7 @@ void Cutscenes::demons_blood()
 		advance();
 		break;
 	case 8: // .Func_9e253
-		if (mem_[wSceneObj4State] == 0x07)
+		if (mem_.scene_obj4_state() == 0x07)
 			advance();
 		break;
 	case 9:
@@ -530,7 +530,7 @@ void Cutscenes::draw_func_9f6a2()
 			if (now == 0x02) {
 				again = next_state_when_done(obj, 0x03);
 				if (again)
-					mem_[wSceneObj3State] = 0x04;
+					mem_.scene_obj3_state() = 0x04;
 			} else if (now == 0x05 || now == 0x06) {
 				again = next_state_when_done(obj, now == 0x05 ? 0x00 : 0x07);
 			}
@@ -570,21 +570,21 @@ void Cutscenes::paragoom_cage()
 		break;
 	case 2: // .Func_9e384: up and left, to x $44
 	case 6:
-		--mem_[wSceneObj2YCoord];
-		if (--mem_[wSceneObj2XCoord] == 0x44)
+		--mem_.scene_obj2_y_coord();
+		if (--mem_.scene_obj2_x_coord() == 0x44)
 			advance();
 		break;
 	case 3: // .Func_9e391: turn
 	case 7:
 		if (frame() < 0x1e)
 			break;
-		set_state(wSceneObj2, static_cast<uint8_t>(mem_[wSceneObj2State] + 1));
+		set_state(wSceneObj2, static_cast<uint8_t>(mem_.scene_obj2_state() + 1));
 		play_sfx(mem_, SFX_0C4);
 		advance();
 		break;
 	case 4: // .Func_9e3a8
 	case 8:
-		if (!mem_[wSceneObj2State])
+		if (!mem_.scene_obj2_state())
 			advance();
 		break;
 	case 5: // .Func_9e3b0
@@ -614,7 +614,7 @@ void Cutscenes::paragoom_cage()
 		advance();
 		break;
 	case 12: // .Func_9e402
-		if (mem_[wSceneObj4State] == 0x07)
+		if (mem_.scene_obj4_state() == 0x07)
 			advance();
 		break;
 	case 13: // .Func_9e40b
@@ -632,7 +632,7 @@ void Cutscenes::paragoom_cage()
 	case 15: // .Func_9e429: down a pixel every 4 frames
 		if (frame() & 0x03)
 			break;
-		if (++mem_[wSceneObj3YCoord] == 0x80)
+		if (++mem_.scene_obj3_y_coord() == 0x80)
 			advance();
 		break;
 	case 16:
@@ -643,7 +643,7 @@ void Cutscenes::paragoom_cage()
 		return;
 	}
 	// Func_9f7a2: the Paragoom (bank $1a's animations, bank $60's sprites)
-	uint8_t state = mem_[wSceneObj3State];
+	uint8_t state = mem_.scene_obj3_state();
 	if (state)
 		draw(animate(wSceneObj3State, frameset(ADDR_Func_9f7a2 + 0x15, state), 0x1a), ADDR_OAM_180b43, 0x60);
 	// Func_9f75c: states 2 and 4 end in 0, state 6 in 7

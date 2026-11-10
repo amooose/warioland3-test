@@ -45,7 +45,7 @@ private:
 
 bool Octohon::wario_to_right() const
 {
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	return static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 }
 
@@ -54,9 +54,9 @@ void Octohon::set_up(uint16_t update, uint8_t right, uint8_t left, uint8_t botto
 	flags() = (flags() & ~OBJFLAG_INVISIBLE) | OBJFLAG_NO_COLLISION;
 	set_update(update);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = right;
-	mem_[wCurObjCollBoxLeft] = left;
-	mem_[wCurObjCollBoxBottom] = bottom;
+	mem_.cur_obj_coll_box_right() = right;
+	mem_.cur_obj_coll_box_left() = left;
+	mem_.cur_obj_coll_box_bottom() = bottom;
 }
 
 void Octohon::small() { set_up(SMALL_START, 0x00, 0x00, 0x00); }
@@ -77,11 +77,11 @@ void Octohon::step(bool right)
 
 bool Octohon::wall_at(int dx)
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
 	uint16_t x_pos = static_cast<uint16_t>(x() + dx);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	return hpos_block_unk4();
 }
 
@@ -90,11 +90,11 @@ bool Octohon::wall_at(int dx)
 // for Wario could leave another hl, and an object's never is.)
 uint16_t Octohon::last_block_function()
 {
-	if (gb_->test.active && mem_[wBlockFuncWarioFlag])
+	if (gb_->test.active && mem_.block_func_wario_flag())
 		gb_->test.unrealistic = true;
-	mem_[rRAMB + 0x100] = mem_[wBlockPtrBank];
-	uint8_t block = mem_[static_cast<uint16_t>(mem_[wBlockPtr + 0] << 8 | mem_[wBlockPtr + 1])];
-	mem_[rRAMB + 0x100] = mem_[wSRAMBank];
+	mem_[rRAMB + 0x100] = mem_.block_ptr_bank();
+	uint8_t block = mem_[mem_.block_pointer()];
+	mem_[rRAMB + 0x100] = mem_.sram_bank();
 	return Word(gb_, static_cast<uint16_t>(wBlockFunctionTable + static_cast<uint8_t>(block * 2)));
 }
 
@@ -121,7 +121,7 @@ void Octohon::small_lap(uint16_t frameset, bool right)
 // a pause (the state duration), then a lap; then the other way
 void Octohon::small_swim()
 {
-	mem_[wCurObjAction] = 0x81;
+	mem_.cur_obj_action() = 0x81;
 	if (var1() > 1)
 		var1() = 0;
 	bool right = var1();
@@ -230,9 +230,9 @@ void Octohon::big_swim()
 			return;
 		}
 		{
-			uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+			uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 			if (dy < 0x14 || dy >= 0xec) {
-				uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+				uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 				bool right = facing_right();
 				if (right ? dx >= 0xc0 : dx < 0x40) {
 					set_frameset(right ? ADDR_Frameset_69bce : ADDR_Frameset_69bc3);
@@ -264,7 +264,7 @@ void Octohon::big_swim()
 		apply_x_movement(ADDR_Data_60d50);
 		[[fallthrough]];
 	case 2:
-		mem_[wCurObjAction] = 0x81;
+		mem_.cur_obj_action() = 0x81;
 		if (!--state_duration())
 			big_turn();
 		return;

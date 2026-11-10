@@ -84,10 +84,10 @@ void Epilogue::init()
 	wram_.unk_2d013() = 0;
 	wram_.unk_2d014() = 0;
 	wram_.pal_config1_total_steps() = 0;
-	mem_[wPalConfig2TotalSteps] = 0;
+	mem_.pal_config2_total_steps() = 0;
 	uint8_t lcdc = LCDC_BG_ON | LCDC_OBJ_ON | LCDC_OBJ_16 | LCDC_WIN_9C00 | LCDC_ON;
-	mem_[rLCDC] = static_cast<uint8_t>(lcdc ^ mem_[wCollectionRow]);
-	mem_[wCollectionRow] = 0;
+	mem_[rLCDC] = static_cast<uint8_t>(lcdc ^ mem_.collection_row());
+	mem_.collection_row() = 0;
 	++wram_.sub_state();
 }
 
@@ -133,7 +133,7 @@ void Epilogue::end_sub()
 // .asm_af400: once Wario's in the state
 void Epilogue::wait_wario(uint8_t state)
 {
-	if (mem_[wOWUIObj1State] == state)
+	if (mem_.owui_obj1_state() == state)
 		next_sub();
 }
 
@@ -148,8 +148,8 @@ void Epilogue::wait_fade()
 // The HDMA of a block (.asm_af1f2): in OldMan1Gfx's bank
 void Epilogue::hdma(uint8_t bank, uint8_t vram_bank, uint16_t src, uint8_t dest_hi, uint8_t mode)
 {
-	mem_[wHDMADestVRAMBank] = vram_bank;
-	mem_[wHDMABank] = bank;
+	mem_.hdma_dest_vram_bank() = vram_bank;
+	mem_.hdma_bank() = bank;
 	mem_[wHDMA + 0] = static_cast<uint8_t>(src >> 8);
 	mem_[wHDMA + 1] = static_cast<uint8_t>(src);
 	mem_[wHDMA + 2] = dest_hi;
@@ -181,21 +181,21 @@ void Epilogue::step()
 	case 0: next_step(); return;
 	case 1: wait(0x3c); return; // .Func_af197
 	case 2: // .Func_af19c: the old man
-		mem_[wSceneObj9] = 0x60;
+		mem_.scene_obj9() = 0x60;
 		mem_[wSceneObj9 + 1] = 0x50;
 		set_state(wSceneObj9State, 0x18);
 		load_pals();
 		load_gift_pals();
 		wram_.pal_config1_total_steps() = 0;
-		mem_[wPalConfig2TotalSteps] = 0;
+		mem_.pal_config2_total_steps() = 0;
 		next_step();
 		return;
 	case 3: case 13: case 27: SceneCommon(gb_).fade(); return;
 	case 4: music_boxes(); return; // .Func_af7af
 	case 5: case 23: case 29: // .Func_af2d0: to black
-		mem_[w2d880] = 0;
+		mem_.unk_2d880() = 0;
 		wram_.pal_config1_total_steps() = 0;
-		mem_[wPalConfig2TotalSteps] = 0;
+		mem_.pal_config2_total_steps() = 0;
 		next_step();
 		return;
 	case 6: case 24: SceneCommon(gb_).prologue_fade(); return;
@@ -215,7 +215,7 @@ void Epilogue::step()
 	case 20: // .Func_af2c1: the old man's thanks
 		SceneCommon(gb_).print_without_header();
 		old_man_talks();
-		if (mem_[wCurTextLine] == 0x80)
+		if (mem_.cur_text_line() == 0x80)
 			next_step();
 		return;
 	case 21: SceneCommon(gb_).next_page(); return;
@@ -224,20 +224,20 @@ void Epilogue::step()
 		hdma(BANK_PrologueBackgroundGfx, 0, ADDR_PrologueBackgroundGfx, (v0Tiles2 >> 8) - 0x80, 0x80 - 1);
 		return;
 	case 26: // .Func_af2f2: the castle
-		mem_[wSceneObj9] = 0x3c;
+		mem_.scene_obj9() = 0x3c;
 		mem_[wSceneObj9 + 1] = 0xb2;
 		set_state(wSceneObj9State, 0x13);
-		mem_[wOWUIObj1YCoord] = 0x3c;
-		mem_[wOWUIObj1XCoord] = 0xc8;
+		mem_.owui_obj1_y_coord() = 0x3c;
+		mem_.owui_obj1_x_coord() = 0xc8;
 		wario_state(0x1c);
 		for (uint16_t state : {wSceneObj10State, wSceneObj11State, wSceneObj12State, wSceneObj13State})
 			mem_[state] = 0;
-		mem_[wCollectionRow] = 0x08;
+		mem_.collection_row() = 0x08;
 		SceneCommon(gb_).copy_temp_pals();
 		far_pals(BANK_Pals_869cd, ADDR_Pals_869cd, wTempPals1);
 		far_pals(BANK_Pals_86b1d, ADDR_Pals_86b1d, wTempPals2);
 		wram_.pal_config1_total_steps() = 0;
-		mem_[wPalConfig2TotalSteps] = 0;
+		mem_.pal_config2_total_steps() = 0;
 		next_step();
 		return;
 	case 28: thrown_out(); return; // .Func_af436
@@ -258,7 +258,7 @@ void Epilogue::step()
 // .Func_af8bc: the crowd's enemies walking right, while the first walks
 void Epilogue::crowd()
 {
-	if (mem_[wSceneObj10State] != 0x1b)
+	if (mem_.scene_obj10_state() != 0x1b)
 		return;
 	static constexpr struct {
 		uint16_t obj;
@@ -283,9 +283,9 @@ void Epilogue::crowd_start()
 	wram_.scx() = SCREEN_WIDTH_PX;
 	mem_[rSCY] = 0;
 	wram_.scy() = 0;
-	mem_[wOWUIObj1YCoord] = 0x60;
-	mem_[wOWUIObj1XCoord] = 0x5c;
-	mem_[wOWUIObj2YCoord] = 0xff;
+	mem_.owui_obj1_y_coord() = 0x60;
+	mem_.owui_obj1_x_coord() = 0x5c;
+	mem_.owui_obj2_y_coord() = 0xff;
 	wario_state(0x0c);
 	static constexpr struct {
 		uint16_t obj;
@@ -302,9 +302,9 @@ void Epilogue::crowd_start()
 	far_pals(BANK_Pals_86add, ADDR_Pals_86add, wTempPals1);
 	far_pals(BANK_Pals_86add, ADDR_Pals_86b1d, wTempPals2);
 	wram_.pal_config1_total_steps() = 0;
-	mem_[wPalConfig2TotalSteps] = 0;
-	mem_[w2d890] = 0;
-	mem_[w2d891] = 0;
+	mem_.pal_config2_total_steps() = 0;
+	mem_.unk_2d890() = 0;
+	mem_.unk_2d891() = 0;
 	next_step();
 }
 
@@ -312,10 +312,10 @@ void Epilogue::crowd_start()
 // line (by language), at each line's first character
 void Epilogue::old_man_talks()
 {
-	if (!mem_[wPendingCharDest] || mem_[wCurTextLinePos] != 1)
+	if (!mem_.pending_char_dest() || mem_.cur_text_line_pos() != 1)
 		return;
-	uint8_t page = mem_[wPalFade7Colour3RedUnk1];
-	uint8_t line = mem_[wPalFade7Colour3RedSign];
+	uint8_t page = mem_.pal_fade7_colour3_red_unk1();
+	uint8_t line = mem_.pal_fade7_colour3_red_sign();
 	auto talk = [&] { // .asm_af3bf
 		if (line == 1)
 			set_state(wSceneObj9State, 0x0b);
@@ -357,14 +357,14 @@ void Epilogue::music_boxes()
 			wSceneObj8Attributes, wSceneObj1Attributes})
 			mem_[a] = attributes;
 		if (started) {
-			mem_[w2d8a0] = 0x01;
+			mem_.unk_2d8a0() = 0x01;
 			next_sub();
 		}
 	};
 	auto turn = [this](uint8_t state, uint8_t dx) { // .Func_af82d and the like
 		set_state(wSceneObj9State, state);
-		mem_[wSceneObj9XCoord] -= dx;
-		mem_[wSceneObj1State] = 0; // .asm_af839
+		mem_.scene_obj9_x_coord() -= dx;
+		mem_.scene_obj1_state() = 0; // .asm_af839
 		load_pals();
 		next_sub();
 	};
@@ -372,7 +372,7 @@ void Epilogue::music_boxes()
 		if (mem_[SUB_FRAMES] < 0x50)
 			return;
 		set_state(wSceneObj9State, state);
-		mem_[wSceneObj9XCoord] = x;
+		mem_.scene_obj9_x_coord() = x;
 		load_gift_pals();
 		SceneCommon(gb_).set_pal_config(wPalConfig2, ADDR_Data_aca04);
 		next_sub();
@@ -388,7 +388,7 @@ void Epilogue::music_boxes()
 		return;
 	case 1: boxes(0x04, true); return; // .Func_af7fd
 	case 2: case 8: case 14: // .Func_af816: once the light's down
-		if (mem_[wSceneObj1YCoord] < 0x50)
+		if (mem_.scene_obj1_y_coord() < 0x50)
 			return;
 		play_sfx(mem_, SFX_0EB);
 		SceneCommon(gb_).copy_temp_pals();
@@ -422,7 +422,7 @@ void Epilogue::music_boxes()
 void Epilogue::transformation()
 {
 	auto walk = [this] { // .Func_af7a7
-		Byte x = mem_[wSceneObj9XCoord];
+		Byte x = mem_.scene_obj9_x_coord();
 		++x;
 		return static_cast<uint8_t>(x & 0xfe);
 	};
@@ -433,7 +433,7 @@ void Epilogue::transformation()
 		if (frames < 0x3c)
 			return;
 		set_state(wSceneObj9State, 0x08);
-		mem_[wSceneObj9] = 0x60;
+		mem_.scene_obj9() = 0x60;
 		mem_[wSceneObj9 + 1] = 0x80;
 		next_sub();
 		return;
@@ -458,7 +458,7 @@ void Epilogue::transformation()
 		next_sub();
 		return;
 	case 4: // .Func_af797
-		if (mem_[wSceneObj9State] == 0x0a)
+		if (mem_.scene_obj9_state() == 0x0a)
 			next_sub();
 		return;
 	case 5: // .Func_af7a0
@@ -496,15 +496,15 @@ void Epilogue::leave_on_gift()
 	case 2: // .Func_af6c1
 		if (frames < 0x3c)
 			return;
-		mem_[w2d150] = 0x01;
+		mem_.unk_2d150() = 0x01;
 		next_sub();
 		return;
 	case 3: // .Func_af6cd: the gift, over Wario
 		if (frames < 0x28)
 			return;
-		mem_[w2d150] = 0x80;
-		mem_[wCurSceneObj] = static_cast<uint8_t>(mem_[wOWUIObj1YCoord] - 4);
-		mem_[wCurSceneObj + 1] = mem_[wOWUIObj1XCoord];
+		mem_.unk_2d150() = 0x80;
+		mem_.cur_scene_obj() = static_cast<uint8_t>(mem_.owui_obj1_y_coord() - 4);
+		mem_[wCurSceneObj + 1] = mem_.owui_obj1_x_coord();
 		set_state(wCurSceneObjState, 0x11);
 		next_sub();
 		return;
@@ -519,7 +519,7 @@ void Epilogue::leave_on_gift()
 			next_sub();
 		return;
 	case 6: { // .Func_af700: the gift rises, slowly then fast
-		Byte y = mem_[wCurSceneObj];
+		Byte y = mem_.cur_scene_obj();
 		if (y >= 0x50) {
 			if (!(frames & 0x03))
 				--y;
@@ -527,12 +527,12 @@ void Epilogue::leave_on_gift()
 		}
 		y -= 3;
 		if (y < 0x18) {
-			mem_[wCurSceneObjState] = 0;
-			mem_[w2d891] = 0; // Func_ae1ce: the next step
-			++mem_[w2d890];
+			mem_.cur_scene_obj_state() = 0;
+			mem_.unk_2d891() = 0; // Func_ae1ce: the next step
+			++mem_.unk_2d890();
 			return;
 		}
-		if (y >= 0x40 || mem_[wCurSceneObjState] == 0x12)
+		if (y >= 0x40 || mem_.cur_scene_obj_state() == 0x12)
 			return;
 		set_state(wCurSceneObjState, 0x12);
 		set_state(wSceneObj9State, 0x0a);
@@ -563,33 +563,33 @@ void Epilogue::thrown_out()
 		next_sub();
 	};
 	auto treasure_at = [this](uint8_t dy, uint8_t dx) { // .asm_af50a
-		mem_[wSceneObj9] = static_cast<uint8_t>(mem_[wOWUIObj1YCoord] + dy);
-		mem_[wSceneObj9 + 1] = static_cast<uint8_t>(mem_[wOWUIObj1XCoord] + dx);
+		mem_.scene_obj9() = static_cast<uint8_t>(mem_.owui_obj1_y_coord() + dy);
+		mem_[wSceneObj9 + 1] = static_cast<uint8_t>(mem_.owui_obj1_x_coord() + dx);
 	};
 	switch (s) {
 	case 0: // .Func_af466
-		mem_[wPalFade2Colour2GreenUnk1] = 0;
-		mem_[w2d892] = 0;
-		mem_[wTempleRock5Action] = 0;
-		mem_[wPalFade2Colour4GreenSign] = 0;
+		mem_.pal_fade2_colour2_green_unk1() = 0;
+		mem_.unk_2d892() = 0;
+		mem_.temple_rock5_action() = 0;
+		mem_.pal_fade2_colour4_green_sign() = 0;
 		next_sub();
 		return;
 	case 1: // .Func_af476: Wario thrown
 		if (frames < 0x40)
 			return;
-		mem_[w2d892] = 0x01;
+		mem_.unk_2d892() = 0x01;
 		play_sfx(mem_, SFX_THROW);
 		next_sub();
 		return;
 	case 2: // .Func_af48a: and the treasure
 		if (frames < 0x56)
 			return;
-		mem_[wTempleRock5Action] = 0x01;
+		mem_.temple_rock5_action() = 0x01;
 		play_sfx(mem_, SFX_THROW);
 		next_sub();
 		return;
 	case 3: // .Func_af49e
-		if (mem_[w2d892] == 0x80 && mem_[wTempleRock5Action] == 0x80)
+		if (mem_.unk_2d892() == 0x80 && mem_.temple_rock5_action() == 0x80)
 			next_sub();
 		return;
 	case 4: after(0x3c, 0x05); return; // .Func_af4ad
@@ -600,12 +600,12 @@ void Epilogue::thrown_out()
 		if (frames < 0x2d)
 			return;
 		wario_state(0x0b);
-		mem_[wSceneObj9Unk7] = 0;
+		mem_.scene_obj9_unk7() = 0;
 		play_sfx(mem_, SFX_GRAB);
 		next_sub();
 		return;
 	case 9: // .Func_af4e7
-		if (mem_[wSceneObj9Unk7] == 0x80 && mem_[wOWUIObj1State] == 0x0a)
+		if (mem_.scene_obj9_unk7() == 0x80 && mem_.owui_obj1_state() == 0x0a)
 			next_sub();
 		return;
 	case 10: // .Func_af4f6: lifting it
@@ -620,7 +620,7 @@ void Epilogue::thrown_out()
 		return;
 	case 11: after(0x32, 0x21); return; // .Func_af528
 	case 12: // .Func_af534
-		if (mem_[wOWUIObj1Frame] != 0x0b)
+		if (mem_.owui_obj1_frame() != 0x0b)
 			return;
 		play_sfx(mem_, SFX_106);
 		next_sub();
@@ -630,17 +630,17 @@ void Epilogue::thrown_out()
 		if (frames < 0x32)
 			return;
 		wario_state(0x09);
-		mem_[wSceneObj9Unk7] = 0;
+		mem_.scene_obj9_unk7() = 0;
 		next_sub();
 		return;
 	case 15: { // .Func_af55a: off left, carrying it
-		--mem_[wOWUIObj1XCoord]; // Func_aca63
-		uint8_t x = mem_[wOWUIObj1XCoord];
-		mem_[wSceneObj9XCoord] = static_cast<uint8_t>(x - 4);
+		--mem_.owui_obj1_x_coord(); // Func_aca63
+		uint8_t x = mem_.owui_obj1_x_coord();
+		mem_.scene_obj9_x_coord() = static_cast<uint8_t>(x - 4);
 		if (x != 0xf0)
 			return;
-		mem_[wOWUIObj1State] = 0;
-		mem_[wSceneObj9State] = 0;
+		mem_.owui_obj1_state() = 0;
+		mem_.scene_obj9_state() = 0;
 		next_sub();
 		return;
 	}
@@ -658,41 +658,41 @@ void Epilogue::thrown_out()
 // and his bounces (w2d892's steps)
 void Epilogue::bounce_wario()
 {
-	if (mem_[wPalFade2Colour2GreenUnk1] && (mem_[SUB_FRAMES] & 0x03)) {
+	if (mem_.pal_fade2_colour2_green_unk1() && (mem_[SUB_FRAMES] & 0x03)) {
 		if (home::apply_ow_movement(gb_, wOWUIObj1YCoord, ADDR_Data_aed06, true).finished)
-			mem_[wPalFade2Colour2GreenUnk1] = 0;
+			mem_.pal_fade2_colour2_green_unk1() = 0;
 	}
-	Byte action = mem_[w2d892];
+	Byte action = mem_.unk_2d892();
 	if (action == 0x80)
 		return;
 	auto next = [&] { // .asm_af5bc
 		++action;
-		mem_[w2d893] = 0;
+		mem_.unk_2d893() = 0;
 	};
 	switch (action) {
 	case 0: return;
 	case 1: // .Func_af5b3
-		mem_[wPalFade2Colour2GreenUnk1] = 0x01;
-		mem_[wSceneWarioUnk7] = 0;
+		mem_.pal_fade2_colour2_green_unk1() = 0x01;
+		mem_.scene_wario_unk7() = 0;
 		next();
 		return;
 	case 2: case 4: case 6: // .Func_af5c5: landing
-		if (mem_[wOWUIObj1YCoord] != 0x60)
+		if (mem_.owui_obj1_y_coord() != 0x60)
 			return;
 		wario_state(0x1b);
 		play_sfx(mem_, SFX_BUMP);
 		next();
 		return;
 	case 3: case 5: // .Func_af5d5
-		if (++mem_[w2d893] >= 4)
+		if (++mem_.unk_2d893() >= 4)
 			next();
 		return;
 	case 7: // .Func_af5df
-		if (mem_[wOWUIObj1State] == 0x1c)
+		if (mem_.owui_obj1_state() == 0x1c)
 			next();
 		return;
 	case 8: // .Func_af5e7
-		if (++mem_[w2d893] < 0x42)
+		if (++mem_.unk_2d893() < 0x42)
 			return;
 		wario_state(0x0c);
 		play_sfx(mem_, SFX_12A);
@@ -706,32 +706,32 @@ void Epilogue::bounce_wario()
 // .Func_af60d: the treasure's flight and bounces
 void Epilogue::bounce_treasure()
 {
-	if (mem_[wPalFade2Colour4GreenSign]) {
+	if (mem_.pal_fade2_colour4_green_sign()) {
 		if (home::apply_ow_movement(gb_, wSceneObj9, ADDR_Data_aed06, true).finished)
-			mem_[wPalFade2Colour4GreenSign] = 0;
+			mem_.pal_fade2_colour4_green_sign() = 0;
 	}
-	Byte action = mem_[wTempleRock5Action];
+	Byte action = mem_.temple_rock5_action();
 	if (action == 0x80)
 		return;
 	auto next = [&] { // .asm_af643
 		++action;
-		mem_[wTempleRock5Counter] = 0;
+		mem_.temple_rock5_counter() = 0;
 	};
 	switch (action) {
 	case 0: return;
 	case 1: // .Func_af63a
-		mem_[wPalFade2Colour4GreenSign] = 0x01;
-		mem_[wSceneObj9Unk7] = 0;
+		mem_.pal_fade2_colour4_green_sign() = 0x01;
+		mem_.scene_obj9_unk7() = 0;
 		next();
 		return;
 	case 2: case 4: case 6: // .Func_af64c
-		if (mem_[wSceneObj9YCoord] != 0x60)
+		if (mem_.scene_obj9_y_coord() != 0x60)
 			return;
 		play_sfx(mem_, SFX_BUMP);
 		next();
 		return;
 	case 3: case 5: // .Func_af657
-		if (++mem_[wTempleRock5Counter] >= 4)
+		if (++mem_.temple_rock5_counter() >= 4)
 			next();
 		return;
 	case 7: action = 0x80; return; // .Func_af661

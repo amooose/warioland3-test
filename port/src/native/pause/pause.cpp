@@ -98,8 +98,8 @@ void PauseMenu::return_from_action_help()
 
 void PauseMenu::init_menu()
 {
-	mem_[hSFXID + 0] = 0xff; // stop_sfx
-	mem_[hSFXID + 1] = 0x00;
+	mem_.sfx().hi() = 0xff; // stop_sfx
+	mem_.sfx().lo() = 0x00;
 	play_music(mem_, MUSIC_PAUSE_MENU);
 	wram_.pause_menu_selection() = PAUSEMENU_RETURN;
 	wram_.room_animated_tiles_enabled() = 0;

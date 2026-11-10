@@ -34,19 +34,19 @@ public:
 	{
 		Memory mem(gb_);
 		mem[rWBK] = 0x02; // BANK("WRAM2")
-		mem[rSCY] = mem[wSCY];
-		mem[rSCX] = mem[wSCX];
-		mem[rWY] = mem[wCutsceneWY];
-		mem[rWX] = mem[wCutsceneWX];
-		if (uint8_t flip = mem[wLCDCFlagsToFlip]) {
+		mem[rSCY] = mem.scy();
+		mem[rSCX] = mem.scx();
+		mem[rWY] = mem.cutscene_wy();
+		mem[rWX] = mem.cutscene_wx();
+		if (uint8_t flip = mem.lcdc_flags_to_flip()) {
 			mem[rLCDC] = static_cast<uint8_t>(mem[rLCDC] ^ flip);
-			mem[wLCDCFlagsToFlip] = 0;
+			mem.lcdc_flags_to_flip() = 0;
 		}
-		uint8_t rom = mem[wROMBank];
+		uint8_t rom = mem.rom_bank();
 		bankswitch(BANK_ApplyPalConfig1);
-		if (mem[wPalConfig1Register])
+		if (mem.pal_config1_register())
 			home::apply_pal_config(gb_, wPalConfig1);
-		if (mem[wPalConfig2])
+		if (mem.pal_config2())
 			home::apply_pal_config(gb_, wPalConfig2);
 		bankswitch(rom);
 		mem[rVBK] = 0;

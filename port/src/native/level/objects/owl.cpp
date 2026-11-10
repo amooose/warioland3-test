@@ -43,9 +43,9 @@ void Owl::init()
 {
 	flags() = (flags() & ~OBJFLAG_INVISIBLE) | OBJFLAG_NO_COLLISION;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 0x06;
-	mem_[wCurObjCollBoxLeft] = 0xf9;
-	mem_[wCurObjCollBoxBottom] = 0xfe;
+	mem_.cur_obj_coll_box_right() = 0x06;
+	mem_.cur_obj_coll_box_left() = 0xf9;
+	mem_.cur_obj_coll_box_bottom() = 0xfe;
 	if (!(wram_.day_night() & 1)) {
 		set_update(SLEEP);
 		set_frameset(ADDR_Frameset_692e7);
@@ -94,7 +94,7 @@ void Owl::fly_upwards()
 	state_duration() = 30;
 	set_update(FLYING);
 	set_interaction(OBJ_INTERACTION_OWL);
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	face(static_cast<uint8_t>(screen_x() + 0x2a) < wario);
 }
 

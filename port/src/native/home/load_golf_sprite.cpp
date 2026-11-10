@@ -14,7 +14,7 @@ void start_golf_vdma(GB *gb, uint16_t src)
 	mem[rVDMA_SRC_LOW] = static_cast<uint8_t>(src);
 	mem[rVDMA_DEST_HIGH] = mem[wdc11 + 0];
 	mem[rVDMA_DEST_LOW] = mem[wdc11 + 1];
-	mem[rVDMA_LEN] = mem[w1dc13];
+	mem[rVDMA_LEN] = mem.unk_1dc13();
 }
 
 void copy_golf_bg_pals(GB *gb, uint16_t src)
@@ -30,12 +30,12 @@ namespace {
 // HoldGolfWarioLastFrame: the states that stay on their last frame
 void hold_golf_wario_last_frame(Memory mem)
 {
-	uint8_t state = mem[wGolfWarioState];
+	uint8_t state = mem.golf_wario_state();
 	if (state != GOLF_WARIO_CHARGING && state != GOLF_WARIO_ATTACKING_1 && state != GOLF_WARIO_MISSING &&
 		state != GOLF_WARIO_TURNING)
 		return;
-	mem[wGolfCounter] = static_cast<uint8_t>(mem[wGolfCounter] + 1);
-	mem[wGolfWarioCurrentFrame] = mem[wGolfAnimLastFrame];
+	mem.golf_counter() = static_cast<uint8_t>(mem.golf_counter() + 1);
+	mem.golf_wario_current_frame() = mem.golf_anim_last_frame();
 }
 
 } // namespace
@@ -47,29 +47,29 @@ void update_golf_wario_animation(GB *gb)
 	static constexpr uint16_t FRAMESETS = ADDR_UpdateGolfWarioAnimation + 0xb1;
 	Memory mem(gb);
 	Routines routines(gb);
-	uint8_t state = mem[wGolfWarioState];
+	uint8_t state = mem.golf_wario_state();
 	uint8_t oam_bank = mem[static_cast<uint16_t>(OAM_BANKS + state)];
-	mem[wTempBank] = oam_bank;
+	mem.temp_bank() = oam_bank;
 
-	uint8_t entry = mem[wGolfWarioDir] ? static_cast<uint8_t>(state + NUM_GOLF_WARIO_STATES) : state;
+	uint8_t entry = mem.golf_wario_dir() ? static_cast<uint8_t>(state + NUM_GOLF_WARIO_STATES) : state;
 	entry = static_cast<uint8_t>(entry << 1);
 	uint16_t oam = static_cast<uint16_t>(OAM_TABLE + entry);
 	mem[wGolfOAMPtr + 1] = mem[oam];
 	mem[wGolfOAMPtr + 0] = mem[static_cast<uint16_t>(oam + 1)];
 	uint16_t frameset = mem.word(static_cast<uint16_t>(FRAMESETS + entry));
 
-	uint8_t bank = mem[wROMBank];
-	routines.switch_bank(mem[wTempBank]);
+	uint8_t bank = mem.rom_bank();
+	routines.switch_bank(mem.temp_bank());
 	bool finished = update_golf_object_animation(gb, frameset, wGolfWarioDuration);
-	mem[wHasGolfWarioAnimationFinished] = finished;
+	mem.has_golf_wario_animation_finished() = finished;
 	routines.switch_bank(bank);
 
-	if (mem[wHasGolfWarioAnimationFinished])
+	if (mem.has_golf_wario_animation_finished())
 		hold_golf_wario_last_frame(mem);
-	mem[wGolfWarioFrame] = mem[wGolfWarioCurrentFrame];
+	mem.golf_wario_frame() = mem.golf_wario_current_frame();
 
-	bank = mem[wROMBank];
-	routines.switch_bank(mem[wTempBank]);
+	bank = mem.rom_bank();
+	routines.switch_bank(mem.temp_bank());
 	load_golf_sprite(gb, wGolfWarioSprite);
 	routines.switch_bank(bank);
 }

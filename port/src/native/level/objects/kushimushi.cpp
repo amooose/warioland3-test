@@ -57,9 +57,9 @@ void Kushimushi::init_vertical()
 	var1() = 0;
 	var2() = 0;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 3;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-4);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-3);
+	mem_.cur_obj_coll_box_right() = 3;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-4);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-3);
 }
 
 void Kushimushi::init_horizontal()
@@ -71,9 +71,9 @@ void Kushimushi::init_horizontal()
 	var1() = 0;
 	var2() = 0;
 	substate() = (substate() & ~OBJSUBFLAG_UNINITIALISED) | OBJSUBFLAG_HDIR;
-	mem_[wCurObjCollBoxRight] = 4;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-5);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-4);
+	mem_.cur_obj_coll_box_right() = 4;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-5);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-4);
 }
 
 // knocked off by Wario: routine (Func_33f8 and the like) takes over
@@ -123,7 +123,7 @@ void Kushimushi::patrol(bool horizontal)
 			frame_duration() = 2;
 		return;
 	}
-	if (mem_[wGlobalCounter] & 1)
+	if (mem_.global_counter() & 1)
 		return;
 	uint8_t leg = var1();
 	if (leg > 3)

@@ -33,10 +33,10 @@ void Palettes::unrealistic()
 // at steps. Whether it's still short of 0x20 steps (the asm's carry).
 bool Palettes::fade_pal_config(uint16_t steps)
 {
-	Byte total = mem_[wCurPalTotalSteps];
+	Byte total = mem_.cur_pal_total_steps();
 	total = mem_[steps];
 	do {
-		uint16_t config = mem_[wPalConfigToFade] ? wPalConfig2Number : wPalConfig1Number;
+		uint16_t config = mem_.pal_config_to_fade() ? wPalConfig2Number : wPalConfig1Number;
 		uint8_t colours = rotate_left(mem_[config], 2); // palettes * 4
 		uint8_t hi = mem_[config + 1];
 		uint8_t e = mem_[config + 2];
@@ -76,7 +76,7 @@ bool Palettes::fade_pal_config(uint16_t steps)
 			target_hi = HIGH_TEMP_PALS1; // the asm resets d to wTempPals1's page
 		} while (--colours);
 		++total;
-		Byte repeat = mem_[wPalFadeRepeat];
+		Byte repeat = mem_.pal_fade_repeat();
 		--repeat;
 		if (!repeat)
 			break;
@@ -97,27 +97,27 @@ bool Palettes::fade_pal_config(uint16_t steps)
 // FadeBGPalConfig: wPalConfig1, fast (4 steps a frame) outside events
 bool Palettes::fade_bg()
 {
-	mem_[wPalConfig1Register] = static_cast<uint8_t>(rBGPI);
-	mem_[wPalConfigToFade] = 0;
-	mem_[wPalFadeRepeat] = wram_.cur_event() ? 1 : 4;
+	mem_.pal_config1_register() = static_cast<uint8_t>(rBGPI);
+	mem_.pal_config_to_fade() = 0;
+	mem_.pal_fade_repeat() = wram_.cur_event() ? 1 : 4;
 	return fade_pal_config(wPalConfig1TotalSteps);
 }
 
 // Func_851bc: wPalConfig1, slowly
 bool Palettes::fade_bg_slow()
 {
-	mem_[wPalConfig1Register] = static_cast<uint8_t>(rBGPI);
-	mem_[wPalConfigToFade] = 0;
-	mem_[wPalFadeRepeat] = 1;
+	mem_.pal_config1_register() = static_cast<uint8_t>(rBGPI);
+	mem_.pal_config_to_fade() = 0;
+	mem_.pal_fade_repeat() = 1;
 	return fade_pal_config(wPalConfig1TotalSteps);
 }
 
 // Func_851d1: wPalConfig2, slowly
 bool Palettes::fade_ob_slow()
 {
-	mem_[wPalConfig2Register] = static_cast<uint8_t>(rOBPI);
-	mem_[wPalConfigToFade] = 1;
-	mem_[wPalFadeRepeat] = 1;
+	mem_.pal_config2_register() = static_cast<uint8_t>(rOBPI);
+	mem_.pal_config_to_fade() = 1;
+	mem_.pal_fade_repeat() = 1;
 	return fade_pal_config(wPalConfig2TotalSteps);
 }
 
@@ -137,21 +137,20 @@ bool Palettes::fade_in_level_name()
 {
 	bool going = true;
 	if (!wram_.pal_config1_total_steps()) { // start it
-		mem_[w2d0e0] = 0x02;
+		mem_.unk_2d0e0() = 0x02;
 		routines_.copy(wTempPals1 + 7 * PAL_SIZE, wTempBGPals + 7 * PAL_SIZE, PAL_SIZE);
-		if (mem_[w2d0e4])
+		if (mem_.unk_2d0e4())
 			routines_.copy(ADDR_Pals_852dd + COLOR_SIZE, wTempPals1 + 7 * PAL_SIZE + COLOR_SIZE, 6);
 		else
-			routines_.copy((mem_[w2d011] ? ADDR_Pals_840c0 : ADDR_Pals_84000) + 7 * PAL_SIZE,
+			routines_.copy((mem_.unk_2d011() ? ADDR_Pals_840c0 : ADDR_Pals_84000) + 7 * PAL_SIZE,
 				wTempPals1 + 7 * PAL_SIZE, PAL_SIZE);
 		config(wPalConfig1, wTempBGPals + 7 * PAL_SIZE, OBPI_AUTOINC | (7 * PAL_SIZE), 1);
 		++wram_.pal_config1_total_steps();
 	} else if (!fade_bg()) { // done
 		wram_.pal_config1_total_steps() = 0;
-		mem_[w2d0e0] = 0x01;
+		mem_.unk_2d0e0() = 0x01;
 		going = false;
 	}
-	gb_->cpu.c = going;
 	return going;
 }
 
@@ -159,7 +158,7 @@ bool Palettes::fade_in_level_name()
 // bar's busy
 void Palettes::fade_out_level_name()
 {
-	if (mem_[w2d0e0] != 0x03 || wram_.bottom_bar_action())
+	if (mem_.unk_2d0e0() != 0x03 || wram_.bottom_bar_action())
 		return;
 	if (!wram_.pal_config1_total_steps()) {
 		routines_.copy(wTempPals1 + 7 * PAL_SIZE + COLOR_SIZE, wTempBGPals + 7 * PAL_SIZE + COLOR_SIZE, 6);
@@ -172,7 +171,7 @@ void Palettes::fade_out_level_name()
 	if (fade_bg())
 		return;
 	wram_.pal_config1_total_steps() = 0;
-	mem_[w2d0e0] = 0;
+	mem_.unk_2d0e0() = 0;
 }
 
 // The fades of all the palettes (Func_84e43, Func_84fff, Func_85145,
@@ -198,7 +197,7 @@ void Palettes::func_84e43()
 	SET_HL(gb_, wPalConfig1TotalSteps); // as the asm leaves it (Func_ac9ca, in C, passes it on)
 	if (fade_all(true)) {
 		wram_.pal_config1_total_steps() = 0;
-		mem_[wPalConfig2TotalSteps] = 0;
+		mem_.pal_config2_total_steps() = 0;
 	}
 }
 
@@ -207,8 +206,8 @@ void Palettes::func_84e43()
 void Palettes::next_w2d013()
 {
 	wram_.pal_config1_total_steps() = 0;
-	mem_[w2d014] = 0;
-	++mem_[w2d013];
+	mem_.unk_2d014() = 0;
+	++mem_.unk_2d013();
 }
 
 void Palettes::func_84fff()
@@ -240,18 +239,18 @@ void Palettes::func_85046()
 // Func_850b9: the objects' palettes from white
 void Palettes::func_850b9()
 {
-	if (mem_[wPalConfig2TotalSteps]) {
+	if (mem_.pal_config2_total_steps()) {
 		if (fade_ob_slow())
 			return;
-		mem_[wPalConfig2TotalSteps] = 0;
-		mem_[w2d014] = 0;
-		++mem_[w2d013];
+		mem_.pal_config2_total_steps() = 0;
+		mem_.unk_2d014() = 0;
+		++mem_.unk_2d013();
 		return;
 	}
 	routines_.copy(wTempPals2, wTempOBPals, 8 * PAL_SIZE);
 	for (uint16_t i = 0; i < 8 * PAL_SIZE; i++)
 		mem_[wTempPals2 + i] = 0xff;
-	++mem_[wPalConfig2TotalSteps];
+	++mem_.pal_config2_total_steps();
 	config(wPalConfig2, wTempOBPals, OBPI_AUTOINC | 0, 8);
 }
 
@@ -300,7 +299,7 @@ void Palettes::star_indicator_pals()
 {
 	routines_.copy(ADDR_Pals_848e0, wTempPals2 + 4 * PAL_SIZE, 2 * PAL_SIZE);
 	config(wPalConfig1, wTempPals2 + 4 * PAL_SIZE, OBPI_AUTOINC | (4 * PAL_SIZE), 2);
-	mem_[wPalConfig1Register] = static_cast<uint8_t>(rOBPI);
+	mem_.pal_config1_register() = static_cast<uint8_t>(rOBPI);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +312,7 @@ void Palettes::star_indicator_pals()
 // dest (base or target): red, green, blue a struct apart
 void Palettes::to_fade_structs(uint16_t src, uint16_t dest)
 {
-	Byte count = mem_[w2d807];
+	Byte count = mem_.unk_2d807();
 	count = FADE_COLOURS;
 	do {
 		uint8_t lo = mem_[src++];
@@ -331,7 +330,7 @@ void Palettes::to_fade_structs(uint16_t src, uint16_t dest)
 // InitColourFadeStructs: each struct's direction and distance
 void Palettes::init_fade_structs()
 {
-	Byte count = mem_[w2d807];
+	Byte count = mem_.unk_2d807();
 	count = FADE_COLOURS * 3;
 	uint16_t s = wFadePals;
 	do {
@@ -357,7 +356,7 @@ void Palettes::init_fade_structs()
 // ApplyPalFadeColours: the structs' current colours to wTempBGPals
 void Palettes::apply_fade_structs()
 {
-	Byte count = mem_[w2d807];
+	Byte count = mem_.unk_2d807();
 	count = FADE_COLOURS;
 	uint16_t s = wFadePals + FADE_CURRENT;
 	uint16_t dest = wTempBGPals;
@@ -379,8 +378,8 @@ void Palettes::apply_fade_structs()
 // DayNightTransition.AdvanceTable
 void Palettes::next_transition()
 {
-	mem_[wOWPalTransitionCounter] = 0;
-	++mem_[wOWPalTransitionState];
+	mem_.ow_pal_transition_counter() = 0;
+	++mem_.ow_pal_transition_state();
 }
 
 // GetOWPals: the entry of OWPals for the time of day, the map side (or
@@ -396,7 +395,7 @@ uint16_t Palettes::ow_pals(uint8_t which)
 			side = 5;
 	}
 	uint8_t e = rotate_left(side, 4);
-	uint8_t time = rotate_right(rotate_left(mem_[w2d011], 4), 1);
+	uint8_t time = rotate_right(rotate_left(mem_.unk_2d011(), 4), 1);
 	return static_cast<uint16_t>(ADDR_OWPals + static_cast<uint8_t>(time | e | c));
 }
 
@@ -410,8 +409,8 @@ void Palettes::load_base_and_target(uint8_t which)
 	to_fade_structs(base, wFadePals + FADE_BASE);
 	init_fade_structs();
 	routines_.copy(base, wTempBGPals, 8 * PAL_SIZE);
-	mem_[wDayNightTransistionSteps] = TRANSITION_STEPS;
-	mem_[w2d809] = 0;
+	mem_.day_night_transistion_steps() = TRANSITION_STEPS;
+	mem_.unk_2d809() = 0;
 }
 
 // VBlank_OWPalTransition: its V-Blank function, the palettes each frame,
@@ -439,28 +438,28 @@ void Palettes::start_transition()
 // map's state 0x0b skips it
 void Palettes::fade_colours()
 {
-	if (mem_[wSubState] == SST_OVERWORLD_0B) {
-		uint8_t pressed = mem_[wJoypadPressed];
-		if ((pressed & (1 << B_PAD_B)) || (mem_[wOWAllowedDPadInput] & pressed)) {
+	if (mem_.sub_state() == SST_OVERWORLD_0B) {
+		uint8_t pressed = mem_.joypad_pressed();
+		if ((pressed & (1 << B_PAD_B)) || (mem_.ow_allowed_d_pad_input() & pressed)) {
 			skip_transition();
 			return;
 		}
 	}
-	if (mem_[wOWPalTransitionCounter] < mem_[w2d809])
+	if (mem_.ow_pal_transition_counter() < mem_.unk_2d809())
 		return;
-	mem_[wOWPalTransitionCounter] = 0;
-	Byte count = mem_[w2d807];
+	mem_.ow_pal_transition_counter() = 0;
+	Byte count = mem_.unk_2d807();
 	count = FADE_COLOURS * 3;
 	uint16_t s = wFadePals;
 	do {
 		uint8_t sign = mem_[s + FADE_SIGN];
 		if (sign) {
 			uint8_t step = sign == 1 ? 1 : 0xff;
-			mem_[wColourFadeStep] = step;
+			mem_.colour_fade_step() = step;
 			uint8_t diff = mem_[s + FADE_DIFF];
-			mem_[wColourFadeDiff] = diff;
+			mem_.colour_fade_diff() = diff;
 			uint8_t accumulated = mem_[s + FADE_ACCUMULATOR];
-			mem_[wColourFadeAccumulator] = accumulated;
+			mem_.colour_fade_accumulator() = accumulated;
 			uint8_t sum = static_cast<uint8_t>(accumulated + diff);
 			if (sum >= TRANSITION_STEPS) {
 				mem_[s + FADE_ACCUMULATOR] = static_cast<uint8_t>(sum - TRANSITION_STEPS);
@@ -473,7 +472,7 @@ void Palettes::fade_colours()
 		--count;
 	} while (count);
 	apply_fade_structs();
-	Byte steps = mem_[wDayNightTransistionSteps];
+	Byte steps = mem_.day_night_transistion_steps();
 	--steps;
 	if (!steps)
 		next_transition();
@@ -483,22 +482,22 @@ void Palettes::fade_colours()
 void Palettes::skip_transition()
 {
 	routines_.copy(wTempPals1, wTempBGPals, 8 * PAL_SIZE);
-	mem_[wDayNightTransistionSteps] = 0;
-	mem_[wOWPalTransitionCounter] = 0;
-	mem_[wOWPalTransitionState] = mem_[w2d011] ? 0x04 : 0x06;
+	mem_.day_night_transistion_steps() = 0;
+	mem_.ow_pal_transition_counter() = 0;
+	mem_.ow_pal_transition_state() = mem_.unk_2d011() ? 0x04 : 0x06;
 }
 
 // DayNightTransition.SwitchDayNight
 void Palettes::switch_day_night()
 {
-	uint8_t night = mem_[w2d011] ^ 1;
-	mem_[w2d011] = night;
-	Byte day_night = mem_[wDayNight];
+	uint8_t night = mem_.unk_2d011() ^ 1;
+	mem_.unk_2d011() = night;
+	Byte day_night = mem_.day_night();
 	day_night = static_cast<uint8_t>(((day_night >> 1) << 1 | (night & 1)) & 0x7f);
 	home::play_overworld_music(gb_);
-	mem_[w2d0e3] = 0;
-	mem_[wOWPalTransitionState] = 0;
-	mem_[wOWPalTransitionCounter] = 0;
+	mem_.unk_2d0e3() = 0;
+	mem_.ow_pal_transition_state() = 0;
+	mem_.ow_pal_transition_counter() = 0;
 }
 
 // DayNightTransition: the map fading from day to night (through two
@@ -507,19 +506,19 @@ void Palettes::day_night()
 {
 	auto fade_until = [this](uint8_t steps) { // and from there, every frame
 		fade_colours();
-		if (mem_[wDayNightTransistionSteps] == steps)
-			mem_[w2d809] = 0;
+		if (mem_.day_night_transistion_steps() == steps)
+			mem_.unk_2d809() = 0;
 	};
 
-	++mem_[wOWPalTransitionCounter];
-	uint8_t state = mem_[wOWPalTransitionState];
-	if (mem_[w2d011]) { // .NightToDayTable
+	++mem_.ow_pal_transition_counter();
+	uint8_t state = mem_.ow_pal_transition_state();
+	if (mem_.unk_2d011()) { // .NightToDayTable
 		switch (state) {
 		case 0: // .InitNightToDay
 			start_transition();
-			mem_[w2d07c] = 0;
-			mem_[w2d07d] = 0;
-			mem_[w2d809] = 0;
+			mem_.unk_2d07c() = 0;
+			mem_.unk_2d07d() = 0;
+			mem_.unk_2d809() = 0;
 			return;
 		case 1: fade_until(10); return; // .FadeDayToPal1
 		case 2: load_base_and_target(1); next_transition(); return; // .LoadPal1
@@ -531,9 +530,9 @@ void Palettes::day_night()
 	switch (state) {
 	case 0: // .InitDayToNight
 		start_transition();
-		mem_[w2d07c] = 0x01;
-		mem_[w2d07d] = 0;
-		mem_[w2d809] = 0;
+		mem_.unk_2d07c() = 0x01;
+		mem_.unk_2d07d() = 0;
+		mem_.unk_2d809() = 0;
 		return;
 	case 1: case 5: fade_colours(); return;
 	case 2: load_base_and_target(1); next_transition(); return; // .LoadPal1_Day
@@ -549,41 +548,41 @@ void Palettes::day_night()
 void Palettes::to_daytime()
 {
 	auto wait = [this](uint8_t frames) {
-		if (mem_[wOWPalTransitionCounter] >= frames)
+		if (mem_.ow_pal_transition_counter() >= frames)
 			next_transition();
 	};
 
-	++mem_[wOWPalTransitionCounter];
-	switch (mem_[wOWPalTransitionState]) {
+	++mem_.ow_pal_transition_counter();
+	switch (mem_.ow_pal_transition_state()) {
 	case 0: // .Func_84bad
 		start_transition();
-		mem_[w2d809] = 0x03;
+		mem_.unk_2d809() = 0x03;
 		return;
 	case 1: wait(4); return; // .Func_84bb6
 	case 2: // .Func_84bbf
 		fade_colours();
-		if (mem_[wDayNightTransistionSteps] == 0x0a)
-			mem_[w2d809] = 0;
+		if (mem_.day_night_transistion_steps() == 0x0a)
+			mem_.unk_2d809() = 0;
 		return;
 	case 3: wait(6); return; // .Func_84bcd
 	case 4: // .Func_84bd6
 		load_base_and_target(1);
 		next_transition();
-		mem_[w2d809] = 0x02;
+		mem_.unk_2d809() = 0x02;
 		home::set_scene_obj_state(gb_, wSceneObj7State, 0x13);
 		return;
 	case 5: // .Func_84be7
 		fade_colours();
-		if (mem_[wDayNightTransistionSteps] == 0x16)
-			mem_[w2d809] = 0x03;
+		if (mem_.day_night_transistion_steps() == 0x16)
+			mem_.unk_2d809() = 0x03;
 		return;
 	case 6: // .Func_84bf6
 		if (!wram_.ow_bars_state())
-			mem_[wDayNight] = 0;
-		mem_[w2d011] = 0;
-		mem_[w2d0e3] = 0;
-		mem_[wOWPalTransitionState] = 0;
-		mem_[wOWPalTransitionCounter] = 0;
+			mem_.day_night() = 0;
+		mem_.unk_2d011() = 0;
+		mem_.unk_2d0e3() = 0;
+		mem_.ow_pal_transition_state() = 0;
+		mem_.ow_pal_transition_counter() = 0;
 		return;
 	default:
 		unrealistic();
@@ -594,8 +593,8 @@ void Palettes::to_daytime()
 // Func_84c0d: the day and night spell's transition (no music)
 void Palettes::spell_transition()
 {
-	++mem_[wOWPalTransitionCounter];
-	switch (mem_[wOWPalTransitionState]) {
+	++mem_.ow_pal_transition_counter();
+	switch (mem_.ow_pal_transition_state()) {
 	case 0: // .Init
 		transition_vblank();
 		load_base_and_target(0);
@@ -605,10 +604,10 @@ void Palettes::spell_transition()
 	case 2: load_base_and_target(1); next_transition(); return;
 	case 4: load_base_and_target(2); next_transition(); return;
 	case 6: // .SwitchDayNight
-		mem_[w2d011] = mem_[w2d011] ^ 0x01;
-		mem_[w2d0e3] = 0;
-		mem_[wOWPalTransitionState] = 0;
-		mem_[wOWPalTransitionCounter] = 0;
+		mem_.unk_2d011() = mem_.unk_2d011() ^ 0x01;
+		mem_.unk_2d0e3() = 0;
+		mem_.ow_pal_transition_state() = 0;
+		mem_.ow_pal_transition_counter() = 0;
 		return;
 	default:
 		unrealistic();
@@ -619,24 +618,24 @@ void Palettes::spell_transition()
 // OWGreyTransition: the map fading to grey (an exit unlocking)
 void Palettes::grey_transition()
 {
-	++mem_[wOWPalTransitionCounter];
-	switch (mem_[wOWPalTransitionState]) {
+	++mem_.ow_pal_transition_counter();
+	switch (mem_.ow_pal_transition_state()) {
 	case 0: // .Start
 		to_fade_structs(wTempPals1, wFadePals + FADE_BASE);
 		routines_.copy(wTempPals1, wTempBGPals, 8 * PAL_SIZE);
 		load_grey();
 		to_fade_structs(wTempPals1, wFadePals + FADE_TARGET);
 		init_fade_structs();
-		mem_[wDayNightTransistionSteps] = TRANSITION_STEPS;
-		mem_[w2d809] = 0;
+		mem_.day_night_transistion_steps() = TRANSITION_STEPS;
+		mem_.unk_2d809() = 0;
 		transition_vblank();
 		next_transition();
 		return;
 	case 1: fade_colours(); return;
 	case 2: // .Finish
-		mem_[w2d0e3] = 0;
-		mem_[wOWPalTransitionState] = 0;
-		mem_[wOWPalTransitionCounter] = 0;
+		mem_.unk_2d0e3() = 0;
+		mem_.ow_pal_transition_state() = 0;
+		mem_.ow_pal_transition_counter() = 0;
 		return;
 	default:
 		unrealistic();
@@ -671,9 +670,9 @@ void Palettes::prologue_fade()
 		if (fade_bg_slow())
 			return;
 		wram_.pal_config1_total_steps() = 0;
-		mem_[wPalConfig2TotalSteps] = 0;
-		mem_[w2d014] = 0;
-		++mem_[w2d013];
+		mem_.pal_config2_total_steps() = 0;
+		mem_.unk_2d014() = 0;
+		++mem_.unk_2d013();
 		SET_HL(gb_, w2d013);
 		return;
 	}
@@ -684,7 +683,7 @@ void Palettes::prologue_fade()
 	auto zero = [this](uint16_t dest, uint16_t count) { // WriteAToHL_BCTimes
 		home::fill(gb_, dest, 0, count ? count : 0x10000);
 	};
-	switch (mem_[w2d880]) {
+	switch (mem_.unk_2d880()) {
 	case 0: // .zero: to black
 		from_current();
 		zero(wTempPals1, 8 * PAL_SIZE); // ClearTempPals_Bank21
@@ -694,7 +693,7 @@ void Palettes::prologue_fade()
 		from_current();
 		routines_.copy(ADDR_Pals_869cd, wTempPals1, 8 * PAL_SIZE);
 		routines_.copy(ADDR_Pals_86a8d, wTempPals2, 8 * PAL_SIZE);
-		if (mem_[w2d880] == 6)
+		if (mem_.unk_2d880() == 6)
 			routines_.copy(ADDR_Pals_86acd, wTempPals2, PAL_SIZE);
 		break;
 	case 2: // .two
@@ -778,7 +777,7 @@ PORT_EX(Func_84b97, 0, ALL_REGISTERS) { wl3::overworld::Palettes(gb).to_daytime(
 PORT_EX(Func_84c0d, 0, ALL_REGISTERS) { wl3::overworld::Palettes(gb).spell_transition(); }
 PORT_EX(OWGreyTransition, 0, ALL_REGISTERS) { wl3::overworld::Palettes(gb).grey_transition(); }
 PORT_EX(LoadGreyOWPals, 0, ALL_REGISTERS) { wl3::overworld::Palettes(gb).load_grey(); }
-PORT_EX(FadeInLevelName, 0, R_A | R_F | R_B | R_D | R_E | R_H | R_L) { wl3::overworld::Palettes(gb).fade_in_level_name(); }
+PORT_EX(FadeInLevelName, 0, R_A | R_F | R_B | R_D | R_E | R_H | R_L) { gb->cpu.c = wl3::overworld::Palettes(gb).fade_in_level_name(); }
 PORT_EX(Func_852e5, 0, ALL_REGISTERS) { wl3::overworld::Palettes(gb).fade_out_level_name(); }
 PORT_EX(Func_84e43, 0, ALL_REGISTERS) { wl3::overworld::Palettes(gb).func_84e43(); }
 PORT_EX(Func_84fff, 0, ALL_REGISTERS) { wl3::overworld::Palettes(gb).func_84fff(); }

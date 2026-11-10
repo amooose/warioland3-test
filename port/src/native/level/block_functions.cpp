@@ -128,7 +128,7 @@ private:
 	}
 	void sram_switch(uint8_t bank)
 	{
-		mem_[wSRAMBank] = bank;
+		mem_.sram_bank() = bank;
 		mem_[rRAMB + 0x100] = bank;
 	}
 	// ld a, v / ld [addr], a
@@ -162,8 +162,8 @@ private:
 		mem_[addr] = static_cast<uint8_t>(v >> 8);
 		mem_[addr + 1] = static_cast<uint8_t>(v);
 	}
-	bool wario_flag() const { return mem_[wBlockFuncWarioFlag]; }
-	bool coll_bit(int n) const { return mem_[wCollisionPoints] & (1 << n); }
+	bool wario_flag() const { return mem_.block_func_wario_flag(); }
+	bool coll_bit(int n) const { return mem_.collision_points() & (1 << n); }
 	void sfx(uint16_t id) { play_sfx(mem_, id); }
 	// ld a, HIGH(ptr) / ld [addr + 0], a / ld a, LOW(ptr) / ld [addr + 1], a
 	void st_ptr(uint16_t addr, uint16_t ptr)
@@ -203,11 +203,11 @@ private:
 // the function of the block at wBlockPtrBank:wBlockPtr
 uint16_t BlockFuncs::block_function()
 {
-	mem_[wIsInWaterOrSand] = FALSE;
-	sram_switch(mem_[wBlockPtrBank]);
+	mem_.is_in_water_or_sand() = FALSE;
+	sram_switch(mem_.block_ptr_bank());
 	// the block (at wBlockPtr, stored big-endian) indexes the level's
 	// wBlockFunctionTable
-	uint16_t at = static_cast<uint16_t>(mem_[wBlockPtr + 0] << 8 | mem_[wBlockPtr + 1]);
+	uint16_t at = mem_.block_pointer();
 	uint8_t block = mem_[at];
 	uint8_t offset = static_cast<uint8_t>(block * 2);
 	unsigned sum = wBlockFunctionTable + offset;
@@ -547,9 +547,9 @@ bool BlockFuncs::dispatch(uint16_t func)
 void BlockFuncs::free()
 {
 	sram_switch(0); // SRAM0
-	mem_[wBlockFuncBreakFlag] = FALSE;
-	mem_[wBlockFuncSpecialCollision] = 0;
-	mem_[wUnused_c18d] = 0;
+	mem_.block_func_break_flag() = FALSE;
+	mem_.block_func_special_collision() = 0;
+	mem_.unused_c18d() = 0;
 	xor_a();
 }
 
@@ -557,32 +557,32 @@ void BlockFuncs::free()
 void BlockFuncs::solid()
 {
 	sram_switch(0); // SRAM0
-	mem_[wBlockFuncBreakFlag] = FALSE;
-	mem_[wBlockFuncSpecialCollision] = 0;
-	bool keep = mem_[wBlockFuncWarioFlag] && mem_[wWarioSlopeInteraction];
+	mem_.block_func_break_flag() = FALSE;
+	mem_.block_func_special_collision() = 0;
+	bool keep = mem_.block_func_wario_flag() && mem_.wario_slope_interaction();
 	if (keep) {
-		uint8_t points = mem_[wCollisionPoints];
+		uint8_t points = mem_.collision_points();
 		keep = points & (1 << COLLISION_UNK4_F);
 	}
 	if (keep) {
-		mem_[wUnused_c18d] = 0;
+		mem_.unused_c18d() = 0;
 		xor_a();
 		return;
 	}
 	// .snap_y_pos
-	mem_[hYPosLo] = mem_[hYPosLo] & 0xf0;
+	mem_.y_pos_lo() = mem_.y_pos_lo() & 0xf0;
 	a_ = 1;
-	mem_[wUnused_c18d] = 1;
+	mem_.unused_c18d() = 1;
 }
 
 void BlockFuncs::water()
 {
-	mem_[wIsInWaterOrSand] = TRUE;
+	mem_.is_in_water_or_sand() = TRUE;
 	if (!wario_flag())
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(FREE);
-	mem_[wWaterInteraction] = SUBMERSIBLE_WATER;
+	mem_.water_interaction() = SUBMERSIBLE_WATER;
 	GOTO(FREE);
 }
 
@@ -590,24 +590,24 @@ void BlockFuncs::water()
 void BlockFuncs::block_func_current(uint8_t current)
 {
 	if (coll_bit(COLLISION_UNK7_F))
-		mem_[wWaterCurrent] = current;
+		mem_.water_current() = current;
 	GOTO(WATER);
 }
 
 void BlockFuncs::floor()
 {
-	mem_[wc1ca] = TRUE;
-	uint8_t points = mem_[wCollisionPoints];
+	mem_.unk_c1ca() = TRUE;
+	uint8_t points = mem_.collision_points();
 	if (!(points & (COLLISION_DOWN | COLLISION_UNK2))) {
 		if (points & (COLLISION_UNK3 | COLLISION_UNK4 | COLLISION_UNK5 | COLLISION_UNK7))
 			GOTO(FREE);
-		if ((mem_[hYPosLo] & 0x0f) >= 0x05)
+		if ((mem_.y_pos_lo() & 0x0f) >= 0x05)
 			GOTO(FREE);
 	}
 	// .asm_18228
 	if (!wario_flag())
 		GOTO(SOLID);
-	uint8_t state = mem_[wWarioState];
+	uint8_t state = mem_.wario_state();
 	GOTO(state == WST_ZOMBIE_LANDING || state == WST_ZOMBIE_SLIPPING_THROUGH_FLOOR ? FREE : SOLID);
 }
 
@@ -615,9 +615,9 @@ void BlockFuncs::floor()
 void BlockFuncs::free_1808c()
 {
 	sram_switch(0); // SRAM0
-	mem_[wBlockFuncBreakFlag] = FALSE;
-	mem_[wBlockFuncSpecialCollision] = 0;
-	mem_[wUnused_c18d] = 0;
+	mem_.block_func_break_flag() = FALSE;
+	mem_.block_func_special_collision() = 0;
+	mem_.unused_c18d() = 0;
 	xor_a();
 }
 
@@ -625,25 +625,25 @@ void BlockFuncs::ladder_or_floor()
 {
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(FLOOR);
-	mem_[wLadderInteraction] = LADDER_UNDERNEATH;
+	mem_.ladder_interaction() = LADDER_UNDERNEATH;
 	GOTO(ADDR_Func_1808c);
 }
 
 void BlockFuncs::enter_door()
 {
 	// centred on the door
-	mem_[wWarioXPos + 1] = static_cast<uint8_t>((mem_[wWarioXPos + 1] & 0xf0) + 0x08);
+	mem_.wario_x().lo() = static_cast<uint8_t>((mem_.wario_x().lo() & 0xf0) + 0x08);
 	sfx(SFX_0E6);
-	mem_[wWarioState] = WST_ENTERING_DOOR;
+	mem_.wario_state() = WST_ENTERING_DOOR;
 	for (uint16_t addr : {wSFXLoopCounter, wWarioStateCounter, wGrabState, wAttackCounter, wJumpVelIndex,
 		     wJumpVelTable, wIsCrouching, wFrameDuration, wAnimationFrame})
 		mem_[addr] = 0;
-	mem_[wDMASourceBank] = BANK_WarioIdleGfx;
+	mem_.dma_source_bank() = BANK_WarioIdleGfx;
 	st_ptr(wDMASourcePtr, ADDR_WarioIdleGfx);
 	home::load_wario_gfx(gb_);
-	mem_[wWarioOAMBank] = BANK_OAM_14a82;
+	mem_.wario_oam_bank() = BANK_OAM_14a82;
 	st_ptr(wWarioOAMPtr, ADDR_OAM_14a82);
-	bool right = mem_[wDirection];
+	bool right = mem_.direction();
 	st_ptr(wWarioFramesetPtr, right ? ADDR_Frameset_14d10 : ADDR_Frameset_14d0b);
 	routines_.farcall(OAM1, ADDR_UpdateWarioAnimation);
 	GOTO(FREE);
@@ -654,17 +654,17 @@ void BlockFuncs::block_func_c18d(uint8_t v)
 {
 	sram_switch(0); // SRAM0
 	xor_a();
-	mem_[wBlockFuncBreakFlag] = FALSE;
-	mem_[wBlockFuncSpecialCollision] = 0;
+	mem_.block_func_break_flag() = FALSE;
+	mem_.block_func_special_collision() = 0;
 	st(wUnused_c18d, v);
 }
 
 // a slope a block up: solid to an air attack
 void BlockFuncs::slope_above(uint16_t collision)
 {
-	if (wario_flag() && mem_[wWarioState] == WST_ATTACKING_AIRBORNE)
+	if (wario_flag() && mem_.wario_state() == WST_ATTACKING_AIRBORNE)
 		GOTO(SOLID);
-	if (!(mem_[wCollisionPoints] & (COLLISION_DOWN | COLLISION_UNK1)))
+	if (!(mem_.collision_points() & (COLLISION_DOWN | COLLISION_UNK1)))
 		GOTO(FREE);
 	set_word_be(hYPosHi, static_cast<uint16_t>(word_be(hYPosHi) - 0x10));
 	GOTO(collision);
@@ -693,17 +693,17 @@ void BlockFuncs::hypos_top_plus_c(uint8_t c)
 
 void BlockFuncs::right_slope_collision()
 {
-	uint8_t x = mem_[hXPosLo] & 0x0f;
+	uint8_t x = mem_.x_pos_lo() & 0x0f;
 	hypos_top_plus_c(static_cast<uint8_t>(0x10 - x));
-	if ((mem_[wCollisionPoints] & (COLLISION_DOWN | COLLISION_UNK1)))
+	if ((mem_.collision_points() & (COLLISION_DOWN | COLLISION_UNK1)))
 		set_slope_interaction(RIGHT_SLOPE);
 	GOTO(ADDR_Func_18064);
 }
 
 void BlockFuncs::left_slope_collision()
 {
-	if (mem_[wCollisionPoints] & (COLLISION_DOWN | COLLISION_UNK1)) {
-		hypos_top_plus_c(static_cast<uint8_t>((mem_[hXPosLo] & 0x0f) + 2));
+	if (mem_.collision_points() & (COLLISION_DOWN | COLLISION_UNK1)) {
+		hypos_top_plus_c(static_cast<uint8_t>((mem_.x_pos_lo() & 0x0f) + 2));
 		set_slope_interaction(LEFT_SLOPE);
 	}
 	GOTO(ADDR_Func_18064);
@@ -711,33 +711,33 @@ void BlockFuncs::left_slope_collision()
 
 void BlockFuncs::right_slope()
 {
-	uint8_t points = mem_[wCollisionPoints];
+	uint8_t points = mem_.collision_points();
 	if (!(points & (COLLISION_DOWN | COLLISION_UNK1)))
 		GOTO(FREE);
 	if (!(points & COLLISION_UNK1))
 		GOTO(ADDR_RightSlopeCollision);
-	GOTO((mem_[hXPosLo] & 0x0f) + (mem_[hYPosLo] & 0x0f) < 0x10 ? FREE : ADDR_RightSlopeCollision);
+	GOTO((mem_.x_pos_lo() & 0x0f) + (mem_.y_pos_lo() & 0x0f) < 0x10 ? FREE : ADDR_RightSlopeCollision);
 }
 
 void BlockFuncs::left_slope()
 {
-	uint8_t points = mem_[wCollisionPoints];
+	uint8_t points = mem_.collision_points();
 	if (!(points & (COLLISION_DOWN | COLLISION_UNK1)))
 		GOTO(FREE);
 	if (!(points & COLLISION_UNK1))
 		GOTO(ADDR_LeftSlopeCollision);
-	GOTO((mem_[hXPosLo] & 0x0f) < (mem_[hYPosLo] & 0x0f) ? ADDR_LeftSlopeCollision : FREE);
+	GOTO((mem_.x_pos_lo() & 0x0f) < (mem_.y_pos_lo() & 0x0f) ? ADDR_LeftSlopeCollision : FREE);
 }
 
 void BlockFuncs::water_surface()
 {
 	if (coll_bit(COLLISION_UNK1_F))
 		GOTO(FLOOR);
-	if ((mem_[hYPosLo] & (0x0e)))
+	if ((mem_.y_pos_lo() & (0x0e)))
 		GOTO(WATER);
-	if (!(mem_[wCollisionPoints] & (COLLISION_DOWN | COLLISION_UNK2)))
+	if (!(mem_.collision_points() & (COLLISION_DOWN | COLLISION_UNK2)))
 		GOTO(WATER);
-	mem_[wIsInWaterOrSand] = TRUE;
+	mem_.is_in_water_or_sand() = TRUE;
 	GOTO(SOLID);
 }
 
@@ -746,13 +746,13 @@ void BlockFuncs::object_floor()
 {
 	if (wario_flag())
 		GOTO(FREE);
-	mem_[wc1ca] = TRUE;
-	uint8_t points = mem_[wCollisionPoints];
+	mem_.unk_c1ca() = TRUE;
+	uint8_t points = mem_.collision_points();
 	if (points & (COLLISION_DOWN | COLLISION_UNK2))
 		GOTO(SOLID);
 	if (points & (COLLISION_UNK3 | COLLISION_UNK4 | COLLISION_UNK5 | COLLISION_UNK7))
 		GOTO(FREE);
-	GOTO((mem_[hYPosLo] & 0x0f) < 0x05 ? SOLID : FREE);
+	GOTO((mem_.y_pos_lo() & 0x0f) < 0x05 ? SOLID : FREE);
 }
 
 void BlockFuncs::ladder()
@@ -761,7 +761,7 @@ void BlockFuncs::ladder()
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(FREE);
-	mem_[wLadderInteraction] = LADDER_COLLISION;
+	mem_.ladder_interaction() = LADDER_COLLISION;
 	GOTO(ADDR_Func_1808c);
 }
 
@@ -776,21 +776,21 @@ void BlockFuncs::ladder_transition(uint8_t param)
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(FREE);
-	mem_[wLadderInteraction] = LADDER_COLLISION;
-	mem_[wRoomTransitionParam] = param;
+	mem_.ladder_interaction() = LADDER_COLLISION;
+	mem_.room_transition_param() = param;
 	GOTO(FREE);
 }
 
 void BlockFuncs::spike(uint16_t next)
 {
-	if (!wario_flag() || mem_[wInvincibleCounter] || mem_[wca94] == 0x02)
+	if (!wario_flag() || mem_.invincible_counter() || mem_.unk_ca94() == 0x02)
 		GOTO(next);
-	uint8_t state = mem_[wWarioState];
+	uint8_t state = mem_.wario_state();
 	if (state == WST_STUNG || state == WST_STUNG_RECOVERY)
 		GOTO(next);
 	// turned around
-	mem_[wDirection] = mem_[wDirection] ? DIRECTION_LEFT : DIRECTION_RIGHT;
-	uint8_t touch = mem_[wca94];
+	mem_.direction() = mem_.direction() ? DIRECTION_LEFT : DIRECTION_RIGHT;
+	uint8_t touch = mem_.unk_ca94();
 	if (!touch)
 		routines_.farcall(BANK_SetState_Stung, ADDR_SetState_Stung);
 	else if (touch == 0x01)
@@ -800,26 +800,26 @@ void BlockFuncs::spike(uint16_t next)
 
 void BlockFuncs::water_spike()
 {
-	if (!wario_flag() || mem_[wInvincibleCounter])
+	if (!wario_flag() || mem_.invincible_counter())
 		GOTO(WATER);
-	if (mem_[wWarioState] != WST_WATER_STUNG)
+	if (mem_.wario_state() != WST_WATER_STUNG)
 		routines_.farcall(BANK_SetState_WaterStung, ADDR_SetState_WaterStung);
 	GOTO(WATER);
 }
 
 void BlockFuncs::enter_pipe(bool down)
 {
-	mem_[wRoomTransitionParam] = ROOMTRANSITION_PIPE | ROOMTRANSITIONF_RELOAD_OBJECTS | ROOMTRANSITIONF_DELAY;
+	mem_.room_transition_param() = ROOMTRANSITION_PIPE | ROOMTRANSITIONF_RELOAD_OBJECTS | ROOMTRANSITIONF_DELAY;
 	sfx(SFX_PIPE_ENTER);
-	mem_[wWarioState] = down ? WST_PIPE_GOING_DOWN : WST_PIPE_GOING_UP;
+	mem_.wario_state() = down ? WST_PIPE_GOING_DOWN : WST_PIPE_GOING_UP;
 	clear({wFrameDuration, wAnimationFrame, wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter,
 		wJumpVelIndex, wJumpVelTable, wIsCrouching});
 	if (down)
-		mem_[wIsSmashAttacking] = 0;
-	mem_[wDMASourceBank] = BANK_WarioIdleGfx;
+		mem_.is_smash_attacking() = 0;
+	mem_.dma_source_bank() = BANK_WarioIdleGfx;
 	st_ptr(wDMASourcePtr, ADDR_WarioIdleGfx);
 	home::load_wario_gfx(gb_);
-	mem_[wWarioOAMBank] = BANK_OAM_14a82;
+	mem_.wario_oam_bank() = BANK_OAM_14a82;
 	st_ptr(wWarioOAMPtr, ADDR_OAM_14a82);
 	st_ptr(wWarioFramesetPtr, ADDR_Frameset_14cf6);
 	routines_.farcall(OAM1, ADDR_UpdateWarioAnimation);
@@ -832,28 +832,28 @@ void BlockFuncs::pipe(uint8_t state1, uint8_t state2, uint8_t coll, int button, 
 {
 	if (!wario_flag())
 		GOTO(SOLID);
-	uint8_t state = mem_[wWarioState];
+	uint8_t state = mem_.wario_state();
 	if (state != state1 && state != state2)
 		GOTO(SOLID);
-	if (!(mem_[wCollisionPoints] & coll) || !(mem_[wJoypadDown] & (1 << button)))
+	if (!(mem_.collision_points() & coll) || !(mem_.joypad_down() & (1 << button)))
 		GOTO(SOLID);
 	// centred on the pipe (the left one's x carrying into the high byte)
-	unsigned lo = (mem_[wWarioXPos + 1] & 0xf0) + (left ? 0x18 : 0x08);
-	mem_[wWarioXPos + 1] = static_cast<uint8_t>(lo);
+	unsigned lo = (mem_.wario_x().lo() & 0xf0) + (left ? 0x18 : 0x08);
+	mem_.wario_x().lo() = static_cast<uint8_t>(lo);
 	if (left)
-		mem_[wWarioXPos + 0] = static_cast<uint8_t>(mem_[wWarioXPos + 0] + (lo > 0xff));
+		mem_.wario_x().hi() = static_cast<uint8_t>(mem_.wario_x().hi() + (lo > 0xff));
 	enter_pipe(button == B_PAD_DOWN);
 }
 
 // a door: Wario in front of it pressing up while idling (or slipping)
 void BlockFuncs::door(bool slipping, uint8_t param)
 {
-	if (!wario_flag() || !coll_bit(COLLISION_UNK7_F) || !(mem_[wJoypadPressed] & (1 << B_PAD_UP)))
+	if (!wario_flag() || !coll_bit(COLLISION_UNK7_F) || !(mem_.joypad_pressed() & (1 << B_PAD_UP)))
 		GOTO(FREE);
-	uint8_t state = mem_[wWarioState];
+	uint8_t state = mem_.wario_state();
 	if (state != WST_IDLING && !(slipping && state == WST_SLIPPING) && state != WST_GRAB_IDLING)
 		GOTO(FREE);
-	mem_[wRoomTransitionParam] = param;
+	mem_.room_transition_param() = param;
 	GOTO(ADDR_EnterDoor);
 }
 
@@ -863,27 +863,27 @@ void BlockFuncs::underwater_door(bool water, uint8_t param)
 	uint16_t next = water ? WATER : FREE;
 	if (!wario_flag())
 		GOTO(next);
-	uint8_t transformation = mem_[wTransformation];
+	uint8_t transformation = mem_.transformation();
 	if (transformation != TRANSFORMATION_INVISIBLE_WARIO && transformation)
 		GOTO(next);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(next);
 	if (water)
-		mem_[wWaterInteraction] = SUBMERSIBLE_WATER;
-	if (mem_[wJoypadPressed] & (1 << B_PAD_UP))
-		mem_[wRoomTransitionParam] = param;
+		mem_.water_interaction() = SUBMERSIBLE_WATER;
+	if (mem_.joypad_pressed() & (1 << B_PAD_UP))
+		mem_.room_transition_param() = param;
 	GOTO(FREE);
 }
 
 void BlockFuncs::treasure_door()
 {
-	if (!wario_flag() || !(mem_[wJoypadPressed] & (1 << B_PAD_UP)) || mem_[wTransformation])
+	if (!wario_flag() || !(mem_.joypad_pressed() & (1 << B_PAD_UP)) || mem_.transformation())
 		GOTO(FREE);
-	uint8_t state = mem_[wWarioState];
+	uint8_t state = mem_.wario_state();
 	if (state != WST_IDLING && state != WST_SLIPPING && state != WST_GRAB_IDLING)
 		GOTO(FREE);
-	mem_[wGrabState] = 0;
-	mem_[wLevelEndScreen] = LVLEND_NO_TREASURE;
+	mem_.grab_state() = 0;
+	mem_.level_end_screen() = LVLEND_NO_TREASURE;
 	GOTO(FREE);
 }
 
@@ -893,13 +893,13 @@ void BlockFuncs::transition_block(uint16_t next, uint8_t param)
 		GOTO(next);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(next);
-	mem_[wRoomTransitionParam] = param;
+	mem_.room_transition_param() = param;
 	GOTO(next);
 }
 
 void BlockFuncs::walkthrough_pipe()
 {
-	if (wario_flag() && mem_[wTransformation] == TRANSFORMATION_INVISIBLE_WARIO)
+	if (wario_flag() && mem_.transformation() == TRANSFORMATION_INVISIBLE_WARIO)
 		routines_.call(ADDR_RecoverFromTransformation_WithoutInvincibility);
 	GOTO(FREE);
 }
@@ -908,7 +908,7 @@ void BlockFuncs::light_source()
 {
 	if (!wario_flag())
 		GOTO(FREE);
-	uint8_t transformation = mem_[wTransformation];
+	uint8_t transformation = mem_.transformation();
 	if (transformation == TRANSFORMATION_ZOMBIE_WARIO)
 		routines_.farcall(BANK_SetState_ZombieRecovering, ADDR_SetState_ZombieRecovering);
 	else if (transformation == TRANSFORMATION_VAMPIRE_WARIO)
@@ -919,7 +919,7 @@ void BlockFuncs::light_source()
 // sand / non-submersible water: in it, and Wario's in it if he touches it
 void BlockFuncs::in_block(uint16_t addr, uint8_t v)
 {
-	mem_[wIsInWaterOrSand] = TRUE;
+	mem_.is_in_water_or_sand() = TRUE;
 	if (!wario_flag())
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
@@ -931,18 +931,18 @@ void BlockFuncs::in_block(uint16_t addr, uint8_t v)
 // solid to Vampire Wario, who's pushed out of it
 void BlockFuncs::vampire_block()
 {
-	if (!wario_flag() || mem_[wTransformation] != TRANSFORMATION_VAMPIRE_WARIO)
+	if (!wario_flag() || mem_.transformation() != TRANSFORMATION_VAMPIRE_WARIO)
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(SOLID);
 	// pushed out past the block's edge, by b
-	uint16_t x = static_cast<uint16_t>(word_be(wWarioXPos) & 0xfff0);
-	if (!(mem_[wWarioXPos + 1] & 0x08)) {
-		x = static_cast<uint16_t>(x - mem_[wCollisionBoxRight]);
+	uint16_t x = static_cast<uint16_t>(mem_.wario_x() & 0xfff0);
+	if (!(mem_.wario_x().lo() & 0x08)) {
+		x = static_cast<uint16_t>(x - mem_.collision_box_right());
 	} else {
-		x = static_cast<uint16_t>(x + static_cast<uint8_t>(0x10 - mem_[wCollisionBoxLeft]));
+		x = static_cast<uint16_t>(x + static_cast<uint8_t>(0x10 - mem_.collision_box_left()));
 	}
-	set_word_be(wWarioXPos, x);
+	mem_.wario_x() = x;
 	GOTO(SOLID);
 }
 
@@ -981,7 +981,7 @@ void BlockFuncs::fence()
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(FREE);
-	mem_[wIsNearFence] = TRUE;
+	mem_.is_near_fence() = TRUE;
 	GOTO(ADDR_Func_1808c);
 }
 
@@ -991,15 +991,15 @@ void BlockFuncs::air_current()
 		GOTO(FREE);
 	if (!coll_bit(COLLISION_UNK7_F))
 		GOTO(FREE);
-	if (mem_[wInvincibleCounter])
+	if (mem_.invincible_counter())
 		GOTO(FREE);
-	mem_[wIsInAirCurrent] = TRUE;
-	if (mem_[wTransformation])
+	mem_.is_in_air_current() = TRUE;
+	if (mem_.transformation())
 		GOTO(FREE);
-	mem_[wTransformation] = TRANSFORMATION_FAN;
-	mem_[wTouchState] = TOUCH_BUMP;
-	mem_[wStingTouchState] = TOUCH_VULNERABLE;
-	mem_[wca94] = 0x01;
+	mem_.transformation() = TRANSFORMATION_FAN;
+	mem_.touch_state() = TOUCH_BUMP;
+	mem_.sting_touch_state() = TOUCH_VULNERABLE;
+	mem_.unk_ca94() = 0x01;
 	routines_.farcall(BANK_SetState_FanStart, ADDR_SetState_FanStart);
 	GOTO(FREE);
 }
@@ -1008,42 +1008,42 @@ void BlockFuncs::slippery(uint16_t next)
 {
 	if (!wario_flag())
 		GOTO(next);
-	if (!(mem_[wCollisionPoints] & (COLLISION_DOWN)))
+	if (!(mem_.collision_points() & (COLLISION_DOWN)))
 		GOTO(next);
-	mem_[wIsOnSlipperyGround] = TRUE;
+	mem_.is_on_slippery_ground() = TRUE;
 	GOTO(next);
 }
 
 void BlockFuncs::cloud_platform_1()
 {
-	uint8_t i = mem_[wRoomPalCycleIndex];
+	uint8_t i = mem_.room_pal_cycle_index();
 	GOTO(i == 0x07 || i < 0x04 ? FLOOR : FREE);
 }
 
 void BlockFuncs::cloud_platform_2()
 {
-	GOTO(mem_[wRoomPalCycleIndex] < 0x03 ? FREE : FLOOR);
+	GOTO(mem_.room_pal_cycle_index() < 0x03 ? FREE : FLOOR);
 }
 
 void BlockFuncs::small_gap()
 {
 	if (!wario_flag())
 		GOTO(FREE);
-	GOTO(mem_[wTransformation] == TRANSFORMATION_FLAT_WARIO ? FREE : SOLID);
+	GOTO(mem_.transformation() == TRANSFORMATION_FLAT_WARIO ? FREE : SOLID);
 }
 
 // toggles the switch Wario hit (and with it every switchable block), then
 // it's solid
 void BlockFuncs::switch_block()
 {
-	if (!wario_flag() || !(mem_[wCollisionPoints] & (COLLISION_UNK3 | COLLISION_UNK5)))
+	if (!wario_flag() || !(mem_.collision_points() & (COLLISION_UNK3 | COLLISION_UNK5)))
 		GOTO(SOLID);
-	uint16_t at = word_be(wBlockPtr);
+	uint16_t at = mem_.block_pointer();
 	uint8_t block = mem_[at];
-	mem_[wSwitchState] = block;
+	mem_.switch_state() = block;
 	mem_[at] = block ^ 0x08;
 	home::queue_block_update(gb_, at);
-	mem_[wSwitchStateUpdated] = mem_[wSwitchStateUpdated] ^ 1;
+	mem_.switch_state_updated() = mem_.switch_state_updated() ^ 1;
 	sfx(SFX_SWITCH);
 	home::do_ground_shake(gb_, 16);
 	GOTO(SOLID);
@@ -1053,10 +1053,10 @@ void BlockFuncs::switch_block()
 // time in 4 for BreakBlock, unless on cooldown), keeping hPos and wCurObj
 void BlockFuncs::break_block(bool chance, uint16_t params)
 {
-	mem_[hYPosHiBackup] = mem_[hYPosHi];
-	mem_[hYPosLoBackup] = mem_[hYPosLo];
-	mem_[hXPosHiBackup] = mem_[hXPosHi];
-	mem_[hXPosLoBackup] = mem_[hXPosLo];
+	mem_.y_pos_hi_backup() = mem_.y_pos_hi();
+	mem_.y_pos_lo_backup() = mem_.y_pos_lo();
+	mem_.x_pos_hi_backup() = mem_.x_pos_hi();
+	mem_.x_pos_lo_backup() = mem_.x_pos_lo();
 
 	routines_.in_bank(BANK_CreateParticleInBlock, ADDR_CreateParticleInBlock,
 		[&] { create_particle_in_block(gb_, hl_, PARTICLE_DEBRIS); });
@@ -1078,10 +1078,10 @@ void BlockFuncs::break_block(bool chance, uint16_t params)
 
 		mem_[wCurObjUnk01 + 0] = 0;
 		mem_[wCurObjUnk01 + 1] = 0;
-		mem_[wCurObjUnk01 + 2] = mem_[hYPosLo];
-		mem_[wCurObjUnk01 + 3] = mem_[hYPosHi];
-		mem_[wCurObjUnk01 + 4] = mem_[hXPosLo];
-		mem_[wCurObjUnk01 + 5] = mem_[hXPosHi];
+		mem_[wCurObjUnk01 + 2] = mem_.y_pos_lo();
+		mem_[wCurObjUnk01 + 3] = mem_.y_pos_hi();
+		mem_[wCurObjUnk01 + 4] = mem_.x_pos_lo();
+		mem_[wCurObjUnk01 + 5] = mem_.x_pos_hi();
 		routines_.in_bank(BANK__CreateObjectFromCurObjPos, ADDR__CreateObjectFromCurObjPos,
 			[&] { create_object_from_cur_obj_pos(gb_, params); });
 
@@ -1089,32 +1089,32 @@ void BlockFuncs::break_block(bool chance, uint16_t params)
 		mem_[rWBK] = wbk;
 	}
 
-	mem_[hYPosHi] = mem_[hYPosHiBackup];
-	mem_[hYPosLo] = mem_[hYPosLoBackup];
-	mem_[hXPosHi] = mem_[hXPosHiBackup];
-	mem_[hXPosLo] = mem_[hXPosLoBackup];
+	mem_.y_pos_hi() = mem_.y_pos_hi_backup();
+	mem_.y_pos_lo() = mem_.y_pos_lo_backup();
+	mem_.x_pos_hi() = mem_.x_pos_hi_backup();
+	mem_.x_pos_lo() = mem_.x_pos_lo_backup();
 }
 
 // wcedb / wcedc / wcedf = the SRAM bank, pointer and value of the block at
 // wBlockPtr
 void BlockFuncs::save_block()
 {
-	mem_[wcedb] = mem_[wSRAMBank];
-	uint8_t row = mem_[wBlockPtr + 0], column = mem_[wBlockPtr + 1];
+	mem_.unk_cedb() = mem_.sram_bank();
+	uint8_t row = mem_.block_pointer().hi(), column = mem_.block_pointer().lo();
 	mem_[wcedc + 0] = row;
 	mem_[wcedc + 1] = column;
 	hl_ = wBlockPtr + 1;
-	mem_[wcedf] = mem_[static_cast<uint16_t>(row << 8 | column)];
+	mem_.unk_cedf() = mem_[static_cast<uint16_t>(row << 8 | column)];
 }
 
 // the block at wBlockPtr = b (keeping bit 7), redrawn with Func_e31 (or
 // Func_e2b)
 void BlockFuncs::replace_block(bool e2b)
 {
-	uint16_t at = static_cast<uint16_t>(mem_[wBlockPtr] << 8 | mem_[wBlockPtr + 1]);
+	uint16_t at = mem_.block_pointer();
 	hl_ = at;
 	mem_[at] = (mem_[at] & 0x80) | b_;
-	if (!e2b || (mem_[wCurObjFlags] & (1 << OBJFLAG_ON_SCREEN_F)))
+	if (!e2b || (mem_.cur_obj_flags() & (1 << OBJFLAG_ON_SCREEN_F)))
 		home::queue_block_update(gb_, at);
 }
 
@@ -1128,10 +1128,10 @@ void BlockFuncs::replace_and_break()
 // (garlic, or the super jump slam overalls for a ground pound)
 void BlockFuncs::free_if_strong()
 {
-	if (mem_[wIsRolling] || mem_[wTransformation] == TRANSFORMATION_FAT_WARIO)
+	if (mem_.is_rolling() || mem_.transformation() == TRANSFORMATION_FAT_WARIO)
 		GOTO(FREE);
-	uint8_t needs = mem_[wIsSmashAttacking] ? SUPER_JUMP_SLAM_OVERALLS : GARLIC;
-	GOTO(mem_[wPowerUpLevel] < needs ? SOLID : FREE);
+	uint8_t needs = mem_.is_smash_attacking() ? SUPER_JUMP_SLAM_OVERALLS : GARLIC;
+	GOTO(mem_.power_up_level() < needs ? SOLID : FREE);
 }
 
 // Func_18f32 / Func_19246 / Func_193dc: saves the block, then breaks it
@@ -1139,7 +1139,7 @@ void BlockFuncs::saved_break(bool floor_transition, uint16_t next)
 {
 	save_block();
 	if (floor_transition) {
-		mem_[wIsFloorTransition] = TRUE;
+		mem_.is_floor_transition() = TRUE;
 		GOTO(next);
 	}
 	replace_and_break();
@@ -1155,13 +1155,13 @@ void BlockFuncs::break_free()
 void BlockFuncs::break_free_if_rolling()
 {
 	replace_and_break();
-	GOTO(mem_[wIsRolling] ? FREE : SOLID);
+	GOTO(mem_.is_rolling() ? FREE : SOLID);
 }
 
 void BlockFuncs::break_multi()
 {
 	save_block();
-	mem_[wIsFloorTransition] = TRUE;
+	mem_.is_floor_transition() = TRUE;
 	replace_and_break();
 	free_if_strong();
 }
@@ -1170,7 +1170,7 @@ void BlockFuncs::break_multi()
 void BlockFuncs::break_by_object()
 {
 	replace_block(true);
-	if (mem_[wCurObjFlags] & (1 << OBJFLAG_ON_SCREEN_F))
+	if (mem_.cur_obj_flags() & (1 << OBJFLAG_ON_SCREEN_F))
 		break_block(true, ADDR_ObjParams_Coin);
 	else
 		sfx(SFX_BLOCK_BREAK);
@@ -1179,8 +1179,8 @@ void BlockFuncs::break_by_object()
 
 void BlockFuncs::doughnut_block()
 {
-	if (wario_flag() && mem_[wTransformation] == TRANSFORMATION_FAT_WARIO
-		&& (mem_[wCollisionPoints] & (COLLISION_UNK1 | COLLISION_UNK6)))
+	if (wario_flag() && mem_.transformation() == TRANSFORMATION_FAT_WARIO
+		&& (mem_.collision_points() & (COLLISION_UNK1 | COLLISION_UNK6)))
 		replace_and_break();
 	GOTO(SOLID);
 }
@@ -1188,7 +1188,7 @@ void BlockFuncs::doughnut_block()
 // the robo mouse breaks (Func_19423) or passes through: true if it jumped
 bool BlockFuncs::robo_mouse()
 {
-	uint8_t special = mem_[wBlockFuncSpecialCollision];
+	uint8_t special = mem_.block_func_special_collision();
 	if (special == COLLISION_ROBO_MOUSE_BREAK) {
 		next_ = ADDR_Func_19423;
 		return true;
@@ -1205,17 +1205,17 @@ bool BlockFuncs::robo_mouse()
 bool BlockFuncs::breaks_cracked() const
 {
 	if (coll_bit(COLLISION_UNK4_F))
-		return mem_[wAttackCounter] || mem_[wIsRolling];
+		return mem_.attack_counter() || mem_.is_rolling();
 	if (coll_bit(COLLISION_UNK5_F) || coll_bit(COLLISION_UNK3_F))
-		return mem_[wPowerUpLevel] >= HEAD_SMASH_HELMET && (mem_[wJumpVelTable] || mem_[wSwimVelIndex]);
-	return mem_[wCollisionPoints] & (COLLISION_UNK1 | COLLISION_UNK6);
+		return mem_.power_up_level() >= HEAD_SMASH_HELMET && (mem_.jump_vel_table() || mem_.swim_vel_index());
+	return mem_.collision_points() & (COLLISION_UNK1 | COLLISION_UNK6);
 }
 
 // b = the block that replaces it: broken by an attack or a roll (from the
 // side), a head smash with the helmet (above), or a ground pound
 void BlockFuncs::cracked_block(uint16_t break_func)
 {
-	if (!mem_[wBlockFuncBreakFlag] || !breaks_cracked())
+	if (!mem_.block_func_break_flag() || !breaks_cracked())
 		GOTO(SOLID);
 	replace_block(false);
 	dispatch(break_func);
@@ -1236,20 +1236,20 @@ void BlockFuncs::non_cracked()
 {
 	if (robo_mouse())
 		return;
-	if (!mem_[wBlockFuncBreakFlag])
+	if (!mem_.block_func_break_flag())
 		GOTO(SOLID);
-	if (mem_[wTransformation] == TRANSFORMATION_FAT_WARIO)
-		GOTO(mem_[wCollisionPoints] & (COLLISION_UNK1 | COLLISION_UNK6) ? ADDR_Func_18df1 : SOLID);
-	if (mem_[wPowerUpLevel] < GARLIC)
+	if (mem_.transformation() == TRANSFORMATION_FAT_WARIO)
+		GOTO(mem_.collision_points() & (COLLISION_UNK1 | COLLISION_UNK6) ? ADDR_Func_18df1 : SOLID);
+	if (mem_.power_up_level() < GARLIC)
 		GOTO(SOLID);
 	bool brk;
 	if (coll_bit(COLLISION_UNK4_F)) {
-		brk = mem_[wAttackCounter] || mem_[wIsRolling];
+		brk = mem_.attack_counter() || mem_.is_rolling();
 	} else if (coll_bit(COLLISION_UNK5_F) || coll_bit(COLLISION_UNK3_F)) {
-		brk = mem_[wPowerUpLevel] >= HEAD_SMASH_HELMET && (mem_[wJumpVelTable] || mem_[wSwimVelIndex]);
+		brk = mem_.power_up_level() >= HEAD_SMASH_HELMET && (mem_.jump_vel_table() || mem_.swim_vel_index());
 	} else {
-		brk = (mem_[wCollisionPoints] & (COLLISION_UNK1 | COLLISION_UNK6))
-			&& mem_[wPowerUpLevel] >= SUPER_JUMP_SLAM_OVERALLS;
+		brk = (mem_.collision_points() & (COLLISION_UNK1 | COLLISION_UNK6))
+			&& mem_.power_up_level() >= SUPER_JUMP_SLAM_OVERALLS;
 	}
 	GOTO(brk ? ADDR_Func_18df1 : SOLID);
 }
@@ -1257,13 +1257,13 @@ void BlockFuncs::non_cracked()
 // broken by a thrown object
 void BlockFuncs::enemy_block()
 {
-	GOTO(mem_[wBlockFuncSpecialCollision] == COLLISION_THROWN_OBJ ? ADDR_Func_19423 : SOLID);
+	GOTO(mem_.block_func_special_collision() == COLLISION_THROWN_OBJ ? ADDR_Func_19423 : SOLID);
 }
 
 // burnt by Hot Wario once he's engulfed in flames
 void BlockFuncs::bonfire_block()
 {
-	if (wario_flag() && mem_[wTransformation] == TRANSFORMATION_HOT_WARIO && mem_[wTransformationProgress] >= 2)
+	if (wario_flag() && mem_.transformation() == TRANSFORMATION_HOT_WARIO && mem_.transformation_progress() >= 2)
 		GOTO(ADDR_Func_19481);
 	GOTO(SOLID);
 }
@@ -1285,7 +1285,7 @@ void BlockFuncs::ldb_jump(uint8_t block, uint16_t target)
 // or n / ld [wMultiBlockParam], a
 void BlockFuncs::multi_or(uint8_t base, uint8_t n)
 {
-	mem_[wMultiBlockParam] = base | n;
+	mem_.multi_block_param() = base | n;
 }
 
 // wMultiBlockParam: bits 0-2 the part already handled (-> low), bits 3-7 a
@@ -1293,7 +1293,7 @@ void BlockFuncs::multi_or(uint8_t base, uint8_t n)
 // jumped
 bool BlockFuncs::multi_start(uint16_t low, uint8_t n, uint16_t high)
 {
-	uint8_t param = mem_[wMultiBlockParam];
+	uint8_t param = mem_.multi_block_param();
 	if (param & 0x07) {
 		next_ = low;
 		return true;
@@ -1312,14 +1312,14 @@ void BlockFuncs::transformation_multi(uint8_t n, uint8_t transformation, Progres
 {
 	if (multi_start(FREE, n, ADDR_Func_18f32))
 		return;
-	if (!wario_flag() || mem_[wTransformation] != transformation)
+	if (!wario_flag() || mem_.transformation() != transformation)
 		GOTO(SOLID);
-	uint8_t done = mem_[wTransformationProgress];
+	uint8_t done = mem_.transformation_progress();
 	if (progress == Progress::SNOWBALL && done < 1)
 		GOTO(SOLID);
 	if (progress == Progress::BIG_SNOWBALL && done != 3)
 		GOTO(SOLID);
-	mem_[wMultiBlockParam] = n;
+	mem_.multi_block_param() = n;
 	if (n == 3)
 		multi_or(n, 3);
 	GOTO(ADDR_Func_18f32);
@@ -1329,13 +1329,13 @@ void BlockFuncs::transformation_multi(uint8_t n, uint8_t transformation, Progres
 // if it jumped
 bool BlockFuncs::multi_robo_mouse(uint8_t n, uint16_t broken)
 {
-	uint8_t special = mem_[wBlockFuncSpecialCollision];
+	uint8_t special = mem_.block_func_special_collision();
 	if (special == COLLISION_ROBO_MOUSE_FREE) {
 		next_ = FREE;
 		return true;
 	}
 	if (special == COLLISION_ROBO_MOUSE_BREAK) {
-		mem_[wMultiBlockParam] = n;
+		mem_.multi_block_param() = n;
 		next_ = broken;
 		return true;
 	}
@@ -1349,9 +1349,9 @@ void BlockFuncs::cracked_multi(uint8_t n)
 		return;
 	if (multi_robo_mouse(n, ADDR_Func_18f32))
 		return;
-	if (!mem_[wBlockFuncBreakFlag] || !breaks_cracked())
+	if (!mem_.block_func_break_flag() || !breaks_cracked())
 		GOTO(SOLID);
-	mem_[wMultiBlockParam] = n;
+	mem_.multi_block_param() = n;
 	GOTO(ADDR_Func_19086);
 }
 
@@ -1363,36 +1363,36 @@ void BlockFuncs::noncracked_multi(uint8_t n)
 		return;
 	if (multi_robo_mouse(n, ADDR_Func_19246))
 		return;
-	if (!mem_[wBlockFuncBreakFlag])
+	if (!mem_.block_func_break_flag())
 		GOTO(SOLID);
 	bool overalls; // needs the super jump slam overalls
-	if (mem_[wTransformation] == TRANSFORMATION_FAT_WARIO) {
-		if (!(mem_[wCollisionPoints] & (COLLISION_UNK1 | COLLISION_UNK6)))
+	if (mem_.transformation() == TRANSFORMATION_FAT_WARIO) {
+		if (!(mem_.collision_points() & (COLLISION_UNK1 | COLLISION_UNK6)))
 			GOTO(SOLID);
 		overalls = false;
 	} else {
-		if (mem_[wPowerUpLevel] < GARLIC)
+		if (mem_.power_up_level() < GARLIC)
 			GOTO(SOLID);
 		if (coll_bit(COLLISION_UNK4_F)) {
-			if (mem_[wAttackCounter])
+			if (mem_.attack_counter())
 				overalls = false;
-			else if (mem_[wIsRolling])
+			else if (mem_.is_rolling())
 				overalls = n == 1; // only Func_190fe checks them when rolling
 			else
 				GOTO(SOLID);
 		} else if (coll_bit(COLLISION_UNK5_F) || coll_bit(COLLISION_UNK3_F)) {
-			if (mem_[wPowerUpLevel] < HEAD_SMASH_HELMET || (!mem_[wJumpVelTable] && !mem_[wSwimVelIndex]))
+			if (mem_.power_up_level() < HEAD_SMASH_HELMET || (!mem_.jump_vel_table() && !mem_.swim_vel_index()))
 				GOTO(SOLID);
 			overalls = false;
 		} else {
-			if (!(mem_[wCollisionPoints] & (COLLISION_UNK1 | COLLISION_UNK6)))
+			if (!(mem_.collision_points() & (COLLISION_UNK1 | COLLISION_UNK6)))
 				GOTO(SOLID);
 			overalls = true;
 		}
 	}
-	if (overalls && mem_[wPowerUpLevel] < SUPER_JUMP_SLAM_OVERALLS)
+	if (overalls && mem_.power_up_level() < SUPER_JUMP_SLAM_OVERALLS)
 		GOTO(SOLID);
-	mem_[wMultiBlockParam] = n;
+	mem_.multi_block_param() = n;
 	GOTO(ADDR_Func_193dc);
 }
 
@@ -1401,7 +1401,7 @@ void BlockFuncs::ball_o_string_block()
 {
 	if (!wario_flag())
 		GOTO(SOLID);
-	GOTO(mem_[wTransformation] == TRANSFORMATION_BALL_O_STRING_WARIO ? ADDR_Func_19481 : SOLID);
+	GOTO(mem_.transformation() == TRANSFORMATION_BALL_O_STRING_WARIO ? ADDR_Func_19481 : SOLID);
 }
 
 #undef GOTO

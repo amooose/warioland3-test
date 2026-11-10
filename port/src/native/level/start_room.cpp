@@ -6,6 +6,7 @@
 // They call much that's still C with its registers, and the room drawing's
 // queues read the stack (the asm's return addresses, see HANDOFF.md), so
 // these keep the original's registers, flags and return addresses.
+#include "room_gfx.hpp"
 #include "frame.hpp"
 #include "../flags.hpp"
 #include "../native.hpp"
@@ -18,6 +19,9 @@
 #include <initializer_list>
 
 namespace wl3::level {
+
+void queue_block_tiles_along_row(GB *gb, uint16_t block, bool odd); // scroll.cpp
+void queue_block_attributes_along_row(GB *gb, uint16_t block, bool odd);
 
 namespace {
 
@@ -45,7 +49,7 @@ private:
 	bool cf() const { return cpu_.f & FLAG_C; }
 	void sram_switch(uint8_t bank)
 	{
-		mem_[wSRAMBank] = bank;
+		mem_.sram_bank() = bank;
 		mem_[rRAMB + 0x100] = bank;
 	}
 	void xor_a()
@@ -75,21 +79,21 @@ private:
 	// ld a, [wceef] / and %00111100: from a saved level
 	bool from_saved_level()
 	{
-		cpu_.a = mem_[wceef] & 0x3c;
+		cpu_.a = mem_.unk_ceef() & 0x3c;
 		cpu_.f = flags::and_(cpu_.a);
 		return cpu_.a;
 	}
 	// ld a, [wCameraConfigFlags] / bit n, a
 	bool cam_bit(int n)
 	{
-		cpu_.a = mem_[wCameraConfigFlags];
+		cpu_.a = mem_.camera_config_flags();
 		cpu_.f = flags::bit(cpu_.f, cpu_.a, n);
 		return cpu_.a & (1 << n);
 	}
 	// ld a, [wCameraConfigFlags] / and CAM_SCROLLING_MASK / cp v
 	void cam_cp(uint8_t v)
 	{
-		cpu_.a = mem_[wCameraConfigFlags] & CAM_SCROLLING_MASK;
+		cpu_.a = mem_.camera_config_flags() & CAM_SCROLLING_MASK;
 		cpu_.f = flags::cp(cpu_.a, v);
 	}
 	void ld_cp(uint16_t addr, uint8_t v)
@@ -119,7 +123,7 @@ private:
 		mem_[addr] = static_cast<uint8_t>(v >> 8);
 		mem_[addr + 1] = static_cast<uint8_t>(v);
 	}
-	bool cam_border(int bit) const { return mem_[wCameraConfigFlags] & (1 << bit); }
+	bool cam_border(int bit) const { return mem_.camera_config_flags() & (1 << bit); }
 	void draw_room_column(uint16_t queue);
 	void queue_row_tiles_and_attributes();
 	void call_in_sram1(uint16_t addr);
@@ -140,10 +144,10 @@ void RoomStart::spawn_if_in_range(uint8_t index, home::ObjMapBlock block)
 {
 	if (index >= 0x0f)
 		return; // Wario's spawn block
-	if (static_cast<uint8_t>(mem_[wc0c7] - 1) < block.col || mem_[wc0c6] > block.col)
+	if (static_cast<uint8_t>(mem_.unk_c0c7() - 1) < block.col || mem_.unk_c0c6() > block.col)
 		return;
-	uint8_t sub = mem_[wccec] == 1 ? 0 : 0x20;
-	if (static_cast<uint8_t>(mem_[wc0c4] - sub - 1) < block.row || static_cast<uint8_t>(mem_[wc0c5] - sub) > block.row)
+	uint8_t sub = mem_.unk_ccec() == 1 ? 0 : 0x20;
+	if (static_cast<uint8_t>(mem_.unk_c0c4() - sub - 1) < block.row || static_cast<uint8_t>(mem_.unk_c0c5() - sub) > block.row)
 		return;
 
 	// .spawn
@@ -161,7 +165,7 @@ void RoomStart::spawn_objects()
 	for (int i = 0; i < 4; i++)
 		mem_[hXPosLo - i] = mem_[wBlockXPos + 1 - i];
 	home::ObjMapBlock block = obj_map_at_hpos();
-	mem_[wUnused_ObjectParity] = 1;
+	mem_.unused_object_parity() = 1;
 	block.parity = 1;
 	for (int rows = 0x10; rows; rows--) {
 		for (int pairs = 16 / 2; pairs; pairs--) {
@@ -184,12 +188,12 @@ home::ObjMapBlock RoomStart::obj_map_at_hpos()
 {
 	home::ObjMapBlock block = home::obj_map_block(gb_, hYPosHi);
 	uint8_t bank = 0x01;
-	uint8_t row = mem_[wObjectSpawnBlockY];
+	uint8_t row = mem_.object_spawn_block_y();
 	for (int i = 0; i < 2 && row >= 0xc0; i++) {
 		bank++;
 		row = static_cast<uint8_t>(row - 0x20);
 	}
-	mem_[wccec] = bank;
+	mem_.unk_ccec() = bank;
 	sram_switch(bank);
 	block.row = row;
 	return block;
@@ -201,8 +205,8 @@ void RoomStart::next_obj_map_row(home::ObjMapBlock &block)
 	block.col = static_cast<uint8_t>(block.col - 0x08);
 	if (++block.row == 0xc0) {
 		block.row = sLevelBlockObjectMap >> 8;
-		mem_[wccec] = static_cast<uint8_t>(mem_[wccec] + 1);
-		sram_switch(mem_[wccec]);
+		mem_.unk_ccec() = static_cast<uint8_t>(mem_.unk_ccec() + 1);
+		sram_switch(mem_.unk_ccec());
 	}
 }
 
@@ -243,13 +247,13 @@ bool RoomStart::cap_high(uint16_t scroll, uint8_t span, uint8_t wide_span, int b
 // the camera scroll for a new room or the level's start
 void RoomStart::set_initial_camera_scroll()
 {
-	mem_[wCameraRoomXScrollLimit] = 0;
-	uint8_t mode = mem_[wCameraConfigFlags] & CAM_SCROLLING_MASK;
+	mem_.camera_room_x_scroll_limit() = 0;
+	uint8_t mode = mem_.camera_config_flags() & CAM_SCROLLING_MASK;
 	if (mode == (CAM_XSCROLL2 | CAM_TRANSITIONS) || mode == CAM_YSCROLL) { // the x scroll at Wario's
-		mem_[wCameraSCX + 0] = mem_[wWarioXPos + 0];
+		mem_[wCameraSCX + 0] = mem_.wario_x().hi();
 		mem_[wCameraSCX + 1] = 0x30;
 	} else {
-		uint8_t spacing = static_cast<uint8_t>(mem_[mem_[wDirection] ? wCamRightSpacing : wCamLeftSpacing] - 8);
+		uint8_t spacing = static_cast<uint8_t>(mem_[mem_.direction() ? wCamRightSpacing : wCamLeftSpacing] - 8);
 		uint16_t v = scroll_minus(wCameraSCX, wWarioXPos, spacing, CAM_BORDER_LEFT_F);
 		if (!cap_low(wCameraSCX, v, wRoomLeftXLimit, wCameraRoomXScrollLimit))
 			cap_high(wCameraSCX, sLevelBlockObjectMap >> 8, 0xc0, CAM_BORDER_RIGHT_F, wRoomRightXLimit,
@@ -257,11 +261,11 @@ void RoomStart::set_initial_camera_scroll()
 	}
 
 	// .check_if_saved_level: no y scroll to handle
-	if ((mem_[wceef] & 0b00111100) && mode >= CAM_TRANSITIONS)
+	if ((mem_.unk_ceef() & 0b00111100) && mode >= CAM_TRANSITIONS)
 		return;
 
 	// .handle_cam_y_scroll
-	mem_[wCameraRoomYScrollLimit] = 0;
+	mem_.camera_room_y_scroll_limit() = 0;
 	uint16_t v = scroll_minus(wCameraSCY, wWarioYPos, 0x60, CAM_BORDER_UP_F);
 	if (cap_low(wCameraSCY, v, wRoomUpperYLimit, wCameraRoomYScrollLimit))
 		return;
@@ -271,16 +275,16 @@ void RoomStart::set_initial_camera_scroll()
 	// .check_transitions: the floor Wario's on
 	if (mode < CAM_TRANSITIONS)
 		return;
-	if (mem_[wWarioYPos + 1] >= 0x80) {
+	if (mem_.wario_y().lo() >= 0x80) {
 		mem_[wCameraSCY + 1] = 0x68;
 		return;
 	}
-	uint8_t upper = mem_[wRoomUpperYLimit];
-	uint8_t hi = static_cast<uint8_t>(mem_[wWarioYPos + 0] - 1);
+	uint8_t upper = mem_.room_upper_y_limit();
+	uint8_t hi = static_cast<uint8_t>(mem_.wario_y().hi() - 1);
 	mem_[wCameraSCY + 0] = hi;
 	if (hi < upper) { // .cap_up_side
 		mem_[wCameraSCY + 0] = upper;
-		mem_[wCameraRoomYScrollLimit] = 1;
+		mem_.camera_room_y_scroll_limit() = 1;
 		return;
 	}
 	if (!(hi & 0x80)) {
@@ -288,7 +292,7 @@ void RoomStart::set_initial_camera_scroll()
 		return;
 	}
 	mem_[wCameraSCY + 0] = 0;
-	mem_[wCameraRoomYScrollLimit] = 1;
+	mem_.camera_room_y_scroll_limit() = 1;
 }
 
 // the scroll's low byte to rSC* and wSC* (and to [scroll + 1], if store)
@@ -305,7 +309,7 @@ void RoomStart::set_scroll(uint16_t scroll, uint16_t reg, uint16_t wreg, uint8_t
 void RoomStart::apply_initial_camera_scroll()
 {
 	uint16_t scy = be(wCameraSCY);
-	uint8_t limit = mem_[wCameraRoomYScrollLimit];
+	uint8_t limit = mem_.camera_room_y_scroll_limit();
 	if (limit == 1) { // .on_upper_edge
 		uint8_t v = cam_border(CAM_BORDER_UP_F) ? 0x20 : 0x00;
 		set_scroll(wCameraSCY, rSCY, wSCY, v, true);
@@ -321,7 +325,7 @@ void RoomStart::apply_initial_camera_scroll()
 
 	// .cam_x_scroll
 	uint16_t scx = be(wCameraSCX);
-	limit = mem_[wCameraRoomXScrollLimit];
+	limit = mem_.camera_room_x_scroll_limit();
 	if (limit == 1) { // .on_left_edge
 		uint8_t v = cam_border(CAM_BORDER_LEFT_F) ? 0x20 : 0x00;
 		set_scroll(wCameraSCX, rSCX, wSCX, v, true);
@@ -343,11 +347,11 @@ void RoomStart::apply_initial_camera_scroll()
 // spawn block ($f) found in the object map there
 void RoomStart::set_wario_position_to_spawn()
 {
-	uint8_t spawn = mem_[wWarioSpawnPos];
-	mem_[hXPosLo] = 0;
-	mem_[hXPosHi] = spawn & 0x0f;
-	mem_[hYPosLo] = 0;
-	mem_[hYPosHi] = spawn >> 4;
+	uint8_t spawn = mem_.wario_spawn_pos();
+	mem_.x_pos_lo() = 0;
+	mem_.x_pos_hi() = spawn & 0x0f;
+	mem_.y_pos_lo() = 0;
+	mem_.y_pos_hi() = spawn >> 4;
 	home::ObjMapBlock block = obj_map_at_hpos();
 	// the spawn block's nybble ($f), on from the parity Func_cc0 gave
 	for (;; next_obj_map_row(block)) {
@@ -374,7 +378,7 @@ void RoomStart::set_wario_position_to_spawn()
 	home::obj_map_block_to_hpos(gb_, block);
 	for (int i = 0; i < 4; i++) // update_pos
 		mem_[wWarioPos + i] = mem_[hPos + i];
-	if ((mem_[wCameraConfigFlags] & CAM_SCROLLING_MASK) < CAM_TRANSITIONS || (mem_[wceef] & 0x3c))
+	if ((mem_.camera_config_flags() & CAM_SCROLLING_MASK) < CAM_TRANSITIONS || (mem_.unk_ceef() & 0x3c))
 		return;
 	home::update_floor(gb_);
 }
@@ -398,29 +402,27 @@ void RoomStart::queue_row_tiles_and_attributes()
 {
 	// the BG map addresses down the column (from GetBlockBGPtr's hl; the
 	// queue's index wraps in its page, as the asm's inc e)
-	routines_.call(ADDR_GetBlockBGPtr);
-	uint16_t bg = REG_HL(gb_);
-	uint8_t at = static_cast<uint8_t>(wBGMapAddressQueue + mem_[wBGMapAddressQueueSize]);
+	uint16_t bg = level::block_bg_ptr(gb_);
+	uint8_t at = static_cast<uint8_t>(wBGMapAddressQueue + mem_.bg_map_address_queue_size());
 	for (int i = 0; i < TILEMAP_HEIGHT; i++) {
 		mem_[static_cast<uint16_t>((wBGMapAddressQueue & 0xff00) | at++)] = static_cast<uint8_t>(bg >> 8);
 		mem_[static_cast<uint16_t>((wBGMapAddressQueue & 0xff00) | at++)] = static_cast<uint8_t>(bg);
 		bg = static_cast<uint16_t>((bg + TILEMAP_WIDTH) & 0xfbff); // wrapping in the BG map
 	}
-	mem_[wBGMapAddressQueueSize] = static_cast<uint8_t>(mem_[wBGMapAddressQueueSize] + 2 * TILEMAP_HEIGHT);
+	mem_.bg_map_address_queue_size() = static_cast<uint8_t>(mem_.bg_map_address_queue_size() + 2 * TILEMAP_HEIGHT);
 
-	// the tiles and attributes of the column's blocks: the queue routines
-	// take the block pointer in hl
-	SET_HL(gb_, home::block_ptr(gb_, wBlockPos).ptr);
-	sram_switch(mem_[wBlockPtrBank]);
-	bool odd = mem_[wBlockXPos + 1] & 0x08;
-	uint16_t block = REG_HL(gb_);
-	routines_.farcall(BANK_QueueBlockTilesAlongRow_OddColumn,
-		odd ? ADDR_QueueBlockTilesAlongRow_OddColumn : ADDR_QueueBlockTilesAlongRow_EvenColumn);
-	SET_HL(gb_, block);
-	sram_switch(mem_[wBlockPtrBank]);
-	routines_.farcall(BANK_QueueBlockTilesAlongRow_OddColumn,
-		odd ? ADDR_QueueBlockAttributesAlongRow_OddColumn : ADDR_QueueBlockAttributesAlongRow_EvenColumn);
-	mem_[wBGMapTileQueueSize] = static_cast<uint8_t>(mem_[wBGMapTileQueueSize] + TILEMAP_WIDTH);
+	// the tiles and attributes of the column's blocks, from its block pointer
+	uint16_t block = home::block_ptr(gb_, wBlockPos).ptr;
+	sram_switch(mem_.block_ptr_bank());
+	bool odd = mem_.block_x().lo() & 0x08;
+	routines_.in_bank(BANK_QueueBlockTilesAlongRow_OddColumn,
+		odd ? ADDR_QueueBlockTilesAlongRow_OddColumn : ADDR_QueueBlockTilesAlongRow_EvenColumn,
+		[&] { queue_block_tiles_along_row(gb_, block, odd); });
+	sram_switch(mem_.block_ptr_bank());
+	routines_.in_bank(BANK_QueueBlockTilesAlongRow_OddColumn,
+		odd ? ADDR_QueueBlockAttributesAlongRow_OddColumn : ADDR_QueueBlockAttributesAlongRow_EvenColumn,
+		[&] { queue_block_attributes_along_row(gb_, block, odd); });
+	mem_.bg_map_tile_queue_size() = static_cast<uint8_t>(mem_.bg_map_tile_queue_size() + TILEMAP_WIDTH);
 }
 
 // draws all of the room that the BG map shows, column by column
@@ -428,18 +430,18 @@ void RoomStart::draw_room()
 {
 	for (int i = 0; i < 4; i++)
 		mem_[wBackupBlockPos + i] = mem_[wBlockPos + i];
-	mem_[wDrawRoomWidthLoopVar] = TILEMAP_WIDTH;
+	mem_.draw_room_width_loop_var() = TILEMAP_WIDTH;
 	do {
 		queue_row_tiles_and_attributes();
 		draw_room_column(wBGMapTileVRAM0Queue);
 		mem_[rVBK] = 1; // BANK("VRAM1")
 		draw_room_column(wBGMapTileVRAM1Queue);
 		mem_[rVBK] = 0;
-		mem_[wBGMapAddressQueueSize] = 0;
-		mem_[wBGMapTileQueueSize] = 0;
+		mem_.bg_map_address_queue_size() = 0;
+		mem_.bg_map_tile_queue_size() = 0;
 		set_be(wBlockXPos, static_cast<uint16_t>(be(wBlockXPos) + 0x08));
-		mem_[wDrawRoomWidthLoopVar] = static_cast<uint8_t>(mem_[wDrawRoomWidthLoopVar] - 1);
-	} while (mem_[wDrawRoomWidthLoopVar]);
+		mem_.draw_room_width_loop_var() = static_cast<uint8_t>(mem_.draw_room_width_loop_var() - 1);
+	} while (mem_.draw_room_width_loop_var());
 	for (int i = 0; i < 4; i++)
 		mem_[wBlockYPos + i] = mem_[wBackupBlockPos + i];
 }
@@ -461,7 +463,7 @@ void RoomStart::process_multi_block()
 	home::draw_wario(gb_);
 	farcall_obj_wram(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority);
 	home::clear_unused_virtual_oam(gb_);
-	uint8_t sram = mem_[wSRAMBank];
+	uint8_t sram = mem_.sram_bank();
 	sram_switch(SRAM1);
 	cpu_.ime = false; // di
 	level::set_tile_queue_processing_functions(gb_);
@@ -474,15 +476,15 @@ void RoomStart::process_multi_block()
 // 3 bits, until ProcessBlock leaves none
 void RoomStart::process_blocks()
 {
-	uint8_t param = static_cast<uint8_t>((mem_[wMultiBlockParam] & 0x0f) + 0x10);
-	mem_[wMultiBlockParam] = param;
-	mem_[wcede] = param & 0x08;
+	uint8_t param = static_cast<uint8_t>((mem_.multi_block_param() & 0x0f) + 0x10);
+	mem_.multi_block_param() = param;
+	mem_.unk_cede() = param & 0x08;
 
 	for (;;) {
 		// the next block from wcedb:wcedc (the map's rows run on into the
 		// next SRAM bank)
-		uint8_t bank = mem_[wcedb], row = mem_[wcedc + 0], column = mem_[wcedc + 1];
-		switch (mem_[wMultiBlockParam] & 0x07) {
+		uint8_t bank = mem_.unk_cedb(), row = mem_[wcedc + 0], column = mem_[wcedc + 1];
+		switch (mem_.multi_block_param() & 0x07) {
 		case 1: // the block on the right
 			column++;
 			break;
@@ -502,29 +504,29 @@ void RoomStart::process_blocks()
 			}
 			break;
 		}
-		mem_[wBlockPtrBank] = bank;
-		mem_[wBlockPtr + 0] = row;
-		mem_[wBlockPtr + 1] = column;
+		mem_.block_ptr_bank() = bank;
+		mem_.block_pointer().hi() = row;
+		mem_.block_pointer().lo() = column;
 
 		// .process_block
-		mem_[wMultiBlockParam] = mem_[wMultiBlockParam] & (0xff ^ 0x07);
+		mem_.multi_block_param() = mem_.multi_block_param() & (0xff ^ 0x07);
 		routines_.farcall(BANK_ProcessBlock, ADDR_ProcessBlock);
-		if (!(mem_[wMultiBlockParam] & 0x07))
+		if (!(mem_.multi_block_param() & 0x07))
 			break;
 		level::queue_changed_block(gb_);
 	}
 
 	// .break
-	mem_[wMultiBlockParam] = 0;
-	mem_[wIsFloorTransition] = 0;
-	mem_[wSubState] = mem_[wPendingSubState];
+	mem_.multi_block_param() = 0;
+	mem_.is_floor_transition() = 0;
+	mem_.sub_state() = mem_.pending_sub_state();
 }
 
 // ld a, [wSRAMBank] / push af / ld a, BANK("SRAM1") / sramswitch /
 // call addr / pop af / sramswitch
 void RoomStart::call_in_sram1(uint16_t addr)
 {
-	uint8_t sram = mem_[wSRAMBank];
+	uint8_t sram = mem_.sram_bank();
 	sram_switch(SRAM1);
 	routines_.call(addr);
 	sram_switch(sram);
@@ -533,14 +535,14 @@ void RoomStart::call_in_sram1(uint16_t addr)
 // a room from a transition (or the golf minigame)
 void RoomStart::from_transition()
 {
-	if ((mem_[wRoomTransitionParam] & ROOMTRANSITION_MASK) == ROOMTRANSITION_GOLF) { // the golf minigame
+	if ((mem_.room_transition_param() & ROOMTRANSITION_MASK) == ROOMTRANSITION_GOLF) { // the golf minigame
 		push_wram(0x03);
-		mem_[wTempAnimatedTilesFrameDuration] = mem_[wAnimatedTilesFrameDuration];
-		mem_[wTempAnimatedTilesGroup] = mem_[wAnimatedTilesGfx];
+		mem_.temp_animated_tiles_frame_duration() = mem_.animated_tiles_frame_duration();
+		mem_.temp_animated_tiles_group() = mem_.animated_tiles_gfx();
 		pop_wram();
-		mem_[wPendingSubState] = mem_[wSubState];
-		mem_[wState] = ST_GOLF;
-		mem_[wSubState] = 0;
+		mem_.pending_sub_state() = mem_.sub_state();
+		mem_.state() = ST_GOLF;
+		mem_.sub_state() = 0;
 		return;
 	}
 
@@ -552,21 +554,21 @@ void RoomStart::from_transition()
 	pop_wram();
 
 	sram_switch(0x00);
-	if ((mem_[wRoomTransitionParam] & ROOMTRANSITION_MASK) == ROOMTRANSITION_TELEPORT) {
-		mem_[wWarioYPos + 0] = 0x01;
-		mem_[wWarioXPos + 0] = 0;
+	if ((mem_.room_transition_param() & ROOMTRANSITION_MASK) == ROOMTRANSITION_TELEPORT) {
+		mem_.wario_y().hi() = 0x01;
+		mem_.wario_x().hi() = 0;
 	}
 	// .not_teleport: up a block
 	set_be(wWarioYPos, static_cast<uint16_t>(be(wWarioYPos) - 0x10));
-	uint8_t y_hi = mem_[wWarioYPos + 0];
-	mem_[wUnused_ca6c] = static_cast<uint8_t>(mem_[wWarioXPos + 0] | (y_hi << 4 | y_hi >> 4));
+	uint8_t y_hi = mem_.wario_y().hi();
+	mem_.unused_ca6c() = static_cast<uint8_t>(mem_.wario_x().hi() | (y_hi << 4 | y_hi >> 4));
 
 	// the next room's ID from Wario's position
-	mem_[wLevelRoomID] = static_cast<uint8_t>(mem_[wWarioPos + 2] + 10 * mem_[wWarioPos]); // GetNextLevelRoomID
+	mem_.level_room_id() = static_cast<uint8_t>(mem_[wWarioPos + 2] + 10 * mem_.wario_pos()); // GetNextLevelRoomID
 
 	clear({wFloorTransitionDir, wFloorTransitionTimer, wCameraYDelta, wCameraXDelta, wScrollUpEdge,
 		wScrollDownEdge, wGroundShakeCounter, wSCYShake});
-	mem_[wTempLevelRoomID] = mem_[wLevelRoomID];
+	mem_.temp_level_room_id() = mem_.level_room_id();
 
 	push_wram(GFX_RAM);
 	routines_.call(ADDR_LoadRoom);
@@ -579,19 +581,19 @@ void RoomStart::from_transition()
 	routines_.call(ADDR_SetInitialCameraScroll);
 	routines_.call(ADDR_ApplyInitialCameraScroll);
 
-	if (mem_[wRoomTransitionParam] & (1 << ROOMTRANSITIONF_RELOAD_OBJECTS_F))
+	if (mem_.room_transition_param() & (1 << ROOMTRANSITIONF_RELOAD_OBJECTS_F))
 		routines_.call(ADDR_ReloadLevelObjects);
 	// .no_object_reloading
-	mem_[wRoomTransitionParam] = 0;
+	mem_.room_transition_param() = 0;
 
 	routines_.call(ADDR_UpdateSwitchableBlocks);
 	call_in_sram1(ADDR_DrawRoom_FromStart);
 	call_in_sram1(ADDR_Func_896f);
 	level::set_wario_screen_pos(gb_);
 
-	if (mem_[wWarioState] == WST_ENTERING_DOOR) {
-		mem_[wFrameDuration] = 0;
-		mem_[wAnimationFrame] = 0;
+	if (mem_.wario_state() == WST_ENTERING_DOOR) {
+		mem_.frame_duration() = 0;
+		mem_.animation_frame() = 0;
 		mem_[wWarioFramesetPtr + 0] = ADDR_Frameset_14d18 >> 8;
 		mem_[wWarioFramesetPtr + 1] = static_cast<uint8_t>(ADDR_Frameset_14d18);
 		routines_.farcall(OAM1, ADDR_UpdateWarioAnimation);
@@ -599,8 +601,8 @@ void RoomStart::from_transition()
 
 	// .not_entering_door
 	home::update_level_music(gb_);
-	mem_[wBlockFuncWarioFlag] = FALSE;
-	mem_[wIsFloorTransition] = 0;
+	mem_.block_func_wario_flag() = FALSE;
+	mem_.is_floor_transition() = 0;
 	push_wram(BANK_wObjects);
 	routines_.in_bank(BANK_UpdateObjects, ADDR_UpdateObjects, [&] { level::update_objects(gb_); });
 	routines_.in_bank(BANK_UpdateObjects, ADDR_UpdateObjects, [&] { level::update_objects(gb_); });
@@ -612,15 +614,15 @@ void RoomStart::from_transition()
 	push_wram(BANK_wObjects);
 	routines_.in_bank(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, [&] { level::draw_objects_with_priority(gb_); });
 	pop_wram();
-	mem_[wIsIntangible] = 0;
-	mem_[wSubState] = 0x02;
+	mem_.is_intangible() = 0;
+	mem_.sub_state() = 0x02;
 	mem_[rLCDC] = LCDC_DEFAULT;
 }
 
 // the level's first room (or the saved level's)
 void RoomStart::from_level_start()
 {
-	mem_[wIsBossBattle] = FALSE;
+	mem_.is_boss_battle() = FALSE;
 
 	if (!from_saved_level()) {
 		clear({wLevelRoomID, wUnused_ca6c, wTempLevelRoomID});
@@ -643,7 +645,7 @@ void RoomStart::from_level_start()
 		pop_wram();
 	} else {
 		// .skip_init_vars_and_objects
-		mem_[wLevelRoomID] = mem_[wTempLevelRoomID];
+		mem_.level_room_id() = mem_.temp_level_room_id();
 		home::load_wario_gfx(gb_);
 	}
 
@@ -655,7 +657,7 @@ void RoomStart::from_level_start()
 
 	if (!from_saved_level()) {
 		routines_.call(ADDR_SetWarioPositionToSpawn);
-		mem_[wDirection] = DIRECTION_RIGHT;
+		mem_.direction() = DIRECTION_RIGHT;
 		routines_.farcall(BANK_SetState_Idling, ADDR_SetState_Idling);
 		set_be(wWarioPalsPtr, ADDR_WarioDefaultPal);
 		// CopyHLToDE_Short takes hl, de and b
@@ -679,7 +681,7 @@ void RoomStart::from_level_start()
 		call_in_sram1(ADDR_Func_896f);
 
 	// .asm_88b7
-	if (mem_[wLevel] == THE_TEMPLE) {
+	if (mem_.level() == THE_TEMPLE) {
 		uint8_t scy = mem_[wCameraSCY + 1];
 		for (uint16_t addr : std::initializer_list<uint16_t>{wc08a, wHiddenFigureSCYShake, wSCY, rSCY})
 			mem_[addr] = scy;
@@ -690,10 +692,10 @@ void RoomStart::from_level_start()
 
 	// .not_the_temple
 	level::set_wario_screen_pos(gb_);
-	mem_[wBlockFuncWarioFlag] = FALSE;
+	mem_.block_func_wario_flag() = FALSE;
 
 	if (!from_saved_level()) {
-		mem_[wIsFloorTransition] = FALSE;
+		mem_.is_floor_transition() = FALSE;
 		push_wram(BANK_wObjects);
 		// the objects updated twice
 		routines_.in_bank(BANK_UpdateObjects, ADDR_UpdateObjects, [&] { level::update_objects(gb_); });
@@ -701,14 +703,14 @@ void RoomStart::from_level_start()
 		pop_wram();
 	} else {
 		// .asm_8917
-		mem_[wIsFloorTransition] = TRUE;
+		mem_.is_floor_transition() = TRUE;
 		push_wram(BANK_wObjects);
 		routines_.in_bank(BANK_UpdateObjects, ADDR_UpdateObjects, [&] { level::update_objects(gb_); });
 		pop_wram();
 	}
 
 	// .draw_objs
-	mem_[wIsFloorTransition] = FALSE;
+	mem_.is_floor_transition() = FALSE;
 	push_wram(BANK_wObjects);
 	routines_.in_bank(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority, [&] { level::draw_objects_no_priority(gb_); });
 	pop_wram();

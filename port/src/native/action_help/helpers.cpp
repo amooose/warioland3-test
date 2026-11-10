@@ -255,13 +255,13 @@ void Demo::load_object_sprite(MenuObject obj)
 void Demo::load_wario_sprite()
 {
 	wario().set_cur_sprite();
-	routines_.in_bank(0x05, ADDR_LoadSprite, [&] { home::load_sprite(gb_, static_cast<uint16_t>(mem_[wActionHelpWarioOAMPtr] << 8 | mem_[wActionHelpWarioOAMPtr + 1])); });
+	routines_.in_bank(0x05, ADDR_LoadSprite, [&] { home::load_sprite(gb_, static_cast<uint16_t>(mem_.action_help_wario_oam_ptr() << 8 | mem_[wActionHelpWarioOAMPtr + 1])); });
 }
 
 void SpecialDemo::load_wario_sprite_from_bank()
 {
 	wario().set_cur_sprite();
-	SET_HL(gb_, static_cast<uint16_t>(mem_[wActionHelpWarioOAMPtr] << 8 | mem_[wActionHelpWarioOAMPtr + 1]));
+	SET_HL(gb_, static_cast<uint16_t>(mem_.action_help_wario_oam_ptr() << 8 | mem_[wActionHelpWarioOAMPtr + 1]));
 	uint8_t bank = wram_.action_help_wario_oam_bank();
 	wram_.temp_bank() = bank;
 	routines_.farcall(bank, ADDR_LoadSprite);

@@ -745,7 +745,7 @@ PORT_LOCAL_EX(VBlank_1c84e0, Func, 0, 0)
 	wl3::Memory mem(gb);
 	gb->cpu.a = 0x01; // BANK("Golf RAM")
 	mem[rWBK] = gb->cpu.a;
-	gb->cpu.a = mem[wSCX];
+	gb->cpu.a = mem.scx();
 	mem[rSCX] = gb->cpu.a;
 	gb->cpu.a = static_cast<uint8_t>(wVirtualOAM >> 8);
 	gb_tail_jump(gb, hTransferVirtualOAM);

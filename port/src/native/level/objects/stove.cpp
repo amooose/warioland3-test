@@ -33,9 +33,9 @@ void Stove::init()
 	flags() = (flags() & ~OBJFLAG_INVISIBLE) | OBJFLAG_NO_COLLISION;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	set_update(UPDATE);
-	mem_[wCurObjCollBoxRight] = 10;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-9);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-9);
+	mem_.cur_obj_coll_box_right() = 10;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-9);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-9);
 	set_frameset(ADDR_Frameset_69615);
 	var1() = 0;
 }
@@ -51,7 +51,7 @@ void Stove::update()
 	case OBJSTATE_ATTACKED_RIGHT: pushed(false); return;
 	case OBJSTATE_ATTACKED_RIGHT_START: start_push(OBJSTATE_ATTACKED_RIGHT); return;
 	case OBJSTATE_VANISH_TOUCH: // .VanishTouch: Wario's set on fire
-		if (mem_[wTransformation]) {
+		if (mem_.transformation()) {
 			vanish();
 			return;
 		}
@@ -78,14 +78,14 @@ void Stove::set_fall()
 void Stove::fall()
 {
 	apply_y_movement(ADDR_Data_605e0);
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_unk1())
 		return;
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	state() = OBJSTATE_LAND;
 	if (!var1())
 		return;
@@ -110,7 +110,7 @@ void Stove::start_push(uint8_t s)
 // meets a wall
 void Stove::pushed(bool right)
 {
-	if (!(mem_[wGlobalCounter] & 0b111)) {
+	if (!(mem_.global_counter() & 0b111)) {
 		play_sfx(SFX_078);
 		if (!--var2()) {
 			set_land();
@@ -119,10 +119,10 @@ void Stove::pushed(bool right)
 	}
 	uint16_t y_pos = static_cast<uint16_t>(y() - 4);
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 10) : static_cast<uint16_t>(x() - 9);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4() & 0x0f) {
 		set_land();
 		return;
@@ -132,8 +132,8 @@ void Stove::pushed(bool right)
 
 bool Stove::ground_at(uint16_t x_pos)
 {
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	return hpos_block_unk2();
 }
 
@@ -141,13 +141,13 @@ bool Stove::ground_at(uint16_t x_pos)
 // the ground when it lands)
 void Stove::land()
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	bool on_floor = hpos_block_down() == 0x10;
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	if (on_floor)
 		return;
 	if (ground_at(static_cast<uint16_t>(x() - 7)))

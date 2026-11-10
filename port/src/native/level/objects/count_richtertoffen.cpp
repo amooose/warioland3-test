@@ -96,9 +96,9 @@ void Count::init()
 	flags() &= ~OBJFLAG_INVISIBLE;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	set_update(UPDATE);
-	mem_[wCurObjCollBoxRight] = 7;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-8);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-4);
+	mem_.cur_obj_coll_box_right() = 7;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-8);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-4);
 	run(RESET);
 }
 
@@ -131,10 +131,10 @@ void Count::start_jump()
 {
 	state() = OBJSTATE_SPECIAL_1;
 	bool right;
-	if (mem_[wTransformation] == TRANSFORMATION_FLAT_WARIO) {
+	if (mem_.transformation() == TRANSFORMATION_FLAT_WARIO) {
 		right = !facing_right();
 	} else {
-		uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+		uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 		right = static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 	}
 	jump(right);
@@ -152,10 +152,10 @@ void Count::hop_along()
 	bool right = facing_right();
 	uint16_t y_pos = static_cast<uint16_t>(y() - 10);
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 7) : static_cast<uint16_t>(x() - 8);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (!(hpos_block_unk4() & 0x0f)) {
 		right ? move_right() : move_left();
 		return;
@@ -171,7 +171,7 @@ void Count::hop_along()
 
 void Count::wario_above()
 {
-	uint16_t wario_y = static_cast<uint16_t>((mem_[wWarioYPos + 0] << 8 | mem_[wWarioYPos + 1]) - 8);
+	uint16_t wario_y = static_cast<uint16_t>(mem_.wario_y() - 8);
 	y() = wario_y;
 }
 
@@ -195,12 +195,12 @@ void Count::knocked(uint8_t s, uint8_t var2_)
 
 bool Count::shrugs_off()
 {
-	return !mem_[wTransformation] && mem_[wEffectivePowerUp] < GARLIC && (interaction() & INTERACTION_MASK);
+	return !mem_.transformation() && mem_.effective_power_up() < GARLIC && (interaction() & INTERACTION_MASK);
 }
 
 void Count::wobble(uint8_t s)
 {
-	mem_[wCurObjAction] = 15 | (1 << 7);
+	mem_.cur_obj_action() = 15 | (1 << 7);
 	state() = s;
 	set_frameset(ADDR_Frameset_683d9);
 	state_duration() = 4;
@@ -229,14 +229,14 @@ void Count::run(uint16_t handler)
 {
 	switch (handler) {
 	case VANISH_TOUCH: // pounded: wobbles, unless Wario's strong enough
-		if (!mem_[wCurObjAction] || mem_[wTransformation] || mem_[wEffectivePowerUp] >= SUPER_JUMP_SLAM_OVERALLS
+		if (!mem_.cur_obj_action() || mem_.transformation() || mem_.effective_power_up() >= SUPER_JUMP_SLAM_OVERALLS
 			|| !(interaction() & INTERACTION_MASK)) {
 			call_home(ADDR_VanishObject2);
 			return;
 		}
 		play_sfx(SFX_014);
 		{
-			uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+			uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 			run(static_cast<uint8_t>(screen_x() + 0x2a) >= wario ? WOBBLE_LEFT : WOBBLE_RIGHT);
 		}
 		return;
@@ -256,7 +256,7 @@ void Count::run(uint16_t handler)
 		return;
 	case STATE_5A:
 		if (state_duration() == 20) {
-			if (mem_[wAutoMoveState]) {
+			if (mem_.auto_move_state()) {
 				call_home(ADDR_MoveObjectDown_Fast);
 				return;
 			}
@@ -264,7 +264,7 @@ void Count::run(uint16_t handler)
 		}
 		if (--state_duration())
 			return;
-		mem_[wCurObjAction] = 31 | (1 << 7);
+		mem_.cur_obj_action() = 31 | (1 << 7);
 		start_jump();
 		return;
 	case RESET:
@@ -290,21 +290,21 @@ void Count::run(uint16_t handler)
 			start_jump();
 			return;
 		}
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		if (!hpos_block_down()) {
 			state() = OBJSTATE_STANDING_FALL_START;
 			return;
 		}
-		mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-		mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+		mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+		mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 		return;
 	case BUMP: { // hops away from Wario
 		state() = OBJSTATE_SPECIAL_1;
 		uint8_t count = static_cast<uint8_t>(screen_x() + 0x2a);
-		jump(static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a) < count);
+		jump(static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a) < count);
 		return;
 	}
 	case JUMP_RISE:
@@ -314,10 +314,10 @@ void Count::run(uint16_t handler)
 		}
 		{
 			uint16_t y_pos = static_cast<uint16_t>(y() - 18);
-			mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-			mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-			mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-			mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+			mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+			mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+			mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+			mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		}
 		if (hpos_block_unk3() & 0x0f) { // the ceiling: turns and falls
 			var2() = 0x01;
@@ -329,13 +329,13 @@ void Count::run(uint16_t handler)
 		hop_along();
 		return;
 	case JUMP_FALL: // lands with a ground shake (lost in water)
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		if (hpos_block_unk1()) {
-			mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-			mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+			mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+			mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 			state() = OBJSTATE_SPECIAL_3;
 			var3() = 0;
 			set_frameset(ADDR_Frameset_683d4);
@@ -344,7 +344,7 @@ void Count::run(uint16_t handler)
 			ground_shake(24);
 			return;
 		}
-		if (mem_[wIsInWaterOrSand]) {
+		if (mem_.is_in_water_or_sand()) {
 			call_home(ADDR_VanishObject2);
 			return;
 		}
@@ -440,7 +440,7 @@ void Count::run(uint16_t handler)
 		grab(OBJSTATE_49);
 		[[fallthrough]];
 	case STATE_49: // carried facing the way Wario does
-		if (mem_[wDirection]) {
+		if (mem_.direction()) {
 			call_home(ADDR_Func_3353);
 			return;
 		}
@@ -451,7 +451,7 @@ void Count::run(uint16_t handler)
 		grab(OBJSTATE_48);
 		[[fallthrough]];
 	case STATE_48:
-		if (!mem_[wDirection]) {
+		if (!mem_.direction()) {
 			call_home(ADDR_Func_3362);
 			return;
 		}
@@ -459,7 +459,7 @@ void Count::run(uint16_t handler)
 		run(STATE_19);
 		return;
 	case STATE_12:
-		mem_[wCurObjAction] = 31 | (1 << 7);
+		mem_.cur_obj_action() = 31 | (1 << 7);
 		state() = OBJSTATE_42;
 		var3() = 0;
 		set_interaction(OBJ_INTERACTION_00);

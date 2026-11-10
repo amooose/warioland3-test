@@ -42,7 +42,7 @@ private:
 
 void ZipLine::init()
 {
-	uint8_t id = mem_[wCurObjId];
+	uint8_t id = mem_.cur_obj_id();
 	var2() = id < ZIP_LINE4 ? 1 : 3;
 	if (id == ZIP_LINE4)
 		substate() &= ~OBJSUBFLAG_HDIR;
@@ -50,9 +50,9 @@ void ZipLine::init()
 		substate() |= OBJSUBFLAG_HDIR;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	flags() = (flags() & ~OBJFLAG_INVISIBLE) | OBJFLAG_NO_COLLISION;
-	mem_[wCurObjCollBoxRight] = 0x03;
-	mem_[wCurObjCollBoxLeft] = 0xfc;
-	mem_[wCurObjCollBoxBottom] = 0xfe;
+	mem_.cur_obj_coll_box_right() = 0x03;
+	mem_.cur_obj_coll_box_left() = 0xfc;
+	mem_.cur_obj_coll_box_bottom() = 0xfe;
 	var1() = WAITING;
 	reset();
 }
@@ -82,19 +82,17 @@ void ZipLine::idle()
 	}
 	if (!state()) {
 		// the asm adds c to both, which cancels out
-		uint8_t below = static_cast<uint8_t>(mem_[wWarioScreenYPos] - screen_y());
+		uint8_t below = static_cast<uint8_t>(mem_.wario_screen_y_pos() - screen_y());
 		if (below >= 0x10 && below < 0x18)
-			mem_[wCurObjAction] = 0;
+			mem_.cur_obj_action() = 0;
 		return;
 	}
 	set_update(RIDING);
 	var1() = CARRYING;
 	uint16_t wario_y = static_cast<uint16_t>(y() + 0x1b);
 	uint16_t wario_x = static_cast<uint16_t>(x() + 0x04);
-	mem_[wWarioYPos + 1] = static_cast<uint8_t>(wario_y);
-	mem_[wWarioYPos + 0] = static_cast<uint8_t>(wario_y >> 8);
-	mem_[wWarioXPos + 1] = static_cast<uint8_t>(wario_x);
-	mem_[wWarioXPos + 0] = static_cast<uint8_t>(wario_x >> 8);
+	mem_.wario_y() = wario_y;
+	mem_.wario_x() = wario_x;
 	set_frameset(facing_right() ? ADDR_Frameset_691d2 : ADDR_Frameset_691c9);
 }
 
@@ -107,7 +105,7 @@ void ZipLine::riding()
 		stop();
 		return;
 	}
-	if (mem_[wTransformation] == TRANSFORMATION_RAIL)
+	if (mem_.transformation() == TRANSFORMATION_RAIL)
 		return;
 	set_update(LET_GO);
 	state_duration() = 0x0a;
@@ -129,16 +127,16 @@ void ZipLine::move()
 	bool right = facing_right();
 	uint16_t y_pos = static_cast<uint16_t>(y() - 0x10);
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 7) : static_cast<uint16_t>(x() - 8);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4()) {
 		at_wall();
 		return;
 	}
 	along(right);
-	uint8_t id = mem_[wCurObjId];
+	uint8_t id = mem_.cur_obj_id();
 	if (id == ZIP_LINE1)
 		return;
 	bool even = !(id & 1);
@@ -147,7 +145,7 @@ void ZipLine::move()
 
 void ZipLine::at_wall()
 {
-	if (mem_[wCurObjId] < ZIP_LINE4) { // turns back
+	if (mem_.cur_obj_id() < ZIP_LINE4) { // turns back
 		if (facing_right()) {
 			substate() &= ~OBJSUBFLAG_HDIR;
 			set_frameset(ADDR_Frameset_691c9);
@@ -158,7 +156,7 @@ void ZipLine::at_wall()
 		return;
 	}
 	if (carrying()) {
-		mem_[wAutoMoveState] = 0;
+		mem_.auto_move_state() = 0;
 		play_sfx(SFX_129);
 	}
 	var1() = AT_END;
@@ -172,13 +170,10 @@ void ZipLine::along(bool right)
 	if (!carrying())
 		return;
 	move_wario(right ? ADDR_MoveWarioRight : ADDR_MoveWarioLeft, var2());
-	if (right)
-		routines_.farcall(BANK_Func_19706, ADDR_Func_19706);
-	else
-		routines_.farcall(BANK_Func_19713, ADDR_Func_19713);
-	if (mem_[wCurObjId] >= ZIP_LINE4)
+	wario_bottom_collision(right);
+	if (mem_.cur_obj_id() >= ZIP_LINE4)
 		return;
-	if (!(mem_[wGlobalCounter] & 0x1f))
+	if (!(mem_.global_counter() & 0x1f))
 		play_sfx(SFX_08C);
 }
 
@@ -194,9 +189,9 @@ void ZipLine::slope(bool up)
 	}
 	move_wario(ADDR_MoveWarioDown, var2());
 	home::handle_downwards_floor_transition(gb_);
-	if (mem_[wCurObjId] < ZIP_LINE4)
+	if (mem_.cur_obj_id() < ZIP_LINE4)
 		return;
-	if (!(mem_[wGlobalCounter] & 0b111))
+	if (!(mem_.global_counter() & 0b111))
 		play_sfx(SFX_ZIP_LINE_SLIDE);
 }
 
@@ -209,5 +204,5 @@ PORT_LOCAL_EX(ZipLineFunc, Func_49356, 0, ALL_REGISTERS) { ZipLine(gb).reset(); 
 PORT_LOCAL_EX(ZipLineFunc, Func_49369, 0, ALL_REGISTERS) { ZipLine(gb).idle(); }
 PORT_LOCAL_EX(ZipLineFunc, Func_493dc, 0, ALL_REGISTERS) { ZipLine(gb).riding(); }
 PORT_LOCAL_EX(ZipLineFunc, Func_49405, 0, ALL_REGISTERS) { ZipLine(gb).let_go(); }
-PORT_LOCAL_EX(ZipLineFunc, Func_49412, 0, ALL_REGISTERS) { wl3::Memory mem(gb); mem[wCurObjAction] = (1 << NO_ACTIONS_F) | 1; }
+PORT_LOCAL_EX(ZipLineFunc, Func_49412, 0, ALL_REGISTERS) { wl3::Memory mem(gb); mem.cur_obj_action() = (1 << NO_ACTIONS_F) | 1; }
 PORT_LOCAL_EX(ZipLineFunc, Func_49418, 0, ALL_REGISTERS) { ZipLine(gb).move(); }

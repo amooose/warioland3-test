@@ -47,7 +47,7 @@ protected:
 	void play_sfx(uint16_t sfx)
 	{
 		wr8(hSFXID + 0, static_cast<uint8_t>(sfx >> 8));
-		wr8(hSFXID + 1, static_cast<uint8_t>(sfx));
+		mem_.sfx().lo() = static_cast<uint8_t>(sfx);
 	}
 
 	// Wario's collision checks (farcalled): the result the asm leaves in b
@@ -77,14 +77,14 @@ protected:
 	// wDMASourceBank/Ptr = gfx, call LoadWarioGfx
 	void load_gfx(uint8_t bank, uint16_t ptr)
 	{
-		wr8(wDMASourceBank, bank);
+		mem_.dma_source_bank() = bank;
 		wr8(wDMASourcePtr + 0, static_cast<uint8_t>(ptr >> 8));
 		wr8(wDMASourcePtr + 1, static_cast<uint8_t>(ptr));
 		home::load_wario_gfx(gb_);
 	}
 	void set_oam(uint8_t bank, uint16_t ptr)
 	{
-		wr8(wWarioOAMBank, bank);
+		mem_.wario_oam_bank() = bank;
 		wr8(wWarioOAMPtr + 0, static_cast<uint8_t>(ptr >> 8));
 		wr8(wWarioOAMPtr + 1, static_cast<uint8_t>(ptr));
 	}
@@ -105,16 +105,16 @@ protected:
 	void coll_box_btlr() { collision_box(-1, -27, -9, 9); }
 	void collision_box(int8_t bottom, int8_t top, int8_t left, int8_t right)
 	{
-		wr8(wCollisionBoxBottom, static_cast<uint8_t>(bottom));
-		wr8(wCollisionBoxTop, static_cast<uint8_t>(top));
-		wr8(wCollisionBoxLeft, static_cast<uint8_t>(left));
-		wr8(wCollisionBoxRight, static_cast<uint8_t>(right));
+		mem_.collision_box_bottom() = static_cast<uint8_t>(bottom);
+		mem_.collision_box_top() = static_cast<uint8_t>(top);
+		mem_.collision_box_left() = static_cast<uint8_t>(left);
+		mem_.collision_box_right() = static_cast<uint8_t>(right);
 	}
 	// Wario's y from hYPos (where the last check left the point)
 	void update_pos_y()
 	{
-		wr8(wWarioYPos + 0, rd8(hYPosHi));
-		wr8(wWarioYPos + 1, rd8(hYPosHi + 1));
+		wr8(wWarioYPos + 0, mem_.y_pos_hi());
+		mem_.wario_y().lo() = rd8(hYPosHi + 1);
 	}
 	// hPos = Wario's position
 	void get_pos()
@@ -135,15 +135,15 @@ protected:
 	// the sfx every reload frames
 	void sfx_loop(uint8_t reload, uint16_t sfx)
 	{
-		uint8_t v = rd8(wSFXLoopCounter);
-		wr8(wSFXLoopCounter, static_cast<uint8_t>(v - 1));
+		uint8_t v = mem_.sfx_loop_counter();
+		mem_.sfx_loop_counter() = static_cast<uint8_t>(v - 1);
 		if (v >= 1)
 			return;
-		wr8(wSFXLoopCounter, reload);
+		mem_.sfx_loop_counter() = reload;
 		play_sfx(sfx);
 	}
 	bool room_transition() const { return ld_and(wRoomTransitionParam); }
-	bool still_in(uint8_t state) const { return rd8(wWarioState) == state; }
+	bool still_in(uint8_t state) const { return mem_.wario_state() == state; }
 	// farcall Func_19b25 / the room transition check; true if it started one
 	bool room_transition_check()
 	{
@@ -175,25 +175,25 @@ protected:
 	// cap wWalkVelIndex at max (to v)
 	void cap_walk(uint8_t max, uint8_t v)
 	{
-		if (rd8(wWalkVelIndex) >= max)
-			wr8(wWalkVelIndex, v);
+		if (mem_.walk_vel_index() >= max)
+			mem_.walk_vel_index() = v;
 	}
 	// The transformations' d-pad walk: false if neither way is held; else
 	// *turn when it points away from wDirection (which then takes it), or
 	// WalkIfPossible_Right / Left.
 	bool walk_or_turn(bool *turn)
 	{
-		uint8_t pad = rd8(wJoypadDown);
+		uint8_t pad = mem_.joypad_down();
 		if (pad & PAD_RIGHT) {
 			*turn = !facing_right();
 			if (*turn)
-				wr8(wDirection, DIRECTION_RIGHT);
+				mem_.direction() = DIRECTION_RIGHT;
 			else
 				FARCALL(WalkIfPossible_Right);
 		} else if (pad & PAD_LEFT) {
-			*turn = rd8(wDirection) != DIRECTION_LEFT;
+			*turn = mem_.direction() != DIRECTION_LEFT;
 			if (*turn)
-				wr8(wDirection, DIRECTION_LEFT);
+				mem_.direction() = DIRECTION_LEFT;
 			else
 				FARCALL(WalkIfPossible_Left);
 		} else {
@@ -202,21 +202,21 @@ protected:
 		return true;
 	}
 	// the jump velocity table's entry for wJumpVelIndex
-	uint8_t jump_vel(uint16_t table) const { return rd8(static_cast<uint16_t>(table + rd8(wJumpVelIndex))); }
+	uint8_t jump_vel(uint16_t table) const { return rd8(static_cast<uint16_t>(table + mem_.jump_vel_index())); }
 	// Wario moves by the jump velocity table (JumpVelTable_Normal) at wJumpVelIndex, up or down
 	// (MoveWarioUp / Down); rising, the index just goes up, else it stops
 	// at MAX_JUMP_VEL_INDEX. True if he rose.
 	bool jump_vel_move(uint16_t table = ADDR_JumpVelTable_Normal)
 	{
 		uint8_t v = jump_vel(table);
-		uint8_t index = static_cast<uint8_t>(rd8(wJumpVelIndex) + 1);
+		uint8_t index = static_cast<uint8_t>(mem_.jump_vel_index() + 1);
 		if (v & 0x80) {
 			move_y(-static_cast<uint8_t>(-v)); // cpl / inc a
-			wr8(wJumpVelIndex, index);
+			mem_.jump_vel_index() = index;
 			return true;
 		}
 		move_y(v);
-		wr8(wJumpVelIndex, index >= MAX_JUMP_VEL_INDEX ? MAX_JUMP_VEL_INDEX : index);
+		mem_.jump_vel_index() = index >= MAX_JUMP_VEL_INDEX ? MAX_JUMP_VEL_INDEX : index;
 		return false;
 	}
 	bool anim_ended() const { return ld_and(wWarioAnimationEnded); }
@@ -243,12 +243,12 @@ protected:
 	void move_y(int delta) { home::move_wario_y(gb_, delta); }
 	// MoveWarioRight / Left by the direction
 	void move_by_dir(int n) { move_x(facing_right() ? n : -n); }
-	void center_on_ladder() { wr8(wWarioXPos + 1, static_cast<uint8_t>((rd8(wWarioXPos + 1) & 0xf0) + 0x08)); }
+	void center_on_ladder() { mem_.wario_x().lo() = static_cast<uint8_t>((mem_.wario_x().lo() & 0xf0) + 0x08); }
 	// ld hl, wWarioStateCounter / inc [hl]: the new count
 	uint8_t inc_counter()
 	{
-		uint8_t v = static_cast<uint8_t>(rd8(wWarioStateCounter) + 1);
-		wr8(wWarioStateCounter, v);
+		uint8_t v = static_cast<uint8_t>(mem_.wario_state_counter() + 1);
+		mem_.wario_state_counter() = v;
 		return v;
 	}
 	void clear(std::initializer_list<uint16_t> addrs)
@@ -264,15 +264,15 @@ protected:
 	void reset_anim() { clear({wFrameDuration, wAnimationFrame}); }
 	void touch_states(uint8_t t, uint8_t ca94)
 	{
-		wr8(wTouchState, t);
-		wr8(wStingTouchState, t);
-		wr8(wca94, ca94);
+		mem_.touch_state() = t;
+		mem_.sting_touch_state() = t;
+		mem_.unk_ca94() = ca94;
 	}
 	// the new direction
 	uint8_t flip_dir()
 	{
-		uint8_t dir = rd8(wDirection) ^ 1;
-		wr8(wDirection, dir);
+		uint8_t dir = mem_.direction() ^ 1;
+		mem_.direction() = dir;
 		return dir;
 	}
 };

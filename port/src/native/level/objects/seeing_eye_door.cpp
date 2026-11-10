@@ -47,14 +47,14 @@ void SeeingEyeDoor::init()
 	var2() = 24;
 	move_down_by_var2();
 	set_frameset(ADDR_Frameset_68c47);
-	mem_[wCurObjCollBoxRight] = 0x02;
-	mem_[wCurObjCollBoxLeft] = 0xfd;
-	mem_[wCurObjCollBoxBottom] = 0x17;
+	mem_.cur_obj_coll_box_right() = 0x02;
+	mem_.cur_obj_coll_box_left() = 0xfd;
+	mem_.cur_obj_coll_box_bottom() = 0x17;
 }
 
 bool SeeingEyeDoor::wario_to_right() const
 {
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	return static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 }
 
@@ -75,10 +75,10 @@ void SeeingEyeDoor::check_distance()
 // visible and in the eye's rows
 bool SeeingEyeDoor::wario_in_sight()
 {
-	if (mem_[wTransformation] == TRANSFORMATION_INVISIBLE_WARIO)
+	if (mem_.transformation() == TRANSFORMATION_INVISIBLE_WARIO)
 		return false;
 	uint8_t top = static_cast<uint8_t>(screen_y() - 0x19);
-	return static_cast<uint8_t>(mem_[wWarioScreenYPos] - top) < 0x36;
+	return static_cast<uint8_t>(mem_.wario_screen_y_pos() - top) < 0x36;
 }
 
 void SeeingEyeDoor::wait_for_wario()
@@ -127,7 +127,7 @@ void SeeingEyeDoor::watching()
 		set_look_around();
 		return;
 	}
-	uint8_t wario = mem_[wWarioScreenXPos];
+	uint8_t wario = mem_.wario_screen_x_pos();
 	uint8_t eye = screen_x();
 	if (state()) {
 		state() = 0;

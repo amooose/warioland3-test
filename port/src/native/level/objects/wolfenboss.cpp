@@ -101,16 +101,16 @@ void Wolfenboss::start()
 	set_update(WHISP_WAITING);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	substate() = (substate() & OBJSUBFLAGS_MASK) | (3 + 1);
-	mem_[wCurObjCollBoxRight] = 2;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-3);
-	mem_[wCurObjCollBoxBottom] = 1;
+	mem_.cur_obj_coll_box_right() = 2;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-3);
+	mem_.cur_obj_coll_box_bottom() = 1;
 	set_frameset(ADDR_Frameset_69e97);
 	state_duration() = 20;
 	var2() = 0;
-	mem_[wWolfenbossNextAttack] = 0;
-	mem_[wWolfenbossIgaguriOrKuriActive] = 0;
-	mem_[wWolfenbossRemainingHits] = 3 + 1;
-	mem_[wWolfenbossConsecutiveSpirals] = 2;
+	mem_.wolfenboss_next_attack() = 0;
+	mem_.wolfenboss_igaguri_or_kuri_active() = 0;
+	mem_.wolfenboss_remaining_hits() = 3 + 1;
+	mem_.wolfenboss_consecutive_spirals() = 2;
 }
 
 void Wolfenboss::whisp_waiting()
@@ -125,7 +125,7 @@ void Wolfenboss::whisp_waiting()
 	set_update(WHISP_RISING);
 	set_frameset(ADDR_Frameset_69ea0);
 	state_duration() = 64;
-	mem_[wIsBossBattle] = TRUE;
+	mem_.is_boss_battle() = TRUE;
 	stop_music2(mem_);
 }
 
@@ -151,9 +151,9 @@ void Wolfenboss::smoke_entrance()
 	mem_[wCurObjFramesetPtr + 0] = static_cast<uint8_t>(ADDR_Frameset_69e0e);
 	mem_[wCurObjFramesetPtr + 1] = static_cast<uint8_t>(ADDR_Frameset_69e0e >> 8);
 	frame_duration() = 0;
-	mem_[wCurObjFramesetOffset] = 2;
+	mem_.cur_obj_frameset_offset() = 2;
 	set_coll_box(static_cast<uint8_t>(-8), 12, static_cast<uint8_t>(-8), 7);
-	mem_[wBossState] = BOSS_REGULAR;
+	mem_.boss_state() = BOSS_REGULAR;
 	home::update_level_music(gb_);
 }
 
@@ -213,18 +213,18 @@ void Wolfenboss::start_attack(uint16_t frameset)
 {
 	set_frameset(frameset);
 	bool spiral;
-	uint8_t spirals = mem_[wWolfenbossConsecutiveSpirals];
+	uint8_t spirals = mem_.wolfenboss_consecutive_spirals();
 	if (spirals) {
-		mem_[wWolfenbossConsecutiveSpirals] = static_cast<uint8_t>(spirals - 1);
+		mem_.wolfenboss_consecutive_spirals() = static_cast<uint8_t>(spirals - 1);
 		spiral = true;
 	} else {
-		spiral = mem_[wWolfenbossIgaguriOrKuriActive];
+		spiral = mem_.wolfenboss_igaguri_or_kuri_active();
 	}
 	if (!spiral)
-		mem_[wWolfenbossIgaguriOrKuriActive] = TRUE;
+		mem_.wolfenboss_igaguri_or_kuri_active() = TRUE;
 	state_duration() = spiral ? SPIRAL_ATTACK_DURATION : IGAGURI_ATTACK_DURATION;
 	var1() = 0x01;
-	mem_[wWolfenbossNextAttack] = spiral ? 0x00 : 0x01;
+	mem_.wolfenboss_next_attack() = spiral ? 0x00 : 0x01;
 }
 
 void Wolfenboss::start_turning(uint16_t frameset)
@@ -255,12 +255,12 @@ void Wolfenboss::wait_then_start_movement(uint16_t page)
 // of 0)
 void Wolfenboss::do_movement()
 {
-	if (!(mem_[wGlobalCounter] & 0x1f))
+	if (!(mem_.global_counter() & 0x1f))
 		play_sfx(SFX_0C3);
 	apply_y_movement_loop(ADDR_Data_604c0);
 	bool right = facing_right();
-	if (!mem_[wGlobalCounter]) {
-		bool passed = right ? mem_[wWarioScreenXPos] >= screen_x() : screen_x() >= mem_[wWarioScreenXPos];
+	if (!mem_.global_counter()) {
+		bool passed = right ? mem_.wario_screen_x_pos() >= screen_x() : screen_x() >= mem_.wario_screen_x_pos();
 		if (passed) {
 			start_attack(right ? ADDR_Frameset_69df6 : ADDR_Frameset_69df1);
 			return;
@@ -277,11 +277,11 @@ void Wolfenboss::do_movement()
 void Wolfenboss::main()
 {
 	no_actions();
-	if (mem_[wTransformation]) {
+	if (mem_.transformation()) {
 		set_frameset(facing_right() ? ADDR_Frameset_69e1f : ADDR_Frameset_69e0e);
 		state_duration() = 70; // WOLFENBOSS_DISAPPEAR_DELAY
 		set_update(DISAPPEAR);
-		mem_[wBossState] = 0;
+		mem_.boss_state() = 0;
 		return;
 	}
 	uint8_t s = state() & 0xfe;
@@ -293,7 +293,7 @@ void Wolfenboss::main()
 			if ((substate() & 0x0f) == 1)
 				return;
 			--substate();
-			--mem_[wWolfenbossRemainingHits];
+			--mem_.wolfenboss_remaining_hits();
 			return;
 		}
 		if (s == 0x38) {
@@ -319,7 +319,7 @@ void Wolfenboss::main()
 		do_movement();
 		return;
 	case 1: { // the attack thrown 16 frames in
-		uint8_t next = mem_[wWolfenbossNextAttack];
+		uint8_t next = mem_.wolfenboss_next_attack();
 		uint8_t at = next ? IGAGURI_ATTACK_DURATION - 16 : SPIRAL_ATTACK_DURATION - 16;
 		if (state_duration() == at) {
 			--state_duration();
@@ -377,9 +377,9 @@ void Wolfenboss::defeat_fall()
 		apply_y_movement(ADDR_Data_60da0);
 		return;
 	}
-	mem_[wBossState] = BOSS_DEFEATED;
+	mem_.boss_state() = BOSS_DEFEATED;
 	home::update_level_music(gb_);
-	mem_[wIsBossBattle] = 0;
+	mem_.is_boss_battle() = 0;
 	call_home(ADDR_Func_56326);
 	for (uint8_t obj = static_cast<uint8_t>(wObj1);; obj = static_cast<uint8_t>(obj + OBJ_STRUCT_LENGTH)) {
 		uint16_t base = static_cast<uint16_t>((wObj1 & 0xff00) | obj);
@@ -435,11 +435,11 @@ void WolfenbossHelper::spiral_move()
 {
 	if (state_duration() && !--state_duration())
 		play_sfx(SFX_07C);
-	if (mem_[wTransformation]) {
+	if (mem_.transformation()) {
 		spiral_vanish();
 		return;
 	}
-	if (mem_[wWolfenbossRemainingHits] == 1) {
+	if (mem_.wolfenboss_remaining_hits() == 1) {
 		flags() = 0;
 		return;
 	}
@@ -492,9 +492,9 @@ void WolfenbossHelper::platform()
 	set_update(PLATFORM_WAIT_OPEN);
 	set_frameset(ADDR_Frameset_69e72);
 	substate() = (substate() & ~OBJSUBFLAG_UNINITIALISED) | (1 << OBJSUBFLAG_UNK_4_F);
-	mem_[wCurObjCollBoxRight] = 7;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-8);
-	mem_[wCurObjCollBoxBottom] = 8;
+	mem_.cur_obj_coll_box_right() = 7;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-8);
+	mem_.cur_obj_coll_box_bottom() = 8;
 }
 
 // until the boss is beaten (state $2f)
@@ -536,16 +536,16 @@ void WolfenbossHelper::kuri()
 {
 	no_actions();
 	apply_y_movement(ADDR_Data_60d60);
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_unk1())
 		return;
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	set_update(KURI_LANDED);
-	if (static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a))
+	if (static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a))
 		substate() &= ~OBJSUBFLAG_HDIR;
 	else
 		substate() |= OBJSUBFLAG_HDIR;
@@ -553,7 +553,7 @@ void WolfenbossHelper::kuri()
 
 void WolfenbossHelper::kuri_vanish()
 {
-	--mem_[wWolfenbossIgaguriOrKuriActive];
+	--mem_.wolfenboss_igaguri_or_kuri_active();
 	call_home(ADDR_VanishObject2);
 }
 
@@ -561,7 +561,7 @@ void WolfenbossHelper::kuri_vanish()
 // launched up
 void WolfenbossHelper::kuri_landed()
 {
-	if (mem_[wTransformation])
+	if (mem_.transformation())
 		no_actions();
 	uint8_t s = state();
 	if (s) {
@@ -595,7 +595,7 @@ void WolfenbossHelper::kuri_landed()
 		flags() = 0;
 		return;
 	}
-	if (!mem_[wTransformation] && !(mem_[wGlobalCounter] & 0x07))
+	if (!mem_.transformation() && !(mem_.global_counter() & 0x07))
 		play_sfx(SFX_06A);
 	if (!facing_right()) {
 		if (screen_x() >= 0x10) {
@@ -624,7 +624,7 @@ void WolfenbossHelper::kuri_launched()
 	uint16_t flags_addr = wCurObjFlags;
 	if (!(mem_[flags_addr] & (1 << OBJFLAG_ON_SCREEN_F))) {
 		mem_[flags_addr] = 0;
-		--mem_[wWolfenbossIgaguriOrKuriActive];
+		--mem_.wolfenboss_igaguri_or_kuri_active();
 		return;
 	}
 	if (!facing_right()) {
@@ -647,7 +647,7 @@ void WolfenbossHelper::kuri_launched()
 
 void WolfenbossHelper::igaguri()
 {
-	if (!(mem_[wGlobalCounter] & 0x07))
+	if (!(mem_.global_counter() & 0x07))
 		play_sfx(SFX_06B);
 	no_actions();
 	if (--state_duration()) {
@@ -662,7 +662,7 @@ void WolfenbossHelper::igaguri()
 	set_frameset(ADDR_Frameset_69e4b);
 	state_duration() = 40;
 	var1() = 0x03;
-	if (mem_[wWolfenbossRemainingHits] >= 2 + 1) {
+	if (mem_.wolfenboss_remaining_hits() >= 2 + 1) {
 		play_sfx(SFX_101);
 		var2() = 0x02;
 	} else {
@@ -698,14 +698,14 @@ void WolfenbossHelper::igaguri_skip_bounce()
 // on the floor: hYPos into the position
 bool WolfenbossHelper::landed()
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_unk1())
 		return false;
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	return true;
 }
 
@@ -719,13 +719,13 @@ void WolfenbossHelper::ground_shake()
 // bouncing
 void WolfenbossHelper::igaguri_fall()
 {
-	if (mem_[wTransformation])
+	if (mem_.transformation())
 		no_actions();
 	frame_duration() = 0x02;
-	if (mem_[wWolfenbossRemainingHits] >= 2 + 1) {
-		mem_[wCurObjYPos + 0] += 0x4;
-		if (mem_[wCurObjYPos + 0] < 0x4)
-			++mem_[wCurObjYPos + 1];
+	if (mem_.wolfenboss_remaining_hits() >= 2 + 1) {
+		mem_.cur_obj_y().lo() += 0x4;
+		if (mem_.cur_obj_y().lo() < 0x4)
+			++mem_.cur_obj_y().hi();
 	} else {
 		apply_y_movement(ADDR_Data_60d80);
 	}
@@ -734,11 +734,11 @@ void WolfenbossHelper::igaguri_fall()
 		return;
 	}
 	ground_shake();
-	if (mem_[wWolfenbossRemainingHits] >= 2 + 1) {
+	if (mem_.wolfenboss_remaining_hits() >= 2 + 1) {
 		igaguri_skip_bounce();
 		return;
 	}
-	if (static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a))
+	if (static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a))
 		substate() |= OBJSUBFLAG_HDIR;
 	else
 		substate() &= ~OBJSUBFLAG_HDIR;
@@ -748,7 +748,7 @@ void WolfenbossHelper::igaguri_fall()
 
 void WolfenbossHelper::igaguri_bounce()
 {
-	if (mem_[wTransformation])
+	if (mem_.transformation())
 		no_actions();
 	frame_duration() = 0x2;
 	apply_y_movement(ADDR_Data_60e00);
@@ -767,7 +767,7 @@ void WolfenbossHelper::igaguri_bounce()
 // cracks open, and a kuri comes out
 void WolfenbossHelper::igaguri_hatch()
 {
-	if (mem_[wTransformation])
+	if (mem_.transformation())
 		no_actions();
 	switch (var1()) {
 	case 0:
@@ -778,7 +778,7 @@ void WolfenbossHelper::igaguri_hatch()
 		++var1();
 		return;
 	case 1:
-		if (!(mem_[wGlobalCounter] & 0x1f))
+		if (!(mem_.global_counter() & 0x1f))
 			play_sfx(SFX_0C5);
 		if (--state_duration())
 			return;

@@ -98,7 +98,7 @@ private:
 void stop_boss_music(Memory mem)
 {
 	stop_music2(mem);
-	mem[wBossState] = 0;
+	mem.boss_state() = 0;
 }
 
 } // namespace
@@ -111,13 +111,13 @@ void YellowBelly::start()
 	state_duration() = 0x3c;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	substate() = (substate() & 0xf0) | 0x04;
-	mem_[wCurObjCollBoxRight] = 0x07;
-	mem_[wCurObjCollBoxLeft] = 0xf8;
-	mem_[wCurObjCollBoxBottom] = 0x0a;
-	mem_[wDollBoyActiveBarrels] = 0;
-	mem_[w1d147] = 0;
-	mem_[wDollBoyHammerRange] = 0;
-	mem_[wIsBossBattle] = TRUE;
+	mem_.cur_obj_coll_box_right() = 0x07;
+	mem_.cur_obj_coll_box_left() = 0xf8;
+	mem_.cur_obj_coll_box_bottom() = 0x0a;
+	mem_.doll_boy_active_barrels() = 0;
+	mem_.unk_1d147() = 0;
+	mem_.doll_boy_hammer_range() = 0;
+	mem_.is_boss_battle() = TRUE;
 	stop_music2(mem_);
 }
 
@@ -146,7 +146,7 @@ void YellowBelly::music_start()
 		return;
 	state_duration() = 0x20;
 	set_update(RISING);
-	mem_[wBossState] = BOSS_REGULAR;
+	mem_.boss_state() = BOSS_REGULAR;
 	home::update_level_music(gb_);
 }
 
@@ -184,13 +184,13 @@ void YellowBelly::aim(uint16_t page)
 	mem_[page | (OBJ_UPDATE_FUNCTION + 1)] = static_cast<uint8_t>(SHOOTING >> 8);
 	mem_[page | OBJ_UPDATE_FUNCTION] = static_cast<uint8_t>(SHOOTING);
 	bool vdir = mem_[page | OBJ_SUBSTATE] & OBJSUBFLAG_VDIR;
-	if (mem_[wDollBoyHammerRange]) {
+	if (mem_.doll_boy_hammer_range()) {
 		var1() = 0;
 		frameset_62(vdir ? ADDR_Frameset_697a1 : ADDR_Frameset_69792);
 		return;
 	}
 	uint16_t own = word_at(mem_, page | OBJ_X_POS);
-	uint16_t wario = static_cast<uint16_t>(mem_[wWarioXPos + 0] << 8 | mem_[wWarioXPos + 1]);
+	uint16_t wario = mem_.wario_x();
 	if (wario >= own) {
 		if (vdir)
 			frameset_62(ADDR_Frameset_697a1);
@@ -207,7 +207,7 @@ void YellowBelly::aim(uint16_t page)
 // the arrow shot partway through
 void YellowBelly::shooting()
 {
-	if (mem_[w1d147]) {
+	if (mem_.unk_1d147()) {
 		hit();
 		return;
 	}
@@ -232,7 +232,7 @@ void YellowBelly::shooting()
 void YellowBelly::swim_on()
 {
 	bool vdir;
-	if (!mem_[wDollBoyHammerRange]) {
+	if (!mem_.doll_boy_hammer_range()) {
 		set_update(SWIMMING);
 		flags() |= 1 << OBJFLAG_PRIORITY_F;
 		state_duration() = static_cast<uint8_t>((mem_[rDIV] & 0x01) + 0x03);
@@ -256,7 +256,7 @@ void YellowBelly::swim_on()
 void YellowBelly::stranded_start(uint16_t page)
 {
 	stop_sfx(mem_);
-	mem_[wDollBoyHammerRange] = 0x01;
+	mem_.doll_boy_hammer_range() = 0x01;
 	mem_[page | (OBJ_UPDATE_FUNCTION + 1)] = static_cast<uint8_t>(STRANDED >> 8);
 	mem_[page | OBJ_UPDATE_FUNCTION] = static_cast<uint8_t>(STRANDED);
 	mem_[page | OBJ_FLAGS] &= ~(1 << OBJFLAG_PRIORITY_F);
@@ -299,16 +299,16 @@ void YellowBelly::stranded()
 // swims to the pump, $38 pixels away on its side, and aims from there
 void YellowBelly::to_pump()
 {
-	if (mem_[wTransformation] == TRANSFORMATION_PUFFY_WARIO) {
-		mem_[wDollBoyHammerRange] = 0;
+	if (mem_.transformation() == TRANSFORMATION_PUFFY_WARIO) {
+		mem_.doll_boy_hammer_range() = 0;
 		swim_on();
 		return;
 	}
-	if (mem_[w1d147]) {
+	if (mem_.unk_1d147()) {
 		hit();
 		return;
 	}
-	if (!mem_[wDollBoyHammerRange]) {
+	if (!mem_.doll_boy_hammer_range()) {
 		swim_on();
 		return;
 	}
@@ -328,16 +328,16 @@ void YellowBelly::to_pump()
 
 void YellowBelly::swimming()
 {
-	if (mem_[wDollBoyActiveBarrels]) {
+	if (mem_.doll_boy_active_barrels()) {
 		no_actions();
 		state() = 0;
 		return;
 	}
-	if (mem_[w1d147]) {
+	if (mem_.unk_1d147()) {
 		hit();
 		return;
 	}
-	if (!var1() && var3() == 1 && screen_y() >= mem_[wWarioScreenYPos]) {
+	if (!var1() && var3() == 1 && screen_y() >= mem_.wario_screen_y_pos()) {
 		set_update(SINKING);
 		return;
 	}
@@ -355,7 +355,7 @@ void YellowBelly::swim()
 			return;
 		}
 		state() = 0;
-		uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+		uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 		uint8_t own = static_cast<uint8_t>(screen_x() + 0x2a);
 		if (substate() & 0x80 ? wario >= own : own >= wario)
 			substate() ^= 0x80;
@@ -364,10 +364,10 @@ void YellowBelly::swim()
 	if (var1()) {
 		if (--var1())
 			return;
-		if (!(mem_[wGlobalCounter] & 1) && state_duration() >= 0x02)
+		if (!(mem_.global_counter() & 1) && state_duration() >= 0x02)
 			--state_duration();
 		bool vdir = substate() & OBJSUBFLAG_VDIR;
-		if (mem_[wDollBoyHammerRange] != 1) {
+		if (mem_.doll_boy_hammer_range() != 1) {
 			set_frameset(vdir ? ADDR_Frameset_697eb : ADDR_Frameset_697e6);
 		} else {
 			play_sfx(SFX_101);
@@ -375,7 +375,7 @@ void YellowBelly::swim()
 		}
 		return;
 	}
-	if (var3() == 1 && mem_[wTransformation] != TRANSFORMATION_PUFFY_WARIO && screen_y() < mem_[wWarioScreenYPos]) {
+	if (var3() == 1 && mem_.transformation() != TRANSFORMATION_PUFFY_WARIO && screen_y() < mem_.wario_screen_y_pos()) {
 		if (!--state_duration()) {
 			aim(wCurObjSubState & 0xff00);
 			return;
@@ -385,10 +385,10 @@ void YellowBelly::swim()
 	bool right = substate() & 0x80;
 	uint16_t y_pos = static_cast<uint16_t>(y() - 0x04);
 	uint16_t x_pos = static_cast<uint16_t>(right ? x() + 0x18 : x() - 0x18);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (!hpos_block_unk4()) {
 		if (right)
 			move_right_by_var2();
@@ -415,7 +415,7 @@ void YellowBelly::sinking()
 // hurt, or beaten on the last hit
 void YellowBelly::hit()
 {
-	mem_[w1d147] = 0;
+	mem_.unk_1d147() = 0;
 	set_update(HURT);
 	decrement_boss_hits();
 	if ((substate() & 0x0f) != 1) {
@@ -455,7 +455,7 @@ void YellowBelly::hurt()
 		flash(ADDR_Pals_51ce1);
 		return;
 	}
-	if (mem_[wCurObjFramesetOffset] != 0x10 || frame_duration())
+	if (mem_.cur_obj_frameset_offset() != 0x10 || frame_duration())
 		return;
 	var1() = 0;
 	swim_on();
@@ -482,9 +482,9 @@ void YellowBelly::defeated()
 		flash(ADDR_Pals_51ce1);
 		return;
 	}
-	if (mem_[wCurObjFramesetOffset] == 0x14 && !frame_duration())
+	if (mem_.cur_obj_frameset_offset() == 0x14 && !frame_duration())
 		play_sfx(SFX_0AA);
-	if (mem_[wCurObjFramesetOffset] != 0x20 || frame_duration())
+	if (mem_.cur_obj_frameset_offset() != 0x20 || frame_duration())
 		return;
 	flags() = 0;
 	uint16_t platform = find_active(mem_, YELLOW_BELLY_PLATFORM);
@@ -497,7 +497,7 @@ void YellowBelly::defeated()
 void YellowBellyHelper::arrow(bool left)
 {
 	set_update(YA(left ? 0x18 : 0x74));
-	if (mem_[wDollBoyHammerRange]) {
+	if (mem_.doll_boy_hammer_range()) {
 		flags() |= OBJFLAG_GRABBED;
 		var2() = 0x02;
 	}
@@ -507,8 +507,8 @@ void YellowBellyHelper::arrow(bool left)
 // harmless unless above Wario and flying at him
 void YellowBellyHelper::arrow_actions()
 {
-	if (screen_y() < mem_[wWarioScreenYPos]) {
-		bool before = screen_x() < mem_[wWarioScreenXPos];
+	if (screen_y() < mem_.wario_screen_y_pos()) {
+		bool before = screen_x() < mem_.wario_screen_x_pos();
 		if (facing_right() ? before : !before)
 			return;
 	}
@@ -532,7 +532,7 @@ void YellowBellyHelper::arrow_flying(bool left)
 		return;
 	}
 	move_down_by_var2();
-	if (!mem_[wDollBoyHammerRange]) {
+	if (!mem_.doll_boy_hammer_range()) {
 		if (left)
 			move_left_by_var2();
 		else
@@ -574,22 +574,21 @@ void YellowBellyHelper::head()
 // rides the body, 8 pixels to its side
 void YellowBellyHelper::head_update()
 {
-	if (mem_[wTransformation] == TRANSFORMATION_PUFFY_WARIO)
+	if (mem_.transformation() == TRANSFORMATION_PUFFY_WARIO)
 		no_actions();
 	if (state()) {
 		state() = 0;
 		state_duration() = 0x1e;
-		mem_[wDollBoyActiveBarrels] = 0x01;
+		mem_.doll_boy_active_barrels() = 0x01;
 		stop_boss_music(mem_);
 	}
 	if (state_duration() && !--state_duration())
-		mem_[wDollBoyActiveBarrels] = 0;
+		mem_.doll_boy_active_barrels() = 0;
 	uint16_t body = find_active(mem_, YELLOW_BELLY_BODY);
 	if (!body)
 		return;
 	uint16_t y_pos = static_cast<uint16_t>(word_at(mem_, body + OBJ_Y_POS) + 0x10);
-	mem_[wCurObjYPos + 0] = static_cast<uint8_t>(y_pos);
-	mem_[wCurObjYPos + 1] = static_cast<uint8_t>(y_pos >> 8);
+	mem_.cur_obj_y() = y_pos;
 	uint16_t body_x = word_at(mem_, body + OBJ_X_POS);
 	uint8_t body_var1 = mem_[body + OBJ_VAR_1];
 	if (body_var1) {
@@ -600,8 +599,7 @@ void YellowBellyHelper::head_update()
 		no_actions();
 	}
 	uint16_t x_pos = static_cast<uint16_t>((mem_[body + OBJ_SUBSTATE] & OBJSUBFLAG_VDIR) ? body_x + 0x08 : body_x - 0x08);
-	mem_[wCurObjXPos + 0] = static_cast<uint8_t>(x_pos);
-	mem_[wCurObjXPos + 1] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.cur_obj_x() = x_pos;
 }
 
 void YellowBellyHelper::platform()
@@ -610,9 +608,9 @@ void YellowBellyHelper::platform()
 	set_update(PLATFORM_UPDATE);
 	set_frameset(ADDR_Frameset_69893);
 	substate() = (substate() & ~OBJSUBFLAG_UNINITIALISED) | (1 << OBJSUBFLAG_UNK_4_F);
-	mem_[wCurObjCollBoxRight] = 0x07;
-	mem_[wCurObjCollBoxLeft] = 0xf8;
-	mem_[wCurObjCollBoxBottom] = 0xf6;
+	mem_.cur_obj_coll_box_right() = 0x07;
+	mem_.cur_obj_coll_box_left() = 0xf8;
+	mem_.cur_obj_coll_box_bottom() = 0xf6;
 }
 
 // once the boss is beaten ($2f): the battle's over
@@ -623,9 +621,9 @@ void YellowBellyHelper::platform_update()
 	set_frameset(ADDR_Frameset_69896);
 	state_duration() = 0x5a;
 	set_update(ADDR_Func_51c77);
-	mem_[wBossState] = BOSS_DEFEATED;
+	mem_.boss_state() = BOSS_DEFEATED;
 	home::update_level_music(gb_);
-	mem_[wIsBossBattle] = 0;
+	mem_.is_boss_battle() = 0;
 	platform_done();
 }
 
@@ -644,7 +642,7 @@ void YellowBellyHelper::platform_vanish()
 void YellowBellyHelper::pump()
 {
 	set_update(PUMP_FALLING);
-	var1() = mem_[wGlobalCounter];
+	var1() = mem_.global_counter();
 	pump_falling();
 }
 
@@ -656,13 +654,13 @@ void YellowBellyHelper::pump_falling()
 	if (state_duration()) {
 		--state_duration();
 	} else {
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		if (hpos_block_unk1()) {
-			mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-			mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+			mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+			mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 			set_frameset(ADDR_Frameset_6987f);
 			set_update(PUMP_LANDED);
 			state() = 0;
@@ -673,10 +671,10 @@ void YellowBellyHelper::pump_falling()
 	bool right = var1() & 1;
 	uint16_t y_pos = static_cast<uint16_t>(y() - 0x04);
 	uint16_t x_pos = static_cast<uint16_t>(right ? x() + 0x05 : x() - 0x06);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		return;
 	call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
@@ -695,10 +693,10 @@ void YellowBellyHelper::pump_landed()
 		bool right = substate() & 0x80;
 		uint16_t y_pos = static_cast<uint16_t>(y() - 0x04);
 		uint16_t x_pos = static_cast<uint16_t>(right ? x() + 0x05 : x() - 0x06);
-		mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-		mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-		mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+		mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+		mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+		mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+		mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 		bool blocked = hpos_block_unk4();
 		if (blocked) {
 			if (right)
@@ -711,8 +709,8 @@ void YellowBellyHelper::pump_landed()
 	}
 	if (s == 0x0a) {
 		state() = 0x3a;
-		mem_[w1d147] = 0x3a;
-		mem_[wDollBoyHammerRange] = 0;
+		mem_.unk_1d147() = 0x3a;
+		mem_.doll_boy_hammer_range() = 0;
 		set_frameset(ADDR_Frameset_69882);
 		state_duration() = 0x1d;
 		var3() = 0;
@@ -737,12 +735,12 @@ void YellowBellyHelper::pump_landed()
 		return;
 	if (s == 0x28) {
 		state() = 0x58;
-		mem_[wDollBoyHammerRange] = 0;
+		mem_.doll_boy_hammer_range() = 0;
 		pump_carried();
 		return;
 	}
 	state() = 0x31;
-	if (static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a))
+	if (static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a))
 		substate() &= ~OBJSUBFLAG_HDIR;
 	else
 		substate() |= OBJSUBFLAG_HDIR;
@@ -762,10 +760,9 @@ void YellowBellyHelper::pump_carried()
 	if (!arrow)
 		return;
 	uint16_t y_pos = static_cast<uint16_t>(word_at(mem_, arrow + OBJ_Y_POS) + 0x08);
-	mem_[wCurObjYPos + 0] = static_cast<uint8_t>(y_pos);
-	mem_[wCurObjYPos + 1] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[wCurObjXPos + 0] = mem_[arrow + OBJ_X_POS];
-	mem_[wCurObjXPos + 1] = mem_[arrow + OBJ_X_POS + 1];
+	mem_.cur_obj_y() = y_pos;
+	mem_.cur_obj_x().lo() = mem_[arrow + OBJ_X_POS];
+	mem_.cur_obj_x().hi() = mem_[arrow + OBJ_X_POS + 1];
 }
 
 } // namespace wl3::level

@@ -3,6 +3,7 @@
 
 #include "../flags.hpp"
 #include "memory.hpp"
+#include "pals.hpp"
 
 namespace wl3::home {
 
@@ -36,7 +37,7 @@ void unpack(Memory mem, Colour at, uint16_t rgb)
 // wrapped below 0 spills into the others, as in the asm.
 void pack(Memory mem, Colour at, FadeFrame &f)
 {
-	uint8_t r = mem[wCurRed], g = mem[wCurGreen], b = mem[wCurBlue];
+	uint8_t r = mem.cur_red(), g = mem.cur_green(), b = mem.cur_blue();
 	mem[at.lo] = static_cast<uint8_t>(r | (g & 0x07) << 5);
 	f.c = static_cast<uint8_t>((g & 0x18) >> 3);
 	f.a = static_cast<uint8_t>((b << 2 | b >> 6) | f.c); // rlca / rlca / or c
@@ -45,7 +46,7 @@ void pack(Memory mem, Colour at, FadeFrame &f)
 
 int speed_steps(Memory mem)
 {
-	uint8_t speed = mem[wFadeSpeed];
+	uint8_t speed = mem.fade_speed();
 	return speed == FADE_SPEED_SLOW ? 1 : speed == FADE_SPEED_NORMAL ? 2 : 4;
 }
 
@@ -62,7 +63,7 @@ void lighten(GB *gb, FadeFrame &f)
 			uint8_t v = static_cast<uint8_t>(mem[wCurRGB + c] + step);
 			mem[wCurRGB + c] = v >= 0x1f ? 0x1f : v;
 		}
-		uint8_t r = mem[wCurRed], g = mem[wCurGreen], b = mem[wCurBlue];
+		uint8_t r = mem.cur_red(), g = mem.cur_green(), b = mem.cur_blue();
 		mem[at.lo] = static_cast<uint8_t>(r | (g & 0x07) << 5);
 		f.c = static_cast<uint8_t>((g & 0x18) >> 3);
 		f.a = static_cast<uint8_t>(b << 2 | f.c);
@@ -106,12 +107,12 @@ FadeFrame frame(GB *gb, uint8_t limit, bool unreferenced, Step step)
 {
 	Memory mem(gb);
 	FadeFrame f{};
-	f.counter = mem[wPalFadeCounter];
+	f.counter = mem.pal_fade_counter();
 	if (f.counter < 2) {
 		if (f.counter == 0) {
-			mem[wUnused_c186] = 1;
+			mem.unused_c186() = 1;
 			vblank_88d(gb);
-			++mem[wPalFadeCounter];
+			++mem.pal_fade_counter();
 			return f;
 		}
 		vblank_8bf(gb);
@@ -119,18 +120,18 @@ FadeFrame frame(GB *gb, uint8_t limit, bool unreferenced, Step step)
 	f.stepped = true;
 	step(f);
 	f.limit = limit;
-	if (++mem[wPalFadeCounter] < limit)
+	if (++mem.pal_fade_counter() < limit)
 		return f;
 	gb->cpu.ime = false; // di
 	copy(gb, wBackupVBlankFunc, wVBlankFunc, 3);
 	gb->cpu.ime = true; // ei
 	gb->cpu.ime_delay = 0;
 	if (!unreferenced)
-		mem[wFadeSpeed] = 0;
-	mem[wPalFadeCounter] = 0;
-	mem[wUnused_c186] = 0;
-	f.sub_state = mem[wSubState];
-	++mem[wSubState];
+		mem.fade_speed() = 0;
+	mem.pal_fade_counter() = 0;
+	mem.unused_c186() = 0;
+	f.sub_state = mem.sub_state();
+	++mem.sub_state();
 	f.done = true;
 	return f;
 }
@@ -138,14 +139,14 @@ FadeFrame frame(GB *gb, uint8_t limit, bool unreferenced, Step step)
 // 33 frames, or 18 / 10 at the faster speeds
 uint8_t frames_by_speed(Memory mem)
 {
-	uint8_t speed = mem[wFadeSpeed];
+	uint8_t speed = mem.fade_speed();
 	return speed == FADE_SPEED_SLOW ? 33 : speed == FADE_SPEED_NORMAL ? 18 : 10;
 }
 
 void set_speed(GB *gb, uint8_t speed)
 {
 	if (speed != 0xff)
-		Memory(gb).byte(wFadeSpeed) = speed;
+		Memory(gb).fade_speed() = speed;
 }
 
 } // namespace
@@ -345,22 +346,34 @@ PORT_EX(VBlank_8bf, 0, 0)
 static void apply_vblank(GB *gb, uint16_t bg, uint16_t ob)
 {
 	wl3::Memory mem(gb);
-	mem[rSCY] = mem[wSCY];
-	mem[rSCX] = mem[wSCX];
-	gb_call(gb, bg);
-	gb_call(gb, ob);
+	mem[rSCY] = mem.scy();
+	mem[rSCX] = mem.scx();
+	if (!gb->test.active) {
+		// in play nothing reads the registers the palette routines leave
+		// (VBlank pops them all after its function): the plain routines
+		if (bg == ADDR_StoreBGPals) {
+			wl3::home::store_bg_pals(gb, wTempBGPals);
+			wl3::home::store_ob_pals(gb, wTempOBPals);
+		} else {
+			wl3::home::apply_bg_pals(gb, wTempBGPals);
+			wl3::home::apply_ob_pals(gb, wTempOBPals);
+		}
+	} else {
+		gb_call(gb, bg);
+		gb_call(gb, ob);
+	}
 	gb->cpu.a = static_cast<uint8_t>(wVirtualOAM >> 8);
 	transfer_virtual_oam(gb);
 }
 
 PORT_LOCAL_EX(VBlank_88d, asm_8a9, 0, 0)
 {
-	gb->cpu.a = wl3::Memory(gb)[wSCX];
+	gb->cpu.a = wl3::Memory(gb).scx();
 	apply_vblank(gb, ADDR_StoreBGPals, ADDR_StoreOBPals);
 }
 
 PORT_LOCAL_EX(VBlank_8bf, asm_8d0, 0, 0)
 {
-	gb->cpu.a = wl3::Memory(gb)[wSCX];
+	gb->cpu.a = wl3::Memory(gb).scx();
 	apply_vblank(gb, ADDR_LoadBGPalettesFromWRAM, ADDR_LoadOBPalettesFromWRAM);
 }

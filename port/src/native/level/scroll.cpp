@@ -8,6 +8,7 @@
 // QueueBlockAttributesAlongRow_OddColumn's first half block reads its tile
 // from past the tile queue, which can reach the stack in the asm. The port
 // doesn't keep that stack, so that byte can differ (see ASM_BUGS.md).
+#include "room_gfx.hpp"
 #include "frame.hpp"
 #include "../flags.hpp"
 #include "../native.hpp"
@@ -38,7 +39,7 @@ public:
 private:
 	void sram_switch(uint8_t bank)
 	{
-		mem_[wSRAMBank] = bank;
+		mem_.sram_bank() = bank;
 		mem_[rRAMB + 0x100] = bank;
 	}
 	uint16_t be(uint16_t var) { return static_cast<uint16_t>(mem_[var] << 8 | mem_[var + 1]); }
@@ -93,7 +94,7 @@ uint16_t EdgeQueue::step(uint16_t map, uint16_t base, uint16_t ptr_var, int incs
 	next = static_cast<uint16_t>(next + 0x100); // inc h
 	if (next >> 8 == 0xc0) { // HIGH(STARTOF(SRAM) + SIZEOF(SRAM))
 		next = static_cast<uint16_t>((sLevelBlockObjectMap & 0xff00) | (next & 0xff));
-		sram_switch(static_cast<uint8_t>(mem_[wSRAMBank] + 1));
+		sram_switch(static_cast<uint8_t>(mem_.sram_bank() + 1));
 	}
 	return next;
 }
@@ -102,7 +103,7 @@ uint16_t EdgeQueue::step(uint16_t map, uint16_t base, uint16_t ptr_var, int incs
 void EdgeQueue::start_queue(uint16_t queue, uint16_t ptr_var)
 {
 	mem_[ptr_var + 0] = static_cast<uint8_t>(queue >> 8);
-	mem_[ptr_var + 1] = static_cast<uint8_t>(queue + mem_[wBGMapTileQueueSize]);
+	mem_[ptr_var + 1] = static_cast<uint8_t>(queue + mem_.bg_map_tile_queue_size());
 }
 
 // the 12 blocks' tiles (or attributes, in GFX RAM) of a column of the level
@@ -111,7 +112,7 @@ void EdgeQueue::start_queue(uint16_t queue, uint16_t ptr_var)
 void EdgeQueue::queue_column(uint16_t map, uint16_t queue, uint16_t ptr_var, uint16_t base, int offset, bool wram)
 {
 	start_queue(queue, ptr_var);
-	bool half = mem_[wBlockYPos + 1] & 0x08;
+	bool half = mem_.block_y().lo() & 0x08;
 	uint8_t wbk = 0;
 	if (wram) {
 		wbk = mem_[rWBK];
@@ -146,7 +147,7 @@ void EdgeQueue::queue_block_row(uint16_t map, uint16_t queue, uint16_t ptr_var, 
 		mem_[rWBK] = BANK_wRoomBlockAttributes;
 	}
 	start_queue(queue, ptr_var);
-	bool half = mem_[wBlockYPos + 1] & 0x08;
+	bool half = mem_.block_y().lo() & 0x08;
 	if (half)
 		map = step(map, quirk ? wBGMapTileVRAM1Queue : base, ptr_var, offset + 2, Step::FIRST, false);
 	for (int i = 0; i < 0x10; i++)
@@ -162,23 +163,22 @@ void EdgeQueue::queue_block_row(uint16_t map, uint16_t queue, uint16_t ptr_var, 
 // attributes to draw there
 void EdgeQueue::queue_column_at_block()
 {
-	routines_.call(ADDR_GetBlockBGPtr);
-	uint16_t bg = REG_HL(gb_);
-	uint8_t at = static_cast<uint8_t>(wBGMapAddressQueue + mem_[wBGMapAddressQueueSize]);
+	uint16_t bg = level::block_bg_ptr(gb_);
+	uint8_t at = static_cast<uint8_t>(wBGMapAddressQueue + mem_.bg_map_address_queue_size());
 	for (int i = 0; i < 23; i++) {
 		mem_[static_cast<uint16_t>((wBGMapAddressQueue & 0xff00) | at++)] = static_cast<uint8_t>(bg >> 8);
 		mem_[static_cast<uint16_t>((wBGMapAddressQueue & 0xff00) | at++)] = static_cast<uint8_t>(bg);
 		bg = static_cast<uint16_t>((bg + TILEMAP_WIDTH) & 0xfbff); // wraps within the BG map
 	}
-	mem_[wBGMapAddressQueueSize] = static_cast<uint8_t>(mem_[wBGMapAddressQueueSize] + 2 * 23);
+	mem_.bg_map_address_queue_size() = static_cast<uint8_t>(mem_.bg_map_address_queue_size() + 2 * 23);
 
 	uint16_t map = home::block_ptr(gb_, wBlockPos).ptr;
-	sram_switch(mem_[wBlockPtrBank]);
-	int offset = (mem_[wBlockXPos + 1] & 0x08) ? 1 : 0;
+	sram_switch(mem_.block_ptr_bank());
+	int offset = (mem_.block_x().lo() & 0x08) ? 1 : 0;
 	queue_column(map, wBGMapTileVRAM0Queue, wcce7, wRoomBlockTiles, offset, false); // Func_a2aa / Func_aca6
-	sram_switch(mem_[wBlockPtrBank]);
+	sram_switch(mem_.block_ptr_bank());
 	queue_column(map, wBGMapTileVRAM1Queue, wc0b3, wRoomBlockAttributes, offset, true); // Func_a79e / Func_b182
-	mem_[wBGMapTileQueueSize] = static_cast<uint8_t>(mem_[wBGMapTileQueueSize] + 23);
+	mem_.bg_map_tile_queue_size() = static_cast<uint8_t>(mem_.bg_map_tile_queue_size() + 23);
 }
 
 // the 13 blocks' tiles (or attributes, in GFX RAM) of a row of the level
@@ -187,7 +187,7 @@ void EdgeQueue::queue_column_at_block()
 void EdgeQueue::queue_row(uint16_t map, uint16_t queue, uint16_t ptr_var, uint16_t base, bool bottom, bool wram)
 {
 	start_queue(queue, ptr_var);
-	bool half = mem_[wBlockXPos + 1] & 0x08;
+	bool half = mem_.block_x().lo() & 0x08;
 	uint8_t wbk = 0;
 	if (wram) {
 		wbk = mem_[rWBK];
@@ -232,9 +232,8 @@ uint16_t EdgeQueue::left_x()
 // to draw there
 void EdgeQueue::queue_edge_row()
 {
-	routines_.call(ADDR_GetBlockBGPtr);
-	uint16_t bg = REG_HL(gb_);
-	uint8_t at = static_cast<uint8_t>(wBGMapAddressQueue + mem_[wBGMapAddressQueueSize]);
+	uint16_t bg = level::block_bg_ptr(gb_);
+	uint8_t at = static_cast<uint8_t>(wBGMapAddressQueue + mem_.bg_map_address_queue_size());
 	for (int i = 0; i < 25; i++) {
 		mem_[static_cast<uint16_t>((wBGMapAddressQueue & 0xff00) | at++)] = static_cast<uint8_t>(bg >> 8);
 		mem_[static_cast<uint16_t>((wBGMapAddressQueue & 0xff00) | at++)] = static_cast<uint8_t>(bg);
@@ -242,22 +241,22 @@ void EdgeQueue::queue_edge_row()
 		l = static_cast<uint8_t>((l & 0xe0) + ((l + 1) & 0x1f)); // wraps within the BG map row
 		bg = static_cast<uint16_t>((bg & 0xff00) | l);
 	}
-	mem_[wBGMapAddressQueueSize] = static_cast<uint8_t>(mem_[wBGMapAddressQueueSize] + 2 * 25);
+	mem_.bg_map_address_queue_size() = static_cast<uint8_t>(mem_.bg_map_address_queue_size() + 2 * 25);
 
 	uint16_t map = home::block_ptr(gb_, wBlockPos).ptr;
-	sram_switch(mem_[wBlockPtrBank]);
-	bool bottom = mem_[wBlockYPos + 1] & 0x08;
+	sram_switch(mem_.block_ptr_bank());
+	bool bottom = mem_.block_y().lo() & 0x08;
 	queue_row(map, wBGMapTileVRAM0Queue, wcce7, wRoomBlockTiles, bottom, false);
-	sram_switch(mem_[wBlockPtrBank]);
+	sram_switch(mem_.block_ptr_bank());
 	queue_row(map, wBGMapTileVRAM1Queue, wc0b3, wRoomBlockAttributes, bottom, true);
-	mem_[wBGMapTileQueueSize] = static_cast<uint8_t>(mem_[wBGMapTileQueueSize] + 25);
+	mem_.bg_map_tile_queue_size() = static_cast<uint8_t>(mem_.bg_map_tile_queue_size() + 25);
 }
 
 // draws the rows and columns that scrolled into view (wLevelEdgeUpdateFlags)
 // and spawns the objects there
 void EdgeQueue::update()
 {
-	uint8_t edges = mem_[wLevelEdgeUpdateFlags];
+	uint8_t edges = mem_.level_edge_update_flags();
 	if (!edges)
 		return;
 	if (edges & (LEVEL_EDGE_UPDATE_RIGHT | LEVEL_EDGE_UPDATE_LEFT)) {
@@ -270,9 +269,9 @@ void EdgeQueue::update()
 			set_be(wBlockXPos, left_x());
 		}
 		queue_column_at_block();
-		mem_[wLevelEdgeUpdateFlags] &= ~(right ? LEVEL_EDGE_UPDATE_RIGHT : LEVEL_EDGE_UPDATE_LEFT);
+		mem_.level_edge_update_flags() &= ~(right ? LEVEL_EDGE_UPDATE_RIGHT : LEVEL_EDGE_UPDATE_LEFT);
 		routines_.in_bank(BANK_SpawnRowEdgeObjects, ADDR_SpawnRowEdgeObjects, [&] { spawn_row_edge_objects(gb_); });
-		edges = mem_[wLevelEdgeUpdateFlags];
+		edges = mem_.level_edge_update_flags();
 	}
 	// .check_vertical_direction
 	bool up = edges & LEVEL_EDGE_UPDATE_UP;
@@ -287,7 +286,7 @@ void EdgeQueue::update()
 	}
 	set_be(wBlockXPos, left_x());
 	queue_edge_row();
-	mem_[wLevelEdgeUpdateFlags] &= ~(up ? LEVEL_EDGE_UPDATE_UP : LEVEL_EDGE_UPDATE_DOWN);
+	mem_.level_edge_update_flags() &= ~(up ? LEVEL_EDGE_UPDATE_UP : LEVEL_EDGE_UPDATE_DOWN);
 	routines_.in_bank(BANK_SpawnColEdgeObjects, ADDR_SpawnColEdgeObjects, [&] { spawn_col_edge_objects(gb_); });
 }
 
@@ -319,7 +318,7 @@ PORT(GetNextLevelRoomID)
 		cpu.c = 10;
 	}
 	cpu.a = id;
-	mem[wLevelRoomID] = id;
+	mem.level_room_id() = id;
 }
 PORT_EX(Func_8ed9, 0, ALL_REGISTERS) { wl3::level::queue_scrolled_edge(gb); }
 PORT_EX(Func_a0e2, 0, ALL_REGISTERS) { EdgeQueue(gb).queue_column_at_block(); }
@@ -358,4 +357,14 @@ PORT_EX(QueueBlockAttributesAlongRow_EvenColumn, 0, ALL_REGISTERS)
 
 namespace wl3::level {
 void queue_scrolled_edge(GB *gb) { EdgeQueue(gb).update(); }
+// QueueBlockTilesAlongRow_* / QueueBlockAttributesAlongRow_*: the row of
+// blocks from `block`, starting on an odd or even column
+void queue_block_tiles_along_row(GB *gb, uint16_t block, bool odd)
+{
+	EdgeQueue(gb).queue_block_row(block, wBGMapTileVRAM0Queue, wcce7, wRoomBlockTiles, odd ? 1 : 0, false, false);
+}
+void queue_block_attributes_along_row(GB *gb, uint16_t block, bool odd)
+{
+	EdgeQueue(gb).queue_block_row(block, wBGMapTileVRAM1Queue, wc0b3, wRoomBlockAttributes, odd ? 1 : 0, true, odd);
+}
 } // namespace wl3::level

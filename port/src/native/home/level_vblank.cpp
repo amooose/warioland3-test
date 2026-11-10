@@ -17,10 +17,10 @@ public:
 	// the shake's add)
 	void apply_scroll_and_oam()
 	{
-		uint8_t scy = mem_[wSCY], shake = mem_[wSCYShake];
+		uint8_t scy = mem_.scy(), shake = mem_.scy_shake();
 		alu_.add(scy, shake); // the add's flags
 		mem_[rSCY] = static_cast<uint8_t>(scy + shake);
-		mem_[rSCX] = mem_[wSCX];
+		mem_[rSCX] = mem_.scx();
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
 		transfer_virtual_oam(gb_);
 	}
@@ -29,7 +29,7 @@ public:
 	// RAM code at wVBlankFunc + $10 takes hl and bc)
 	void port_LevelVBlankFunc()
 	{
-		if (!mem_[wIsDMATransferPending]) {
+		if (!mem_.is_dma_transfer_pending()) {
 			mem_[rRAMB + 0x100] = 0; // SRAM0
 			apply_scroll_and_oam();
 			// the tiles in wBGMapTileVRAM0Queue to the addresses in
@@ -41,17 +41,17 @@ public:
 		}
 		// wPendingDMASourceBank, then the source, destination bank and
 		// destination (big-endian) and length
-		mem_[rROMB0 + 0x100] = mem_[wPendingDMASourceBank];
+		mem_[rROMB0 + 0x100] = mem_.pending_dma_source_bank();
 		mem_[rVDMA_SRC_HIGH] = mem_[wPendingDMASourceBank + 1];
 		mem_[rVDMA_SRC_LOW] = mem_[wPendingDMASourceBank + 2];
 		mem_[rVBK] = mem_[wPendingDMASourceBank + 3];
 		mem_[rVDMA_DEST_HIGH] = mem_[wPendingDMASourceBank + 4];
 		mem_[rVDMA_DEST_LOW] = mem_[wPendingDMASourceBank + 5];
 		mem_[rVDMA_LEN] = mem_[wPendingDMASourceBank + 6];
-		mem_[wIsDMATransferPending] = 0;
+		mem_.is_dma_transfer_pending() = 0;
 		apply_scroll_and_oam();
-		mem_[wBGMapTileQueueSize] = 0;
-		mem_[wBGMapAddressQueueSize] = 0;
+		mem_.bg_map_tile_queue_size() = 0;
+		mem_.bg_map_address_queue_size() = 0;
 		// the asm's c, hl (the shake's, ld hl, wSCYShake / add [hl]) and
 		// xor a
 		cpu_.c = static_cast<uint8_t>(rVDMA_LEN);
@@ -75,8 +75,8 @@ public:
 	{
 		cpu_.a = 0;
 		cpu_.f = FLAG_Z; // xor a
-		mem_[wBGMapTileQueueSize] = 0;
-		mem_[wBGMapAddressQueueSize] = 0;
+		mem_.bg_map_tile_queue_size() = 0;
+		mem_.bg_map_address_queue_size() = 0;
 	}
 };
 

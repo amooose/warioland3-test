@@ -81,11 +81,11 @@ public:
 	void set_cur_sprite(bool scrolled = true) const
 	{
 		Memory mem(gb_);
-		uint8_t scroll = scrolled ? static_cast<uint8_t>(mem[wSCY]) : 0;
-		mem[wCurSpriteYCoord] = static_cast<uint8_t>(y() + OAM_Y_OFS - scroll);
-		mem[wCurSpriteXCoord] = static_cast<uint8_t>(x() + OAM_X_OFS);
-		mem[wCurSpriteFrame] = frame();
-		mem[wCurSpriteAttributes] = attributes();
+		uint8_t scroll = scrolled ? static_cast<uint8_t>(mem.scy()) : 0;
+		mem.cur_sprite_y_coord() = static_cast<uint8_t>(y() + OAM_Y_OFS - scroll);
+		mem.cur_sprite_x_coord() = static_cast<uint8_t>(x() + OAM_X_OFS);
+		mem.cur_sprite_frame() = frame();
+		mem.cur_sprite_attributes() = attributes();
 	}
 
 private:

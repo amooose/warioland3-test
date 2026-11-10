@@ -83,6 +83,30 @@ private:
 
 inline Word Byte::word() const { return Word(gb_, addr_); }
 
+// A big-endian word in memory: its high byte first (the game's positions in
+// the level, pointers it keeps as hi / lo, the sound IDs)
+class WordBE {
+public:
+	WordBE(GB *gb, uint16_t addr) : gb_(gb), addr_(addr) {}
+	WordBE(const WordBE &) = default;
+
+	operator uint16_t() const { return static_cast<uint16_t>(hi() << 8 | lo()); }
+	WordBE &operator=(uint16_t v)
+	{
+		hi() = static_cast<uint8_t>(v >> 8);
+		lo() = static_cast<uint8_t>(v);
+		return *this;
+	}
+	WordBE &operator=(const WordBE &other) { return *this = static_cast<uint16_t>(other); }
+	Byte hi() const { return Byte(gb_, addr_); }
+	Byte lo() const { return Byte(gb_, static_cast<uint16_t>(addr_ + 1)); }
+	uint16_t addr() const { return addr_; }
+
+private:
+	GB *gb_;
+	uint16_t addr_;
+};
+
 // The Game Boy's address space, as the CPU sees it.
 class Memory {
 public:
@@ -92,6 +116,26 @@ public:
 	Byte byte(uint16_t addr) const { return Byte(gb_, addr); }
 	Word word(uint16_t addr) const { return Word(gb_, addr); }
 	GB *gb() const { return gb_; }
+
+	// The RAM by name (ram_fields.h, from the disassembly's labels: wFooBar
+	// -> foo_bar()): the byte at the label, as operator[] gives it
+#define WRAM(name, label) Byte name() const { return Byte(gb_, label); }
+#define HRAM(name, label) Byte name() const { return Byte(gb_, label); }
+#include "ram_fields.h"
+#undef WRAM
+#undef HRAM
+
+	// The 16-bit fields, as words of their byte order
+	WordBE wario_x() const { return WordBE(gb_, wWarioXPos); }
+	WordBE wario_y() const { return WordBE(gb_, wWarioYPos); }
+	WordBE block_y() const { return WordBE(gb_, wBlockYPos); }
+	WordBE block_x() const { return WordBE(gb_, wBlockXPos); }
+	WordBE block_pointer() const { return WordBE(gb_, wBlockPtr); }
+	WordBE bg_pointer() const { return WordBE(gb_, wBGPtr); }
+	WordBE sfx() const { return WordBE(gb_, hSFXID); }
+	WordBE music() const { return WordBE(gb_, hMusicID); }
+	Word cur_obj_y() const { return Word(gb_, wCurObjYPos); }
+	Word cur_obj_x() const { return Word(gb_, wCurObjXPos); }
 
 private:
 	GB *gb_;

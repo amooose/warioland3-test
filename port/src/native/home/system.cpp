@@ -28,8 +28,8 @@ void update_joypad(GB *gb)
 	mem[rJOYP] = JOYP_GET_BUTTONS;
 	uint8_t buttons = static_cast<uint8_t>(~mem[rJOYP] & 0x0f);
 	uint8_t down = static_cast<uint8_t>(dpad << 4 | buttons);
-	mem[wJoypadPressed] = static_cast<uint8_t>((mem[wJoypadDown] ^ down) & down);
-	mem[wJoypadDown] = down;
+	mem.joypad_pressed() = static_cast<uint8_t>((mem.joypad_down() ^ down) & down);
+	mem.joypad_down() = down;
 	mem[rJOYP] = JOYP_GET_NONE;
 }
 
@@ -38,13 +38,13 @@ uint8_t process_dpad_repeat(GB *gb)
 	Memory mem(gb);
 	uint8_t wram_bank = mem[rWBK];
 	mem[rWBK] = BANK_wDPadRepeatCounter;
-	auto counter = mem[wDPadRepeatCounter];
+	auto counter = mem.d_pad_repeat_counter();
 	uint8_t added = 0;
-	uint8_t down = mem[wJoypadDown] & PAD_CTRL_PAD;
-	if (!counter || (mem[wJoypadPressed] & PAD_CTRL_PAD) || !down) {
+	uint8_t down = mem.joypad_down() & PAD_CTRL_PAD;
+	if (!counter || (mem.joypad_pressed() & PAD_CTRL_PAD) || !down) {
 		counter = 0x10; // a new press: the first repeat's delay
 	} else if (!--counter) {
-		mem[wJoypadPressed] = static_cast<uint8_t>(mem[wJoypadPressed] | down);
+		mem.joypad_pressed() = static_cast<uint8_t>(mem.joypad_pressed() | down);
 		added = down;
 		counter = 0x08;
 	}
@@ -84,7 +84,7 @@ void clear_save_data(GB *gb)
 {
 	for (uint16_t vals : {sCheckVals, sBackupCheckVals, s0a000, s0a800, s0a400, s0ac00})
 		fill(gb, vals, 0, 8);
-	Memory(gb).byte(hUnused_fffd) = 0;
+	Memory(gb).unused_fffd() = 0;
 }
 
 void wait_next_hblank(GB *gb)
@@ -99,7 +99,7 @@ void wait_next_hblank(GB *gb)
 void init_lcd(GB *gb)
 {
 	Memory mem(gb);
-	mem[wLCDFunc] = 0xd9; // reti
+	mem.lcd_func() = 0xd9; // reti
 	mem[rIF] = 0;
 	mem[rIE] = static_cast<uint8_t>(mem[rIE] & ~(1 << B_IE_STAT));
 	mem[rSTAT] = static_cast<uint8_t>(mem[rSTAT] & ~(1 << B_STAT_LYC));
@@ -130,22 +130,22 @@ struct LevelMusic {
 LevelMusic level_music(GB *gb)
 {
 	Memory mem(gb);
-	if (uint8_t boss = mem[wBossState]) {
+	if (uint8_t boss = mem.boss_state()) {
 		uint8_t index = static_cast<uint8_t>((boss - 1) * 2);
 		return {static_cast<uint16_t>(BOSS_MUSIC_IDS + index), false, false, index, false};
 	}
-	bool transformed = mem[wTransformation] != 0;
+	bool transformed = mem.transformation() != 0;
 	if (transformed) {
-		uint8_t index = static_cast<uint8_t>((mem[wTransformation] & 0x1f) * 2);
+		uint8_t index = static_cast<uint8_t>((mem.transformation() & 0x1f) * 2);
 		uint16_t id = static_cast<uint16_t>(ADDR_TransformationMusicIDs + index);
-		uint8_t bank = mem[wROMBank];
+		uint8_t bank = mem.rom_bank();
 		bankswitch(gb, BANK_TransformationMusicIDs, ADDR_UpdateLevelMusic);
 		bool has_music = mem[id] != 0xff;
 		bankswitch(gb, bank, ADDR_UpdateLevelMusic);
 		if (has_music)
 			return {id, true, true, index, false};
 	}
-	unsigned twice = mem[wLevel] * 2u;
+	unsigned twice = mem.level() * 2u;
 	return {static_cast<uint16_t>(ADDR_LevelMusic + twice), true, transformed, static_cast<uint8_t>(twice),
 		twice > 0xff};
 }
@@ -158,12 +158,12 @@ void update_level_music(GB *gb)
 {
 	Memory mem(gb);
 	LevelMusic music = level_music(gb);
-	uint8_t bank = mem[wROMBank];
+	uint8_t bank = mem.rom_bank();
 	if (music.banked)
 		bankswitch(gb, music.by_transformation ? BANK_TransformationMusicIDs : BANK_LevelMusic,
 			ADDR_UpdateLevelMusic);
-	mem[hMusicID + 1] = mem[music.id];
-	mem[hMusicID + 0] = mem[static_cast<uint16_t>(music.id + 1)];
+	mem.music().lo() = mem[music.id];
+	mem.music().hi() = mem[static_cast<uint16_t>(music.id + 1)];
 	if (music.banked)
 		bankswitch(gb, bank, ADDR_UpdateLevelMusic);
 }
@@ -171,15 +171,15 @@ void update_level_music(GB *gb)
 void init_game_state(GB *gb)
 {
 	Memory mem(gb);
-	mem[wState] = ST_TITLE;
-	mem[wSubState] = 0;
+	mem.state() = ST_TITLE;
+	mem.sub_state() = 0;
 }
 
 void set_perfect_state(GB *gb)
 {
 	Memory mem(gb);
-	mem[wState] = ST_PERFECT;
-	mem[wSubState] = 0;
+	mem.state() = ST_PERFECT;
+	mem.sub_state() = 0;
 }
 
 namespace {
@@ -190,15 +190,15 @@ enum class SaveReason { PERFECT, TIME_ATTACK, TRANSITION, NOT_CLEARED, TREASURES
 
 SaveReason save_reason(Memory mem)
 {
-	if (mem[wGameModeFlags] & (1 << MODE_TIME_ATTACK_F))
+	if (mem.game_mode_flags() & (1 << MODE_TIME_ATTACK_F))
 		return SaveReason::TIME_ATTACK;
-	uint8_t transition = mem[wTransitionParam];
+	uint8_t transition = mem.transition_param();
 	if (transition == TRANSITION_EPILOGUE_NOT_PERFECT || transition == TRANSITION_EPILOGUE_PERFECT
 		|| transition == TRANSITION_GAME_OVER)
 		return SaveReason::TRANSITION;
-	if (!(mem[wGameModeFlags] & MODE_GAME_CLEARED))
+	if (!(mem.game_mode_flags() & MODE_GAME_CLEARED))
 		return SaveReason::NOT_CLEARED;
-	return mem[wNumCollectedTreasures] == 1 ? SaveReason::PERFECT : SaveReason::TREASURES;
+	return mem.num_collected_treasures() == 1 ? SaveReason::PERFECT : SaveReason::TREASURES;
 }
 
 } // namespace
@@ -210,9 +210,9 @@ void save_game_or_enter_perfect_screen(GB *gb)
 		set_perfect_state(gb);
 		return;
 	}
-	mem[wPendingSubState] = mem[wSubState];
-	mem[wState] = ST_PAUSE_MENU;
-	mem[wSubState] = SST_PAUSE_18;
+	mem.pending_sub_state() = mem.sub_state();
+	mem.state() = ST_PAUSE_MENU;
+	mem.sub_state() = SST_PAUSE_18;
 }
 
 namespace {
@@ -250,10 +250,10 @@ PORT_EX(UpdateJoypad, 0, 0)
 {
 	update_joypad(gb);
 	wl3::Memory mem(gb);
-	gb->cpu.c = mem[wJoypadDown];
+	gb->cpu.c = mem.joypad_down();
 	gb->cpu.b = gb->cpu.c & 0xf0;
 	gb->cpu.a = JOYP_GET_NONE;
-	gb->cpu.f = static_cast<uint8_t>(FLAG_H | (mem[wJoypadPressed] ? 0 : FLAG_Z)); // and c
+	gb->cpu.f = static_cast<uint8_t>(FLAG_H | (mem.joypad_pressed() ? 0 : FLAG_Z)); // and c
 }
 
 // a and f are popped by pop_wram (the WRAM bank it read, the entry's flags)
@@ -362,7 +362,7 @@ PORT_EX(VBlank_TimeAttackDescription, 0, 0)
 PORT_EX(UpdateLevelMusic, 0, 0)
 {
 	wl3::Memory mem(gb);
-	uint8_t bank = mem[wROMBank];
+	uint8_t bank = mem.rom_bank();
 	LevelMusic music = level_music(gb);
 	update_level_music(gb);
 	SET_HL(gb, static_cast<uint16_t>(music.id + 1));
@@ -404,8 +404,8 @@ PORT_EX(SaveGameOrEnterPerfectScreen, 0, 0)
 	wl3::Memory mem(gb);
 	SaveReason reason = save_reason(mem);
 	uint8_t carry = gb->cpu.f & FLAG_C;
-	uint8_t transition = mem[wTransitionParam];
-	uint8_t treasures = mem[wNumCollectedTreasures];
+	uint8_t transition = mem.transition_param();
+	uint8_t treasures = mem.num_collected_treasures();
 	save_game_or_enter_perfect_screen(gb);
 	if (reason == SaveReason::PERFECT) {
 		SET_HL(gb, wState);

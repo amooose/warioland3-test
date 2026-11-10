@@ -16,8 +16,8 @@ public:
 	// ram_code.c)
 	void port_VBlank_TimeAttackDescription__Func()
 	{
-		wr8(rSCY, rd8(wSCY));
-		wr8(rSCX, rd8(wSCX));
+		wr8(rSCY, mem_.scy());
+		wr8(rSCX, mem_.scx());
 		cpu_.a = (uint8_t)(wVirtualOAM >> 8);
 		transfer_virtual_oam(gb_);
 	}

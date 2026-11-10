@@ -159,8 +159,7 @@ void MapWalk::fade_in_level_name()
 {
 	update_objects();
 	if (wram_.map_side_level_id() < OW_EXITS) {
-		routines_.farcall(BANK_FadeInLevelName, ADDR_FadeInLevelName);
-		if (gb_->cpu.c & 1) // still fading in
+		if (Palettes(gb_).farcall_fade_in_level_name()) // still fading in
 			return;
 	}
 	next_state();
@@ -344,8 +343,7 @@ void MapWalk::temple_step()
 		wram_.pal_config1_total_steps() = 0;
 		break;
 	case 5: // Func_813f6
-		routines_.farcall(BANK_FadeInLevelName, ADDR_FadeInLevelName);
-		if (gb_->cpu.c & 1) // still fading in
+		if (Palettes(gb_).farcall_fade_in_level_name()) // still fading in
 			return;
 		set_scene_obj_state(wSceneObj13State, 0x1c);
 		break;
@@ -527,7 +525,7 @@ void MapWalk::set_next_level()
 // end
 uint8_t MapWalk::next_path_leg()
 {
-	Byte shape = mem_[wOWPathShape];
+	Byte shape = mem_.ow_path_shape();
 	switch (shape) {
 	case PATH_NONE: // the end (marked in the byte after)
 		mem_[static_cast<uint16_t>((wOWPathShape & 0xff00) | static_cast<uint8_t>(wOWPathShape + 1))] = 0xff;
@@ -564,7 +562,7 @@ uint8_t MapWalk::next_path_leg()
 // w2d0a3 the shorter axis' accumulator, w2d0a5/6 the y and x steps
 void MapWalk::path_distances()
 {
-	Byte flags = mem_[w2d0a0];
+	Byte flags = mem_.unk_2d0a0();
 	flags = 0;
 	auto distance = [&](uint8_t from, uint8_t to, uint8_t backwards) { // .CalculateDistance
 		if (to >= from)
@@ -583,20 +581,20 @@ void MapWalk::path_distances()
 		shorter = dy;
 		bits |= 1;
 	}
-	mem_[w2d0a1] = longer;
-	mem_[w2d0a2] = longer;
-	mem_[w2d0a3] = shorter;
-	mem_[w2d0a4] = shorter;
+	mem_.unk_2d0a1() = longer;
+	mem_.unk_2d0a2() = longer;
+	mem_.unk_2d0a3() = shorter;
+	mem_.unk_2d0a4() = shorter;
 	flags = bits;
-	mem_[w2d0a5] = (bits & (1 << 1)) ? 0xff : 0x01;
-	mem_[w2d0a6] = (bits & (1 << 2)) ? 0xff : 0x01;
+	mem_.unk_2d0a5() = (bits & (1 << 1)) ? 0xff : 0x01;
+	mem_.unk_2d0a6() = (bits & (1 << 2)) ? 0xff : 0x01;
 }
 
 // Func_82208: a step along the leg: the longer axis each time, the
 // shorter when its accumulator passes the longer distance
 void MapWalk::path_step()
 {
-	Byte left = mem_[w2d0a1];
+	Byte left = mem_.unk_2d0a1();
 	if (!left)
 		return;
 	--left;
@@ -604,10 +602,10 @@ void MapWalk::path_step()
 		uint16_t coord = x ? wOWXCoord1 : wOWYCoord1;
 		mem_[coord] = static_cast<uint8_t>(mem_[coord] + mem_[x ? w2d0a6 : w2d0a5]);
 	};
-	uint8_t longer = mem_[w2d0a2];
-	Byte accumulated = mem_[w2d0a3];
-	accumulated = static_cast<uint8_t>(mem_[w2d0a4] + accumulated);
-	bool x_longer = mem_[w2d0a0] & 1;
+	uint8_t longer = mem_.unk_2d0a2();
+	Byte accumulated = mem_.unk_2d0a3();
+	accumulated = static_cast<uint8_t>(mem_.unk_2d0a4() + accumulated);
+	bool x_longer = mem_.unk_2d0a0() & 1;
 	if (accumulated >= longer) { // .Func_82224
 		accumulated = static_cast<uint8_t>(accumulated - longer);
 		step(!x_longer);
@@ -687,16 +685,16 @@ void MapWalk::update_wario()
 void MapWalk::set_wario_oam(uint8_t oam)
 {
 	static constexpr uint16_t FRAMESETS = ADDR_SetOWWarioOAM + 0x2d; // .framesets
-	mem_[w2d106] = oam;
+	mem_.unk_2d106() = oam;
 	if (!oam)
 		return;
 	uint16_t sprites = oam < 0x05 ? ADDR_OAM_aa329 : ADDR_OAM_aa0cf;
 	uint16_t frameset = mem_.word(static_cast<uint16_t>(FRAMESETS + static_cast<uint8_t>((oam - 1) * 2)));
-	mem_[w2d109] = static_cast<uint8_t>(frameset);
+	mem_.unk_2d109() = static_cast<uint8_t>(frameset);
 	mem_[w2d109 + 1] = static_cast<uint8_t>(frameset >> 8);
-	mem_[w2d107] = static_cast<uint8_t>(sprites);
+	mem_.unk_2d107() = static_cast<uint8_t>(sprites);
 	mem_[w2d107 + 1] = static_cast<uint8_t>(sprites >> 8);
-	mem_[w2d104] = 0;
+	mem_.unk_2d104() = 0;
 	mem_[w2d104 + 1] = 0;
 }
 

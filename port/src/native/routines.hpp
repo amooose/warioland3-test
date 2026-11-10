@@ -48,7 +48,7 @@ public:
 	void switch_bank(uint8_t bank)
 	{
 		Memory mem(gb_);
-		mem[wROMBank] = bank;
+		mem.rom_bank() = bank;
 		mem[rROMB0 + 0x100] = bank;
 	}
 
@@ -61,7 +61,7 @@ public:
 	// decompresses src from the given ROM bank (wTempBank) to dest
 	void far_decompress(uint8_t bank, uint16_t src, uint16_t dest)
 	{
-		Memory(gb_).byte(wTempBank) = bank;
+		Memory(gb_).temp_bank() = bank;
 		home::far_decompress(gb_, src, dest);
 	}
 
@@ -163,42 +163,40 @@ void run_state_table(GB *gb, uint8_t wram_bank, uint8_t bank, uint16_t addr, F f
 // The play_sfx, stop_sfx and play_music2 / stop_music2 macros
 inline void play_sfx(Memory mem, uint16_t sfx)
 {
-	mem[hSFXID + 0] = static_cast<uint8_t>(sfx >> 8);
-	mem[hSFXID + 1] = static_cast<uint8_t>(sfx);
+	mem.sfx() = sfx;
 }
 
 inline void play_music(Memory mem, uint16_t music)
 {
-	mem[hMusicID + 0] = static_cast<uint8_t>(music >> 8);
-	mem[hMusicID + 1] = static_cast<uint8_t>(music);
+	mem.music() = music;
 }
 
 inline void stop_music(Memory mem)
 {
-	mem[hMusicID + 0] = 0xff;
-	mem[hMusicID + 1] = 0x00;
+	mem.music().hi() = 0xff;
+	mem.music().lo() = 0x00;
 }
 
 inline void play_music2(Memory mem, uint16_t music)
 {
 	mem[hMusicIDBackup + 0] = static_cast<uint8_t>(music >> 8);
-	mem[hMusicID + 0] = static_cast<uint8_t>(music >> 8);
+	mem.music().hi() = static_cast<uint8_t>(music >> 8);
 	mem[hMusicIDBackup + 1] = static_cast<uint8_t>(music);
-	mem[hMusicID + 1] = static_cast<uint8_t>(music);
+	mem.music().lo() = static_cast<uint8_t>(music);
 }
 
 inline void stop_sfx(Memory mem)
 {
-	mem[hSFXID + 0] = 0xff;
-	mem[hSFXID + 1] = 0x00;
+	mem.sfx().hi() = 0xff;
+	mem.sfx().lo() = 0x00;
 }
 
 inline void stop_music2(Memory mem)
 {
 	mem[hMusicIDBackup + 0] = 0xff;
-	mem[hMusicID + 0] = 0xff;
+	mem.music().hi() = 0xff;
 	mem[hMusicIDBackup + 1] = 0x00;
-	mem[hMusicID + 1] = 0x00;
+	mem.music().lo() = 0x00;
 }
 
 // sub n / daa on a BCD byte: the result, and whether it borrowed (the carry

@@ -56,7 +56,7 @@ int ObjectLoader::free_slot()
 // in the first free slot, if it's on screen.
 void ObjectLoader::spawn(uint8_t index, uint16_t at)
 {
-	uint8_t x_hi = mem_[hXPosHi];
+	uint8_t x_hi = mem_.x_pos_hi();
 	if (x_hi >= 0x0a)
 		return;
 	int n = free_slot();
@@ -71,10 +71,10 @@ void ObjectLoader::spawn(uint8_t index, uint16_t at)
 
 	uint16_t obj = slot(n);
 	mem_[obj + OBJ_UNK_01] = static_cast<uint8_t>(at);
-	mem_[obj + OBJ_UNK_02] = static_cast<uint8_t>(((mem_[wccec] - 1) << 5) + (at >> 8));
-	mem_[obj + OBJ_Y_POS + 0] = mem_[hYPosLo];
-	mem_[obj + OBJ_Y_POS + 1] = mem_[hYPosHi];
-	mem_[obj + OBJ_X_POS + 0] = mem_[hXPosLo];
+	mem_[obj + OBJ_UNK_02] = static_cast<uint8_t>(((mem_.unk_ccec() - 1) << 5) + (at >> 8));
+	mem_[obj + OBJ_Y_POS + 0] = mem_.y_pos_lo();
+	mem_[obj + OBJ_Y_POS + 1] = mem_.y_pos_hi();
+	mem_[obj + OBJ_X_POS + 0] = mem_.x_pos_lo();
 	mem_[obj + OBJ_X_POS + 1] = x_hi;
 
 	uint16_t data = Word(gb_, wObjDataPointers + static_cast<uint8_t>((index - 1) << 1));
@@ -128,12 +128,12 @@ void ObjectLoader::create_from_cur_obj_pos(uint16_t data)
 		return;
 	uint16_t obj = slot(n);
 	mem_[obj + OBJ_FLAGS] = OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT;
-	mem_[obj + OBJ_UNK_01] = mem_[wCurObjUnk01];
-	mem_[obj + OBJ_UNK_02] = mem_[wCurObjUnk02];
-	mem_[obj + OBJ_Y_POS + 0] = mem_[wCurObjYPos + 0];
-	mem_[obj + OBJ_Y_POS + 1] = mem_[wCurObjYPos + 1];
-	mem_[obj + OBJ_X_POS + 0] = mem_[wCurObjXPos + 0];
-	create_got_pos(mem_[wCurObjXPos + 1], obj + OBJ_X_POS + 1, data);
+	mem_[obj + OBJ_UNK_01] = mem_.cur_obj_unk01();
+	mem_[obj + OBJ_UNK_02] = mem_.cur_obj_unk02();
+	mem_[obj + OBJ_Y_POS + 0] = mem_.cur_obj_y().lo();
+	mem_[obj + OBJ_Y_POS + 1] = mem_.cur_obj_y().hi();
+	mem_[obj + OBJ_X_POS + 0] = mem_.cur_obj_x().lo();
+	create_got_pos(mem_.cur_obj_x().hi(), obj + OBJ_X_POS + 1, data);
 }
 
 // pos + the signed offset: its low byte to `at`, the high byte returned
@@ -157,8 +157,8 @@ void ObjectLoader::create_at_relative_pos(uint16_t data)
 		return;
 	uint16_t obj = slot(n);
 	mem_[obj + OBJ_FLAGS] = OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT;
-	mem_[obj + OBJ_UNK_01] = mem_[wCurObjUnk01];
-	mem_[obj + OBJ_UNK_02] = mem_[wCurObjUnk02];
+	mem_[obj + OBJ_UNK_01] = mem_.cur_obj_unk01();
+	mem_[obj + OBJ_UNK_02] = mem_.cur_obj_unk02();
 	uint16_t at = obj + OBJ_Y_POS;
 	uint8_t y_hi = relative(wCurObjYPos, mem_[data], at);
 	mem_[at++] = y_hi;
@@ -187,7 +187,7 @@ void ObjectLoader::despawn_all()
 // one (hffa0 counts down); returns where the reading stopped
 uint16_t ObjectLoader::load_data_pointers(uint16_t from, uint8_t count)
 {
-	mem_[hffa0] = count;
+	mem_.unk_ffa0() = count;
 	uint8_t dest = static_cast<uint8_t>(wObjDataPtr01); // inc e: within the page
 	uint16_t src = from;
 	for (;;) {
@@ -197,7 +197,7 @@ uint16_t ObjectLoader::load_data_pointers(uint16_t from, uint8_t count)
 			break;
 		mem_[static_cast<uint16_t>((wObjDataPtr01 & 0xff00) | dest++)] = lo;
 		mem_[static_cast<uint16_t>((wObjDataPtr01 & 0xff00) | dest++)] = hi;
-		if (!--mem_[hffa0])
+		if (!--mem_.unk_ffa0())
 			break;
 	}
 	return src;
@@ -217,7 +217,7 @@ void ObjectLoader::load_group()
 {
 	for (int i = 0; i < 0x10; i++)
 		Word(gb_, wObjDataPointers + 2 * i) = ADDR_DummyObjectData;
-	uint8_t group = mem_[wObjectGroup];
+	uint8_t group = mem_.object_group();
 	if (group == OBJECT_GROUP_HIDDEN_FIGURE) {
 		load_hidden_figure_data();
 		return;
@@ -231,7 +231,7 @@ void ObjectLoader::load_group()
 
 	uint16_t enemies = Word(gb_, entry + 2);
 	mem_[rVBK] = VRAM1;
-	mem_[hffa0] = mem_[enemies];
+	mem_.unk_ffa0() = mem_[enemies];
 	static constexpr uint16_t dest[4] = {
 		v1Tiles0, v1Tiles0 + 0x40 * TILE_SIZE, v1Tiles1, v1Tiles1 + 0x40 * TILE_SIZE,
 	};
@@ -239,7 +239,7 @@ void ObjectLoader::load_group()
 	for (int i = 0; i < 4; i++) {
 		uint16_t src = Word(gb_, ptrs);
 		ptrs += 2;
-		uint8_t bank = static_cast<uint8_t>(mem_[hffa0] + ENEMY_GFX_1_SLOT_1 + i);
+		uint8_t bank = static_cast<uint8_t>(mem_.unk_ffa0() + ENEMY_GFX_1_SLOT_1 + i);
 		routines_.in_bank(bank, ADDR_Decompress, [&] { routines_.decompress(src, dest[i]); }); // hcall Decompress
 	}
 	mem_[rVBK] = 0; // VRAM0

@@ -50,7 +50,7 @@ void BigLeaf::spawn_set_1()
 	no_actions();
 	frame_duration() = 2;
 	uint16_t limit = static_cast<uint16_t>(x() + 22);
-	uint16_t wario_x = static_cast<uint16_t>(mem_[wWarioXPos + 0] << 8 | mem_[wWarioXPos + 1]);
+	uint16_t wario_x = mem_.wario_x();
 	if (wario_x >= limit)
 		return;
 	if (state_duration()) {
@@ -112,7 +112,7 @@ void BigLeaf::falling()
 		return;
 	}
 	if (s) { // hit: drifts away from Wario from now on
-		uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+		uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 		state_duration() = static_cast<uint8_t>(screen_x() + 0x2a) < wario ? 2 : 1;
 		state() = 0;
 	}
@@ -121,7 +121,7 @@ void BigLeaf::falling()
 		move_right();
 	else if (drift)
 		move_left();
-	bool odd = mem_[wGlobalCounter] & 1;
+	bool odd = mem_.global_counter() & 1;
 	if (flags() & OBJFLAG_STEPPED) {
 		flags() &= ~OBJFLAG_STEPPED;
 		if (!odd)
@@ -145,12 +145,12 @@ void BigLeaf::falling()
 
 bool BigLeaf::pos_in_water()
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	hpos_block_unk1();
-	return mem_[wIsInWaterOrSand];
+	return mem_.is_in_water_or_sand();
 }
 
 void BigLeaf::sinking()

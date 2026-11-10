@@ -45,11 +45,11 @@ void Haridama::init()
 {
 	flags() = (flags() & ~OBJFLAG_INVISIBLE) | OBJFLAG_NO_COLLISION;
 	set_update(UPDATE);
-	mem_[wCurObjCollBoxRight] = 0x07;
-	mem_[wCurObjCollBoxLeft] = 0xf8;
-	mem_[wCurObjCollBoxBottom] = 0xfd;
+	mem_.cur_obj_coll_box_right() = 0x07;
+	mem_.cur_obj_coll_box_left() = 0xf8;
+	mem_.cur_obj_coll_box_bottom() = 0xfd;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	if (static_cast<uint8_t>(screen_x() + 0x2a) < wario) {
 		substate() |= OBJSUBFLAG_HDIR;
 		set_frameset(ADDR_Frameset_69290);
@@ -64,10 +64,10 @@ bool Haridama::wall(bool right)
 {
 	uint16_t y_pos = static_cast<uint16_t>(y() - 8);
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 8) : static_cast<uint16_t>(x() - 9);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	return hpos_block_unk4() & 0x0f;
 }
 
@@ -91,9 +91,9 @@ void Haridama::curl(uint16_t frameset)
 void Haridama::crawl()
 {
 	bool right = facing_right();
-	uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+	uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 	if (dy < 0x08 || dy >= 0xe8) {
-		uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+		uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 		if (right ? dx >= 0xc0 : dx < 0x40) {
 			curl(right ? ADDR_Frameset_692ce : ADDR_Frameset_692c7);
 			return;
@@ -170,7 +170,7 @@ void Haridama::update()
 	}
 	switch (s & 0xfe) {
 	case 0x08: // pounded
-		if (!(mem_[wCurObjUnk1d] & 0x80)) {
+		if (!(mem_.cur_obj_unk1d() & 0x80)) {
 			hit_from(facing_right());
 			return;
 		}
@@ -200,17 +200,17 @@ void Haridama::update()
 void Haridama::floating()
 {
 	uint16_t y_pos = static_cast<uint16_t>(y() - 0x11);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
 	uint16_t x_pos = static_cast<uint16_t>(x() - 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
-	if (!hpos_block_unk3() && mem_[wIsInWaterOrSand]) {
-		mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
+	if (!hpos_block_unk3() && mem_.is_in_water_or_sand()) {
+		mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+		mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
 		x_pos = static_cast<uint16_t>(x() + 7);
-		mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-		mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+		mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+		mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 		if (!hpos_block_unk3()) {
 			call_home(ADDR_MoveObjectUp_Slow);
 			return;
@@ -241,7 +241,7 @@ void Haridama::in_water()
 			turn(right ? ADDR_Frameset_692a1 : ADDR_Frameset_692aa);
 			return;
 		}
-		if (mem_[wGlobalCounter] & 0b11)
+		if (mem_.global_counter() & 0b11)
 			return;
 		bool right = facing_right();
 		if (!wall(right)) {
@@ -259,7 +259,7 @@ void Haridama::in_water()
 		drift_right();
 		return;
 	}
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	if (static_cast<uint8_t>(screen_x() + 0x2a) < wario) {
 		state() = 0x32;
 		substate() &= ~OBJSUBFLAG_HDIR;

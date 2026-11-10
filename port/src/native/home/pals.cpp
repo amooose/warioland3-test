@@ -61,7 +61,7 @@ struct TreasurePal {
 TreasurePal treasure_pal(GB *gb)
 {
 	Memory mem(gb);
-	uint8_t index = static_cast<uint8_t>((mem[wLevelEndScreen] & 0x7f) - 1);
+	uint8_t index = static_cast<uint8_t>((mem.level_end_screen() & 0x7f) - 1);
 	uint8_t colour = mem[static_cast<uint16_t>(wLevelTreasurePals + index)];
 	uint8_t offset = static_cast<uint8_t>((colour - OBPAL_TREASURE_YELLOW) * 8);
 	return {index, static_cast<uint16_t>(ADDR_TreasurePals + offset)};
@@ -121,9 +121,9 @@ void set_wario_pal(GB *gb, uint16_t pals)
 	Memory mem(gb);
 	mem[wWarioPalsPtr + 0] = static_cast<uint8_t>(pals >> 8);
 	mem[wWarioPalsPtr + 1] = static_cast<uint8_t>(pals);
-	uint8_t bank = mem[wROMBank];
+	uint8_t bank = mem.rom_bank();
 	bankswitch(gb, BANK_WarioDefaultPal, ADDR_SetWarioPal); // BANK("Wario Palettes")
-	mem[hCallFuncBank] = BANK_WarioDefaultPal;
+	mem.call_func_bank() = BANK_WarioDefaultPal;
 	hcall(gb, ADDR_CopyHLToDE_Short, [&] { copy_short(gb, pals, wTempPals2, 2 * PAL_SIZE); });
 	mem[rOBPI] = OBPI_AUTOINC | 0;
 	for (int i = 0; i < 2; i++)
@@ -137,7 +137,7 @@ void load_collected_treasure_pal_clear_screen(GB *gb)
 	uint8_t wram_bank = mem[rWBK];
 	mem[rWBK] = BANK_wLevelTreasurePals;
 	TreasurePal pal = treasure_pal(gb);
-	uint8_t bank = mem[wROMBank];
+	uint8_t bank = mem.rom_bank();
 	bankswitch(gb, BANK_TreasurePals, ADDR_LoadCollectedTreasurePal_ClearScreen);
 	// an unneeded farcall, the bank being mapped
 	farcall(gb, BANK_TreasurePals, ADDR_CopyHLToDE_Short,
@@ -152,7 +152,7 @@ void load_collected_treasure_pal_level(GB *gb)
 	uint8_t wram_bank = mem[rWBK];
 	mem[rWBK] = BANK_wLevelTreasurePals;
 	TreasurePal pal = treasure_pal(gb);
-	uint8_t bank = mem[wROMBank];
+	uint8_t bank = mem.rom_bank();
 	bankswitch(gb, BANK_TreasurePals, ADDR_LoadCollectedTreasurePal_Level);
 	uint8_t offset = static_cast<uint8_t>(pal.index * 8);
 	uint16_t dest = static_cast<uint16_t>(((wTempPals2 + 4 * PAL_SIZE) & 0xff00)
@@ -337,7 +337,7 @@ PORT_EX(Func_1ae2, 0, 0)
 PORT_EX(SetWarioPal, 0, 0)
 {
 	uint16_t pals = REG_HL(gb);
-	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t bank = wl3::Memory(gb).rom_bank();
 	set_wario_pal(gb, pals);
 	copied_short(gb, pals, wTempPals2, 2 * PAL_SIZE);
 	gb->cpu.c = static_cast<uint8_t>(rOBPD);
@@ -351,7 +351,7 @@ static void treasure_pal_regs(GB *gb, uint16_t dest, uint8_t c)
 	wl3::Memory mem(gb);
 	uint8_t wram_bank = mem[rWBK];
 	mem[rWBK] = BANK_wLevelTreasurePals;
-	uint8_t index = static_cast<uint8_t>((mem[wLevelEndScreen] & 0x7f) - 1);
+	uint8_t index = static_cast<uint8_t>((mem.level_end_screen() & 0x7f) - 1);
 	uint8_t colour = mem[static_cast<uint16_t>(wLevelTreasurePals + index)];
 	mem[rWBK] = wram_bank;
 	uint16_t pals = static_cast<uint16_t>(ADDR_TreasurePals + static_cast<uint8_t>((colour - OBPAL_TREASURE_YELLOW) * 8));

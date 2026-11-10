@@ -53,9 +53,9 @@ void DoorTransition::set_vblank()
 // tile down and left (wrapping in the BG map), for 16 steps
 void DoorTransition::prepare_next_step()
 {
-	if (mem_[wDoorTransitionCounter] >= 16)
+	if (mem_.door_transition_counter() >= 16)
 		return;
-	mem_[wTransitionEffectStep] = static_cast<uint8_t>(mem_[wTransitionEffectStep] + 2);
+	mem_.transition_effect_step() = static_cast<uint8_t>(mem_.transition_effect_step() + 2);
 	// wDoorTransitionEffectBGPtr (low byte first): one row below
 	Byte lo = mem_[wDoorTransitionEffectBGPtr + 0];
 	Byte hi = mem_[wDoorTransitionEffectBGPtr + 1];
@@ -78,26 +78,26 @@ void DoorTransition::update()
 {
 	uint8_t wbk = mem_[rWBK]; // push_wram $03
 	mem_[rWBK] = GFX_RAM;
-	if (!(mem_[wDoorTransitionCounter] | mem_[wDoorTransitionOrientation])) {
-		mem_[wUnused_c186] = 0x01;
+	if (!(mem_.door_transition_counter() | mem_.door_transition_orientation())) {
+		mem_.unused_c186() = 0x01;
 		set_vblank();
-		mem_[wDoorTransitionOrientation] ^= 1;
-		mem_[wTransitionEffectStep] = 1;
+		mem_.door_transition_orientation() ^= 1;
+		mem_.transition_effect_step() = 1;
 		// starting with Wario's tile
 		mem_[wDoorTransitionEffectBGPtr + 0] = mem_[wWarioTileBGPtr + 0];
 		mem_[wDoorTransitionEffectBGPtr + 1] = mem_[wWarioTileBGPtr + 1];
-	} else if (mem_[wDoorTransitionOrientation] ^= 1) { // .already_started
+	} else if (mem_.door_transition_orientation() ^= 1) { // .already_started
 		prepare_next_step();
-	} else if (++mem_[wDoorTransitionCounter] >= 17) { // .skip_incr_step
+	} else if (++mem_.door_transition_counter() >= 17) { // .skip_incr_step
 		copy3(wBackupVBlankFunc, wVBlankFunc);
-		mem_[wDoorTransitionCounter] = 0;
-		mem_[wUnused_c186] = 0;
-		mem_[wDoorTransitionOrientation] = 0;
-		mem_[hMusicID + 0] = 0xff; // stop_music
-		mem_[hMusicID + 1] = 0x00;
-		mem_[hSFXID + 0] = 0xff; // stop_sfx
-		mem_[hSFXID + 1] = 0x00;
-		++mem_[wSubState];
+		mem_.door_transition_counter() = 0;
+		mem_.unused_c186() = 0;
+		mem_.door_transition_orientation() = 0;
+		mem_.music().hi() = 0xff; // stop_music
+		mem_.music().lo() = 0x00;
+		mem_.sfx().hi() = 0xff; // stop_sfx
+		mem_.sfx().lo() = 0x00;
+		++mem_.sub_state();
 	}
 	mem_[rWBK] = wbk; // pop_wram
 }
@@ -139,13 +139,13 @@ uint16_t DoorTransition::fill_left(uint16_t at, uint8_t n)
 // the scroll, then the step's tiles: up then left, or left then up
 void DoorTransition::effect()
 {
-	mem_[rSCY] = mem_[wSCY];
-	mem_[rSCX] = mem_[wSCX];
+	mem_[rSCY] = mem_.scy();
+	mem_[rSCX] = mem_.scx();
 	uint8_t wbk = mem_[rWBK]; // push_wram $03
 	mem_[rWBK] = GFX_RAM;
-	uint8_t step = mem_[wTransitionEffectStep];
+	uint8_t step = mem_.transition_effect_step();
 	uint16_t at = static_cast<uint16_t>(mem_[wDoorTransitionEffectBGPtr + 0] | mem_[wDoorTransitionEffectBGPtr + 1] << 8);
-	if (mem_[wDoorTransitionOrientation]) {
+	if (mem_.door_transition_orientation()) {
 		at = fill_upwards(at, step);
 		fill_left(at, static_cast<uint8_t>(step + 1));
 	} else { // .left_then_up

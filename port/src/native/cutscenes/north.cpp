@@ -32,7 +32,7 @@ void Cutscenes::cut_tree()
 		break;
 	case 1: // .ShowAxe
 		place(wSceneObj2, SCREEN_HEIGHT_PX, 0x6c, 0x01);
-		mem_[wSceneObj1YCoord] = 3; // its shadow (draw_shadow)
+		mem_.scene_obj1_y_coord() = 3; // its shadow (draw_shadow)
 		advance();
 		break;
 	case 2: // .RaiseAxe: up and left a pixel a frame
@@ -51,7 +51,7 @@ void Cutscenes::cut_tree()
 	case 6: // .HideAxe
 		wram_.lcdc_flags_to_flip() = LCDC_BG_MAP;
 		set_state(wSceneObj2, 0);
-		mem_[wSceneObj1YCoord] = 0;
+		mem_.scene_obj1_y_coord() = 0;
 		advance();
 		break;
 	case 7: // .Wait16
@@ -63,7 +63,7 @@ void Cutscenes::cut_tree()
 		advance();
 		break;
 	case 9: // .WaitCutAnimation
-		if (!mem_[wSceneObj2State])
+		if (!mem_.scene_obj2_state())
 			advance();
 		break;
 	case 10:
@@ -83,7 +83,7 @@ void Cutscenes::draw_cut_tree()
 	uint16_t obj;
 	for (;;) {
 		draw_shadow(wSceneObj2, wCurSceneObj, 0x03, 0x05); // Func_9fb97
-		uint8_t state = mem_[wSceneObj2State];
+		uint8_t state = mem_.scene_obj2_state();
 		if (!state)
 			return;
 		if (state == 1) {
@@ -116,9 +116,9 @@ void Cutscenes::open_north_gate()
 	case 2: // .Func_9cf59: the two close in, every other frame
 		if (frame() & 1)
 			break;
-		--mem_[wSceneObj3XCoord];
-		++mem_[wSceneObj2XCoord];
-		if (mem_[wSceneObj2XCoord] == 79)
+		--mem_.scene_obj3_x_coord();
+		++mem_.scene_obj2_x_coord();
+		if (mem_.scene_obj2_x_coord() == 79)
 			advance();
 		break;
 	case 3: // .Wait30_1
@@ -129,8 +129,8 @@ void Cutscenes::open_north_gate()
 		break;
 	case 4: // .Func_9cf71
 		set_state(wSceneObj2, 0x03);
-		mem_[wSceneObj2XCoord] = 80;
-		mem_[wSceneObj3State] = 0;
+		mem_.scene_obj2_x_coord() = 80;
+		mem_.scene_obj3_state() = 0;
 		play_sfx(mem_, SFX_CLICK);
 		advance();
 		break;
@@ -140,7 +140,7 @@ void Cutscenes::open_north_gate()
 		advance();
 		break;
 	case 7: // .Func_9cfad
-		if (!mem_[wSceneObj3State])
+		if (!mem_.scene_obj3_state())
 			advance();
 		break;
 	case 8: // .Wait60_1
@@ -150,24 +150,24 @@ void Cutscenes::open_north_gate()
 	case 9: // .Func_9cfba: down, every other frame
 		if (!(frame() & 1))
 			break;
-		++mem_[wSceneObj2YCoord];
-		if (mem_[wSceneObj2YCoord] == 0x54)
+		++mem_.scene_obj2_y_coord();
+		if (mem_.scene_obj2_y_coord() == 0x54)
 			advance();
 		break;
 	case 11: // .Func_9cfce
 		set_state(wSceneObj2, 0x04);
-		++mem_[wSceneObj2XCoord];
+		++mem_.scene_obj2_x_coord();
 		play_sfx(mem_, SFX_CLICK);
 		advance();
 		break;
 	case 13: // .Func_9cfea
-		mem_[wSceneObj3YCoord] = mem_[wSceneObj2YCoord];
-		mem_[wSceneObj3XCoord] = mem_[wSceneObj2XCoord];
+		mem_.scene_obj3_y_coord() = mem_.scene_obj2_y_coord();
+		mem_.scene_obj3_x_coord() = mem_.scene_obj2_x_coord();
 		set_state(wSceneObj3, 0x06);
 		advance();
 		break;
 	case 14: // .Func_9d001
-		if (mem_[wSceneObj3State] == 0x07)
+		if (mem_.scene_obj3_state() == 0x07)
 			advance();
 		break;
 	case 15: // .Func_9d00a
@@ -242,7 +242,7 @@ void Cutscenes::expel_tornado()
 		advance();
 		break;
 	case 4: { // .Func_9db5d
-		Byte y = mem_[wSceneObj3YCoord];
+		Byte y = mem_.scene_obj3_y_coord();
 		--y;
 		if (y != 0x4a)
 			break;
@@ -252,7 +252,7 @@ void Cutscenes::expel_tornado()
 	}
 	case 5: // .Func_9db71
 		set_state(wSceneObj2, 0x01);
-		mem_[wSceneObj3State] = 0;
+		mem_.scene_obj3_state() = 0;
 		wram_.collection_row() = 0x08;
 		advance();
 		break;
@@ -300,7 +300,7 @@ void Cutscenes::rainstorm()
 		}
 		if (f & 0x03)
 			break;
-		mem_[wSceneObj2YCoord] += (f & (1 << 2)) ? 0xff : 0x01;
+		mem_.scene_obj2_y_coord() += (f & (1 << 2)) ? 0xff : 0x01;
 		if (f >= 0x20)
 			advance();
 		break;
@@ -316,7 +316,7 @@ void Cutscenes::rainstorm()
 			break;
 		}
 		uint8_t dy = f < 0x08 ? 0xff : f < 0x10 ? 0xfe : 0xfd;
-		Byte y = mem_[wSceneObj2YCoord];
+		Byte y = mem_.scene_obj2_y_coord();
 		y += dy;
 		if (y < 0x20)
 			advance();
@@ -327,7 +327,7 @@ void Cutscenes::rainstorm()
 		advance();
 		break;
 	case 6: // .Func_9d0af
-		if (mem_[wSceneObj2State] != 0x03)
+		if (mem_.scene_obj2_state() != 0x03)
 			break;
 		wram_.colour_fade_diff() = 0;
 		advance();
@@ -345,7 +345,7 @@ void Cutscenes::rainstorm()
 		}
 		if (frame() & 0x03)
 			break;
-		Byte y = mem_[wSceneObj2YCoord];
+		Byte y = mem_.scene_obj2_y_coord();
 		--y;
 		if (y == 0x28)
 			advance();
@@ -366,11 +366,11 @@ void Cutscenes::draw_func_9f11e()
 {
 	uint16_t obj;
 	for (;;) {
-		uint8_t s = mem_[wSceneObj2State];
+		uint8_t s = mem_.scene_obj2_state();
 		if (!s)
 			return;
 		obj = animate(wSceneObj2State, frameset(ADDR_Func_9f11e + 0x22, s));
-		if (mem_[wSceneObj2State] != 0x02 || !next_state_when_done(obj, 0x03))
+		if (mem_.scene_obj2_state() != 0x02 || !next_state_when_done(obj, 0x03))
 			break;
 	}
 	draw(obj, ADDR_OAM_bd377);
@@ -443,7 +443,7 @@ void Cutscenes::fix_elevator()
 	case 10:
 	case 12:
 	case 14:
-		if (mem_[wSceneObj2Frame])
+		if (mem_.scene_obj2_frame())
 			break;
 		play_sfx(mem_, SFX_109);
 		advance();
@@ -451,7 +451,7 @@ void Cutscenes::fix_elevator()
 	case 9: // .Func_9d22c: and away from it
 	case 11:
 	case 13:
-		if (mem_[wSceneObj2Frame])
+		if (mem_.scene_obj2_frame())
 			advance();
 		break;
 	case 16: // .Func_9d239
@@ -464,7 +464,7 @@ void Cutscenes::fix_elevator()
 		advance();
 		break;
 	case 19: // .Func_9d25c
-		if (!mem_[wSceneObj4State])
+		if (!mem_.scene_obj4_state())
 			advance();
 		break;
 	case 21: // .Func_9d269
@@ -472,7 +472,7 @@ void Cutscenes::fix_elevator()
 		advance();
 		break;
 	case 22: { // .Func_9d274: up to y $18
-		Byte y = mem_[wSceneObj2YCoord];
+		Byte y = mem_.scene_obj2_y_coord();
 		--y;
 		if (y < 0x18)
 			advance();
@@ -525,7 +525,7 @@ void Cutscenes::init_raise_tower()
 	load_pals2(BANK_Pals_b8a00, ADDR_Pals_b8a00);
 	cutscenes::load_cutscenes1_gfx_vram0(gb_);
 	cutscenes::load_cutscene_bg_maps(gb_, 3);
-	mem_[wSceneObj1YCoord] = 3; // the shadows (draw_shadow)
+	mem_.scene_obj1_y_coord() = 3; // the shadows (draw_shadow)
 	place(wSceneObj2, 130, 113, 0x01);
 	place(wSceneObj3, 130, 47, 0x02);
 	draw_func_9f146();
@@ -571,11 +571,11 @@ void Cutscenes::raise_tower()
 // .Func_9d133: both up a pixel, apart a pixel; their new y
 uint8_t Cutscenes::raise_tower_step()
 {
-	uint8_t y = static_cast<uint8_t>(mem_[wSceneObj2YCoord] - 1);
-	mem_[wSceneObj2YCoord] = y;
-	--mem_[wSceneObj2XCoord];
-	mem_[wSceneObj3YCoord] = y;
-	++mem_[wSceneObj3XCoord];
+	uint8_t y = static_cast<uint8_t>(mem_.scene_obj2_y_coord() - 1);
+	mem_.scene_obj2_y_coord() = y;
+	--mem_.scene_obj2_x_coord();
+	mem_.scene_obj3_y_coord() = y;
+	++mem_.scene_obj3_x_coord();
 	return y;
 }
 
@@ -614,7 +614,7 @@ void Cutscenes::blow_mist()
 		break;
 	case 1: // .Func_9d840
 		place(wSceneObj2, 164, 120, 0x01);
-		mem_[wSceneObj1YCoord] = 3;
+		mem_.scene_obj1_y_coord() = 3;
 		advance();
 		break;
 	case 2: // .Func_9d858: up and left
@@ -683,23 +683,23 @@ void Cutscenes::summon_snakes()
 	case 9: // wSceneObj4 takes over
 		if (!(frame() & 1))
 			break;
-		if (--mem_[wSceneObj3XCoord] != 0x1c)
+		if (--mem_.scene_obj3_x_coord() != 0x1c)
 			break;
-		mem_[wSceneObj3State] = 0;
+		mem_.scene_obj3_state() = 0;
 		place(wSceneObj4, 80, 60, 0x03);
 		advance();
 		break;
 	case 8: // .Func_9d94c: wSceneObj4 left on even frames, to x $18
 		if (!snake_left())
 			break;
-		mem_[wSceneObj4State] = 0;
+		mem_.scene_obj4_state() = 0;
 		place(wSceneObj3, 88, 64, 0x02);
 		advance();
 		break;
 	case 10: // .Func_9d973
 		if (!snake_left())
 			break;
-		mem_[wSceneObj4State] = 0;
+		mem_.scene_obj4_state() = 0;
 		advance();
 		break;
 	case 11: // .Func_9d980
@@ -721,7 +721,7 @@ bool Cutscenes::snake_left()
 {
 	if (frame() & 1)
 		return false;
-	return --mem_[wSceneObj4XCoord] == 0x18;
+	return --mem_.scene_obj4_x_coord() == 0x18;
 }
 
 } // namespace wl3::cutscenes

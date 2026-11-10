@@ -37,7 +37,7 @@ public:
 	void rising(); // .Func_45934
 
 private:
-	bool puffy() const { return mem_[wTransformation] == TRANSFORMATION_PUFFY_WARIO; }
+	bool puffy() const { return mem_.transformation() == TRANSFORMATION_PUFFY_WARIO; }
 	void set_mode(uint8_t m) { substate() = (substate() & OBJSUBFLAGS_MASK) | m; }
 	void hpos(int dy, int dx);
 	void knocked(uint16_t routine); // .asm_456e8
@@ -55,19 +55,19 @@ void Pneumo::init()
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	var3() = 0;
 	var1() = 0;
-	mem_[wCurObjCollBoxRight] = 0x07;
-	mem_[wCurObjCollBoxLeft] = 0xf8;
-	mem_[wCurObjCollBoxBottom] = 0x02;
+	mem_.cur_obj_coll_box_right() = 0x07;
+	mem_.cur_obj_coll_box_left() = 0xf8;
+	mem_.cur_obj_coll_box_bottom() = 0x02;
 }
 
 void Pneumo::hpos(int dy, int dx)
 {
 	uint16_t y_pos = static_cast<uint16_t>(y() + dy);
 	uint16_t x_pos = static_cast<uint16_t>(x() + dx);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 }
 
 void Pneumo::knocked(uint16_t routine)
@@ -140,9 +140,9 @@ void Pneumo::reset()
 // below it, it rises
 void Pneumo::hopping()
 {
-	uint8_t below = static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a);
+	uint8_t below = static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a);
 	if (below >= static_cast<uint8_t>(screen_y() + 0x2a) && below < 0x61 && !puffy()
-		&& !(mem_[wGlobalCounter] & 0x3f)) {
+		&& !(mem_.global_counter() & 0x3f)) {
 		set_mode(RISING);
 		return;
 	}
@@ -155,9 +155,9 @@ void Pneumo::hopping()
 			return;
 		}
 		if (!puffy()) {
-			uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+			uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 			if (dy >= 0xb0 && dy < 0xec) {
-				uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+				uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 				if (dx < 0x60) {
 					var2() = dx >= 0x10 ? 1 : 0;
 					substate() &= ~OBJSUBFLAG_HDIR;
@@ -193,14 +193,14 @@ void Pneumo::walking()
 		--state_duration();
 		return;
 	}
-	mem_[wc1ca] = 0;
+	mem_.unk_c1ca() = 0;
 	hpos(0, 0);
-	bool on_floor = hpos_block_unk1() ? mem_[wc1ca] : !mem_[wIsInWaterOrSand];
+	bool on_floor = hpos_block_unk1() ? mem_.unk_c1ca() : !mem_.is_in_water_or_sand();
 	if (!on_floor) {
 		set_floating();
 		return;
 	}
-	uint8_t below = static_cast<uint8_t>(static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a) - static_cast<uint8_t>(screen_y() + 0x2a));
+	uint8_t below = static_cast<uint8_t>(static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a) - static_cast<uint8_t>(screen_y() + 0x2a));
 	if (below < 0x14 || below >= 0x80) {
 		set_floating();
 		return;
@@ -253,7 +253,7 @@ void Pneumo::drifting()
 void Pneumo::inflate()
 {
 	set_mode(INFLATED);
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	if (static_cast<uint8_t>(screen_x() + 0x2a) < wario)
 		substate() &= ~OBJSUBFLAG_HDIR;
 	else
@@ -300,12 +300,12 @@ void Pneumo::rising()
 		reset();
 		return;
 	}
-	uint16_t wario_y = static_cast<uint16_t>(mem_[wWarioYPos + 0] << 8 | (mem_[wWarioYPos + 1] & 0xfc));
+	uint16_t wario_y = static_cast<uint16_t>(mem_.wario_y().hi() << 8 | (mem_.wario_y().lo() & 0xfc));
 	uint16_t target = static_cast<uint16_t>(wario_y + hXPosLoBackup);
-	uint8_t hi = mem_[wCurObjYPos + 1];
+	uint8_t hi = mem_.cur_obj_y().hi();
 	bool up;
 	if (hi == (target >> 8)) {
-		uint8_t lo = mem_[wCurObjYPos + 0] & 0xfc;
+		uint8_t lo = mem_.cur_obj_y().lo() & 0xfc;
 		if (lo == (target & 0xff)) {
 			reset();
 			return;
@@ -322,16 +322,16 @@ void Pneumo::rising()
 			move_up();
 		return;
 	}
-	mem_[wc1ca] = 0;
+	mem_.unk_c1ca() = 0;
 	hpos(0, 0);
 	if (hpos_block_unk1()) {
-		if (mem_[wc1ca])
+		if (mem_.unk_c1ca())
 			call_home(ADDR_MoveObjectDown_Slow);
 		else
 			reset();
 		return;
 	}
-	if (mem_[wIsInWaterOrSand])
+	if (mem_.is_in_water_or_sand())
 		reset();
 	else
 		move_down();

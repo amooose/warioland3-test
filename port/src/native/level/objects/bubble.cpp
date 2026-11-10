@@ -59,7 +59,7 @@ void Bubble::hole_update()
 // Wario in a bubble); else tries again next frame
 void Bubble::spawn()
 {
-	uint8_t limit = mem_[wTransformation] == TRANSFORMATION_BUBBLE ? 1 : 2;
+	uint8_t limit = mem_.transformation() == TRANSFORMATION_BUBBLE ? 1 : 2;
 	if (active_transient_objects() >= limit) {
 		state_duration() = 1;
 		return;
@@ -108,17 +108,17 @@ void Bubble::burst()
 bool Bubble::in_water_at(uint8_t dy)
 {
 	uint16_t y_pos = static_cast<uint16_t>(y() - dy);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	return hpos_block_unk3();
 }
 
 // up a pixel (on screen, every other frame; the others sway)
 void Bubble::rise()
 {
-	if ((flags() & OBJFLAG_ON_SCREEN) && (mem_[wGlobalCounter] & 1)) {
+	if ((flags() & OBJFLAG_ON_SCREEN) && (mem_.global_counter() & 1)) {
 		sway();
 		return;
 	}
@@ -127,9 +127,9 @@ void Bubble::rise()
 		set_burst();
 		return;
 	}
-	mem_[hIsInWaterOrSandBackup] = mem_[wIsInWaterOrSand];
+	mem_.is_in_water_or_sand_backup() = mem_.is_in_water_or_sand();
 	in_water_at(0x0c);
-	if (mem_[wIsInWaterOrSand] || mem_[hIsInWaterOrSandBackup])
+	if (mem_.is_in_water_or_sand() || mem_.is_in_water_or_sand_backup())
 		return; // still underwater
 	set_burst();
 }
@@ -148,15 +148,15 @@ bool Bubble::blocked(bool right)
 {
 	uint16_t y_pos = static_cast<uint16_t>(y() - 0x18);
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 0x0b) : static_cast<uint16_t>(x() - 0x0c);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4() & 0x0f)
 		return true;
 	y_pos = static_cast<uint16_t>(y() - 7);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
 	return hpos_block_unk4() & 0x0f;
 }
 
@@ -183,13 +183,13 @@ void Bubble::sway()
 		++var2();
 	if (!speed)
 		return;
-	unsigned sum = mem_[wCurObjXPos + 0] + speed;
-	mem_[wCurObjXPos + 0] = static_cast<uint8_t>(sum);
+	unsigned sum = mem_.cur_obj_x().lo() + speed;
+	mem_.cur_obj_x().lo() = static_cast<uint8_t>(sum);
 	if (right) {
 		if (sum > 0xff)
-			++mem_[wCurObjXPos + 1];
+			++mem_.cur_obj_x().hi();
 	} else if (sum <= 0xff) {
-		--mem_[wCurObjXPos + 1];
+		--mem_.cur_obj_x().hi();
 	}
 }
 

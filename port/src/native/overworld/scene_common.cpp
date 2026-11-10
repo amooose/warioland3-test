@@ -31,21 +31,21 @@ void SceneCommon::set_state(uint16_t state, uint8_t value)
 // Func_aca6d
 void SceneCommon::next_step()
 {
-	mem_[w2d014] = 0;
-	++mem_[w2d013];
+	mem_.unk_2d014() = 0;
+	++mem_.unk_2d013();
 }
 
 // ApplySceneWarioMovementRight: 1 pixel, and another every other frame
 // or while right is held. ApplySceneWarioMovementLeft: the same leftwards.
 uint8_t SceneCommon::walk(bool right)
 {
-	uint8_t pad = static_cast<uint8_t>(mem_[wJoypadDown] << 4 | mem_[wJoypadDown] >> 4);
+	uint8_t pad = static_cast<uint8_t>(mem_.joypad_down() << 4 | mem_.joypad_down() >> 4);
 	if (!right)
 		pad >>= 1; // d-left
 	int8_t step = right ? 1 : -1;
-	Byte x = mem_[wSceneWarioXCoord];
+	Byte x = mem_.scene_wario_x_coord();
 	x = static_cast<uint8_t>(x + step);
-	if ((mem_[wGlobalCounter] | pad) & 1)
+	if ((mem_.global_counter() | pad) & 1)
 		x = static_cast<uint8_t>(x + step);
 	return x & 0xfe;
 }
@@ -76,7 +76,7 @@ void SceneCommon::white_pals(uint16_t pals)
 void SceneCommon::fade()
 {
 	routines_.farcall(BANK_Func_84e43, ADDR_Func_84e43);
-	if (!mem_[wPalConfig1TotalSteps])
+	if (!mem_.pal_config1_total_steps())
 		next_step();
 }
 
@@ -112,8 +112,8 @@ void SceneCommon::init_text()
 // LoadCurTextPageBufferPage: the page's 3 lines below the header
 void SceneCommon::load_page()
 {
-	routines_.copy(buffer_page(mem_[wCurTextBufferPage]), wTextLine2, 3 * TEXT_LINE_LENGTH);
-	mem_[wCurTextLine] = 0;
+	routines_.copy(buffer_page(mem_.cur_text_buffer_page()), wTextLine2, 3 * TEXT_LINE_LENGTH);
+	mem_.cur_text_line() = 0;
 	next_step();
 }
 
@@ -121,38 +121,38 @@ void SceneCommon::load_page()
 // arrow shows and the scene goes back 3 steps to print it
 bool SceneCommon::next_page()
 {
-	uint8_t page = ++mem_[wCurTextBufferPage];
+	uint8_t page = ++mem_.cur_text_buffer_page();
 	if (mem_[buffer_page(page)] == ARROW) {
 		next_step();
 		return true;
 	}
 	set_state(wSceneObj1State, 0x01);
-	mem_[w2d013] = static_cast<uint8_t>(mem_[w2d013] - 3);
-	mem_[w2d014] = 0;
+	mem_.unk_2d013() = static_cast<uint8_t>(mem_.unk_2d013() - 3);
+	mem_.unk_2d014() = 0;
 	return false;
 }
 
 void SceneCommon::print_page()
 {
 	print_with_header();
-	if (mem_[wCurTextLine] != TEXT_DONE)
+	if (mem_.cur_text_line() != TEXT_DONE)
 		return;
-	++mem_[wCurTextBufferPage];
+	++mem_.cur_text_buffer_page();
 	next_step();
 }
 
 void SceneCommon::print_page_without_header()
 {
 	print_without_header();
-	if (mem_[wCurTextLine] == TEXT_DONE)
+	if (mem_.cur_text_line() == TEXT_DONE)
 		next_step();
 }
 
 // Func_acacd: past the first page, waits for A (and hides the arrow)
 void SceneCommon::wait_for_a()
 {
-	if (mem_[wCurTextBufferPage] != 1) {
-		if (!(mem_[wJoypadPressed] & PAD_A))
+	if (mem_.cur_text_buffer_page() != 1) {
+		if (!(mem_.joypad_pressed() & PAD_A))
 			return;
 		set_state(wSceneObj1State, 0);
 	}
@@ -164,16 +164,16 @@ void SceneCommon::wait_for_a()
 // wCurTextLine 0 is a pause before the first line
 void SceneCommon::print_lines(bool header)
 {
-	++mem_[wTextDelayCounter];
-	uint8_t line = mem_[wCurTextLine];
+	++mem_.text_delay_counter();
+	uint8_t line = mem_.cur_text_line();
 	if (!line) { // DelayTextThenGoToNextLine
-		if (mem_[wTextDelayCounter] >= 10)
+		if (mem_.text_delay_counter() >= 10)
 			next_line();
 		return;
 	}
 	uint8_t lines = header ? 4 : 3;
 	if (line > lines) {
-		mem_[wCurTextLine] = TEXT_DONE;
+		mem_.cur_text_line() = TEXT_DONE;
 		return;
 	}
 	print(header ? line - 1 : line);
@@ -181,9 +181,9 @@ void SceneCommon::print_lines(bool header)
 
 void SceneCommon::next_line()
 {
-	mem_[wCurTextLinePos] = 0;
-	mem_[wTextDelayCounter] = 0;
-	++mem_[wCurTextLine];
+	mem_.cur_text_line_pos() = 0;
+	mem_.text_delay_counter() = 0;
+	++mem_.cur_text_line();
 }
 
 // PrintText: the line's next character (skipping blanks) to
@@ -192,30 +192,30 @@ void SceneCommon::print(uint8_t line)
 {
 	if (mem_[wPendingCharDest + 0])
 		return;
-	uint8_t delay = (mem_[wJoypadDown] & (PAD_A | PAD_DOWN)) ? 2 : 4;
-	if (mem_[wTextDelayCounter] < delay)
+	uint8_t delay = (mem_.joypad_down() & (PAD_A | PAD_DOWN)) ? 2 : 4;
+	if (mem_.text_delay_counter() < delay)
 		return;
-	mem_[wTextDelayCounter] = 0;
-	mem_[wCurTextBufferLine] = line;
+	mem_.text_delay_counter() = 0;
+	mem_.cur_text_buffer_line() = line;
 	uint8_t row = static_cast<uint8_t>(line << 4 | line >> 4); // * TEXT_LINE_LENGTH
 	for (;;) {
-		uint8_t pos = mem_[wCurTextLinePos];
+		uint8_t pos = mem_.cur_text_line_pos();
 		uint8_t c = mem_[static_cast<uint16_t>(wText + pos + row)];
 		if (c != NO_CHAR) {
-			mem_[wPendingCharTile] = c;
-			mem_[wPendingCharAttr] = 0x1 | BG_BANK1;
-			uint16_t dest = mem_[wBGMapToPrintText] ? 0x9c00 + 14 * 0x20 + 2 : 0x9800 + 14 * 0x20 + 2;
+			mem_.pending_char_tile() = c;
+			mem_.pending_char_attr() = 0x1 | BG_BANK1;
+			uint16_t dest = mem_.bg_map_to_print_text() ? 0x9c00 + 14 * 0x20 + 2 : 0x9800 + 14 * 0x20 + 2;
 			if (!line) // the header starts 1 tile to the left
 				dest = static_cast<uint16_t>((dest & 0xff00) | static_cast<uint8_t>(dest - 1));
 			dest = static_cast<uint16_t>(dest + pos + static_cast<uint8_t>(row << 1));
 			mem_.word(wPendingCharDest) = dest;
 			if (c != SPACE)
 				play_sfx(mem_, SFX_130);
-			if (++mem_[wCurTextLinePos] == TEXT_LINE_LENGTH)
+			if (++mem_.cur_text_line_pos() == TEXT_LINE_LENGTH)
 				next_line();
 			return;
 		}
-		if (++mem_[wCurTextLinePos] == TEXT_LINE_LENGTH) {
+		if (++mem_.cur_text_line_pos() == TEXT_LINE_LENGTH) {
 			next_line();
 			return;
 		}
@@ -226,14 +226,14 @@ void SceneCommon::print(uint8_t line)
 // tiles from dest (its low byte)
 void SceneCommon::clear_textbox_at(uint8_t dest, uint8_t tiles)
 {
-	uint8_t dest_hi = mem_[wBGMapToPrintText] ? ((v0BGMap1 + 0x100) >> 8) - 0x80 : ((v0BGMap0 + 0x100) >> 8) - 0x80;
+	uint8_t dest_hi = mem_.bg_map_to_print_text() ? ((v0BGMap1 + 0x100) >> 8) - 0x80 : ((v0BGMap0 + 0x100) >> 8) - 0x80;
 	mem_[wHDMA + 0] = wClearedTextBuffer >> 8;
 	mem_[wHDMA + 1] = wClearedTextBuffer & 0xff;
 	mem_[wHDMA + 2] = dest_hi;
 	mem_[wHDMA + 3] = dest;
 	mem_[wHDMA + 4] = tiles;
-	mem_[wHDMABank] = BANK_ClearTextboxAtCoord;
-	mem_[wHDMADestVRAMBank] = 0;
+	mem_.hdma_bank() = BANK_ClearTextboxAtCoord;
+	mem_.hdma_dest_vram_bank() = 0;
 	mem_[wPendingCharDest + 0] = 0;
 }
 
@@ -242,9 +242,11 @@ void SceneCommon::clear_textbox_at(uint8_t dest, uint8_t tiles)
 void SceneCommon::load_next_objective()
 {
 	routines_.copy(wTextBuffer, wTextLine1, TEXT_LINE_LENGTH);
-	mem_[wIsNextObjectiveTheTemple] = 0;
-	routines_.farcall(BANK_GetMapSideAndLevelForNextTreasure, ADDR_GetMapSideAndLevelForNextTreasure);
-	uint8_t side = gb_->cpu.b, level = gb_->cpu.d;
+	mem_.is_next_objective_the_temple() = 0;
+	Events::SideLevel at{};
+	routines_.in_bank(BANK_GetMapSideAndLevelForNextTreasure, ADDR_GetMapSideAndLevelForNextTreasure,
+		[&] { at = Events(gb_).next_treasure_side_level(); });
+	uint8_t side = at.side, level = at.level;
 	uint16_t offset;
 	switch (side) {
 	case 1: offset = 0x120; break; // west
@@ -253,11 +255,11 @@ void SceneCommon::load_next_objective()
 	default: offset = 0x2e0; break; // east (anything else: debug_nop, then the temple's check)
 	}
 	if ((side == 0 || side > 3) && !level)
-		mem_[wIsNextObjectiveTheTemple] = TRUE;
+		mem_.is_next_objective_the_temple() = TRUE;
 	uint8_t swapped = static_cast<uint8_t>(level << 4 | level >> 4);
 	uint8_t row = static_cast<uint8_t>(swapped << 1 | swapped >> 7); // * $20
 	uint16_t text = static_cast<uint16_t>(wTextBuffer + offset + row);
-	if (mem_[wLanguage]) {
+	if (mem_.language()) {
 		routines_.copy(text, wTextLine3, 2 * TEXT_LINE_LENGTH);
 		routines_.copy(wTextBuffer + TEXT_LINE_LENGTH, wTextLine2, TEXT_LINE_LENGTH);
 		return;

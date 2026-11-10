@@ -22,13 +22,13 @@ ObjMapBlock obj_map_block(GB *gb, uint16_t pos)
 	Memory mem(gb);
 	// the y position's block, a page per 16 rows
 	uint8_t row = static_cast<uint8_t>(((mem[pos] & 0x0f) << 4) + (mem[static_cast<uint16_t>(pos + 1)] >> 4) + SRAM_HI);
-	mem[wObjectSpawnBlockY] = row;
+	mem.object_spawn_block_y() = row;
 	// the x position's block, two to a byte
 	uint8_t x = static_cast<uint8_t>(((mem[static_cast<uint16_t>(pos + 2)] & 0x0f) << 4) + (mem[static_cast<uint16_t>(pos + 3)] >> 4));
 	uint8_t parity = (x & 1) ^ 1;
-	mem[wUnused_ObjectParity] = parity;
+	mem.unused_object_parity() = parity;
 	uint8_t col = static_cast<uint8_t>((x >> 1) + 0xb0);
-	mem[wObjectSpawnBlockX] = col;
+	mem.object_spawn_block_x() = col;
 	return {row, col, parity};
 }
 
@@ -36,7 +36,7 @@ void obj_map_block_to_hpos(GB *gb, ObjMapBlock block)
 {
 	Memory mem(gb);
 	uint8_t y = static_cast<uint8_t>(block.row - SRAM_HI);
-	set_be(mem, hYPosHi, static_cast<uint8_t>((mem[wccec] - 1) * 2 + (y >> 4)) * 0x100u + ((y & 0x0f) << 4) + 0x10);
+	set_be(mem, hYPosHi, static_cast<uint8_t>((mem.unk_ccec() - 1) * 2 + (y >> 4)) * 0x100u + ((y & 0x0f) << 4) + 0x10);
 	uint8_t x = static_cast<uint8_t>((block.col - 0xb0) * 2);
 	set_be(mem, hXPosHi, (x >> 4) * 0x100u + ((x & 0x0f) << 4) + static_cast<uint8_t>((block.parity ^ 1) * 16 + 8));
 }
@@ -45,10 +45,10 @@ uint8_t level_block_to_hpos(GB *gb, uint8_t h, uint8_t l)
 {
 	Memory mem(gb);
 	uint8_t y = static_cast<uint8_t>(h - SRAM_HI);
-	set_be(mem, hYPosHi, static_cast<uint8_t>((mem[wBlockPtrBank] - 1) * 2 + (y >> 4)) * 0x100u + ((y & 0x0f) << 4) + 0x10);
+	set_be(mem, hYPosHi, static_cast<uint8_t>((mem.block_ptr_bank() - 1) * 2 + (y >> 4)) * 0x100u + ((y & 0x0f) << 4) + 0x10);
 	set_be(mem, hXPosHi, (l >> 4) * 0x100u + ((l & 0x0f) << 4) + 0x08);
 	uint8_t parity = (l & 1) ^ 1;
-	mem[wUnused_ObjectParity] = parity;
+	mem.unused_object_parity() = parity;
 	return parity;
 }
 
@@ -60,7 +60,7 @@ uint8_t level_col(uint8_t col, uint8_t parity)
 ObjMapBlock obj_map_col(GB *gb, uint8_t row, uint8_t l)
 {
 	Memory mem(gb);
-	mem[wccec] = mem[wBlockPtrBank];
+	mem.unk_ccec() = mem.block_ptr_bank();
 	return {row, static_cast<uint8_t>((l >> 1) + 0xb0), static_cast<uint8_t>((l & 1) ^ 1)};
 }
 

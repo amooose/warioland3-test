@@ -600,7 +600,7 @@ public:
 	// hPos = Wario's position + (-ysub, +-dx)
 	void pos_offset(bool add, uint8_t dx, uint8_t ysub)
 	{
-		uint16_t x = static_cast<uint16_t>(rd8(wWarioXPos + 0) << 8 | rd8(wWarioXPos + 1));
+		uint16_t x = static_cast<uint16_t>(rd8(wWarioXPos + 0) << 8 | mem_.wario_x().lo());
 		x = static_cast<uint16_t>(add ? x + dx : x - dx);
 		wr8(hXPosLo, static_cast<uint8_t>(x));
 		wr8(hXPosLo - 1, static_cast<uint8_t>(x >> 8));
@@ -1119,7 +1119,7 @@ public:
 			dx = 0x8;
 		}
 		uint8_t lo = rd8(obj_x);
-		wr8(wWarioXPos + 1, static_cast<uint8_t>(lo - dx));
+		mem_.wario_x().lo() = static_cast<uint8_t>(lo - dx);
 		wr8(wWarioXPos + 0, static_cast<uint8_t>(rd8(static_cast<uint16_t>(obj_x + 1)) - (lo < dx)));
 		wr8(rWBK, wbk);
 		wr8(wTransformation, TRANSFORMATION_FLAT_WARIO);
@@ -2400,11 +2400,11 @@ public:
 		play_sfx(SFX_041);
 		{
 			// smoke 8 in front, $20 up
-			uint16_t x = static_cast<uint16_t>(rd8(wWarioXPos + 0) << 8 | rd8(wWarioXPos + 1));
+			uint16_t x = static_cast<uint16_t>(rd8(wWarioXPos + 0) << 8 | mem_.wario_x().lo());
 			x = static_cast<uint16_t>(facing_right() ? x + 0x08 : x - 0x08);
 			wr8(hXPosLo, static_cast<uint8_t>(x));
 			wr8(hXPosHi, static_cast<uint8_t>(x >> 8));
-			uint16_t y = static_cast<uint16_t>((rd8(wWarioYPos + 0) << 8 | rd8(wWarioYPos + 1)) - 0x20);
+			uint16_t y = static_cast<uint16_t>((rd8(wWarioYPos + 0) << 8 | mem_.wario_y().lo()) - 0x20);
 			wr8(hYPosLo, static_cast<uint8_t>(y));
 			wr8(hYPosHi, static_cast<uint8_t>(y >> 8));
 		}

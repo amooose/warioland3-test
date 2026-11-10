@@ -43,7 +43,7 @@ void Cutscenes::volcano()
 		if (c < 0x0a)
 			return;
 		c = 0;
-		play_sfx(mem_, mem_[wSceneObj5Frame] < 0x09 ? SFX_110 : SFX_111);
+		play_sfx(mem_, mem_.scene_obj5_frame() < 0x09 ? SFX_110 : SFX_111);
 	};
 	switch (wram_.unk_2d013()) {
 	case 0:
@@ -53,9 +53,9 @@ void Cutscenes::volcano()
 		place(wSceneObj2, 120, 82, 0x01);
 		place(wSceneObj3, 145, 68, 0x02);
 		place(wSceneObj4, 145, 96, 0x03);
-		mem_[wCurSceneObj] = 0xbc; // the shadow (Func_9fb87)
+		mem_.cur_scene_obj() = 0xbc; // the shadow (Func_9fb87)
 		mem_[wCurSceneObj + 1] = 0x50;
-		mem_[wSceneObj1YCoord] = 2;
+		mem_.scene_obj1_y_coord() = 2;
 		set_bob_pointers({0x99, 0x6e, 0xe7, 0x6e, 0x33, 0x6f});
 		advance();
 		break;
@@ -63,10 +63,10 @@ void Cutscenes::volcano()
 		bob_rocks();
 		if (wram_.global_counter() & 1)
 			break;
-		--mem_[wSceneObj2YCoord];
-		--mem_[wSceneObj3YCoord];
-		--mem_[wSceneObj4YCoord];
-		uint8_t y = --mem_[wCurSceneObj];
+		--mem_.scene_obj2_y_coord();
+		--mem_.scene_obj3_y_coord();
+		--mem_.scene_obj4_y_coord();
+		uint8_t y = --mem_.cur_scene_obj();
 		if (y == 0x87) {
 			play_sfx(mem_, SFX_112); // Func_9ce1f
 			break;
@@ -83,19 +83,19 @@ void Cutscenes::volcano()
 		bob_rocks();
 		if (wram_.global_counter() & 0x03)
 			break;
-		++mem_[wSceneObj2YCoord];
-		++mem_[wSceneObj3YCoord];
-		++mem_[wSceneObj4YCoord];
-		if (++mem_[wCurSceneObj] == 0x82)
+		++mem_.scene_obj2_y_coord();
+		++mem_.scene_obj3_y_coord();
+		++mem_.scene_obj4_y_coord();
+		if (++mem_.cur_scene_obj() == 0x82)
 			advance();
 		break;
 	case 5: // .Func_9ed3c: the shadow on down
 		bob_rocks();
 		if (wram_.global_counter() & 0x03)
 			break;
-		if (++mem_[wCurSceneObj] != 0x92)
+		if (++mem_.cur_scene_obj() != 0x92)
 			break;
-		mem_[wSceneObj1YCoord] = 0;
+		mem_.scene_obj1_y_coord() = 0;
 		advance();
 		break;
 	case 6: // .Func_9ed54: at the bob's end, the next paths
@@ -113,9 +113,9 @@ void Cutscenes::volcano()
 		break;
 	case 9: // .Func_9ed7c: the volcano
 		place(wSceneObj5, 76, 80, 0x04);
-		mem_[wSceneObj2State] = 0;
-		mem_[wSceneObj3State] = 0;
-		mem_[wSceneObj4State] = 0;
+		mem_.scene_obj2_state() = 0;
+		mem_.scene_obj3_state() = 0;
+		mem_.scene_obj4_state() = 0;
 		wram_.colour_fade_diff() = 0;
 		advance();
 		break;
@@ -135,7 +135,7 @@ void Cutscenes::volcano()
 		break;
 	case 12: // .Func_9edc2
 		rumble();
-		if (mem_[wSceneObj5State] == 0x06)
+		if (mem_.scene_obj5_state() == 0x06)
 			advance();
 		break;
 	case 13: // .Func_9edf1
@@ -146,7 +146,7 @@ void Cutscenes::volcano()
 		rumble();
 		uint8_t f = wram_.unk_2d014();
 		uint8_t dy = f < 0x08 ? 1 : f < 0x10 ? 2 : 3;
-		Byte y = mem_[wSceneObj5];
+		Byte y = mem_.scene_obj5();
 		y += dy;
 		if (y >= 0x70)
 			advance();
@@ -205,9 +205,9 @@ bool Cutscenes::bob_rocks()
 // erupting) ends in 6
 void Cutscenes::draw_volcano()
 {
-	if (mem_[wSceneObj1YCoord] == 0x02) { // Func_9fb87
-		mem_[wCurSceneObjFrame] = 0x04;
-		mem_[wCurSceneObjAttributes] = 0;
+	if (mem_.scene_obj1_y_coord() == 0x02) { // Func_9fb87
+		mem_.cur_scene_obj_frame() = 0x04;
+		mem_.cur_scene_obj_attributes() = 0;
 		draw(static_cast<uint16_t>(wCurSceneObjAttributes & 0xfffc), ADDR_OAM_bc000); // Func_9fb61
 	}
 	animate_all({wSceneObj4State, wSceneObj2State, wSceneObj3State, wSceneObj5State}, VOLCANO_FRAMESETS,

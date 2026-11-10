@@ -34,9 +34,9 @@ void WaterDrop::init()
 {
 	set_update(UPDATE);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 0x04;
-	mem_[wCurObjCollBoxLeft] = 0xfa;
-	mem_[wCurObjCollBoxBottom] = 0xff;
+	mem_.cur_obj_coll_box_right() = 0x04;
+	mem_.cur_obj_coll_box_left() = 0xfa;
+	mem_.cur_obj_coll_box_bottom() = 0xff;
 	flags() |= OBJFLAG_NO_COLLISION;
 	reset();
 }
@@ -45,8 +45,8 @@ void WaterDrop::reset()
 {
 	set_frameset(ADDR_Frameset_69761);
 	state_duration() = 0x41;
-	var1() = mem_[wCurObjYPos + 0];
-	var2() = mem_[wCurObjYPos + 1];
+	var1() = mem_.cur_obj_y().lo();
+	var2() = mem_.cur_obj_y().hi();
 	var3() = 0;
 	state() = FALLING;
 	flags() &= ~OBJFLAG_INVISIBLE;
@@ -70,16 +70,16 @@ void WaterDrop::fall()
 			set_frameset(ADDR_Frameset_69772);
 		return;
 	}
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-	if (!hpos_block_unk1() && !mem_[wIsInWaterOrSand]) {
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
+	if (!hpos_block_unk1() && !mem_.is_in_water_or_sand()) {
 		apply_y_movement(ADDR_FallingYVel_Light);
 		return;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	splash();
 }
 
@@ -110,7 +110,7 @@ void WaterDrop::rising()
 	uint8_t wait = state_duration();
 	if (wait)
 		--state_duration();
-	if (mem_[wCurObjYPos + 0] != var1() || mem_[wCurObjYPos + 1] != var2()) {
+	if (mem_.cur_obj_y().lo() != var1() || mem_.cur_obj_y().hi() != var2()) {
 		move_up();
 		return;
 	}

@@ -15,7 +15,7 @@ namespace {
 void decompress(GB *gb, uint8_t bank, uint16_t src, uint16_t dest)
 {
 	Memory mem(gb);
-	mem[wTempBank] = bank;
+	mem.temp_bank() = bank;
 	home::farcall(gb, bank, ADDR_Decompress, [&] { home::decompress(gb, src, dest); });
 }
 
@@ -49,7 +49,7 @@ void init_prologue(GB *gb)
 	home::copy_far_bytes_long(gb, BANK_MusicBoxGfx, ADDR_MusicBoxGfx, v0Tiles1, (0x30 * TILE_SIZE) >> 8);
 
 	// the prologue's text to the buffer
-	if (mem[wLanguage])
+	if (mem.language())
 		decompress(gb, BANK_TextEN_HiddenFigureAreYouAware, ADDR_TextEN_HiddenFigureAreYouAware, wTextBuffer);
 	else
 		decompress(gb, BANK_TextJP_HiddenFigureAreYouAware, ADDR_TextJP_HiddenFigureAreYouAware, wTextBuffer);
@@ -61,10 +61,10 @@ void init_prologue(GB *gb)
 	// the scene's Wario
 	mem[wSceneWarioYCoord + 0] = 96; // y
 	mem[wSceneWarioYCoord + 1] = 96; // x
-	mem[wSceneWarioStateGroup] = SCENEWARIO_GROUP_NONE;
+	mem.scene_wario_state_group() = SCENEWARIO_GROUP_NONE;
 	overworld::SceneWario(gb).set_state(SCENEWARIO_NONE);
 
-	mem[wLCDCFlagsToFlip] = LCDC_BG_MAP;
+	mem.lcdc_flags_to_flip() = LCDC_BG_MAP;
 }
 
 } // namespace

@@ -41,17 +41,17 @@ void Prologue::wait(uint8_t frames)
 // Prologue.Func_ae009: the next fade's palettes (PrologueFade, by w2d880)
 void Prologue::set_fade(uint8_t fade)
 {
-	mem_[w2d880] = fade;
+	mem_.unk_2d880() = fade;
 	wram_.pal_config1_total_steps() = 0;
-	mem_[wPalConfig2TotalSteps] = 0;
+	mem_.pal_config2_total_steps() = 0;
 	next_step();
 }
 
 // Prologue.Func_ae067: the music box on its pedestal (scene object 3)
 void Prologue::place_music_box()
 {
-	mem_[wSceneObj3YCoord] = 195;
-	mem_[wSceneObj3XCoord] = 120;
+	mem_.scene_obj3_y_coord() = 195;
+	mem_.scene_obj3_x_coord() = 120;
 	set_state(wSceneObj3State, 0x09);
 }
 
@@ -68,8 +68,8 @@ void Prologue::load_pals(uint16_t pals)
 // Prologue.configure_hdma_transfer: a block of the temple's, by HDMA
 void Prologue::hdma(uint8_t vram_bank, uint16_t src, uint8_t dest_hi, uint8_t mode)
 {
-	mem_[wHDMADestVRAMBank] = vram_bank;
-	mem_[wHDMABank] = BANK_TempleTilemap;
+	mem_.hdma_dest_vram_bank() = vram_bank;
+	mem_.hdma_bank() = BANK_TempleTilemap;
 	mem_[wHDMA + 0] = static_cast<uint8_t>(src >> 8);
 	mem_[wHDMA + 1] = static_cast<uint8_t>(src);
 	mem_[wHDMA + 2] = dest_hi;
@@ -108,15 +108,15 @@ void Prologue::step()
 	case 9: // .PrepareCaveScene1: the cave, Wario coming in from the right
 		wram_.scy() = 112;
 		wram_.scx() = 0;
-		mem_[wSceneWarioYCoord] = 208;
-		mem_[wSceneWarioXCoord] = 240;
+		mem_.scene_wario_y_coord() = 208;
+		mem_.scene_wario_x_coord() = 240;
 		wario_state(SCENEWARIO_NONE);
 		place_music_box();
-		mem_[wSceneObj1] = 187;
-		mem_[wSceneObj2YCoord] = 187;
+		mem_.scene_obj1() = 187;
+		mem_.scene_obj2_y_coord() = 187;
 		mem_[wSceneObj1 + 1] = 120;
-		mem_[wSceneObj2XCoord] = 120;
-		mem_[w2d8b0] = 0;
+		mem_.scene_obj2_x_coord() = 120;
+		mem_.unk_2d8b0() = 0;
 		set_state(wSceneObj1State, 0x00);
 		play_music2(mem_, MUSIC_MUSIC_BOX_CAVE);
 		set_fade(0x06);
@@ -125,8 +125,8 @@ void Prologue::step()
 	case 12: // .ShowMusicBoxCloseUp: on BG map 1
 		wram_.scy() = 0;
 		wram_.scx() = 0;
-		mem_[wLCDCFlagsToFlip] = LCDC_BG_MAP;
-		mem_[wSceneObj8] = 80;
+		mem_.lcdc_flags_to_flip() = LCDC_BG_MAP;
+		mem_.scene_obj8() = 80;
 		mem_[wSceneObj8 + 1] = 80;
 		set_state(wSceneObj8State, 0x0d);
 		set_state(wSceneObj3State, 0x00);
@@ -137,7 +137,7 @@ void Prologue::step()
 	case 14: // .PrepareCaveScene2: back in the cave, Wario holding it
 		wram_.scy() = 112;
 		wram_.scx() = 0;
-		mem_[wLCDCFlagsToFlip] = LCDC_BG_MAP;
+		mem_.lcdc_flags_to_flip() = LCDC_BG_MAP;
 		wario_state(SCENEWARIO_HOLD_MUSIC_BOX);
 		place_music_box();
 		set_state(wSceneObj1State, 0x0e);
@@ -153,9 +153,9 @@ void Prologue::step()
 	case 21: // .PrepareTempleScene: Wario asleep
 		wram_.scy() = 0;
 		wram_.scx() = 0;
-		mem_[wLCDCFlagsToFlip] = LCDC_BG_MAP;
-		mem_[wSceneWarioYCoord] = 96;
-		mem_[wSceneWarioXCoord] = 64;
+		mem_.lcdc_flags_to_flip() = LCDC_BG_MAP;
+		mem_.scene_wario_y_coord() = 96;
+		mem_.scene_wario_x_coord() = 64;
 		wario_state(SCENEWARIO_SLEEP);
 		play_sfx(mem_, SFX_SNORE);
 		set_fade(0x05);
@@ -181,7 +181,7 @@ void Prologue::step()
 	case 32: SceneCommon(gb_).print_page_without_header(); return;
 	case 33: // .Func_ae181
 		SceneCommon(gb_).next_page();
-		if (mem_[wCurTextBufferPage] == 0x02) // .Func_ae188
+		if (mem_.cur_text_buffer_page() == 0x02) // .Func_ae188
 			wario_state(SCENEWARIO_LOOK_AROUND);
 		return;
 	case 34: // .Func_ae196
@@ -189,7 +189,7 @@ void Prologue::step()
 		next_step();
 		return;
 	case 35: // .Func_ae19e: the text arrow once he looks back
-		if (mem_[wSceneWarioState] != SCENEWARIO_LOOK_BACK)
+		if (mem_.scene_wario_state() != SCENEWARIO_LOOK_BACK)
 			return;
 		set_state(wSceneObj1State, 0x01);
 		next_step();
@@ -215,22 +215,22 @@ void Prologue::step()
 // Func_ae1ce
 void Prologue::next_sub()
 {
-	mem_[w2d891] = 0;
-	++mem_[w2d890];
+	mem_.unk_2d891() = 0;
+	++mem_.unk_2d890();
 }
 
 // Func_ae1c9: after frames
 void Prologue::wait_sub(uint8_t frames)
 {
-	if (mem_[w2d891] >= frames)
+	if (mem_.unk_2d891() >= frames)
 		next_sub();
 }
 
 // Func_ae1d5: the sub-scene done, the next step
 void Prologue::end_sub()
 {
-	mem_[w2d890] = 0;
-	mem_[w2d891] = 0;
+	mem_.unk_2d890() = 0;
+	mem_.unk_2d891() = 0;
 	next_step();
 }
 
@@ -243,11 +243,11 @@ uint8_t Prologue::walk_right()
 // Func_ae1de: the music box's close-up: two sparkles
 void Prologue::music_box_close_up()
 {
-	++mem_[w2d891];
-	switch (mem_[w2d890]) {
+	++mem_.unk_2d891();
+	switch (mem_.unk_2d890()) {
 	case 0: wait_sub(20); return; // .Wait20
 	case 1: // .Func_ae1f5
-		mem_[wSceneObj4] = 56;
+		mem_.scene_obj4() = 56;
 		mem_[wSceneObj4 + 1] = 56;
 		set_state(wSceneObj4State, 0x0e);
 		play_sfx(mem_, SFX_104);
@@ -255,7 +255,7 @@ void Prologue::music_box_close_up()
 		return;
 	case 2: wait_sub(10); return; // .Wait10
 	case 3: // .Func_ae215
-		mem_[wSceneObj5] = 48;
+		mem_.scene_obj5() = 48;
 		mem_[wSceneObj5 + 1] = 120;
 		set_state(wSceneObj5State, 0x0e);
 		next_sub();
@@ -271,13 +271,13 @@ void Prologue::music_box_close_up()
 void Prologue::enter_cave()
 {
 	music_box_glow();
-	++mem_[w2d891];
+	++mem_.unk_2d891();
 	auto stop_at = [this](uint8_t x) { // .wario_idle_right
-		mem_[wSceneWarioXCoord] = x;
+		mem_.scene_wario_x_coord() = x;
 		wario_state(SCENEWARIO_IDLE_RIGHT);
 		next_sub();
 	};
-	switch (mem_[w2d890]) {
+	switch (mem_.unk_2d890()) {
 	case 0: case 6: // .WarioWalkRight
 		wario_state(SCENEWARIO_WALK_RIGHT);
 		next_sub();
@@ -285,26 +285,26 @@ void Prologue::enter_cave()
 	case 1: { // .WarioMoveRightTo64, the glow on the way (.Func_ae26c)
 		uint8_t x = walk_right();
 		if (x == 50)
-			mem_[w2d8b0] = 0x01;
+			mem_.unk_2d8b0() = 0x01;
 		else if (x == 64)
 			stop_at(x);
 		return;
 	}
 	case 2: // .Func_ae272
-		if (!mem_[w2d8b0])
+		if (!mem_.unk_2d8b0())
 			next_sub();
 		return;
 	case 3: // .ShowEmote
-		if (mem_[w2d891] < 0x16)
+		if (mem_.unk_2d891() < 0x16)
 			return;
-		mem_[wCurSceneObj] = static_cast<uint8_t>(mem_[wSceneWarioYCoord] - 24);
-		mem_[wCurSceneObj + 1] = static_cast<uint8_t>(mem_[wSceneWarioXCoord] + 16);
+		mem_.cur_scene_obj() = static_cast<uint8_t>(mem_.scene_wario_y_coord() - 24);
+		mem_[wCurSceneObj + 1] = static_cast<uint8_t>(mem_.scene_wario_x_coord() + 16);
 		set_state(wCurSceneObjState, 0x11);
 		play_sfx(mem_, SFX_106);
 		next_sub();
 		return;
 	case 4: // .WaitEmoteAnimation
-		if (!mem_[wCurSceneObjState])
+		if (!mem_.cur_scene_obj_state())
 			next_sub();
 		return;
 	case 5: wait_sub(26); return; // .Wait26
@@ -313,9 +313,9 @@ void Prologue::enter_cave()
 			stop_at(x);
 		return;
 	case 8: { // .Func_ae2b8: the glow again
-		uint8_t frames = mem_[w2d891];
+		uint8_t frames = mem_.unk_2d891();
 		if (frames == 0x14)
-			mem_[w2d8b0] = 0x03;
+			mem_.unk_2d8b0() = 0x03;
 		else if (frames >= 0x3c)
 			next_sub();
 		return;
@@ -325,7 +325,7 @@ void Prologue::enter_cave()
 		next_sub();
 		return;
 	case 10: // .WarioHoldMusicBox (Func_ae1c2)
-		if (mem_[wSceneWarioState] == SCENEWARIO_HOLD_MUSIC_BOX)
+		if (mem_.scene_wario_state() == SCENEWARIO_HOLD_MUSIC_BOX)
 			next_sub();
 		return;
 	case 11: wait_sub(60); return; // .Wait60
@@ -338,9 +338,9 @@ void Prologue::enter_cave()
 // (from 3) twice
 void Prologue::music_box_glow()
 {
-	Byte glow = mem_[w2d8b0];
+	Byte glow = mem_.unk_2d8b0();
 	auto next = [&] { // Func_ae2f5
-		mem_[w2d8b1] = 0;
+		mem_.unk_2d8b1() = 0;
 		++glow;
 	};
 	switch (glow) {
@@ -350,17 +350,17 @@ void Prologue::music_box_glow()
 		next();
 		return;
 	case 2: // Func_ae303
-		if (mem_[wSceneObj1State])
+		if (mem_.scene_obj1_state())
 			return;
 		glow = 0;
-		mem_[w2d8b1] = 0;
+		mem_.unk_2d8b1() = 0;
 		return;
 	case 4: // Func_ae2fc
-		if (!mem_[wSceneObj1State])
+		if (!mem_.scene_obj1_state())
 			next();
 		return;
 	case 5: // Func_ae30e: again after 20 frames
-		if (++mem_[w2d8b1] >= 0x14)
+		if (++mem_.unk_2d8b1() >= 0x14)
 			glow -= 2;
 		return;
 	default:
@@ -374,15 +374,15 @@ void Prologue::music_box_glow()
 void Prologue::wario_flicker()
 {
 	static constexpr uint16_t PALETTES = ADDR_Func_ae523 + 0x28; // .data_ae54b
-	Byte flicker = mem_[w2d150];
+	Byte flicker = mem_.unk_2d150();
 	if (!flicker)
 		return;
 	if (flicker == 0x80) {
-		mem_[wSceneWarioAttributes] = 0;
+		mem_.scene_wario_attributes() = 0;
 		flicker = 0;
 		return;
 	}
-	Byte frames = mem_[w2d151];
+	Byte frames = mem_.unk_2d151();
 	++frames;
 	if (frames < 0x02)
 		return;
@@ -391,7 +391,7 @@ void Prologue::wario_flicker()
 	++flicker;
 	if (flicker >= 0x09)
 		flicker = 0x01;
-	mem_[wSceneWarioAttributes] = mem_[static_cast<uint16_t>(PALETTES + palette)];
+	mem_.scene_wario_attributes() = mem_[static_cast<uint16_t>(PALETTES + palette)];
 }
 
 // Prologue_WarioSuckedIntoMusicBox: Wario picks up the music box, it
@@ -402,11 +402,11 @@ void Prologue::sucked_into_music_box()
 	static constexpr uint16_t BOUNCE = ADDR_Prologue_WarioSuckedIntoMusicBox + 0x1ed; // .data_ae509
 
 	wario_flicker();
-	uint8_t frames = ++mem_[w2d891];
+	uint8_t frames = ++mem_.unk_2d891();
 	auto bump = [this] { play_sfx(mem_, SFX_BUMP); }; // .PlayBumpSFX
-	switch (mem_[w2d890]) {
+	switch (mem_.unk_2d890()) {
 	case 0: // .Func_ae352: the glow over
-		if (!mem_[wSceneObj1State])
+		if (!mem_.scene_obj1_state())
 			next_sub();
 		return;
 	case 1: // .Func_ae35a
@@ -428,10 +428,10 @@ void Prologue::sucked_into_music_box()
 		return;
 	case 5: // .WarioShortHopBack
 		if (frames == 0x01) { // .hop_up
-			--mem_[wSceneWario];
+			--mem_.scene_wario();
 			--mem_[wSceneWario + 1];
 		} else if (frames == 0x05) { // .hop_down
-			++mem_[wSceneWario];
+			++mem_.scene_wario();
 			--mem_[wSceneWario + 1];
 		} else if (frames >= 0x30) {
 			next_sub();
@@ -440,11 +440,11 @@ void Prologue::sucked_into_music_box()
 	case 6: { // .MusicBoxRise: a pixel every 8 frames, its glow at 180
 		if (frames & 0x07)
 			return;
-		uint8_t y = --mem_[wSceneObj3YCoord];
-		mem_[wSceneObj2YCoord] = static_cast<uint8_t>(y - 8);
+		uint8_t y = --mem_.scene_obj3_y_coord();
+		mem_.scene_obj2_y_coord() = static_cast<uint8_t>(y - 8);
 		if (y == 180) {
 			set_state(wSceneObj2State, 0x0c);
-			mem_[w2d150] = 0x01;
+			mem_.unk_2d150() = 0x01;
 		} else if (y == 165) {
 			next_sub();
 		}
@@ -456,21 +456,21 @@ void Prologue::sucked_into_music_box()
 		next_sub();
 		return;
 	case 9: // .Func_ae3e2: the sparkle over Wario
-		mem_[wCurSceneObj] = static_cast<uint8_t>(mem_[wSceneWarioYCoord] - 8);
-		mem_[wCurSceneObj + 1] = mem_[wSceneWarioXCoord];
+		mem_.cur_scene_obj() = static_cast<uint8_t>(mem_.scene_wario_y_coord() - 8);
+		mem_[wCurSceneObj + 1] = mem_.scene_wario_x_coord();
 		set_state(wCurSceneObjState, 0x0e);
 		next_sub();
 		return;
 	case 10: // .Func_ae3fa
-		if (mem_[wCurSceneObjState])
+		if (mem_.cur_scene_obj_state())
 			return;
-		mem_[w2d150] = 0x80;
+		mem_.unk_2d150() = 0x80;
 		next_sub();
 		return;
 	case 11: { // .Func_ae407: Wario turned into a light, OB palette 0
 		// all (28, 28, 28)
-		mem_[wCurSceneObj] = static_cast<uint8_t>(mem_[wSceneWarioYCoord] - 16);
-		mem_[wCurSceneObj + 1] = static_cast<uint8_t>(mem_[wSceneWarioXCoord] + 2);
+		mem_.cur_scene_obj() = static_cast<uint8_t>(mem_.scene_wario_y_coord() - 16);
+		mem_[wCurSceneObj + 1] = static_cast<uint8_t>(mem_.scene_wario_x_coord() + 2);
 		set_state(wCurSceneObjState, 0x15);
 		constexpr uint16_t GREY = 28 | 28 << 5 | 28 << 10;
 		for (uint16_t i = 0; i < 4; i++) {
@@ -482,14 +482,14 @@ void Prologue::sucked_into_music_box()
 		return;
 	}
 	case 12: // .Func_ae435
-		if (mem_[wCurSceneObjState] != 0x16)
+		if (mem_.cur_scene_obj_state() != 0x16)
 			return;
 		wario_state(SCENEWARIO_NONE);
 		next_sub();
 		return;
 	case 13: wait_sub(60); return; // .Wait60
 	case 14: { // .Func_ae447: the light flies into the box
-		Byte y = mem_[wCurSceneObj];
+		Byte y = mem_.cur_scene_obj();
 		Byte x = mem_[wCurSceneObj + 1];
 		if (y >= 181) {
 			if (frames & 0x03)
@@ -516,20 +516,20 @@ void Prologue::sucked_into_music_box()
 		if (frames & 1)
 			return;
 		if (frames >> 1 == 0x01) { // .IncreaseX
-			++mem_[wSceneObj3XCoord];
+			++mem_.scene_obj3_x_coord();
 		} else if (frames >> 1 == 0x02) { // .DecreaseX
-			mem_[wSceneObj3XCoord] -= 2;
+			mem_.scene_obj3_x_coord() -= 2;
 		} else {
-			++mem_[wSceneObj3XCoord];
+			++mem_.scene_obj3_x_coord();
 			next_sub();
 		}
 		return;
 	case 17: wait_sub(40); return; // .Wait40
 	case 18: { // .Func_ae4a9: and falls back to 195
-		Byte counter = mem_[w2d891];
+		Byte counter = mem_.unk_2d891();
 		if (counter >= 0x14) // .Func_ae4c0
 			counter = 0x10;
-		Byte y = mem_[wSceneObj3YCoord];
+		Byte y = mem_.scene_obj3_y_coord();
 		y += mem_[static_cast<uint16_t>(FALL + counter)];
 		if (y < 195)
 			return;
@@ -544,7 +544,7 @@ void Prologue::sucked_into_music_box()
 		uint8_t last = mem_[static_cast<uint16_t>(entry + 1)];
 		if (!dy)
 			return;
-		Byte y = mem_[wSceneObj3YCoord];
+		Byte y = mem_.scene_obj3_y_coord();
 		y += dy;
 		if (y == 195)
 			bump();
@@ -560,7 +560,7 @@ void Prologue::sucked_into_music_box()
 // Func_ae1c2: once Wario's in the state
 void Prologue::wait_wario(uint8_t state)
 {
-	if (mem_[wSceneWarioState] == state)
+	if (mem_.scene_wario_state() == state)
 		next_sub();
 }
 
@@ -573,7 +573,7 @@ uint8_t Prologue::walk_left()
 // the temple's music
 void Prologue::wake_up()
 {
-	uint8_t frames = ++mem_[w2d891];
+	uint8_t frames = ++mem_.unk_2d891();
 	auto after = [&](uint8_t wait, uint8_t state) {
 		if (frames < wait)
 			return false;
@@ -581,9 +581,9 @@ void Prologue::wake_up()
 		next_sub();
 		return true;
 	};
-	switch (mem_[w2d890]) {
+	switch (mem_.unk_2d890()) {
 	case 0: // Func_ae585: the fade done
-		if (mem_[w2d14e] == 0xff)
+		if (mem_.unk_2d14e() == 0xff)
 			next_sub();
 		return;
 	case 1: after(0x4b, SCENEWARIO_WAKE_UP); return; // Func_ae58d
@@ -597,8 +597,8 @@ void Prologue::wake_up()
 	case 4: // Func_ae5b1: the sweat drop
 		if (frames < 0x05)
 			return;
-		mem_[wCurSceneObjYCoord] = static_cast<uint8_t>(mem_[wSceneWarioYCoord] - 1);
-		mem_[wCurSceneObjXCoord] = static_cast<uint8_t>(mem_[wSceneWarioXCoord] + 9);
+		mem_.cur_scene_obj_y_coord() = static_cast<uint8_t>(mem_.scene_wario_y_coord() - 1);
+		mem_.cur_scene_obj_x_coord() = static_cast<uint8_t>(mem_.scene_wario_x_coord() + 9);
 		set_state(wCurSceneObjState, 0x14);
 		next_sub();
 		return;
@@ -614,7 +614,7 @@ void Prologue::wake_up()
 		return;
 	case 9: // Func_ae5fd
 		if (uint8_t x = walk_right(); x == 0x50) {
-			mem_[wSceneWarioXCoord] = x;
+			mem_.scene_wario_x_coord() = x;
 			wario_state(SCENEWARIO_IDLE_RIGHT);
 			next_sub();
 		}
@@ -637,12 +637,12 @@ void Prologue::wake_up()
 // Func_ae641: Wario looks at the hidden figure, jumps and bows
 void Prologue::bow()
 {
-	++mem_[w2d891];
-	switch (mem_[w2d890]) {
+	++mem_.unk_2d891();
+	switch (mem_.unk_2d890()) {
 	case 0: wait_wario(SCENEWARIO_LOOK_FORWARD); return; // Func_ae652
 	case 1: // Func_ae657
 		wario_state(SCENEWARIO_JUMP_AND_BOW);
-		mem_[wSceneWarioUnk7] = 0;
+		mem_.scene_wario_unk7() = 0;
 		next_sub();
 		return;
 	case 2: wait_wario(SCENEWARIO_LOOK_BACK); return; // Func_ae663
@@ -654,14 +654,14 @@ void Prologue::bow()
 // Func_ae668: Wario snaps his fingers and walks off left
 void Prologue::walk_off()
 {
-	uint8_t frames = ++mem_[w2d891];
-	switch (mem_[w2d890]) {
+	uint8_t frames = ++mem_.unk_2d891();
+	switch (mem_.unk_2d890()) {
 	case 0: // Func_ae683
 		wario_state(SCENEWARIO_SNAP_FINGERS);
 		next_sub();
 		return;
 	case 1: // Func_ae68b
-		if (mem_[wSceneWarioFrame] != 0x0f)
+		if (mem_.scene_wario_frame() != 0x0f)
 			return;
 		play_sfx(mem_, SFX_106);
 		next_sub();
@@ -695,21 +695,21 @@ void Prologue::walk_off()
 void Prologue::fall_from_plane()
 {
 	plane_parts(); // Func_ae8bb
-	++mem_[w2d891];
-	switch (mem_[w2d890]) {
+	++mem_.unk_2d891();
+	switch (mem_.unk_2d890()) {
 	case 0: wait_sub(74); return; // .Wait74
 	case 1: // .ShowWarioFall
-		mem_[wSceneWarioYCoord] = 60;
-		mem_[wSceneWarioXCoord] = 240;
+		mem_.scene_wario_y_coord() = 60;
+		mem_.scene_wario_x_coord() = 240;
 		wario_state(SCENEWARIO_ON_FIRE);
 		play_sfx(mem_, SFX_THROW);
-		mem_[w2d894] = 0;
-		mem_[w2d892] = 0;
+		mem_.unk_2d894() = 0;
+		mem_.unk_2d892() = 0;
 		next_sub();
 		return;
 	case 2: // .WarioBounce
 		bounce();
-		if (mem_[w2d892] == 0x80)
+		if (mem_.unk_2d892() == 0x80)
 			next_sub();
 		return;
 	case 3: wait_sub(60); return; // .Wait60
@@ -734,35 +734,35 @@ void Prologue::fall_from_plane()
 // frame of 4 but the first) and landings (w2d892's steps)
 void Prologue::bounce()
 {
-	if (mem_[w2d894] && (mem_[w2d891] & 0x03)) {
+	if (mem_.unk_2d894() && (mem_.unk_2d891() & 0x03)) {
 		if (home::apply_ow_movement(gb_, wSceneWario, ADDR_Data_aed06, false).finished)
-			mem_[w2d894] = 0;
+			mem_.unk_2d894() = 0;
 	}
-	Byte action = mem_[w2d892];
+	Byte action = mem_.unk_2d892();
 	auto next = [&] { // .asm_ae768
 		++action;
-		mem_[w2d893] = 0;
+		mem_.unk_2d893() = 0;
 	};
 	auto land = [&](uint8_t state, bool stars) { // on the ground, at 96
-		if (mem_[wSceneWarioYCoord] != 96)
+		if (mem_.scene_wario_y_coord() != 96)
 			return;
 		wario_state(state);
 		play_sfx(mem_, SFX_BUMP); // .PlayBumpSfx
 		if (stars) { // .asm_ae77f
-			mem_[wCurSceneObj] = mem_[wSceneWarioYCoord];
-			mem_[wCurSceneObj + 1] = mem_[wSceneWarioXCoord];
+			mem_.cur_scene_obj() = mem_.scene_wario_y_coord();
+			mem_[wCurSceneObj + 1] = mem_.scene_wario_x_coord();
 			set_state(wCurSceneObjState, 0x10);
 		}
 		next();
 	};
 	switch (action) {
 	case 0: // .asm_ae763
-		mem_[w2d894] = 0x01;
+		mem_.unk_2d894() = 0x01;
 		next();
 		return;
 	case 1: land(SCENEWARIO_STUNNED_RIGHT, true); return; // .asm_ae771
 	case 2: case 5: // .asm_ae794
-		if (++mem_[w2d893] >= 0x04)
+		if (++mem_.unk_2d893() >= 0x04)
 			next();
 		return;
 	case 3: // .asm_ae79e
@@ -772,11 +772,11 @@ void Prologue::bounce()
 	case 4: land(SCENEWARIO_CRASH_LAND_RIGHT, true); return; // .asm_ae7a5
 	case 6: land(SCENEWARIO_CRASH_LAND_RIGHT, false); return; // .asm_ae7b5
 	case 7: // .asm_ae7c5
-		if (mem_[wSceneWarioState] == SCENEWARIO_STUNNED_RIGHT)
+		if (mem_.scene_wario_state() == SCENEWARIO_STUNNED_RIGHT)
 			next();
 		return;
 	case 8: // .asm_ae7d4
-		if (++mem_[w2d893] < 0x3e)
+		if (++mem_.unk_2d893() < 0x3e)
 			return;
 		wario_state(SCENEWARIO_IDLE_RIGHT);
 		play_sfx(mem_, SFX_12A);
@@ -791,15 +791,15 @@ void Prologue::bounce()
 // walks in
 void Prologue::walk_to_cave()
 {
-	++mem_[w2d891];
+	++mem_.unk_2d891();
 	auto walk_to = [this](uint8_t x, uint8_t state) {
 		if (walk_right() != x)
 			return;
-		mem_[wSceneWarioXCoord] = x;
+		mem_.scene_wario_x_coord() = x;
 		wario_state(state);
 		next_sub();
 	};
-	switch (mem_[w2d890]) {
+	switch (mem_.unk_2d890()) {
 	case 0: case 3: wait_sub(60); return; // .Wait60_1, .Wait60_2
 	case 1: case 9: // .WarioWalkRight
 		wario_state(SCENEWARIO_WALK_RIGHT);
@@ -812,14 +812,14 @@ void Prologue::walk_to_cave()
 		return;
 	case 5: wait_wario(SCENEWARIO_IDLE_RIGHT); return; // .WarioIdleRight
 	case 6: // .ShowEmote
-		mem_[wCurSceneObj] = static_cast<uint8_t>(mem_[wSceneWarioYCoord] - 24);
-		mem_[wCurSceneObj + 1] = static_cast<uint8_t>(mem_[wSceneWarioXCoord] + 16);
+		mem_.cur_scene_obj() = static_cast<uint8_t>(mem_.scene_wario_y_coord() - 24);
+		mem_[wCurSceneObj + 1] = static_cast<uint8_t>(mem_.scene_wario_x_coord() + 16);
 		set_state(wCurSceneObjState, 0x11);
 		play_sfx(mem_, SFX_106);
 		next_sub();
 		return;
 	case 7: // .WaitEmoteAnimation
-		if (!mem_[wCurSceneObjState])
+		if (!mem_.cur_scene_obj_state())
 			next_sub();
 		return;
 	case 8: case 11: wait_sub(40); return; // .Wait40_1, .Wait40_2
@@ -919,9 +919,9 @@ void Prologue::plane_parts()
 {
 	for (int i = 0; i < 4; i++)
 		plane_part(i);
-	Byte frames = mem_[w2d8a1];
+	Byte frames = mem_.unk_2d8a1();
 	++frames;
-	uint8_t part = mem_[w2d8a0];
+	uint8_t part = mem_.unk_2d8a0();
 	if (part == 4) // .Func_ae8d8: all started
 		return;
 	if (part > 4) {

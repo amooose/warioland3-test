@@ -17,9 +17,9 @@ namespace wl3::home {
 uint8_t floor_for_y_pos(GB *gb)
 {
 	Memory mem(gb);
-	uint8_t hi = mem[wWarioYPos + 0];
+	uint8_t hi = mem.wario_y().hi();
 	uint8_t floor = hi == 1 ? 3 : hi == 2 ? 1 : 5;
-	if (mem[wWarioYPos + 1] < 0x80)
+	if (mem.wario_y().lo() < 0x80)
 		floor++;
 	return floor;
 }
@@ -27,22 +27,22 @@ uint8_t floor_for_y_pos(GB *gb)
 void update_floor(GB *gb)
 {
 	Memory mem(gb);
-	mem[wFloor] = floor_for_y_pos(gb);
+	mem.floor() = floor_for_y_pos(gb);
 }
 
 void start_floor_transition(GB *gb, uint8_t floor, bool up)
 {
 	Memory mem(gb);
-	mem[wFloor] = floor;
+	mem.floor() = floor;
 	uint8_t timer = (!up && floor == 5) ? 0x68 : 0x80;
 	if (!up)
-		mem[wFloorTransitionTimer] = timer;
+		mem.floor_transition_timer() = timer;
 	play_sfx(mem, SFX_PIPE_EXIT);
-	mem[wFloorTransitionDir] = up ? FLOOR_TRANSITION_DOWN : FLOOR_TRANSITION_UP;
-	mem[wIsFloorTransition] = TRUE;
+	mem.floor_transition_dir() = up ? FLOOR_TRANSITION_DOWN : FLOOR_TRANSITION_UP;
+	mem.is_floor_transition() = TRUE;
 	if (up)
-		mem[wFloorTransitionTimer] = timer;
-	mem[wCameraRoomYScrollLimit] = 0;
+		mem.floor_transition_timer() = timer;
+	mem.camera_room_y_scroll_limit() = 0;
 }
 
 namespace {
@@ -51,10 +51,10 @@ namespace {
 bool floor_delta(GB *gb, int &delta, uint8_t &floor)
 {
 	Memory mem(gb);
-	if ((mem[wCameraConfigFlags] & CAM_SCROLLING_MASK) < CAM_TRANSITIONS)
+	if ((mem.camera_config_flags() & CAM_SCROLLING_MASK) < CAM_TRANSITIONS)
 		return false;
 	floor = floor_for_y_pos(gb);
-	delta = mem[wFloor] - floor;
+	delta = mem.floor() - floor;
 	return true;
 }
 

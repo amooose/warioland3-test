@@ -624,7 +624,7 @@ private:
 	};
 	void unrealistic();
 	void set_state(uint16_t state, uint8_t value); // SetSceneObjState
-	bool by_day() const { return !mem_[w2d011]; }
+	bool by_day() const { return !mem_.unk_2d011(); }
 	void north(uint8_t state); // Func_b7984
 	void west(uint8_t state); // Func_b7a6d
 	void south(uint8_t state); // Func_b7c18
@@ -956,6 +956,13 @@ public:
 	void grey_transition(); // OWGreyTransition
 	void load_grey(); // LoadGreyOWPals
 	bool fade_in_level_name(); // FadeInLevelName; whether still fading
+	// the same, farcalled
+	bool farcall_fade_in_level_name()
+	{
+		bool going = false;
+		routines_.in_bank(BANK_FadeInLevelName, ADDR_FadeInLevelName, [&] { going = fade_in_level_name(); });
+		return going;
+	}
 	void fade_out_level_name(); // Func_852e5
 	void func_84e43();
 	void func_84fff();

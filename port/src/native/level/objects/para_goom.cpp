@@ -88,7 +88,7 @@ public:
 
 private:
 	uint16_t facing(uint16_t left, uint16_t right) { return facing_right() ? right : left; }
-	bool sting_up() const { return mem_[wCurObjCollBoxTop] == STING_TOP; }
+	bool sting_up() const { return mem_.cur_obj_coll_box_top() == STING_TOP; }
 	void set_top(uint8_t interaction, uint8_t top);
 	void box(uint8_t right, uint8_t left);
 	bool shaken();
@@ -128,18 +128,18 @@ void ParaGoom::update()
 void ParaGoom::set_top(uint8_t interaction, uint8_t top)
 {
 	set_interaction(interaction);
-	mem_[wCurObjCollBoxTop] = top;
+	mem_.cur_obj_coll_box_top() = top;
 }
 
 void ParaGoom::box(uint8_t right, uint8_t left)
 {
-	mem_[wCurObjCollBoxRight] = right;
-	mem_[wCurObjCollBoxLeft] = left;
+	mem_.cur_obj_coll_box_right() = right;
+	mem_.cur_obj_coll_box_left() = left;
 }
 
 bool ParaGoom::shaken()
 {
-	if (mem_[wGroundShakeCounter] < 0x10)
+	if (mem_.ground_shake_counter() < 0x10)
 		return false;
 	state() = static_cast<uint8_t>(0x08 | (mem_[rDIV] & 1));
 	return true;
@@ -212,7 +212,7 @@ void ParaGoom::dazed()
 
 void ParaGoom::wobble(uint8_t s)
 {
-	mem_[wCurObjAction] = 0x8f;
+	mem_.cur_obj_action() = 0x8f;
 	state() = s;
 	set_frameset(facing(ADDR_Frameset_684aa, ADDR_Frameset_684af));
 	state_duration() = 0x04;
@@ -226,7 +226,7 @@ void ParaGoom::rolled(uint8_t s)
 {
 	state() = s;
 	frame_duration() = 0;
-	mem_[wCurObjFramesetOffset] = 0;
+	mem_.cur_obj_frameset_offset() = 0;
 	var2() = 0x02;
 }
 
@@ -256,7 +256,7 @@ void ParaGoom::run(uint16_t handler)
 		var1() = 0;
 		set_top(OBJ_INTERACTION_01, 0xf4);
 		state() = 0x30;
-		uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+		uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 		if (static_cast<uint8_t>(screen_x() + 0x2a) >= wario) {
 			substate() &= ~(1 << OBJFLAG_PRIORITY_F);
 			var3() = 0;
@@ -268,10 +268,10 @@ void ParaGoom::run(uint16_t handler)
 			set_frameset(ADDR_Frameset_68442);
 			box(0x09, 0xf9);
 		}
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		if (hpos_block_unk1())
 			return;
 		state() = 0x41;
@@ -345,20 +345,20 @@ void ParaGoom::run(uint16_t handler)
 			box(0x05, 0xfa);
 			return;
 		}
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		if (!hpos_block_down()) {
 			state() = 0x11;
 			return;
 		}
-		mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-		mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+		mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+		mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 		bool right = facing_right();
-		uint8_t in_block = mem_[wCurObjXPos + 0] & 0x0f;
-		uint8_t edge = right ? static_cast<uint8_t>(mem_[wCurObjCollBoxRight])
-			: static_cast<uint8_t>(-static_cast<uint8_t>(mem_[wCurObjCollBoxLeft]));
+		uint8_t in_block = mem_.cur_obj_x().lo() & 0x0f;
+		uint8_t edge = right ? static_cast<uint8_t>(mem_.cur_obj_coll_box_right())
+			: static_cast<uint8_t>(-static_cast<uint8_t>(mem_.cur_obj_coll_box_left()));
 		if (right ? static_cast<uint8_t>(in_block + edge) >= 0x10 : in_block < edge) {
 			if (!(block_beside(right) & 0x0f)) {
 				state() = 0x13;
@@ -366,12 +366,12 @@ void ParaGoom::run(uint16_t handler)
 			}
 		}
 		uint16_t y_pos = static_cast<uint16_t>(y() - 4);
-		edge = right ? static_cast<uint8_t>(mem_[wCurObjCollBoxRight]) : static_cast<uint8_t>(-static_cast<uint8_t>(mem_[wCurObjCollBoxLeft]));
+		edge = right ? static_cast<uint8_t>(mem_.cur_obj_coll_box_right()) : static_cast<uint8_t>(-static_cast<uint8_t>(mem_.cur_obj_coll_box_left()));
 		uint16_t x_pos = static_cast<uint16_t>(right ? x() + edge : x() - edge);
-		mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-		mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-		mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+		mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+		mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+		mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+		mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 		if (hpos_block_unk4()) {
 			state() = 0x13;
 			return;
@@ -408,7 +408,7 @@ void ParaGoom::run(uint16_t handler)
 		flags() &= ~(1 << OBJFLAG_GRABBED_F);
 		[[fallthrough]];
 	case STATE_3F:
-		if (mem_[wGroundShakeCounter] >= 0x10) {
+		if (mem_.ground_shake_counter() >= 0x10) {
 			state() = 0x1c;
 			return;
 		}
@@ -427,10 +427,10 @@ void ParaGoom::run(uint16_t handler)
 	case STATE_40:
 		if (--state_duration()) {
 			uint16_t y_pos = static_cast<uint16_t>(y() - 8);
-			mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-			mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-			mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-			mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+			mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+			mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+			mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+			mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 			if (!(hpos_block_unk3() & 0x0f)) {
 				apply_y_movement(ADDR_Data_60530);
 				return;
@@ -449,18 +449,18 @@ void ParaGoom::run(uint16_t handler)
 		return;
 	case DROPPING: // drifting down to a floor
 		call_home(ADDR_MoveObjectDown_Slow);
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
-		mem_[wObjSlopeInteraction] = 0;
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
+		mem_.obj_slope_interaction() = 0;
 		if (!hpos_block_unk1()) {
-			if (mem_[wIsInWaterOrSand])
+			if (mem_.is_in_water_or_sand())
 				state() = 0x0a;
 			return;
 		}
-		mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-		mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+		mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+		mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 		state() = 0x5c;
 		set_frameset(ADDR_Frameset_6855f);
 		state_duration() = 0x0a;
@@ -498,7 +498,7 @@ void ParaGoom::run(uint16_t handler)
 			state() = 0x01;
 		return;
 	case WOBBLE_START: {
-		uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+		uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 		wobble(static_cast<uint8_t>(screen_x() + 0x2a) < wario ? 0x39 : 0x38);
 		return;
 	}
@@ -517,7 +517,7 @@ void ParaGoom::run(uint16_t handler)
 	case STATE_3B:
 	case STATE_3C:
 		frame_duration() = 0;
-		mem_[wCurObjFramesetOffset] = 0;
+		mem_.cur_obj_frameset_offset() = 0;
 		var2_move(handler == STATE_3B ? ADDR_Func_32bd : ADDR_Func_32ae, 0x13);
 		return;
 	case STATE_29: attacked(0x59); return;
@@ -538,7 +538,7 @@ void ParaGoom::run(uint16_t handler)
 		grab(0x49);
 		[[fallthrough]];
 	case STATE_49: // carried, turning with Wario
-		if (mem_[wDirection]) {
+		if (mem_.direction()) {
 			call_home(ADDR_Func_3353);
 			return;
 		}
@@ -549,7 +549,7 @@ void ParaGoom::run(uint16_t handler)
 		grab(0x48);
 		[[fallthrough]];
 	case STATE_48:
-		if (!mem_[wDirection]) {
+		if (!mem_.direction()) {
 			call_home(ADDR_Func_3362);
 			return;
 		}
@@ -557,7 +557,7 @@ void ParaGoom::run(uint16_t handler)
 		run(STATE_19);
 		return;
 	case STATE_12:
-		mem_[wCurObjAction] = 0x9f;
+		mem_.cur_obj_action() = 0x9f;
 		state() = 0x42;
 		var3() = 0;
 		set_top(OBJ_INTERACTION_00, 0xf4);

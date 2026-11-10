@@ -46,6 +46,7 @@ void create_object_at_relative_pos(GB *gb, uint16_t params);
 // collisions.cpp's block checks (see collisions.hpp)
 uint8_t check_block(GB *gb, uint8_t points);
 uint8_t check_block_beside(GB *gb, bool right);
+uint8_t check_wario_bottom(GB *gb, bool right);
 // SpawnObject: index = its wObjDataPointers entry, at = its object map entry
 void spawn_object(GB *gb, uint8_t index, uint16_t at);
 // The object's place in the level map, from its OBJ_UNK_02 at `at`:
@@ -76,26 +77,26 @@ protected:
 	}
 
 	// wCurObj's fields
-	Byte flags() const { return mem_[wCurObjFlags]; }
-	Byte substate() const { return mem_[wCurObjSubState]; }
-	Byte state() const { return mem_[wCurObjState]; }
-	Byte state_duration() const { return mem_[wCurObjStateDuration]; }
-	Byte frame() const { return mem_[wCurObjFrame]; }
-	Byte frame_duration() const { return mem_[wCurObjFrameDuration]; }
-	Byte interaction() const { return mem_[wCurObjInteractionType]; }
-	Byte screen_x() const { return mem_[wCurObjScreenXPos]; }
-	Byte screen_y() const { return mem_[wCurObjScreenYPos]; }
-	Byte var1() const { return mem_[wCurObjVar1]; }
-	Byte var2() const { return mem_[wCurObjVar2]; }
-	Byte var3() const { return mem_[wCurObjVar3]; }
-	Word y() const { return mem_.word(wCurObjYPos); }
-	Word x() const { return mem_.word(wCurObjXPos); }
+	Byte flags() const { return mem_.cur_obj_flags(); }
+	Byte substate() const { return mem_.cur_obj_sub_state(); }
+	Byte state() const { return mem_.cur_obj_state(); }
+	Byte state_duration() const { return mem_.cur_obj_state_duration(); }
+	Byte frame() const { return mem_.cur_obj_frame(); }
+	Byte frame_duration() const { return mem_.cur_obj_frame_duration(); }
+	Byte interaction() const { return mem_.cur_obj_interaction_type(); }
+	Byte screen_x() const { return mem_.cur_obj_screen_x_pos(); }
+	Byte screen_y() const { return mem_.cur_obj_screen_y_pos(); }
+	Byte var1() const { return mem_.cur_obj_var1(); }
+	Byte var2() const { return mem_.cur_obj_var2(); }
+	Byte var3() const { return mem_.cur_obj_var3(); }
+	Word y() const { return mem_.cur_obj_y(); }
+	Word x() const { return mem_.cur_obj_x(); }
 
 	bool facing_right() const { return substate() & OBJSUBFLAG_HDIR; }
 	void set_update(uint16_t f) // high byte first, as the asm
 	{
 		mem_[wCurObjUpdateFunction + 1] = f >> 8;
-		mem_[wCurObjUpdateFunction] = f & 0xff;
+		mem_.cur_obj_update_function() = f & 0xff;
 	}
 	// the collision box's top, bottom, left and right
 	void set_coll_box(uint8_t top, uint8_t bottom, uint8_t left, uint8_t right);
@@ -112,7 +113,7 @@ protected:
 	}
 
 	// no action for a frame (no_actions_for 1)
-	void no_actions() { mem_[wCurObjAction] = (1 << NO_ACTIONS_F) | 1; }
+	void no_actions() { mem_.cur_obj_action() = (1 << NO_ACTIONS_F) | 1; }
 
 	// home routines
 	void set_frameset(uint16_t frameset); // SetObjectFramesetPtr (plain: leaves no registers)
@@ -159,6 +160,15 @@ protected:
 	uint8_t hpos_block_down() { return hpos_block(BANK_Func_19b51, ADDR_Func_3543, COLLISION_DOWN); }
 	uint8_t hpos_block_unk3() { return hpos_block(BANK_Func_19b9b, ADDR_Func_358b, COLLISION_UNK3); }
 	uint8_t hpos_block_unk2() { return hpos_block(BANK_Func_19b8b, ADDR_Func_35a3, COLLISION_UNK2); }
+	// Func_19706 / Func_19713 (farcalled): Wario's bottom-right / -left
+	// collision, as Wario; nonzero when he collides
+	uint8_t wario_bottom_collision(bool right)
+	{
+		uint8_t r = 0;
+		routines_.in_bank(right ? BANK_Func_19706 : BANK_Func_19713, right ? ADDR_Func_19706 : ADDR_Func_19713,
+			[&] { r = level::check_wario_bottom(gb_, right); });
+		return r;
+	}
 	// ProcessBlockOnRight / Left: the block beside the one at wBlockPtr
 	uint8_t block_beside(bool right)
 	{
@@ -176,7 +186,7 @@ protected:
 	template <class F>
 	void homecall(uint8_t bank, uint16_t wrapper, F fn)
 	{
-		uint8_t saved = mem_[wROMBank];
+		uint8_t saved = mem_.rom_bank();
 		home::bankswitch(gb_, bank, wrapper);
 		fn();
 		home::bankswitch(gb_, saved, wrapper);

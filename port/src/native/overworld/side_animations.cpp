@@ -76,7 +76,7 @@ void SideAnimations::north(uint8_t state)
 {
 	switch (state) {
 	case 0x05: // .Func_b79de: the block breaks, from level 6
-		if (wram_.cur_event() || mem_[wLevel2] != 0x06)
+		if (wram_.cur_event() || mem_.level2() != 0x06)
 			return;
 		set_state(wSceneObj3State, 0x06);
 		play_sfx(mem_, SFX_BLOCK_BREAK);
@@ -192,18 +192,18 @@ void SideAnimations::west(uint8_t state)
 	case 0x06: { // Func_b7ac0: the elevator, by night
 		if (wram_.cur_event())
 			return;
-		Byte waiting = mem_[wSceneObj8Unk7];
+		Byte waiting = mem_.scene_obj8_unk7();
 		if (!waiting) {
-			if (mem_[wSceneObj7State] || mem_[wOWPalTransitionState])
+			if (mem_.scene_obj7_state() || mem_.ow_pal_transition_state())
 				return;
 			++waiting;
 		}
 		uint8_t value = 0x07;
 		if (!by_day()) { // .asm_b7af0
-			mem_[wSceneObj8State] = 0x08;
-			mem_[wSceneObj8Duration] = 0;
+			mem_.scene_obj8_state() = 0x08;
+			mem_.scene_obj8_duration() = 0;
 			value = 0;
-		} else if (mem_[wOWPalTransitionState] != 0x02) {
+		} else if (mem_.ow_pal_transition_state() != 0x02) {
 			return;
 		}
 		set_state(wSceneObj7State, value); // .asm_b7ae5
@@ -213,16 +213,16 @@ void SideAnimations::west(uint8_t state)
 	case 0x08: { // Func_b7afb: and by day
 		if (wram_.cur_event())
 			return;
-		Byte waiting = mem_[wSceneObj8Unk7];
+		Byte waiting = mem_.scene_obj8_unk7();
 		if (!waiting) {
-			if (mem_[wOWPalTransitionState])
+			if (mem_.ow_pal_transition_state())
 				return;
 			++waiting;
 		}
-		if (!by_day() && mem_[wOWPalTransitionState] != 0x02)
+		if (!by_day() && mem_.ow_pal_transition_state() != 0x02)
 			return;
-		mem_[wSceneObj8State] = 0x06;
-		mem_[wSceneObj8Duration] = 0;
+		mem_.scene_obj8_state() = 0x06;
+		mem_.scene_obj8_duration() = 0;
 		waiting = 0;
 		return;
 	}
@@ -270,20 +270,20 @@ void SideAnimations::moon()
 {
 	if (wram_.cur_event())
 		return;
-	uint8_t x = mem_[wSceneObj14XCoord];
-	Byte started = mem_[w2d07d];
-	if (mem_[w2d07c]) { // .asm_b7cc0
+	uint8_t x = mem_.scene_obj14_x_coord();
+	Byte started = mem_.unk_2d07d();
+	if (mem_.unk_2d07c()) { // .asm_b7cc0
 		if (x == 0x80)
 			return;
 		if (!started) { // .Func_b7cda
 			++started;
-			mem_[wSceneObj14YCoord] = 0x25;
-			mem_[wSceneObj14XCoord] = 0x70;
+			mem_.scene_obj14_y_coord() = 0x25;
+			mem_.scene_obj14_x_coord() = 0x70;
 		}
 		if (wram_.global_counter() & 0x03)
 			return;
-		--mem_[wSceneObj14YCoord];
-		++mem_[wSceneObj14XCoord];
+		--mem_.scene_obj14_y_coord();
+		++mem_.scene_obj14_x_coord();
 		return;
 	}
 	if (x == 0x70) // .asm_b7ce7
@@ -292,13 +292,13 @@ void SideAnimations::moon()
 		++started;
 	if (wram_.global_counter() & 0x03)
 		return;
-	--mem_[wSceneObj14YCoord];
-	Byte moved = mem_[wSceneObj14XCoord];
+	--mem_.scene_obj14_y_coord();
+	Byte moved = mem_.scene_obj14_x_coord();
 	++moved;
 	if (moved != 0x88)
 		return;
-	mem_[wSceneObj14YCoord] = 0x25;
-	mem_[wSceneObj14XCoord] = 0x70;
+	mem_.scene_obj14_y_coord() = 0x25;
+	mem_.scene_obj14_x_coord() = 0x70;
 }
 
 // ---------------------------------------------------------------------------
@@ -326,7 +326,7 @@ void SideAnimations::east(uint8_t state)
 		if (east_busy())
 			return;
 		bool other = state == 0x12 ? !by_day() : by_day();
-		if (mem_[wOWPalTransitionState] != (other ? 0x02 : 0x00))
+		if (mem_.ow_pal_transition_state() != (other ? 0x02 : 0x00))
 			return;
 		set_state(wSceneObj7State, state == 0x12 ? 0x13 : 0x12);
 		return;
@@ -334,7 +334,7 @@ void SideAnimations::east(uint8_t state)
 	case 0x19: // Func_b7c05: every 256 frames
 		if (wram_.cur_event())
 			return;
-		if (++mem_[w2d12b])
+		if (++mem_.unk_2d12b())
 			return;
 		set_state(wSceneObj5State, 0x1a);
 		return;

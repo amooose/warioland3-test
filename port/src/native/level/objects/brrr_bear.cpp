@@ -93,7 +93,7 @@ private:
 
 bool BrrrBear::wario_to_right() const
 {
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	return static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 }
 
@@ -102,9 +102,9 @@ void BrrrBear::init()
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(UPDATE);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 0x08;
-	mem_[wCurObjCollBoxLeft] = 0xf7;
-	mem_[wCurObjCollBoxBottom] = 0xf9;
+	mem_.cur_obj_coll_box_right() = 0x08;
+	mem_.cur_obj_coll_box_left() = 0xf7;
+	mem_.cur_obj_coll_box_bottom() = 0xf9;
 	run(RESET);
 }
 
@@ -120,7 +120,7 @@ void BrrrBear::update()
 
 bool BrrrBear::shaken()
 {
-	if (mem_[wGroundShakeCounter] < 0x10)
+	if (mem_.ground_shake_counter() < 0x10)
 		return false;
 	state() = static_cast<uint8_t>(0x08 | (mem_[rDIV] & 1));
 	return true;
@@ -129,18 +129,18 @@ bool BrrrBear::shaken()
 // slowly along the floor, turning at walls and edges
 void BrrrBear::walk()
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_down()) {
 		state() = 0x11;
 		return;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	bool right = facing_right();
-	uint8_t in_block = mem_[wCurObjXPos + 0] & 0x0f;
+	uint8_t in_block = mem_.cur_obj_x().lo() & 0x0f;
 	if (right ? in_block + 7 >= 0x10 : in_block < 8) {
 		if (!(block_beside(right) & 0x0f)) {
 			state() = 0x13;
@@ -149,10 +149,10 @@ void BrrrBear::walk()
 	}
 	uint16_t y_pos = static_cast<uint16_t>(y() - 4);
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 7) : static_cast<uint16_t>(x() - 8);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4()) {
 		state() = 0x13;
 		return;
@@ -170,7 +170,7 @@ void BrrrBear::hit_move(uint16_t routine)
 
 void BrrrBear::stunned(uint8_t s)
 {
-	mem_[wCurObjAction] = 0x8f;
+	mem_.cur_obj_action() = 0x8f;
 	state() = s;
 	set_frameset(ADDR_Frameset_6915b);
 	state_duration() = 0x04;
@@ -191,7 +191,7 @@ void BrrrBear::knocked(uint8_t s, uint8_t var2_)
 
 bool BrrrBear::shrugs_off()
 {
-	return !mem_[wTransformation] && mem_[wEffectivePowerUp] < 0x05 && (interaction() & 0x7f);
+	return !mem_.transformation() && mem_.effective_power_up() < 0x05 && (interaction() & 0x7f);
 }
 
 void BrrrBear::grab(uint8_t s)
@@ -214,7 +214,7 @@ void BrrrBear::run(uint16_t handler)
 {
 	switch (handler) {
 	case VANISH_TOUCH: // pounded: wobbles, unless Wario's strong enough
-		if (!mem_[wCurObjAction] || mem_[wTransformation] || mem_[wEffectivePowerUp] >= 0x06
+		if (!mem_.cur_obj_action() || mem_.transformation() || mem_.effective_power_up() >= 0x06
 			|| !(interaction() & 0x7f)) {
 			call_home(ADDR_VanishObject2);
 			return;
@@ -260,9 +260,9 @@ void BrrrBear::run(uint16_t handler)
 		if (shaken())
 			return;
 		{
-			uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+			uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 			if (dy < 0x18 || dy >= 0xe8) {
-				uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+				uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 				bool near_right = dx >= 0xb8, near_left = dx < 0x48;
 				if (near_right || near_left) {
 					if (facing_right() != near_right) {
@@ -316,7 +316,7 @@ void BrrrBear::run(uint16_t handler)
 		flags() &= ~(1 << OBJFLAG_GRABBED_F);
 		[[fallthrough]];
 	case DAZED:
-		if (mem_[wGroundShakeCounter] >= 0x10) {
+		if (mem_.ground_shake_counter() >= 0x10) {
 			state() = 0x1c;
 			return;
 		}
@@ -382,7 +382,7 @@ void BrrrBear::run(uint16_t handler)
 		grab(0x49);
 		[[fallthrough]];
 	case HELD_49: // carried facing the way Wario does
-		if (mem_[wDirection]) {
+		if (mem_.direction()) {
 			call_home(ADDR_Func_3353);
 			return;
 		}
@@ -393,7 +393,7 @@ void BrrrBear::run(uint16_t handler)
 		grab(0x48);
 		[[fallthrough]];
 	case HELD_48:
-		if (!mem_[wDirection]) {
+		if (!mem_.direction()) {
 			call_home(ADDR_Func_3362);
 			return;
 		}
@@ -401,7 +401,7 @@ void BrrrBear::run(uint16_t handler)
 		run(GRAB_49);
 		return;
 	case STATE_42:
-		mem_[wCurObjAction] = 0x9f;
+		mem_.cur_obj_action() = 0x9f;
 		state() = 0x42;
 		var3() = 0;
 		set_interaction(OBJ_INTERACTION_00);

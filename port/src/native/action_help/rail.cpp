@@ -97,8 +97,8 @@ bool RailDemo::ride_right()
 	++wario().x();
 	if (++enemy().x() < 0x4c)
 		return false;
-	mem_[hSFXID + 0] = 0xff; // stop_sfx
-	mem_[hSFXID + 1] = 0x00;
+	mem_.sfx().hi() = 0xff; // stop_sfx
+	mem_.sfx().lo() = 0x00;
 	show_wario_jump2();
 	return true;
 }

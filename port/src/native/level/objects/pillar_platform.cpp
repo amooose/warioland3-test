@@ -42,9 +42,9 @@ void PillarPlatform::init(uint8_t height)
 	flags() = (flags() & ~OBJFLAG_INVISIBLE) | OBJFLAG_NO_COLLISION;
 	set_update(IDLE);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 0x00;
-	mem_[wCurObjCollBoxLeft] = 0xf9;
-	mem_[wCurObjCollBoxBottom] = 0xf4;
+	mem_.cur_obj_coll_box_right() = 0x00;
+	mem_.cur_obj_coll_box_left() = 0xf9;
+	mem_.cur_obj_coll_box_bottom() = 0xf4;
 	set_frameset((wram_.day_night() & 1) ? ADDR_Frameset_6975e : ADDR_Frameset_6975b);
 }
 
@@ -87,7 +87,7 @@ void PillarPlatform::idle()
 	--var1();
 	state_duration() = 0x09;
 	set_update(SINKING);
-	uint8_t unk01 = mem_[wCurObjUnk01];
+	uint8_t unk01 = mem_.cur_obj_unk01();
 	push_neighbours(0x00, 0x00, HIT_FROM_BELOW, static_cast<uint8_t>(unk01 + 3));
 	push_neighbours(0x00, 0x00, HIT_FROM_BELOW, static_cast<uint8_t>(unk01 - 3));
 }

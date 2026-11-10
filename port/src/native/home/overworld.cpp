@@ -29,16 +29,16 @@ uint16_t ow_coord_in_tilemap(GB *gb, uint16_t pos)
 uint16_t load_level_name(GB *gb, uint8_t side, uint8_t index)
 {
 	Memory mem(gb);
-	mem[wHDMABank] = static_cast<uint8_t>(BANK_LevelNamesJPGfx + mem[wLanguage]);
-	mem[wHDMA] = 0;
+	mem.hdma_bank() = static_cast<uint8_t>(BANK_LevelNamesJPGfx + mem.language());
+	mem.hdma() = 0;
 	uint8_t side_hi = static_cast<uint8_t>(side << 4 | side >> 4); // swap: *$10
 	uint16_t src = static_cast<uint16_t>(ADDR_LevelNamesJPGfx + (side_hi << 8)); // aka LevelNamesENGfx
 	src = static_cast<uint16_t>(src + (static_cast<uint8_t>(index * 2) << 8));
-	mem[w2d0b5SourceHi] = static_cast<uint8_t>(src >> 8);
-	mem[w2d0b5SourceLo] = static_cast<uint8_t>(src);
-	mem[w2d0b5DestHi] = 0x15;
-	mem[w2d0b5DestLo] = 0;
-	mem[w2d0b5Mode] = 32 - 1; // 32 dma_tiles
+	mem.unk_2d0b5_source_hi() = static_cast<uint8_t>(src >> 8);
+	mem.unk_2d0b5_source_lo() = static_cast<uint8_t>(src);
+	mem.unk_2d0b5_dest_hi() = 0x15;
+	mem.unk_2d0b5_dest_lo() = 0;
+	mem.unk_2d0b5_mode() = 32 - 1; // 32 dma_tiles
 	return src;
 }
 
@@ -48,13 +48,13 @@ void start_hdma(GB *gb)
 	mem[rVBK] = BANK_v1Tiles0; // BANK("VRAM1")
 	for (int i = 0; i < 5; i++)
 		mem[static_cast<uint16_t>(rVDMA_SRC_HIGH + i)] = mem[static_cast<uint16_t>(w2d0b5 + i)];
-	mem[wHDMABank] = 0;
+	mem.hdma_bank() = 0;
 }
 
 void load_far_bg_map(GB *gb, uint8_t bank, uint16_t src)
 {
 	Memory mem(gb);
-	uint8_t rom = mem[wROMBank];
+	uint8_t rom = mem.rom_bank();
 	bankswitch(gb, bank, ADDR_LoadFarBGMap);
 	copy(gb, src, v0BGMap0, 18 * TILEMAP_WIDTH);
 	bankswitch(gb, rom, ADDR_LoadFarBGMap);
@@ -252,7 +252,7 @@ PORT(Func_3c03)
 // pop af's a and f (the bank it came from, the entry flags)
 PORT(LoadFarBGMap)
 {
-	uint8_t rom = Memory(gb)[wROMBank];
+	uint8_t rom = Memory(gb).rom_bank();
 	uint16_t src = REG_HL(gb);
 	load_far_bg_map(gb, gb->cpu.b, src);
 	SET_HL(gb, src + 18 * TILEMAP_WIDTH);

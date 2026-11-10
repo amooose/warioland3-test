@@ -123,8 +123,7 @@ void MapFunctions::load_level_name()
 // WaitOWSceneLevelNameFadeIn
 void MapFunctions::wait_level_name()
 {
-	routines_.farcall(BANK_FadeInLevelName, ADDR_FadeInLevelName);
-	if (gb_->cpu.c & 1) // still fading in
+	if (Palettes(gb_).farcall_fade_in_level_name()) // still fading in
 		return;
 	next_step();
 }
@@ -164,7 +163,7 @@ void MapFunctions::cut_tree()
 		next_step();
 		return;
 	case 3: // .WaitFall
-		if (mem_[wSceneObj8Frame] != 0x07)
+		if (mem_.scene_obj8_frame() != 0x07)
 			return;
 		play_sfx(mem_, SFX_01A);
 		next_step();
@@ -210,7 +209,7 @@ void MapFunctions::magic_seed(const Seed &seed)
 		return;
 	case 6: { // .SeedFall
 		uint8_t dy = falling_offset(wOWFuncCounter);
-		Byte y = mem_[wSceneObj4YCoord];
+		Byte y = mem_.scene_obj4_y_coord();
 		y += dy;
 		if (y < seed.land_y)
 			return;
@@ -241,7 +240,7 @@ void MapFunctions::summon_snake(const Snake &snake)
 {
 	// .MoveNotes: a pixel a frame, until off the screen
 	if (mem_[snake.flag]) {
-		uint8_t x = --mem_[wSceneObj1XCoord];
+		uint8_t x = --mem_.scene_obj1_x_coord();
 		if (static_cast<uint8_t>(x + 0x18) >= 0xf0)
 			mem_[snake.flag] = 0;
 	}
@@ -269,7 +268,7 @@ void MapFunctions::summon_snake(const Snake &snake)
 		next_step();
 		return;
 	case 6: // .WaitNotesAndShowSnake
-		if (mem_[wSceneObj1XCoord] != snake.notes_x)
+		if (mem_.scene_obj1_x_coord() != snake.notes_x)
 			return;
 		set_state(snake_state, snake.state);
 		play_sfx(mem_, SFX_TEMPLE_ROCK);
@@ -306,17 +305,17 @@ void MapFunctions::fall_leaves()
 		next_step();
 		return;
 	case 6: // .StartLeaf1MovementAndPlaySFX
-		mem_[w2d12c] = 0x01;
+		mem_.unk_2d12c() = 0x01;
 		play_sfx(mem_, SFX_08E);
 		next_step();
 		return;
 	case 7: wait(8); return; // .Wait2
 	case 8: // .StartLeaf3Movement
-		mem_[w2d12e] = 0x01;
+		mem_.unk_2d12e() = 0x01;
 		next_step();
 		return;
 	case 9: // .WaitLeafMovement
-		if (!mem_[w2d12e])
+		if (!mem_.unk_2d12e())
 			next_step();
 		return;
 	case 10: wait(40); return; // .Wait3
@@ -388,12 +387,12 @@ void MapFunctions::crayon()
 		return;
 	case 3: { // .CrayonFall, with its shadow 6 above
 		uint8_t dy = falling_offset(wOWFuncCounter);
-		Byte y = mem_[wSceneObj5YCoord];
+		Byte y = mem_.scene_obj5_y_coord();
 		y += dy;
-		mem_[wSceneObj1YCoord] = static_cast<uint8_t>(y - 6);
+		mem_.scene_obj1_y_coord() = static_cast<uint8_t>(y - 6);
 		if (y < 0x40)
 			return;
-		mem_[wSceneObj1State] = 0;
+		mem_.scene_obj1_state() = 0;
 		play_sfx(mem_, SFX_014);
 		next_step();
 		return;
@@ -407,7 +406,7 @@ void MapFunctions::crayon()
 	case 7: wait(10); return; // .Wait3
 	case 8: { // .Scribble
 		move(wSceneObj5, ADDR_Data_b6294);
-		uint8_t scribble = mem_[wSceneObj5Unk7];
+		uint8_t scribble = mem_.scene_obj5_unk7();
 		if (scribble == 0x0a) {
 			play_sfx(mem_, SFX_12D);
 			return;
@@ -454,7 +453,7 @@ void MapFunctions::north_bottom_bar()
 	case 3: { // .RaiseBBtnIndicator: a pixel every 2 frames
 		if (wram_.ow_func_counter() & 1)
 			return;
-		Byte y = mem_[wSceneObj1];
+		Byte y = mem_.scene_obj1();
 		--y;
 		if (y != 0x94)
 			return;
@@ -465,7 +464,7 @@ void MapFunctions::north_bottom_bar()
 	case 4: wait(45); return; // .Wait2
 	case 5: { // .BlinkBBtnIndicator
 		uint8_t counter = wram_.ow_func_counter();
-		mem_[wSceneObj1State] = (counter & (1 << 3)) ? 0x23 : 0x22;
+		mem_.scene_obj1_state() = (counter & (1 << 3)) ? 0x23 : 0x22;
 		if (counter > 47)
 			next_step();
 		return;
@@ -473,18 +472,18 @@ void MapFunctions::north_bottom_bar()
 	case 6: // .StartOpenBottomBar
 		if (wram_.ow_func_counter() < 45)
 			return;
-		mem_[wSceneObj1State] = 0x23;
+		mem_.scene_obj1_state() = 0x23;
 		play_sfx(mem_, SFX_113);
 		next_step();
 		return;
 	case 7: wait(10); return; // .Wait3
 	case 8: { // .OpenBottomBar: up with the window, to 0x78
-		uint8_t wy = --mem_[wWY];
-		--mem_[wSceneObj1];
-		--mem_[wSceneObj5YCoord];
-		--mem_[wSceneObj8YCoord];
-		--mem_[wSceneObj9YCoord];
-		--mem_[wSceneObj10YCoord];
+		uint8_t wy = --mem_.wy();
+		--mem_.scene_obj1();
+		--mem_.scene_obj5_y_coord();
+		--mem_.scene_obj8_y_coord();
+		--mem_.scene_obj9_y_coord();
+		--mem_.scene_obj10_y_coord();
 		if (wy == 0x78)
 			next_step();
 		return;
@@ -519,16 +518,16 @@ void MapFunctions::show_button(uint16_t block)
 	constexpr uint16_t TILES = wAttrmap + 21 * TILEMAP_WIDTH;
 	constexpr uint16_t ATTRS = wAttrmap + 19 * TILEMAP_WIDTH;
 	constexpr uint16_t BG_MAP = v0BGMap0 + 30 * TILEMAP_WIDTH;
-	mem_[wHDMASourceHi] = static_cast<uint8_t>(TILES >> 8);
-	mem_[wHDMASourceLo] = static_cast<uint8_t>(TILES);
-	mem_[wHDMADestHi] = static_cast<uint8_t>((BG_MAP >> 8) - 0x80);
-	mem_[wHDMADestLo] = static_cast<uint8_t>(BG_MAP);
-	mem_[wHDMAMode] = 2 * 2 - 1; // 2 dma_rows
-	mem_[w2d0b5SourceHi] = static_cast<uint8_t>(ATTRS >> 8);
-	mem_[w2d0b5SourceLo] = static_cast<uint8_t>(ATTRS);
-	mem_[w2d0b5DestHi] = static_cast<uint8_t>((BG_MAP >> 8) - 0x80);
-	mem_[w2d0b5DestLo] = static_cast<uint8_t>(BG_MAP);
-	mem_[w2d0b5Mode] = 2 * 2 - 1;
+	mem_.hdma_source_hi() = static_cast<uint8_t>(TILES >> 8);
+	mem_.hdma_source_lo() = static_cast<uint8_t>(TILES);
+	mem_.hdma_dest_hi() = static_cast<uint8_t>((BG_MAP >> 8) - 0x80);
+	mem_.hdma_dest_lo() = static_cast<uint8_t>(BG_MAP);
+	mem_.hdma_mode() = 2 * 2 - 1; // 2 dma_rows
+	mem_.unk_2d0b5_source_hi() = static_cast<uint8_t>(ATTRS >> 8);
+	mem_.unk_2d0b5_source_lo() = static_cast<uint8_t>(ATTRS);
+	mem_.unk_2d0b5_dest_hi() = static_cast<uint8_t>((BG_MAP >> 8) - 0x80);
+	mem_.unk_2d0b5_dest_lo() = static_cast<uint8_t>(BG_MAP);
+	mem_.unk_2d0b5_mode() = 2 * 2 - 1;
 }
 
 // NOWFunc_DayNightSpell: the top bar opens, its button blinks in, and
@@ -549,14 +548,14 @@ void MapFunctions::day_night_spell()
 		next_step();
 	};
 	auto pressed = [this](uint8_t frame) { // .WaitDayButtonPress / .WaitNightButtonPress
-		if (mem_[wSceneObj5Frame] != frame)
+		if (mem_.scene_obj5_frame() != frame)
 			return;
 		show_button(VISIBLE);
 		next_step();
 	};
 	auto transition = [this] { // .DayNightTransition
 		routines_.farcall(BANK_Func_84c0d, ADDR_Func_84c0d);
-		if (mem_[wOWPalTransitionState])
+		if (mem_.ow_pal_transition_state())
 			return;
 		gb_->cpu.ime = false; // di
 		routines_.in_bank(BANK_VBlank_Overworld, ADDR_VBlank_Overworld, [&] { set_vblank_overworld(gb_); });
@@ -576,7 +575,7 @@ void MapFunctions::day_night_spell()
 	case 1: wait(30); return; // .Wait1
 	case 2: wait_level_name(); return;
 	case 4: { // .OpenTopBar: 2 a frame
-		Byte scy = mem_[wSCY];
+		Byte scy = mem_.scy();
 		scy -= 2;
 		if (scy == 0xec)
 			next_step();
@@ -610,8 +609,8 @@ void MapFunctions::prologue()
 
 	shake();
 	routines_.farcall(BANK_Func_15868e, ADDR_Func_15868e);
-	if (mem_[wOWUIObj2Attributes]) { // .Func_b59e5
-		Byte wind = mem_[wOWUIObj2Duration];
+	if (mem_.owui_obj2_attributes()) { // .Func_b59e5
+		Byte wind = mem_.owui_obj2_duration();
 		++wind;
 		if (wind == 0x01)
 			play_sfx(mem_, SFX_08E);
@@ -623,25 +622,25 @@ void MapFunctions::prologue()
 	case 1: // .Func_b5949
 		if (wram_.ow_func_counter() < 60)
 			return;
-		mem_[wOWUIObj1YCoord] = 0x01;
+		mem_.owui_obj1_y_coord() = 0x01;
 		quake(true);
 		next_step();
 		return;
 	case 2: // .Func_b5965
 		if (wram_.ow_func_counter() < 134)
 			return;
-		mem_[wOWUIObj1YCoord] = 0x04;
+		mem_.owui_obj1_y_coord() = 0x04;
 		next_step();
 		return;
 	case 3: // .Func_b5973
-		if (mem_[wOWUIObj1YCoord] != 0x05)
+		if (mem_.owui_obj1_y_coord() != 0x05)
 			return;
 		set_state(wSceneObj1State, 0x2b);
 		play_sfx(mem_, SFX_061);
 		next_step();
 		return;
 	case 4: // .Func_b598c
-		if (mem_[wOWUIObj1YCoord])
+		if (mem_.owui_obj1_y_coord())
 			return;
 		quake(false);
 		next_step();
@@ -650,8 +649,8 @@ void MapFunctions::prologue()
 	case 6: // .Func_b59a5
 		if (wram_.ow_func_counter() < 6)
 			return;
-		mem_[w2d150] = 0x01;
-		mem_[wOWUIObj2Attributes] = 0x01;
+		mem_.unk_2d150() = 0x01;
+		mem_.owui_obj2_attributes() = 0x01;
 		next_step();
 		return;
 	case 7: note(wd153); return; // .Func_b59ca
@@ -661,7 +660,7 @@ void MapFunctions::prologue()
 	case 11: note(w2d151); return; // .Func_b59b6
 	case 12: case 13: wait(120); return; // .Func_b59d9
 	case 14: // .Func_b59de
-		mem_[wOWUIObj2Attributes] = 0;
+		mem_.owui_obj2_attributes() = 0;
 		finish();
 		return;
 	default: unrealistic(); return;
@@ -678,20 +677,20 @@ void MapFunctions::prologue()
 void MapFunctions::shake()
 {
 	shake_steps();
-	Byte phase = mem_[wOWUIObj1YCoord];
+	Byte phase = mem_.owui_obj1_y_coord();
 	if (!phase)
 		return;
-	++mem_[wOWUIObj1XCoord];
+	++mem_.owui_obj1_x_coord();
 	auto start = [&](uint8_t step) { // .asm_b7221
-		mem_[wOWUIObj1Frame] = step;
-		mem_[wOWUIObj1Attributes] = 0;
+		mem_.owui_obj1_frame() = step;
+		mem_.owui_obj1_attributes() = 0;
 		++phase;
-		mem_[wOWUIObj1XCoord] = 0;
+		mem_.owui_obj1_x_coord() = 0;
 	};
 	auto stop_at = [&](uint8_t step) { // .Func_b7231 / .Func_b7249
-		if (mem_[wOWUIObj1Frame] != step)
+		if (mem_.owui_obj1_frame() != step)
 			return;
-		mem_[wOWUIObj1Frame] = 0;
+		mem_.owui_obj1_frame() = 0;
 		phase = 0;
 	};
 	switch (phase) {
@@ -699,14 +698,14 @@ void MapFunctions::shake()
 	case 2: return; // .Func_b721e: on until told
 	case 3: stop_at(0x01); return; // .Func_b7231
 	case 4: // .Func_b723f: the big one, at the small one's end
-		if (mem_[wOWUIObj1Frame] == 0x01)
+		if (mem_.owui_obj1_frame() == 0x01)
 			start(0x11);
 		return;
 	case 5: case 7: stop_at(0x11); return; // .Func_b7249
 	case 6: start(0x11); return; // .Func_b7245
 	case 8: start(0x15); return; // .Func_b7257: side to side
 	case 9: case 11: // .Func_b725b / .Func_b7269: once it's done
-		if (!mem_[wOWUIObj1Frame])
+		if (!mem_.owui_obj1_frame())
 			phase = 0;
 		return;
 	case 10: start(0x1e); return; // .Func_b7265: the small side to side
@@ -766,10 +765,10 @@ void MapFunctions::shake_steps()
 		{0, 0, 0, 3, 0, false},
 		{0, 1, 0, 0, 0, true}, // .Func_b7371
 	};
-	Byte step = mem_[wOWUIObj1Frame];
+	Byte step = mem_.owui_obj1_frame();
 	if (!step)
 		return;
-	Byte frames = mem_[wOWUIObj1Attributes];
+	Byte frames = mem_.owui_obj1_attributes();
 	++frames;
 	uint8_t i = step - 1;
 	if (i >= sizeof(STEPS) / sizeof(STEPS[0])) {
@@ -784,8 +783,8 @@ void MapFunctions::shake_steps()
 	} else {
 		if (s.sfx)
 			play_sfx(mem_, s.sfx);
-		mem_[wSCY] += static_cast<uint8_t>(s.scy);
-		mem_[wSCX] += static_cast<uint8_t>(s.scx);
+		mem_.scy() += static_cast<uint8_t>(s.scy);
+		mem_.scx() += static_cast<uint8_t>(s.scx);
 	}
 	frames = 0; // .asm_b7304
 	++step;
@@ -799,7 +798,7 @@ void MapFunctions::shake_steps()
 // Func_b5868: a block of the map's tiles to update (Func_854ee's data)
 void MapFunctions::tile_update(uint16_t data)
 {
-	mem_[wOWPendingTileUpdate] = TRUE;
+	mem_.ow_pending_tile_update() = TRUE;
 	routines_.in_bank(BANK_Func_854ee, ADDR_Func_854ee, [&] { Palettes(gb_).update_tiles(data); });
 }
 
@@ -808,7 +807,7 @@ void MapFunctions::rain()
 {
 	rain_pals();
 	// .PlayThunderSFX: every 0x1a frames while w2d13f
-	Byte thunder = mem_[w2d13f];
+	Byte thunder = mem_.unk_2d13f();
 	if (thunder) {
 		++thunder;
 		if (thunder >= 0x1b) {
@@ -820,7 +819,7 @@ void MapFunctions::rain()
 	case 0: next_step(); return;
 	case 1: // .InitPalConfig
 		wram_.pal_config1_total_steps() = 0x5a;
-		mem_[w2d13f] = 0x01;
+		mem_.unk_2d13f() = 0x01;
 		next_step();
 		return;
 	case 2: wait(180); return; // .Wait1
@@ -829,7 +828,7 @@ void MapFunctions::rain()
 		next_step();
 		return;
 	case 4: // .WaitRainClouds
-		if (mem_[wSceneObj15Frame] == 0x0e)
+		if (mem_.scene_obj15_frame() == 0x0e)
 			next_step();
 		return;
 	case 5: // .FillPool
@@ -844,7 +843,7 @@ void MapFunctions::rain()
 		if (steps < 0x3c)
 			return;
 		steps = 0;
-		mem_[w2d13f] = 0;
+		mem_.unk_2d13f() = 0;
 		set_state(wSceneObj14State, 0x04);
 		next_step();
 		return;
@@ -897,7 +896,7 @@ void MapFunctions::clear_tornado()
 	case 0: next_step(); return;
 	case 1: { // .ShowTornado
 		update_tornado();
-		uint8_t moving = mem_[wSceneObj1Unk7];
+		uint8_t moving = mem_.scene_obj1_unk7();
 		if (moving == 0x01) {
 			play_sfx(mem_, SFX_11D);
 			return;
@@ -962,11 +961,11 @@ void MapFunctions::load_one_pal(uint8_t bank, uint16_t pals, uint8_t pal)
 {
 	uint16_t dest = static_cast<uint16_t>(wTempPals1 + pal * PAL_SIZE);
 	home::copy_far_bytes(gb_, bank, static_cast<uint16_t>(pals + pal * PAL_SIZE), dest, PAL_SIZE);
-	mem_[wPalConfig1] = static_cast<uint8_t>(rBGPI);
-	mem_[wPalConfig1Index] = BGPI_AUTOINC | (pal * PAL_SIZE);
-	mem_[wPalConfig1Number] = 1;
-	mem_[wPalConfig1SourceHi] = static_cast<uint8_t>(dest >> 8);
-	mem_[wPalConfig1SourceLo] = static_cast<uint8_t>(dest);
+	mem_.pal_config1() = static_cast<uint8_t>(rBGPI);
+	mem_.pal_config1_index() = BGPI_AUTOINC | (pal * PAL_SIZE);
+	mem_.pal_config1_number() = 1;
+	mem_.pal_config1_source_hi() = static_cast<uint8_t>(dest >> 8);
+	mem_.pal_config1_source_lo() = static_cast<uint8_t>(dest);
 }
 
 // Func_b69a6: colours at colours to the flash's white
@@ -982,11 +981,11 @@ void MapFunctions::flash(uint16_t colours, uint8_t count)
 // shaking object's script, the two scene objects' and w2d03e's quake
 void MapFunctions::start_shaking(uint8_t script)
 {
-	mem_[wOWUIObj1YCoord] = script;
+	mem_.owui_obj1_y_coord() = script;
 	set_state(wSceneObj11State, 0x17);
 	set_state(wSceneObj10State, 0x19);
-	mem_[w2d049] = 0x01;
-	mem_[w2d03e] = 0x03;
+	mem_.unk_2d049() = 0x01;
+	mem_.unk_2d03e() = 0x03;
 	mem_[w2d03e + 1] = 0;
 	mem_[w2d03e + 2] = 0;
 }
@@ -994,18 +993,18 @@ void MapFunctions::start_shaking(uint8_t script)
 void MapFunctions::stop_shaking()
 {
 	set_state(wSceneObj10State, 0x1a);
-	mem_[w2d03e] = 0x0e;
+	mem_.unk_2d03e() = 0x0e;
 	mem_[w2d03e + 1] = 0;
 	mem_[w2d03e + 2] = 0;
-	mem_[w2d049] = 0;
+	mem_.unk_2d049() = 0;
 }
 
 // Func_b6055: the thunder every 0x1a frames while wOWUIObj2Attributes
 void MapFunctions::rumble()
 {
-	if (!mem_[wOWUIObj2Attributes])
+	if (!mem_.owui_obj2_attributes())
 		return;
-	Byte frames = mem_[wOWUIObj2Duration];
+	Byte frames = mem_.owui_obj2_duration();
 	++frames;
 	if (frames < 0x1a)
 		return;
@@ -1059,14 +1058,14 @@ void MapFunctions::west_earthquake()
 	case 3: wait_level_name(); return;
 	case 4: wait(16); return;
 	case 5: // .Func_b5c94
-		mem_[wOWUIObj1Duration] = 0x01;
+		mem_.owui_obj1_duration() = 0x01;
 		start_shaking(0x01);
 		next_step();
 		return;
 	case 6: wait(120); return; // .WaitShake
 	case 7: // .Func_b5cc4
-		mem_[wOWUIObj1Duration] = 0;
-		mem_[wOWUIObj1YCoord] = 0x03;
+		mem_.owui_obj1_duration() = 0;
+		mem_.owui_obj1_y_coord() = 0x03;
 		set_state(wSceneObj11State, 0x18);
 		stop_shaking();
 		next_step();
@@ -1097,10 +1096,10 @@ void MapFunctions::crumble_cliffs()
 		{wSceneObj14State, 0x14}, // .Func_b5d3e
 		{wSceneObj12State, 0x15}, // .Func_b5d48
 	};
-	Byte phase = mem_[wOWUIObj1Duration];
+	Byte phase = mem_.owui_obj1_duration();
 	if (!phase)
 		return;
-	Byte frames = mem_[wOWUIObj1FramesetOffset];
+	Byte frames = mem_.owui_obj1_frameset_offset();
 	++frames;
 	uint8_t i = phase - 1;
 	if (i == 8) { // .Func_b5d5a
@@ -1158,22 +1157,22 @@ void MapFunctions::west_volcano()
 	case 3: wait(58); return; // .Func_b5dd2
 	case 4: // .Func_b5dd7: the smoke, and palette 5's colour 0
 		set_state(wSceneObj11State, 0x1f);
-		mem_[wSceneObj11] = 0x10;
+		mem_.scene_obj11() = 0x10;
 		mem_[wSceneObj11 + 1] = 0x52;
-		mem_[wPalConfig1Index] = BGPI_AUTOINC | (5 * PAL_SIZE);
-		mem_[wPalConfig1Number] = 1;
-		mem_[wPalConfig1SourceHi] = 0xc1;
-		mem_[wPalConfig1SourceLo] = 0x28;
+		mem_.pal_config1_index() = BGPI_AUTOINC | (5 * PAL_SIZE);
+		mem_.pal_config1_number() = 1;
+		mem_.pal_config1_source_hi() = 0xc1;
+		mem_.pal_config1_source_lo() = 0x28;
 		next_step();
 		return;
 	case 5: // .Func_b5dfa
-		if (!mem_[wSceneObj11State])
+		if (!mem_.scene_obj11_state())
 			next_step();
 		return;
 	case 6: // .Func_b5e02
 		if (wram_.ow_func_counter() < 6)
 			return;
-		mem_[wOWUIObj1YCoord] = 0x04;
+		mem_.owui_obj1_y_coord() = 0x04;
 		next_step();
 		return;
 	case 7: // .Func_b5e10: the flash
@@ -1184,14 +1183,14 @@ void MapFunctions::west_volcano()
 		flash(wTempOBPals, 4 * PAL_SIZE);
 		pal_config(wPalConfig1, static_cast<uint8_t>(rBGPI), wTempBGPals);
 		pal_config(wPalConfig2, static_cast<uint8_t>(rOBPI), wTempOBPals);
-		mem_[wOWUIObj2Attributes] = 0x01;
+		mem_.owui_obj2_attributes() = 0x01;
 		next_step();
 		return;
 	case 8: // .Func_b5e73: the eruption
 		if (wram_.ow_func_counter() < 8)
 			return;
 		set_state(wSceneObj11State, 0x1b);
-		mem_[wSceneObj11] = 0x10;
+		mem_.scene_obj11() = 0x10;
 		mem_[wSceneObj11 + 1] = 0x54;
 		tile_update(ADDR_Data_85536);
 		pal_config(wPalConfig1, static_cast<uint8_t>(rBGPI), wTempPals1);
@@ -1205,27 +1204,27 @@ void MapFunctions::west_volcano()
 	case 13: throw_rock(20, w2d122, 0x03); return; // .Func_b5eee
 	case 14: throw_rock(38, w2d126, 0x01); return; // .Func_b5efb
 	case 15: // .Func_b5f08
-		if (!mem_[w2d126])
+		if (!mem_.unk_2d126())
 			next_step();
 		return;
 	case 16: wait(16); return; // .Func_b5f10
 	case 17: // .Func_b5f15
-		mem_[wOWUIObj1YCoord] = 0x08;
+		mem_.owui_obj1_y_coord() = 0x08;
 		set_state(wSceneObj10State, 0x19);
-		mem_[w2d049] = 0x01;
-		mem_[w2d03e] = 0x03;
+		mem_.unk_2d049() = 0x01;
+		mem_.unk_2d03e() = 0x03;
 		mem_[w2d03e + 1] = 0;
 		mem_[w2d03e + 2] = 0;
 		next_step();
 		return;
 	case 18: // .Func_b5f33
-		if (mem_[wOWUIObj1Frame] != 0x1b)
+		if (mem_.owui_obj1_frame() != 0x1b)
 			return;
 		stop_shaking();
 		next_step();
 		return;
 	case 19: // .Func_b5f50
-		if (!mem_[wOWUIObj1YCoord])
+		if (!mem_.owui_obj1_y_coord())
 			next_step();
 		return;
 	case 20: wait(24); return; // .Func_b5da7
@@ -1239,7 +1238,7 @@ void MapFunctions::west_volcano()
 void MapFunctions::red_music_box()
 {
 	// .Func_b608a
-	Byte thunder = mem_[wSceneObj6Unk7];
+	Byte thunder = mem_.scene_obj6_unk7();
 	if (thunder) {
 		if (thunder == 0x01)
 			play_sfx(mem_, SFX_076);
@@ -1258,13 +1257,13 @@ void MapFunctions::red_music_box()
 	case 4: // .Func_b60ba
 		set_state(wSceneObj6State, 0x20);
 		tile_update(ADDR_Data_8556e);
-		mem_[wSceneObj6Unk7] = 0x01;
+		mem_.scene_obj6_unk7() = 0x01;
 		next_step();
 		return;
 	case 5: wait(23); return; // .Func_b60d0
 	case 6: // .Func_b60d5
 		set_state(wSceneObj6State, 0x21);
-		--mem_[wSceneObj6];
+		--mem_.scene_obj6();
 		next_step();
 		return;
 	case 7: wait(10); return; // .Func_b60e4
@@ -1275,7 +1274,7 @@ void MapFunctions::red_music_box()
 	case 9: // .Func_b60f4
 		if (wram_.ow_func_counter() < 106)
 			return;
-		mem_[wSceneObj6Unk7] = 0;
+		mem_.scene_obj6_unk7() = 0;
 		next_step();
 		return;
 	case 10: finish(); return;
@@ -1350,8 +1349,8 @@ void MapFunctions::canyon_thunder()
 		wait(54);
 		return;
 	case 6: // .Func_b6801
-		mem_[wSceneObj2YCoord] = 0x56;
-		mem_[wSceneObj2XCoord] = 0x47;
+		mem_.scene_obj2_y_coord() = 0x56;
+		mem_.scene_obj2_x_coord() = 0x47;
 		strike(wSceneObj2State, 0x17);
 		return;
 	case 7: // .Func_b6810
@@ -1361,11 +1360,11 @@ void MapFunctions::canyon_thunder()
 		return;
 	case 8: wait(30); return; // .Func_b681b
 	case 9: // .Func_b6820
-		mem_[w2d124] = 0x01;
+		mem_.unk_2d124() = 0x01;
 		next_step();
 		return;
 	case 10: // .Func_b6828
-		if (mem_[w2d124] >= 0x07)
+		if (mem_.unk_2d124() >= 0x07)
 			next_step();
 		return;
 	case 11: wait(7); return; // .Func_b6831
@@ -1466,10 +1465,10 @@ void MapFunctions::canyon_bolts()
 		{wSceneObj1, 0x3e, 0x38, 0x12}, // .Func_b6942
 		{wSceneObj10, 0x3b, 0x1f, 0x12}, // .Func_b694c
 	};
-	Byte bolt = mem_[w2d124];
+	Byte bolt = mem_.unk_2d124();
 	if (!bolt)
 		return;
-	Byte frames = mem_[w2d125];
+	Byte frames = mem_.unk_2d125();
 	++frames;
 	uint8_t i = bolt - 1;
 	if (i == 10) { // .Func_b6960
@@ -1507,7 +1506,7 @@ void MapFunctions::canyon_bolts()
 // z flag (down to 0, or up to 0x48); a, their a.
 MapFunctions::Bob MapFunctions::bob_tower(uint8_t period, uint8_t step_mask)
 {
-	Byte y = mem_[wSceneObj3YCoord];
+	Byte y = mem_.scene_obj3_y_coord();
 	uint8_t c = wram_.global_counter() & period;
 	if (!c) { // .asm_b6a28
 		uint8_t old = y;
@@ -1535,8 +1534,8 @@ void MapFunctions::raise_tower()
 	case 4: case 5: case 6: // .RaiseTower
 		if (!bob_tower(0x07, 0x01).zero)
 			return;
-		mem_[wSceneObj3YCoord] += 0x10;
-		set_state(wSceneObj3State, static_cast<uint8_t>(mem_[wSceneObj3State] + 1));
+		mem_.scene_obj3_y_coord() += 0x10;
+		set_state(wSceneObj3State, static_cast<uint8_t>(mem_.scene_obj3_state() + 1));
 		next_step();
 		return;
 	case 7: // .FinishRaiseTower
@@ -1595,7 +1594,7 @@ bool MapFunctions::blow_gusts(uint16_t flag, uint16_t obj)
 void MapFunctions::fan()
 {
 	// .Func_b6af2
-	Byte gusts1 = mem_[w2d122];
+	Byte gusts1 = mem_.unk_2d122();
 	if (gusts1 && blow_gusts(w2d122, wSceneObj1)) {
 		if (gusts1 == 7) { // .Func_b6b3b
 			set_state(wSceneObj1State, 0x00);
@@ -1605,16 +1604,16 @@ void MapFunctions::fan()
 		}
 	}
 	// .Func_b6b48
-	Byte gusts2 = mem_[w2d124];
+	Byte gusts2 = mem_.unk_2d124();
 	if (gusts2 && blow_gusts(w2d124, wSceneObj2)) {
-		Byte frames = mem_[w2d125];
+		Byte frames = mem_.unk_2d125();
 		switch (gusts2) {
 		case 7: // .Func_b6b95
 			set_state(wSceneObj2State, 0x00);
 			++gusts2;
 			break;
 		case 8: // .Func_b6ba2: the fan stops
-			if (mem_[wSceneObj8Frame] != 0x4a)
+			if (mem_.scene_obj8_frame() != 0x4a)
 				break;
 			set_state(wSceneObj8State, 0x19);
 			++gusts2;
@@ -1642,17 +1641,17 @@ void MapFunctions::fan()
 		return;
 	case 3: wait(24); return; // .Func_b6aa3
 	case 4: // .Func_b6aa8
-		mem_[w2d122] = 0x01;
+		mem_.unk_2d122() = 0x01;
 		next_step();
 		return;
 	case 5: // .Func_b6ab0
 		if (wram_.ow_func_counter() != 0x0a)
 			return;
-		mem_[w2d124] = 0x01;
+		mem_.unk_2d124() = 0x01;
 		next_step();
 		return;
 	case 6: // .Func_b6abe
-		if (mem_[wSceneObj9Frame] != 0x21)
+		if (mem_.scene_obj9_frame() != 0x21)
 			return;
 		set_state(wSceneObj9State, 0x11);
 		next_step();
@@ -1663,14 +1662,14 @@ void MapFunctions::fan()
 		if (counter != 0x08)
 			return;
 		counter = 0;
-		Byte y = mem_[wSceneObj9YCoord];
+		Byte y = mem_.scene_obj9_y_coord();
 		--y;
 		if (y == 0x45)
 			next_step();
 		return;
 	}
 	case 9: // .Func_b6aea
-		if (!mem_[w2d124])
+		if (!mem_.unk_2d124())
 			next_step();
 		return;
 	case 10: wait(20); return; // .Func_b6a8b
@@ -1682,10 +1681,10 @@ void MapFunctions::fan()
 // w2d03e and w2d049: the map's quake on (from 3) or off (from 0x0e)
 void MapFunctions::quake(bool on)
 {
-	mem_[w2d03e] = on ? 0x03 : 0x0e;
+	mem_.unk_2d03e() = on ? 0x03 : 0x0e;
 	mem_[w2d03e + 1] = 0;
 	mem_[w2d03e + 2] = 0;
-	mem_[w2d049] = on ? 0x01 : 0x00;
+	mem_.unk_2d049() = on ? 0x01 : 0x00;
 }
 
 // SOWFunc_Earthquake: the ground shakes and the rocks (scene object 2)
@@ -1705,7 +1704,7 @@ void MapFunctions::south_earthquake()
 	case 3: wait_level_name(); return;
 	case 4: wait(16); return;
 	case 5: // .Func_b6c5d
-		mem_[wOWUIObj1YCoord] = 0x01;
+		mem_.owui_obj1_y_coord() = 0x01;
 		quake(true);
 		next_step();
 		return;
@@ -1717,12 +1716,12 @@ void MapFunctions::south_earthquake()
 		return;
 	case 8: wait_state(wSceneObj2State, 0); return; // .Func_b6c91
 	case 9: // .Func_b6c97
-		mem_[wSceneObj2YCoord] += 0x02;
-		mem_[wSceneObj2XCoord] += 0xfe;
+		mem_.scene_obj2_y_coord() += 0x02;
+		mem_.scene_obj2_x_coord() += 0xfe;
 		crumble();
 		return;
 	case 10: // .Func_b6ca4
-		mem_[wOWUIObj1YCoord] = 0x03;
+		mem_.owui_obj1_y_coord() = 0x03;
 		quake(false);
 		next_step();
 		return;
@@ -1768,8 +1767,8 @@ void MapFunctions::explosives()
 	};
 	// .asm_b6d76
 	auto blast_at = [&](int8_t dy, int8_t dx) {
-		mem_[wSceneObj2YCoord] = static_cast<uint8_t>(0x20 + dy);
-		mem_[wSceneObj2XCoord] = static_cast<uint8_t>(0x44 + dx);
+		mem_.scene_obj2_y_coord() = static_cast<uint8_t>(0x20 + dy);
+		mem_.scene_obj2_x_coord() = static_cast<uint8_t>(0x44 + dx);
 		blast(wSceneObj2State, 0x1c);
 	};
 
@@ -1798,9 +1797,9 @@ void MapFunctions::explosives()
 	case 14: blast(wSceneObj2State, 0x08); return; // .Func_b6d88
 	case 16: wait(20); return; // .Func_b6d92
 	case 17: // .Func_b6dcd: the hole's tiles
-		mem_[w2d0e0] = 0x03;
+		mem_.unk_2d0e0() = 0x03;
 		routines_.farcall(BANK_Func_852e5, ADDR_Func_852e5);
-		if (!mem_[w2d0e0])
+		if (!mem_.unk_2d0e0())
 			next_step();
 		return;
 	case 18: wait(10); return; // .Func_b6d97
@@ -1815,8 +1814,8 @@ void MapFunctions::explosives()
 	case 23: // .Func_b6db4
 		if (wram_.ow_func_counter() < 0x14)
 			return;
-		mem_[wSceneObj2YCoord] = 0x46;
-		mem_[wSceneObj2XCoord] = 0x50;
+		mem_.scene_obj2_y_coord() = 0x46;
+		mem_.scene_obj2_x_coord() = 0x50;
 		blast(wSceneObj2State, 0x22);
 		return;
 	case 24: wait(50); return; // .Func_b6d47
@@ -1839,7 +1838,7 @@ void MapFunctions::full_moon()
 	case 4: { // .MoveMoon
 		if (wram_.global_counter() & 0x07)
 			return;
-		--mem_[wSceneObj14];
+		--mem_.scene_obj14();
 		Byte x = mem_[wSceneObj14 + 1];
 		++x;
 		if (x == 0x7b)
@@ -1883,7 +1882,7 @@ void MapFunctions::send_seeds()
 	case 3: case 5: case 7: wait(30); return; // .WaitShowSeed
 	case 4: show(wSceneObj2State); return; // .ShowSeed2
 	case 6: // .ShowSeed3
-		mem_[w2d125] = 0x01;
+		mem_.unk_2d125() = 0x01;
 		show(wSceneObj3State);
 		return;
 	case 8: // .PlayFlyingSFX
@@ -1891,36 +1890,36 @@ void MapFunctions::send_seeds()
 		next_step();
 		return;
 	case 9: { // .MoveSeeds
-		if (mem_[w2d125]) { // .MoveSeed2
+		if (mem_.unk_2d125()) { // .MoveSeed2
 			uint8_t dx = seed_x_offset(w2d125);
-			mem_[wSceneObj2XCoord] -= dx;
-			Byte y = mem_[wSceneObj2YCoord];
+			mem_.scene_obj2_x_coord() -= dx;
+			Byte y = mem_.scene_obj2_y_coord();
 			y -= 3;
 			if (y == 0x1a) {
-				mem_[w2d129] = 0x01;
+				mem_.unk_2d129() = 0x01;
 				play_sfx(mem_, SFX_07F);
 			} else if (y >= 0xf0) {
-				mem_[w2d125] = 0;
+				mem_.unk_2d125() = 0;
 			}
 		}
-		if (mem_[w2d129]) { // .MoveSeed1
-			Byte y = mem_[wSceneObj4YCoord];
+		if (mem_.unk_2d129()) { // .MoveSeed1
+			Byte y = mem_.scene_obj4_y_coord();
 			y -= 3;
 			if (y == 0x1a) {
-				mem_[w2d127] = 0x01;
+				mem_.unk_2d127() = 0x01;
 				play_sfx(mem_, SFX_07F);
 			} else if (y >= 0xf0) {
-				mem_[w2d129] = 0;
+				mem_.unk_2d129() = 0;
 			}
 		}
-		if (mem_[w2d127]) { // .MoveSeed3
+		if (mem_.unk_2d127()) { // .MoveSeed3
 			uint8_t dx = seed_x_offset(w2d127);
-			mem_[wSceneObj3XCoord] += dx;
-			mem_[wSceneObj3YCoord] -= 3;
+			mem_.scene_obj3_x_coord() += dx;
+			mem_.scene_obj3_y_coord() -= 3;
 		}
-		if (mem_[wSceneObj3XCoord] < 0xf0)
+		if (mem_.scene_obj3_x_coord() < 0xf0)
 			return;
-		mem_[w2d127] = 0;
+		mem_.unk_2d127() = 0;
 		next_step();
 		return;
 	}
@@ -1964,7 +1963,7 @@ void MapFunctions::freeze_tiles(uint16_t base, uint16_t offset, uint8_t bank, ui
 	mem_[base + 6] = static_cast<uint8_t>(target);
 	mem_[base + 7] = static_cast<uint8_t>(target >> 8);
 	routines_.farcall(bank, update);
-	mem_[wOWPendingTileUpdate] = TRUE;
+	mem_.ow_pending_tile_update() = TRUE;
 }
 
 // EOWFunc_FreezeSea: the sea freezes over in three streams of tiles while
@@ -1975,19 +1974,19 @@ void MapFunctions::freeze_sea()
 
 	// .Func_b6f77: the boat, 2 right a frame, rising a pixel every 4 once
 	// past 0x60, until off the screen
-	Byte boat = mem_[wSceneObj1Unk7];
+	Byte boat = mem_.scene_obj1_unk7();
 	if (boat == 1) {
-		mem_[w2d122] = 0;
+		mem_.unk_2d122() = 0;
 		++boat;
 	} else if (boat == 2) {
-		uint8_t frame = ++mem_[w2d122];
-		Byte x = mem_[wSceneObj1XCoord];
+		uint8_t frame = ++mem_.unk_2d122();
+		Byte x = mem_.scene_obj1_x_coord();
 		x += 2;
 		uint8_t right = static_cast<uint8_t>(x + 0x18);
 		if (right >= 0xc0)
 			boat = 0;
 		else if (right >= 0x78 && !(frame & 0x03))
-			--mem_[wSceneObj1YCoord];
+			--mem_.scene_obj1_y_coord();
 	}
 	freeze_tiles(wOWUIObj1, 0, BANK_Func_85a68, ADDR_Func_85a68); // .Func_b6fae
 	freeze_tiles(w2d150, 0x280, BANK_Func_85acb, ADDR_Func_85acb); // .Func_b7056
@@ -2010,8 +2009,8 @@ void MapFunctions::freeze_sea()
 		next_step();
 		return;
 	case 3: // .Func_b6f00
-		mem_[w2d046] = 0;
-		mem_[wSceneObj1Unk7] = 0x01;
+		mem_.unk_2d046() = 0;
+		mem_.scene_obj1_unk7() = 0x01;
 		next_step();
 		return;
 	case 4: wait(14); return; // .Func_b6f0c
@@ -2028,7 +2027,7 @@ void MapFunctions::freeze_sea()
 			start_tiles(wOWUIObj2);
 		return;
 	case 8: // .Func_b6f4a
-		if (!mem_[wSceneObj1Unk7])
+		if (!mem_.scene_obj1_unk7())
 			next_step();
 		return;
 	case 9: wait(60); return; // .Func_b6eea
@@ -2044,7 +2043,7 @@ void MapFunctions::east_earthquake()
 	auto sink = [this](uint8_t frames) { // .Func_b7188 to .Func_b71bc
 		if (wram_.ow_func_counter() < frames)
 			return;
-		++mem_[wSceneObj6YCoord];
+		++mem_.scene_obj6_y_coord();
 		next_step();
 	};
 
@@ -2062,7 +2061,7 @@ void MapFunctions::east_earthquake()
 				mem_[attr] |= 1 << B_BG_PRIO;
 			}
 		}
-		mem_[wOWPendingTileUpdate] = TRUE;
+		mem_.ow_pending_tile_update() = TRUE;
 		next_step();
 		return;
 	case 6: // .Func_b7160
@@ -2071,7 +2070,7 @@ void MapFunctions::east_earthquake()
 		return;
 	case 7: wait(10); return; // .Func_b716b
 	case 8: // .Func_b7170
-		mem_[wOWUIObj1YCoord] = 0x01;
+		mem_.owui_obj1_y_coord() = 0x01;
 		set_state(wSceneObj15State, 0x06);
 		set_state(wSceneObj6State, 0x04);
 		next_step();
@@ -2082,7 +2081,7 @@ void MapFunctions::east_earthquake()
 	case 12: sink(0x18); return;
 	case 13: sink(0x14); return;
 	case 14: // .Func_b71c9
-		mem_[wOWUIObj1YCoord] = 0x03;
+		mem_.owui_obj1_y_coord() = 0x03;
 		set_state(wSceneObj15State, 0x07);
 		next_step();
 		return;
@@ -2091,7 +2090,7 @@ void MapFunctions::east_earthquake()
 		next_step();
 		return;
 	case 16: // .Func_b71e4
-		if (mem_[wSceneObj6Frame] == 0x09)
+		if (mem_.scene_obj6_frame() == 0x09)
 			next_step();
 		return;
 	case 17: // .Func_b71ed
@@ -2111,11 +2110,11 @@ void MapFunctions::east_earthquake()
 void MapFunctions::burn_vines()
 {
 	// .Func_b77ce
-	Byte frames = mem_[w2d123];
+	Byte frames = mem_.unk_2d123();
 	++frames;
 	if (frames >= 0x0f) {
 		frames = 0;
-		switch (mem_[wSceneObj1State]) {
+		switch (mem_.scene_obj1_state()) {
 		case 0x15: play_sfx(mem_, SFX_126); break;
 		case 0x16: play_sfx(mem_, SFX_125); break;
 		case 0x14: play_sfx(mem_, SFX_01E); break;
@@ -2175,7 +2174,7 @@ void MapFunctions::raise_pipe()
 	case 3: wait_level_name(); return;
 	case 4: wait(16); return;
 	case 5: // .Func_b78b4
-		mem_[wSceneObj8] = 0x37;
+		mem_.scene_obj8() = 0x37;
 		set_state(wSceneObj8State, 0x1d);
 		next_step();
 		return;
@@ -2200,7 +2199,7 @@ void MapFunctions::daytime()
 	case 1: wait(60); return; // .Func_b78eb
 	case 2: // .Func_b78f5
 		routines_.farcall(BANK_Func_84b97, ADDR_Func_84b97);
-		if (mem_[wOWPalTransitionState])
+		if (mem_.ow_pal_transition_state())
 			return;
 		gb_->cpu.ime = false; // di
 		routines_.in_bank(BANK_VBlank_OWScene, ADDR_VBlank_OWScene, [&] { set_vblank_ow_scene(gb_); });
@@ -2220,22 +2219,22 @@ void MapFunctions::daytime()
 void MapFunctions::castle_pals()
 {
 	static constexpr uint16_t STEPS = ADDR_EOWFunc_FormCastle + 0x1bb; // .data
-	Byte phase = mem_[wOWUIObj2YCoord];
+	Byte phase = mem_.owui_obj2_y_coord();
 	if (!phase)
 		return;
-	Byte frames = mem_[wOWUIObj2XCoord];
+	Byte frames = mem_.owui_obj2_x_coord();
 	++frames;
-	uint16_t lengths = static_cast<uint16_t>(STEPS + static_cast<uint8_t>(mem_[wOWUIObj2Frame] * 2));
+	uint16_t lengths = static_cast<uint16_t>(STEPS + static_cast<uint8_t>(mem_.owui_obj2_frame() * 2));
 	switch (phase) {
 	case 1: // .asm_b74df: the configs, waiting for their registers
-		mem_[wPalConfig1Index] = BGPI_AUTOINC | 0;
-		mem_[wPalConfig1Number] = 6;
-		mem_[wPalConfig1SourceHi] = static_cast<uint8_t>(wTempBGPals >> 8);
-		mem_[wPalConfig1SourceLo] = static_cast<uint8_t>(wTempBGPals);
-		mem_[wPalConfig2Index] = BGPI_AUTOINC | 0;
-		mem_[wPalConfig2Number] = 6;
-		mem_[wPalConfig2SourceHi] = static_cast<uint8_t>(wTempPals1 >> 8);
-		mem_[wPalConfig2SourceLo] = static_cast<uint8_t>(wTempPals1);
+		mem_.pal_config1_index() = BGPI_AUTOINC | 0;
+		mem_.pal_config1_number() = 6;
+		mem_.pal_config1_source_hi() = static_cast<uint8_t>(wTempBGPals >> 8);
+		mem_.pal_config1_source_lo() = static_cast<uint8_t>(wTempBGPals);
+		mem_.pal_config2_index() = BGPI_AUTOINC | 0;
+		mem_.pal_config2_number() = 6;
+		mem_.pal_config2_source_hi() = static_cast<uint8_t>(wTempPals1 >> 8);
+		mem_.pal_config2_source_lo() = static_cast<uint8_t>(wTempPals1);
 		home::copy_far_bytes(gb_, BANK_Pals_84840, ADDR_Pals_84840, wTempBGPals, 6 * PAL_SIZE);
 		frames = 0; // .asm_b750a
 		++phase;
@@ -2243,19 +2242,19 @@ void MapFunctions::castle_pals()
 	case 2: // .asm_b7511: the castle's
 		if (frames < mem_[lengths])
 			return;
-		mem_[wPalConfig1] = static_cast<uint8_t>(rBGPI);
+		mem_.pal_config1() = static_cast<uint8_t>(rBGPI);
 		frames = 0;
 		++phase;
 		return;
 	case 3: // .asm_b7522: back to the map's
 		if (frames < mem_[static_cast<uint16_t>(lengths + 1)])
 			return;
-		mem_[wPalConfig2] = static_cast<uint8_t>(rBGPI);
+		mem_.pal_config2() = static_cast<uint8_t>(rBGPI);
 		frames = 0;
 		--phase;
 		return;
 	case 4: // .asm_b7539
-		mem_[wPalConfig2] = static_cast<uint8_t>(rBGPI);
+		mem_.pal_config2() = static_cast<uint8_t>(rBGPI);
 		phase = 0;
 		return;
 	}
@@ -2283,7 +2282,7 @@ void MapFunctions::form_castle()
 		return;
 	case 3: wait(40); return; // .Func_b73e1
 	case 4: // .Func_b73e6
-		mem_[w2d121] = 0x01;
+		mem_.unk_2d121() = 0x01;
 		next_step();
 		return;
 	case 5: { // .Func_b73ee: rising 3 frames of 4, the flicker starting
@@ -2291,13 +2290,13 @@ void MapFunctions::form_castle()
 		bool moving = wram_.ow_func_counter() & 0x03;
 		if (moving) // .Func_b741b
 			move(wSceneObj1YCoord, ADDR_Data_b64cd);
-		uint8_t rise = mem_[wSceneObj1Unk7];
+		uint8_t rise = mem_.scene_obj1_unk7();
 		if (rise == 0x30) {
 			if (moving)
-				mem_[wOWUIObj2YCoord] = 0x01;
+				mem_.owui_obj2_y_coord() = 0x01;
 		} else if (rise == 0x50 || !rise) { // .asm_b7410
 			if (moving)
-				++mem_[wOWUIObj2Frame];
+				++mem_.owui_obj2_frame();
 			if (!rise)
 				next_step();
 		}
@@ -2326,9 +2325,9 @@ void MapFunctions::form_castle()
 	case 17: { // .Func_b74b0: the flicker slows, and ends
 		uint8_t counter = wram_.ow_func_counter();
 		if (counter == 0x0a || counter == 0x14) {
-			--mem_[wOWUIObj2Frame];
+			--mem_.owui_obj2_frame();
 		} else if (counter == 0x21) {
-			mem_[wOWUIObj2YCoord] = 0x04;
+			mem_.owui_obj2_y_coord() = 0x04;
 			next_step();
 		}
 		return;
@@ -2399,9 +2398,9 @@ void MapFunctions::east_volcano()
 	// in wOWUIObj1Unk7)
 	fly_rock(LEFT_ROCK);
 	fly_rock(RIGHT_ROCK);
-	Byte thrower = mem_[wOWUIObj1State];
+	Byte thrower = mem_.owui_obj1_state();
 	if (thrower) {
-		Byte frames = mem_[wOWUIObj1Unk7];
+		Byte frames = mem_.owui_obj1_unk7();
 		++frames;
 		auto throw_rock = [&](uint8_t wait_frames, uint16_t flag, uint8_t phase) {
 			if (frames < wait_frames)
@@ -2434,22 +2433,22 @@ void MapFunctions::east_volcano()
 	switch (step()) {
 	case 0: next_step(); return;
 	case 1: // .Func_b75b6
-		mem_[wOWUIObj2Attributes] = 0x01;
+		mem_.owui_obj2_attributes() = 0x01;
 		next_step();
 		return;
 	case 2: // .Func_b75c3
-		mem_[wOWUIObj1YCoord] = 0x0a;
-		mem_[wOWUIObj1State] = 0x01;
+		mem_.owui_obj1_y_coord() = 0x0a;
+		mem_.owui_obj1_state() = 0x01;
 		next_step();
 		return;
 	case 3: // .Func_b75d0
-		if (!mem_[wOWUIObj1YCoord])
+		if (!mem_.owui_obj1_y_coord())
 			next_step();
 		return;
 	case 4: wait(56); return; // .Func_b75d8
 	case 5: // .Func_b75dd
 		play_sfx(mem_, SFX_127);
-		mem_[w2d134] = 0x01;
+		mem_.unk_2d134() = 0x01;
 		next_step();
 		return;
 	case 6: start(0x08, w2d13a); return;
@@ -2457,7 +2456,7 @@ void MapFunctions::east_volcano()
 	case 8: start(0x08, w2d138); return;
 	case 9: start(0x08, w2d13e); return;
 	case 10: // .Func_b7625
-		if (!mem_[w2d13e])
+		if (!mem_.unk_2d13e())
 			next_step();
 		return;
 	case 11: wait(180); return; // .Func_b75be

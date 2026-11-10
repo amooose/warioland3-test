@@ -30,7 +30,7 @@ void Cutscenes::explode_bombs()
 		wait(15);
 		break;
 	case 2: // .Func_9d58e
-		if (++mem_[wSceneObj3YCoord] != 0x3b)
+		if (++mem_.scene_obj3_y_coord() != 0x3b)
 			break;
 		play_sfx(mem_, SFX_SWITCH);
 		advance();
@@ -47,7 +47,7 @@ void Cutscenes::explode_bombs()
 		wait(70);
 		break;
 	case 6: // .Func_9d5be
-		if (mem_[wSceneObj2Frame] == 0x03)
+		if (mem_.scene_obj2_frame() == 0x03)
 			advance();
 		break;
 	case 7: // .Func_9d5c7
@@ -98,8 +98,8 @@ void Cutscenes::leaves_fall()
 	case 2: { // .Func_9dcac: down and right, on odd frames
 		if (!(frame() & 1))
 			break;
-		++mem_[wSceneObj2YCoord];
-		uint8_t x = ++mem_[wSceneObj2XCoord];
+		++mem_.scene_obj2_y_coord();
+		uint8_t x = ++mem_.scene_obj2_x_coord();
 		if (x == 0x2e) {
 			play_sfx(mem_, SFX_11D);
 			break;
@@ -111,7 +111,7 @@ void Cutscenes::leaves_fall()
 	case 3: // .Func_9dcca
 		if (frame() < 0x46)
 			break;
-		mem_[wSceneObj2State] = 0;
+		mem_.scene_obj2_state() = 0;
 		advance();
 		break;
 	case 4: // .Func_9dcd5
@@ -121,13 +121,13 @@ void Cutscenes::leaves_fall()
 		advance();
 		break;
 	case 5: // .Func_9dce4
-		if (mem_[wSceneObj3Frame] != 0x0a)
+		if (mem_.scene_obj3_frame() != 0x0a)
 			break;
 		play_sfx(mem_, SFX_FAT_WALK);
 		advance();
 		break;
 	case 6: // .Func_9dcf5
-		if (mem_[wSceneObj3State] == 0x03)
+		if (mem_.scene_obj3_state() == 0x03)
 			advance();
 		break;
 	case 7: // .Func_9dcfe
@@ -157,8 +157,8 @@ void Cutscenes::draw_func_9f423()
 			uint8_t now = mem_[state];
 			if (now == 0x02) {
 				// .Func_9f45a
-				uint8_t frame = mem_[wSceneObj3Frame];
-				Byte foot = mem_[wSceneObj3Unk7];
+				uint8_t frame = mem_.scene_obj3_frame();
+				Byte foot = mem_.scene_obj3_unk7();
 				if (frame == (foot ? 0x08 : 0x07)) {
 					foot = static_cast<uint8_t>(foot ^ 1);
 					play_sfx(mem_, SFX_FAT_WALK);
@@ -208,13 +208,13 @@ void Cutscenes::treasure_map()
 		advance();
 		break;
 	case 5: // .Func_9d631
-		if (mem_[wSceneObj2Frame] != 0x05)
+		if (mem_.scene_obj2_frame() != 0x05)
 			break;
 		play_sfx(mem_, SFX_107);
 		advance();
 		break;
 	case 6: // .Func_9d642
-		if (mem_[wSceneObj2State] == 0x02)
+		if (mem_.scene_obj2_state() == 0x02)
 			advance();
 		break;
 	case 7:
@@ -257,21 +257,21 @@ void Cutscenes::open_tree_mouth()
 		advance();
 		break;
 	case 2: { // .Func_9dbc9: right, off the screen
-		uint8_t x = ++mem_[wSceneObj3XCoord];
+		uint8_t x = ++mem_.scene_obj3_x_coord();
 		if (x == 0x30) {
 			play_sfx(mem_, SFX_128);
 			break;
 		}
 		if (x != SCREEN_WIDTH_PX)
 			break;
-		mem_[wSceneObj3State] = 0;
+		mem_.scene_obj3_state() = 0;
 		advance();
 		break;
 	}
 	case 3: // .Func_9dbe5
 		if (frame() < 0x46)
 			break;
-		++mem_[wSceneObj2YCoord];
+		++mem_.scene_obj2_y_coord();
 		set_state(wSceneObj2, 0x03);
 		advance();
 		break;
@@ -283,14 +283,14 @@ void Cutscenes::open_tree_mouth()
 		if (f >= 0x44)
 			f = 0x40;
 		uint8_t dy = mem_[static_cast<uint16_t>(ADDR_Cutscene24Func + 0x87 + f)];
-		Byte y = mem_[wSceneObj2YCoord];
+		Byte y = mem_.scene_obj2_y_coord();
 		y += dy;
 		if (y >= 0x88)
 			advance();
 		break;
 	}
 	case 6: // .Func_9dc63
-		mem_[wSceneObj2State] = 0;
+		mem_.scene_obj2_state() = 0;
 		advance();
 		break;
 	case 7:
@@ -370,11 +370,11 @@ void Cutscenes::cart_wheels()
 // when state 3's animation ends
 void Cutscenes::draw_cart()
 {
-	uint8_t state = mem_[wSceneObj2State];
+	uint8_t state = mem_.scene_obj2_state();
 	if (!state)
 		return;
 	uint16_t obj = animate(wSceneObj2State, frameset(ADDR_Func_9f2f3 + 0x2a, state), 0x1a);
-	if (mem_[wSceneObj2State] == 0x03 && wram_.ow_animation_finished() == 0xff) // .Func_9f30e
+	if (mem_.scene_obj2_state() == 0x03 && wram_.ow_animation_finished() == 0xff) // .Func_9f30e
 		play_sfx(mem_, SFX_06D);
 	draw(obj, ADDR_OAM_188279, 0x62);
 }
@@ -396,13 +396,13 @@ void Cutscenes::make_wire()
 	// .Func_9dd3f: up a pixel every 4 frames; .Func_9dd4a / .Func_9dd55:
 	// right / left a pixel on odd frames; each returns the new coord
 	auto up = [&] {
-		Byte y = mem_[wSceneObj2YCoord];
+		Byte y = mem_.scene_obj2_y_coord();
 		if (!(frame() & 0x03))
 			--y;
 		return static_cast<uint8_t>(y);
 	};
 	auto across = [&](uint8_t dx) {
-		Byte x = mem_[wSceneObj2XCoord];
+		Byte x = mem_.scene_obj2_x_coord();
 		if (frame() & 1)
 			x += dx;
 		return static_cast<uint8_t>(x);
@@ -416,14 +416,14 @@ void Cutscenes::make_wire()
 		wait(30);
 		break;
 	case 1: // .Func_9dd60
-		mem_[wSceneObj3YCoord] = 72;
-		mem_[wSceneObj3XCoord] = 72;
-		mem_[wSceneObj4YCoord] = 72;
-		mem_[wSceneObj4XCoord] = 88;
-		mem_[wSceneObj5YCoord] = 72;
-		mem_[wSceneObj5XCoord] = 104;
-		mem_[wSceneObj2YCoord] = 128;
-		mem_[wSceneObj2XCoord] = 72;
+		mem_.scene_obj3_y_coord() = 72;
+		mem_.scene_obj3_x_coord() = 72;
+		mem_.scene_obj4_y_coord() = 72;
+		mem_.scene_obj4_x_coord() = 88;
+		mem_.scene_obj5_y_coord() = 72;
+		mem_.scene_obj5_x_coord() = 104;
+		mem_.scene_obj2_y_coord() = 128;
+		mem_.scene_obj2_x_coord() = 72;
 		[[fallthrough]];
 	case 21: // .Func_9dd80
 		set_state(wSceneObj2, 0x01);
@@ -444,55 +444,55 @@ void Cutscenes::make_wire()
 		wait(60);
 		break;
 	case 4: // .Func_9dda1
-		mem_[wSceneObj3State] = 0x03;
+		mem_.scene_obj3_state() = 0x03;
 		advance();
 		break;
 	case 5: // .Func_9dda9
 		advance_at(across(1), 0x58);
 		break;
 	case 7: // .Func_9ddb3
-		mem_[wSceneObj4State] = 0x03;
+		mem_.scene_obj4_state() = 0x03;
 		advance();
 		break;
 	case 8: // .Func_9ddbb
 		advance_at(across(1), 0x68);
 		break;
 	case 10: // .Func_9ddc2
-		mem_[wSceneObj5State] = 0x03;
+		mem_.scene_obj5_state() = 0x03;
 		advance();
 		break;
 	case 11: // .Func_9ddca
 		if (across(1) != 0x88)
 			break;
-		mem_[wSceneObj2YCoord] = 0x38;
+		mem_.scene_obj2_y_coord() = 0x38;
 		advance();
 		break;
 	case 12: // .Func_9ddd8
 		advance_at(across(0xff), 0x68);
 		break;
 	case 14: // .Func_9dddf
-		mem_[wSceneObj5State] = 0x04;
+		mem_.scene_obj5_state() = 0x04;
 		advance();
 		break;
 	case 15: // .Func_9dde3
 		advance_at(across(0xff), 0x58);
 		break;
 	case 17: // .Func_9ddea
-		mem_[wSceneObj4State] = 0x04;
+		mem_.scene_obj4_state() = 0x04;
 		advance();
 		break;
 	case 18: // .Func_9ddee
 		advance_at(across(0xff), 0x48);
 		break;
 	case 20: // .Func_9ddf5
-		mem_[wSceneObj3State] = 0x04;
+		mem_.scene_obj3_state() = 0x04;
 		advance();
 		break;
 	case 22: // .Func_9ddf9
 		advance_at(up(), 0x20);
 		break;
 	case 23: // .Func_9de00
-		mem_[wSceneObj2State] = 0;
+		mem_.scene_obj2_state() = 0;
 		advance();
 		break;
 	case 24:

@@ -17,7 +17,7 @@ public:
 	{
 		cpu_.a = 0;
 		cpu_.f = FLAG_Z; // xor a
-		wr8(wEventWithCutscene, 0);
+		mem_.event_with_cutscene() = 0;
 	}
 };
 

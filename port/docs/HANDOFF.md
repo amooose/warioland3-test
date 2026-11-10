@@ -69,12 +69,39 @@ scripting and expansion on top. The approach:
   Func_3513 and the like) are now reached only by the difftest and
   fuzzer. Block functions keep their result in BlockFuncs::a_ (from the
   caller's a); hooks hand it over in a (exit_regs, leave) and the plain
-  process_block returns it. Still passing registers in play: the block
-  functions' leave() (b and hl, which objects read on; a for calls by
-  address), the copied V-Blank functions' palette calls
-  (fades.cpp apply_vblank, exact-register hooks reached through
-  wVBlankFunc), and object_mechanics' homejp states. Then step 2: the
-  wrappers nothing reaches in play go under WL3_INTERPRETER.
+  process_block returns it.
+- **Register glue, step 1 continued.** Plain in play too: Wario's bottom
+  collisions for objects (check_wario_bottom: carts, Muddee's turtle, zip
+  lines read the result instead of b), FadeInLevelName (its result, c only
+  in the hook), GetMapSideAndLevelForNextTreasure (Events'
+  next_treasure_side_level), GetBlockBGPtr (block_bg_ptr), the room
+  start's row queues (queue_block_tiles/attributes_along_row), the object
+  engine's block checks (ObjectEngine::block maps the wrapper to its
+  collision points), and the fade screens' V-Blank palettes (fades.cpp
+  apply_vblank: plain unless test.active; VBlank pops every register after
+  it, so its exact registers matter only to the hook checks).
+  TopBar::animate read a stale hl after the plain UpdateOWAnimation (no
+  recording reaches it): it now works out the object's block as the asm
+  leaves it. Register reads left in play: block functions' leave() (b, hl
+  for the objects after them), the OAM DMA's a (the HRAM routine's input,
+  until the renderer), shoot.cpp's latent stale b (ASM_BUGS.md), and the
+  wrappers' own glue. **Deferred: compiling the test-only wrappers out**
+  (the old stage 5). Which hooks the game can reach by address isn't
+  known statically (object update pointers and state tables come from ROM
+  data), a wrong guess crashes the game build on an unrecorded path, and
+  it removes no code from play; ROM data as arrays (below) makes those
+  dispatches native, after which it's a safe cut.
+- **Typed RAM.** Memory (native.hpp) has every RAM label by name, generated
+  from the disassembly (ram_fields.h: `mem_.timer()` is the byte at wTimer,
+  as Wram already had), and the 16-bit fields as words of their byte order:
+  `mem_.wario_x()` (WordBE: wWarioXPos, high byte first), wario_y, block_y,
+  block_x, block_pointer, bg_pointer, sfx, music, and `cur_obj_y()` /
+  `cur_obj_x()` (Word, little-endian); `.hi()` / `.lo()` reach their
+  bytes. Converted mechanically (scratch scripts typed1 / typed2):
+  exact-label `mem_[wFoo]`, `Memory(gb)[wFoo]`, AsmModule's `rd8(wFoo)` /
+  `wr8(wFoo, v);`, and those fields' byte pairs. Left raw: offsets into
+  tables and structs (wCurObj's other fields, wHDMA, wTimer's bytes, the
+  camera), which want structs next.
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`.
 - **Progress (2026-10-31):** 3497 / 3497 routines are ported. While the
   port plays the recordings, the interpreter runs no instructions at all

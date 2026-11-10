@@ -26,12 +26,12 @@ public:
 private:
 	void sram_switch(uint8_t bank)
 	{
-		mem_[wSRAMBank] = bank;
+		mem_.sram_bank() = bank;
 		mem_[rRAMB + 0x100] = bank;
 	}
 	void rom_switch(uint8_t bank)
 	{
-		mem_[wROMBank] = bank;
+		mem_.rom_bank() = bank;
 		mem_[rROMB0 + 0x100] = bank;
 	}
 	bool maps(uint8_t &rom, uint16_t &header);
@@ -45,11 +45,11 @@ private:
 // before); false after the jump to InvalidLevelData for a level without
 bool LevelLoader::maps(uint8_t &rom, uint16_t &header)
 {
-	uint8_t offset = static_cast<uint8_t>(mem_[wLevel] * 2);
-	bool d = mem_[wLevel] & 0x80; // add a's carry, rl d
+	uint8_t offset = static_cast<uint8_t>(mem_.level() * 2);
+	bool d = mem_.level() & 0x80; // add a's carry, rl d
 	uint16_t table = static_cast<uint16_t>(ADDR_LevelBlockAndObjectMaps + (d ? 0x100 : 0));
 	uint16_t at = static_cast<uint16_t>(table + offset);
-	rom = mem_[wROMBank];
+	rom = mem_.rom_bank();
 	rom_switch(BANK_LevelBlockAndObjectMaps);
 	header = Word(gb_, at);
 	if (header >> 8 != 0xff)
@@ -70,7 +70,7 @@ uint16_t LevelLoader::read_block_map_header(uint16_t header)
 {
 	mem_[wCompressedLevelBlockMapPtr + 1] = mem_[header + 0];
 	mem_[wCompressedLevelBlockMapPtr + 0] = mem_[header + 1];
-	mem_[wTempBank] = mem_[header + 2];
+	mem_.temp_bank() = mem_[header + 2];
 	return static_cast<uint16_t>(header + 2);
 }
 
@@ -82,11 +82,11 @@ void LevelLoader::load()
 		return;
 	header = read_block_map_header(header);
 	Routines(gb_).call(ADDR_DecompressLevelBlockMap);
-	mem_[wTempBank] = mem_[header + 0];
+	mem_.temp_bank() = mem_[header + 0];
 	mem_[wCompressedLevelBlockMapPtr + 1] = mem_[header + 1];
 	mem_[wCompressedLevelBlockMapPtr + 0] = mem_[header + 2];
 	rom_switch(rom);
-	if (!(mem_[wceef] & 0x3c))
+	if (!(mem_.unk_ceef() & 0x3c))
 		Routines(gb_).call(ADDR_DecompressLevelObjectMap);
 }
 
@@ -105,12 +105,12 @@ void LevelLoader::reload_objects()
 // blocks' bit 7 (their objects)
 void LevelLoader::reload_objects_bits()
 {
-	if (mem_[wceef] & 0x3c)
+	if (mem_.unk_ceef() & 0x3c)
 		return;
-	uint8_t sram = mem_[wSRAMBank];
+	uint8_t sram = mem_.sram_bank();
 	sram_switch(BANK_sLevelBlockObjectMap); // BANK("SRAM1")
-	uint8_t rom = mem_[wROMBank];
-	rom_switch(mem_[wTempBank]);
+	uint8_t rom = mem_.rom_bank();
+	rom_switch(mem_.temp_bank());
 	or_objects_bits(static_cast<uint16_t>(mem_[wCompressedLevelBlockMapPtr + 0] << 8
 		| mem_[wCompressedLevelBlockMapPtr + 1]));
 	rom_switch(rom);
@@ -128,15 +128,15 @@ void LevelLoader::or_objects_bits(uint16_t src)
 		map = static_cast<uint16_t>((map & 0xff00) + 0x100); // the next row
 		if (map >> 8 == 0xc0) { // past SRAM: the next bank's
 			map = 0xa000; // STARTOF(SRAM)
-			sram_switch(static_cast<uint8_t>(mem_[wSRAMBank] + 1));
+			sram_switch(static_cast<uint8_t>(mem_.sram_bank() + 1));
 		}
 	};
 	while (uint8_t cmd = mem_[src]) {
 		if (!(cmd & 0x80)) {
 			src++;
-			mem_[wRepeatByte] = mem_[src++] & 0x80;
+			mem_.repeat_byte() = mem_[src++] & 0x80;
 			while (cmd--)
-				put(mem_[wRepeatByte]);
+				put(mem_.repeat_byte());
 		} else {
 			int n = (cmd & 0x7f) ? (cmd & 0x7f) : 256;
 			src++;

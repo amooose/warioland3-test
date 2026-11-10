@@ -46,7 +46,7 @@ public:
 	// CheckCentreCollision's result is the steppable object (get_pos_y ran)
 	bool on_steppable_ = false;
 
-	void set_break_flag() { mem_[wBlockFuncBreakFlag] = TRUE; }
+	void set_break_flag() { mem_.block_func_break_flag() = TRUE; }
 
 private:
 	uint16_t pos(uint16_t addr) const { return static_cast<uint16_t>(mem_[addr] << 8 | mem_[addr + 1]); }
@@ -86,8 +86,8 @@ void Collisions::set_hpos(int dy, int dx)
 // asm's 8-bit offset
 uint8_t Collisions::edge_dx(bool right, uint8_t in)
 {
-	return right ? static_cast<uint8_t>(mem_[wCollisionBoxRight] - in)
-		     : static_cast<uint8_t>(-mem_[wCollisionBoxLeft] - in);
+	return right ? static_cast<uint8_t>(mem_.collision_box_right() - in)
+		     : static_cast<uint8_t>(-mem_.collision_box_left() - in);
 }
 
 // hPos = the collision box's right (or left) edge, 3 pixels in, at Wario's y
@@ -109,7 +109,7 @@ uint8_t Collisions::process_block()
 uint8_t Collisions::block(uint8_t points)
 {
 	b_ = home::block_ptr(gb_, hPos).bank; // GetBlockPtr's b
-	mem_[wCollisionPoints] = points;
+	mem_.collision_points() = points;
 	return process_block();
 }
 
@@ -117,7 +117,7 @@ uint8_t Collisions::block(uint8_t points)
 // around (to $ff, or $00): false
 bool Collisions::process_adjacent(bool right)
 {
-	Byte lo = mem_[wBlockPtr + 1];
+	Byte lo = mem_.block_pointer().lo();
 	if (right ? ++lo == 0x00 : --lo == 0xff)
 		return false;
 	process_block();
@@ -142,7 +142,7 @@ uint8_t Collisions::at_y_offset(uint8_t dy)
 // resets wWarioSlopeInteraction; the block under Wario
 uint8_t Collisions::below()
 {
-	mem_[wWarioSlopeInteraction] = 0;
+	mem_.wario_slope_interaction() = 0;
 	set_hpos(0, 0);
 	return block(COLLISION_DOWN);
 }
@@ -151,16 +151,16 @@ uint8_t Collisions::below()
 // steppable object Wario stands on, with hYPos = his y
 uint8_t Collisions::centre()
 {
-	mem_[wUnused_ced3] = 1;
+	mem_.unused_ced3() = 1;
 	if (uint8_t r = below())
 		return r;
-	mem_[wUnused_ced3] = 0;
+	mem_.unused_ced3() = 0;
 	for (bool right : {false, true}) {
 		at_edge(right);
 		if (uint8_t r = block(COLLISION_UNK2))
 			return r;
 	}
-	uint8_t steppable = mem_[wIsOnSteppableObject];
+	uint8_t steppable = mem_.is_on_steppable_object();
 	if (!steppable)
 		return 0;
 	set_pos(hYPosHi, pos(wWarioYPos)); // get_pos_y
@@ -171,9 +171,9 @@ uint8_t Collisions::centre()
 // the block a row up from wBlockPtr (in the SRAM bank before, past the top)
 uint8_t Collisions::up_row()
 {
-	Byte hi = mem_[wBlockPtr];
+	Byte hi = mem_.block_pointer().hi();
 	if (--hi == 0xa0 - 1) {
-		--mem_[wBlockPtrBank];
+		--mem_.block_ptr_bank();
 		hi = 0xc0 - 1;
 	}
 	return process_block();
@@ -184,16 +184,16 @@ uint8_t Collisions::break_up()
 {
 	set_break_flag();
 	up_row();
-	mem_[wUnused_c18d] = 1;
+	mem_.unused_c18d() = 1;
 	return 1;
 }
 
 // a gap a block high ahead: crouch or slide under it
 uint8_t Collisions::slide_under()
 {
-	if (!mem_[wIsCrouching]) {
-		uint8_t row = static_cast<uint8_t>(mem_[wWarioYPos + 1] + mem_[wCollisionBoxTop] + 2) & 0xf0;
-		if (mem_[wc0dc] != row) {
+	if (!mem_.is_crouching()) {
+		uint8_t row = static_cast<uint8_t>(mem_.wario_y().lo() + mem_.collision_box_top() + 2) & 0xf0;
+		if (mem_.unk_c0dc() != row) {
 			set_break_flag();
 			b_ = row;
 			uint8_t r = up_row();
@@ -203,13 +203,13 @@ uint8_t Collisions::slide_under()
 				     wIsOnSteppableObject, wTransformation, wIsInSand})
 				if (mem_[addr])
 					return r;
-			uint8_t pad = mem_[wJoypadDown];
-			bool right = (pad & PAD_RIGHT) || (!(pad & PAD_LEFT) && mem_[wDirection]);
+			uint8_t pad = mem_.joypad_down();
+			bool right = (pad & PAD_RIGHT) || (!(pad & PAD_LEFT) && mem_.direction());
 			home::move_wario_x(gb_, right ? 2 : -2);
 			routines_.farcall(BANK_CrouchOrSlide, ADDR_CrouchOrSlide);
 		}
 	}
-	mem_[wUnused_c18d] = 0;
+	mem_.unused_c18d() = 0;
 	return 0;
 }
 
@@ -218,16 +218,16 @@ uint8_t Collisions::slide_under()
 // attack breaks the block a row up
 uint8_t Collisions::bottom(bool right)
 {
-	bool flat = mem_[wTransformation] == TRANSFORMATION_FLAT_WARIO;
+	bool flat = mem_.transformation() == TRANSFORMATION_FLAT_WARIO;
 	uint8_t dx = edge_dx(right, 1);
-	uint8_t dy = static_cast<uint8_t>(-mem_[wCollisionBoxBottom] + (flat ? 1 : 7));
+	uint8_t dy = static_cast<uint8_t>(-mem_.collision_box_bottom() + (flat ? 1 : 7));
 	cpu_.c = dy;
 	set_hpos(-dy, right ? dx : -dx);
-	mem_[wc0dc] = mem_[hYPosLo] & 0xf0;
+	mem_.unk_c0dc() = mem_.y_pos_lo() & 0xf0;
 	uint8_t r = block(COLLISION_UNK4);
 	if (!(r & 0x0f))
 		return slide_under();
-	if (mem_[wAttackCounter])
+	if (mem_.attack_counter())
 		return break_up();
 	return r;
 }
@@ -236,12 +236,12 @@ uint8_t Collisions::bottom(bool right)
 uint8_t Collisions::front()
 {
 	set_break_flag();
-	return bottom(mem_[wDirection]);
+	return bottom(mem_.direction());
 }
 
 void Collisions::break_unless_puffy()
 {
-	if (mem_[wTransformation] != TRANSFORMATION_PUFFY_WARIO)
+	if (mem_.transformation() != TRANSFORMATION_PUFFY_WARIO)
 		set_break_flag(); // can break the blocks above
 }
 
@@ -249,7 +249,7 @@ void Collisions::break_unless_puffy()
 uint8_t Collisions::above()
 {
 	break_unless_puffy();
-	uint8_t dy = static_cast<uint8_t>(-mem_[wCollisionBoxTop] + 2);
+	uint8_t dy = static_cast<uint8_t>(-mem_.collision_box_top() + 2);
 	cpu_.c = dy;
 	set_hpos(-dy, 0);
 	return block(COLLISION_UNK5);
@@ -258,14 +258,14 @@ uint8_t Collisions::above()
 // above the centre, then above the left and right edges, 3 pixels in
 uint8_t Collisions::up()
 {
-	mem_[wJumpCollision] = TRUE;
+	mem_.jump_collision() = TRUE;
 	if (uint8_t r = above())
 		return r;
-	mem_[wJumpCollision] = 0;
+	mem_.jump_collision() = 0;
 	for (bool right : {false, true}) {
 		break_unless_puffy();
 		uint8_t dx = edge_dx(right, 3);
-		uint8_t dy = static_cast<uint8_t>(-mem_[wCollisionBoxTop] + 2);
+		uint8_t dy = static_cast<uint8_t>(-mem_.collision_box_top() + 2);
 		cpu_.c = dy;
 		set_hpos(-dy, right ? dx : -dx);
 		if (uint8_t r = block(COLLISION_UNK3))
@@ -276,7 +276,7 @@ uint8_t Collisions::up()
 
 void Collisions::break_if_smash_attacking()
 {
-	if (mem_[wIsSmashAttacking])
+	if (mem_.is_smash_attacking())
 		set_break_flag();
 }
 
@@ -284,7 +284,7 @@ void Collisions::break_if_smash_attacking()
 // (each followed by the steppable object)
 uint8_t Collisions::airborne()
 {
-	mem_[wWarioSlopeInteraction] = 0;
+	mem_.wario_slope_interaction() = 0;
 	break_if_smash_attacking();
 	set_hpos(0, 0);
 	if (uint8_t r = block(COLLISION_UNK1))
@@ -294,7 +294,7 @@ uint8_t Collisions::airborne()
 		at_edge(right);
 		if (uint8_t r = block(COLLISION_UNK6))
 			return r;
-		if (uint8_t steppable = mem_[wIsOnSteppableObject])
+		if (uint8_t steppable = mem_.is_on_steppable_object())
 			return steppable;
 	}
 	return 0;
@@ -304,24 +304,24 @@ uint8_t Collisions::airborne()
 // one's clear (the left one is skipped over when its block set wc1ca)
 uint8_t Collisions::sides()
 {
-	mem_[wc1ca] = FALSE;
+	mem_.unk_c1ca() = FALSE;
 	at_edge(false);
-	if (uint8_t r = reset_and_process(); r && !mem_[wc1ca])
+	if (uint8_t r = reset_and_process(); r && !mem_.unk_c1ca())
 		return r;
-	mem_[wc1ca] = FALSE;
+	mem_.unk_c1ca() = FALSE;
 	at_edge(true);
 	uint8_t r = reset_and_process();
 	if (!r)
-		mem_[wc1ca] = TRUE;
+		mem_.unk_c1ca() = TRUE;
 	return r;
 }
 
 // with wBlockFuncWarioFlag set: the block functions act for Wario
 template <typename F> uint8_t Collisions::as_wario(F check)
 {
-	mem_[wBlockFuncWarioFlag] = TRUE;
+	mem_.block_func_wario_flag() = TRUE;
 	uint8_t r = check();
-	mem_[wBlockFuncWarioFlag] = FALSE;
+	mem_.block_func_wario_flag() = FALSE;
 	return r;
 }
 
@@ -373,6 +373,15 @@ namespace wl3::level {
 
 uint8_t check_block(GB *gb, uint8_t points) { return Collisions(gb).block(points); }
 
+uint8_t check_wario_bottom(GB *gb, bool right)
+{
+	Collisions c(gb);
+	return c.as_wario([&] {
+		c.set_break_flag();
+		return c.bottom(right);
+	});
+}
+
 uint8_t check_block_beside(GB *gb, bool right)
 {
 	Collisions(gb).process_adjacent(right);
@@ -398,12 +407,12 @@ PORT_EX(_ProcessBlockOnRight, 0, ALL_REGISTERS & ~R_B)
 // its low byte wrapping around
 PORT_EX(Func_19bab, 0, ALL_REGISTERS & ~R_B)
 {
-	--wl3::Memory(gb)[wBlockPtr + 1];
+	--wl3::Memory(gb).block_pointer().lo();
 	Collisions(gb).process_block();
 }
 PORT_EX(Func_19bb7, 0, ALL_REGISTERS & ~R_B)
 {
-	++wl3::Memory(gb)[wBlockPtr + 1];
+	++wl3::Memory(gb).block_pointer().lo();
 	Collisions(gb).process_block();
 }
 PORT_EX(Func_19acd, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).at_y_offset(0x0c); }

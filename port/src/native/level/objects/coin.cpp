@@ -67,7 +67,7 @@ private:
 
 void Coin::init()
 {
-	if (static_cast<uint8_t>(mem_[wGlobalCounter] - 1) & 0x3f) {
+	if (static_cast<uint8_t>(mem_.global_counter() - 1) & 0x3f) {
 		frame() = 0;
 		set_update(UPDATE);
 		flags() |= OBJFLAG_NO_COLLISION;
@@ -91,7 +91,7 @@ void Coin::update()
 {
 	frame_duration() = 2;
 	// the frameset offset is set in water: half speed
-	if (!mem_[wCurObjFramesetOffset] || !(mem_[wGlobalCounter] & 1))
+	if (!mem_.cur_obj_frameset_offset() || !(mem_.global_counter() & 1))
 		spin();
 	else
 		return;
@@ -153,7 +153,7 @@ void Coin::run(uint8_t s)
 
 void Coin::set_up()
 {
-	mem_[wCurObjAction] = 15 | (1 << 7);
+	mem_.cur_obj_action() = 15 | (1 << 7);
 	state() = 0x1a;
 	flags() |= OBJFLAG_NO_COLLISION;
 }
@@ -161,7 +161,7 @@ void Coin::set_up()
 // hops away from Wario
 void Coin::start_moving()
 {
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	state() = static_cast<uint8_t>(screen_x() + 0x2a) < wario ? 0x06 : 0x07;
 }
 
@@ -173,7 +173,7 @@ void Coin::velocity(uint16_t table)
 		v = mem_[static_cast<uint16_t>((table & 0xff00) | static_cast<uint8_t>(c - 1))];
 	else
 		++var3();
-	mem_[hffa0] = v;
+	mem_.unk_ffa0() = v;
 	y() = static_cast<uint16_t>(y() + static_cast<int8_t>(v));
 }
 
@@ -181,10 +181,10 @@ void Coin::pos_to_hram(int dy, int dx)
 {
 	uint16_t y_pos = static_cast<uint16_t>(y() + dy);
 	uint16_t x_pos = static_cast<uint16_t>(x() + dx);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 }
 
 // an arc for its frames, then falling; a wall turns it back
@@ -209,8 +209,8 @@ void Coin::hop(int index, bool start)
 
 void Coin::in_water()
 {
-	if (uint8_t water = mem_[wIsInWaterOrSand])
-		mem_[wCurObjFramesetOffset] = water;
+	if (uint8_t water = mem_.is_in_water_or_sand())
+		mem_.cur_obj_frameset_offset() = water;
 }
 
 // until it lands, then hops again by how fast it fell (or slides)
@@ -230,11 +230,11 @@ void Coin::fall(bool right, bool start)
 			state() = right ? 0x0c : 0x0d;
 		return;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	if (var2())
 		--var2();
-	uint8_t speed = mem_[hffa0];
+	uint8_t speed = mem_.unk_ffa0();
 	if (speed < 2)
 		state() = right ? 0x11 : 0x10;
 	else if (speed < 3)
@@ -254,7 +254,7 @@ void Coin::slide(bool right)
 		state() = 0x12;
 		return;
 	}
-	if (!(mem_[wGlobalCounter] & 0x1f))
+	if (!(mem_.global_counter() & 0x1f))
 		--speed;
 	pos_to_hram(-4, right ? 3 : -4);
 	if (hpos_block_unk4() & 0x0f) {
@@ -264,14 +264,14 @@ void Coin::slide(bool right)
 	right ? move_right_by_var2() : move_left_by_var2();
 	pos_to_hram(0, 0);
 	bool on_floor = hpos_block_down() == 0x10;
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	if (on_floor)
 		return;
 	for (int dx : {right ? 3 : -4, right ? -4 : 3}) {
 		uint16_t x_pos = static_cast<uint16_t>(x() + dx);
-		mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-		mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+		mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+		mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 		if (hpos_block_unk2())
 			return;
 	}
@@ -282,7 +282,7 @@ void Coin::slide(bool right)
 void Coin::rest(uint8_t next)
 {
 	state() = next;
-	state_duration() = mem_[wCurObjFramesetOffset] ? 50 : 100;
+	state_duration() = mem_.cur_obj_frameset_offset() ? 50 : 100;
 }
 
 void Coin::resting()
@@ -321,8 +321,8 @@ void Coin::bounce(bool start)
 	velocity(0x4040);
 	pos_to_hram(0, 0);
 	if (hpos_block_unk1()) {
-		mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-		mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+		mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+		mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 		state() = 0x12;
 	}
 	in_water();
@@ -361,4 +361,4 @@ PORT_LOCAL_EX(CoinFunc, State14, 0, ALL_REGISTERS) { Coin(gb).bounce(true); }
 PORT_LOCAL_EX(CoinFunc, State15, 0, ALL_REGISTERS) { Coin(gb).bounce(false); }
 PORT_LOCAL_EX(CoinFunc, State16, 0, ALL_REGISTERS) { Coin(gb).rest(0x17); }
 PORT_LOCAL_EX(CoinFunc, State17, 0, ALL_REGISTERS) { Coin(gb).flicker(); }
-PORT_LOCAL_EX(CoinFunc, State18, 0, ALL_REGISTERS) { wl3::Memory mem(gb); mem[wCurObjFlags] = 0; }
+PORT_LOCAL_EX(CoinFunc, State18, 0, ALL_REGISTERS) { wl3::Memory mem(gb); mem.cur_obj_flags() = 0; }

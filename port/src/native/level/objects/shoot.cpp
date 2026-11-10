@@ -202,18 +202,18 @@ private:
 
 void Shoot::start()
 {
-	mem_[wIsBossBattle] = TRUE;
+	mem_.is_boss_battle() = TRUE;
 	stop_music2(mem_);
-	mem_[wShootCanTurnAround] = 0;
-	mem_[wShootBallState] = 0;
+	mem_.shoot_can_turn_around() = 0;
+	mem_.shoot_ball_state() = 0;
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(START_WAIT);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	substate() |= 1 << OBJSUBFLAG_UNK_4_F;
 	substate() = (substate() & OBJSUBFLAGS_MASK) | 0x5;
-	mem_[wCurObjCollBoxRight] = 7;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-8);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-8);
+	mem_.cur_obj_coll_box_right() = 7;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-8);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-8);
 	set_frameset(ADDR_Frameset_69f7c);
 	state_duration() = SHOOT_TAUNT_DURATION;
 	// 32 pixels up and 96 pixels right
@@ -255,14 +255,14 @@ void Shoot::set_jumping_up(uint16_t frameset)
 void Shoot::taunt()
 {
 	// a sound every 16 frames
-	if (!(mem_[wGlobalCounter] & 0x0f))
+	if (!(mem_.global_counter() & 0x0f))
 		play_sfx(SFX_0C6);
 	if (--state_duration())
 		return;
 	set_update(MAIN);
 	set_interaction(OBJ_INTERACTION_SHOOT);
-	mem_[wShootBallState] = 0x01;
-	mem_[wBossState] = BOSS_REGULAR;
+	mem_.shoot_ball_state() = 0x01;
+	mem_.boss_state() = BOSS_REGULAR;
 	home::update_level_music(gb_);
 	set_standing();
 }
@@ -291,10 +291,10 @@ void Shoot::interacted_with_ball_wario()
 	var1() = SHOOTPHASE_PREKICK_JUMP;
 	var2() = 1; // the pre-kick x speed
 	// Wario 16 pixels below
-	uint8_t lo = mem_[wCurObjYPos + 0];
-	mem_[wWarioYPos + 1] = static_cast<uint8_t>(lo + 16);
-	mem_[wWarioYPos + 0] = static_cast<uint8_t>(mem_[wWarioYPos + 0] + (lo + 16 > 0xff));
-	mem_[wWarioXPos + 1] = mem_[wCurObjXPos + 0];
+	uint8_t lo = mem_.cur_obj_y().lo();
+	mem_.wario_y().lo() = static_cast<uint8_t>(lo + 16);
+	mem_.wario_y().hi() = static_cast<uint8_t>(mem_.wario_y().hi() + (lo + 16 > 0xff));
+	mem_.wario_x().lo() = mem_.cur_obj_x().lo();
 	play_sfx(SFX_FAT_WALK);
 	substate() |= OBJSUBFLAG_HDIR;
 	// bug (docs/ASM_BUGS.md): meant to compare the x position with 123, it compares a, the
@@ -311,8 +311,8 @@ void Shoot::stepped_on()
 	set_frameset(ADDR_Frameset_69f5d);
 	set_update(BALL_FORM);
 	interaction() = OBJ_INTERACTION_01;
-	mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-18);
-	mem_[wCurObjCollBoxBottom] = 0;
+	mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-18);
+	mem_.cur_obj_coll_box_bottom() = 0;
 	ball_form();
 }
 
@@ -355,23 +355,23 @@ void Shoot::main()
 void Shoot::still_more_goals_needed()
 {
 	bool turn = false;
-	uint8_t wario_x = mem_[wWarioXPos + 1];
+	uint8_t wario_x = mem_.wario_x().lo();
 	if (wario_x < 192) {
-		bool c = mem_[wCurObjXPos + 0] < wario_x;
+		bool c = mem_.cur_obj_x().lo() < wario_x;
 		turn = facing_right() ? !c : c;
 	}
 	if (!turn)
-		turn = mem_[wShootCanTurnAround];
+		turn = mem_.shoot_can_turn_around();
 	bool right = facing_right();
 	if (turn) {
 		set_frameset(right ? ADDR_Frameset_69f40 : ADDR_Frameset_69f35);
 		state_duration() = SHOOT_TURN_AROUND_DURATION;
 		var1() = SHOOTPHASE_TURNING;
-		mem_[wShootCanTurnAround] = 0;
+		mem_.shoot_can_turn_around() = 0;
 		return;
 	}
 	set_frameset(right ? ADDR_Frameset_6a04f : ADDR_Frameset_6a037);
-	state_duration() = mem_[wWarioGoals] ? 2 : 25; // the jumping delay
+	state_duration() = mem_.wario_goals() ? 2 : 25; // the jumping delay
 	var1() = SHOOTPHASE_BETWEEN_JUMPS;
 }
 
@@ -379,8 +379,8 @@ void Shoot::still_more_goals_needed()
 bool Shoot::ground_below(uint8_t offset)
 {
 	uint16_t y_pos = static_cast<uint16_t>(y() + offset);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
 	return hpos_block_unk1();
 }
 
@@ -404,13 +404,13 @@ void Shoot::run(uint16_t handler)
 	case JUMPING_DOWN: {
 		apply_y_movement(ADDR_Data_603e0);
 		move_left_or_right();
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		if (hpos_block_unk1()) { // grounded
-			mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-			mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+			mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+			mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 			still_more_goals_needed();
 			return;
 		}
@@ -443,24 +443,24 @@ void Shoot::run(uint16_t handler)
 	case PREKICK_JUMP:
 		prekick_x_movement();
 		prekick_y_movement(ADDR_Data_54000);
-		if (mem_[wCurObjYPos + 0] < 224)
+		if (mem_.cur_obj_y().lo() < 224)
 			return;
 		set_frameset(ADDR_Frameset_6a000);
 		var1() = SHOOTPHASE_PREKICK_ANIMATION;
 		var2() = 16;
 		move_down_by_var2();
 		// Shoot and Wario at y = 240, Wario at Shoot's x + 8
-		mem_[wCurObjYPos + 0] = 240;
-		mem_[wWarioYPos + 1] = 240;
-		mem_[wWarioYPos + 0] = mem_[wCurObjYPos + 1];
-		mem_[wWarioXPos + 1] = static_cast<uint8_t>(mem_[wCurObjXPos + 0] + 8);
+		mem_.cur_obj_y().lo() = 240;
+		mem_.wario_y().lo() = 240;
+		mem_.wario_y().hi() = mem_.cur_obj_y().hi();
+		mem_.wario_x().lo() = static_cast<uint8_t>(mem_.cur_obj_x().lo() + 8);
 		return;
 	case PREKICK_ANIMATION: {
 		if (frame_duration())
 			return;
-		uint8_t offset = mem_[wCurObjFramesetOffset];
+		uint8_t offset = mem_.cur_obj_frameset_offset();
 		if (offset == 6) { // Wario 8 pixels right
-			mem_[wWarioXPos + 1] = static_cast<uint8_t>(mem_[wWarioXPos + 1] + 8);
+			mem_.wario_x().lo() = static_cast<uint8_t>(mem_.wario_x().lo() + 8);
 			play_sfx(SFX_HANG_GRAB);
 			return;
 		}
@@ -471,15 +471,15 @@ void Shoot::run(uint16_t handler)
 		return;
 	}
 	case KICKING: {
-		if (mem_[wShootBallState] == SHOOTBALL_WARIO_KICKED)
+		if (mem_.shoot_ball_state() == SHOOTBALL_WARIO_KICKED)
 			move_wario_ball_after_kick();
 		if (frame_duration())
 			return;
-		uint8_t offset = mem_[wCurObjFramesetOffset];
+		uint8_t offset = mem_.cur_obj_frameset_offset();
 		if (offset == 4) { // kicks Wario
-			mem_[wShootBallState] = SHOOTBALL_WARIO_KICKED;
+			mem_.shoot_ball_state() = SHOOTBALL_WARIO_KICKED;
 			var3() = 0;
-			mem_[wAutoMoveState] = 0x2 | (1 << 7);
+			mem_.auto_move_state() = 0x2 | (1 << 7);
 			play_sfx(SFX_034);
 			return;
 		}
@@ -490,17 +490,17 @@ void Shoot::run(uint16_t handler)
 		return;
 	}
 	case SCORE_GOAL: {
-		if (mem_[wShootBallState] != SHOOTBALL_WARIO_GOAL) {
+		if (mem_.shoot_ball_state() != SHOOTBALL_WARIO_GOAL) {
 			move_wario_ball_after_kick();
 			return;
 		}
 		// b: the goals now (with 3 already, whatever b held)
 		uint8_t goals = gb_->cpu.b;
-		if (mem_[wShootGoals] != NUM_SHOOT_GOALS_NEEDED)
-			goals = ++mem_[wShootGoals];
-		mem_[wAutoMoveState] = 0x1 | (1 << 7);
+		if (mem_.shoot_goals() != NUM_SHOOT_GOALS_NEEDED)
+			goals = ++mem_.shoot_goals();
+		mem_.auto_move_state() = 0x1 | (1 << 7);
 		play_sfx(SFX_0C7);
-		mem_[wShootCanTurnAround] = TRUE;
+		mem_.shoot_can_turn_around() = TRUE;
 		substate() &= ~OBJSUBFLAG_VDIR;
 		if (goals != NUM_SHOOT_GOALS_NEEDED) {
 			still_more_goals_needed();
@@ -520,17 +520,17 @@ void Shoot::run(uint16_t handler)
 
 void Shoot::move_wario_ball_after_kick()
 {
-	if (mem_[wWarioXPos + 1] < 237) { // Wario right
+	if (mem_.wario_x().lo() < 237) { // Wario right
 		kicked_ball_y_offset(ADDR_Data_54010);
 		move_wario(ADDR_MoveWarioRight, 3);
 		return;
 	}
 	// in the net: Wario down to the ground
-	if (mem_[wWarioYPos + 1] < 240) {
+	if (mem_.wario_y().lo() < 240) {
 		move_wario(ADDR_MoveWarioDown, 3);
 		return;
 	}
-	mem_[wShootBallState] = SHOOTBALL_WARIO_GOAL;
+	mem_.shoot_ball_state() = SHOOTBALL_WARIO_GOAL;
 }
 
 void Shoot::prekick_x_movement()
@@ -547,7 +547,7 @@ void Shoot::prekick_x_movement()
 // moves by var2 along its vertical direction, turning at the pitch's ends
 void Shoot::move_left_or_right()
 {
-	uint8_t x_pos = mem_[wCurObjXPos + 0];
+	uint8_t x_pos = mem_.cur_obj_x().lo();
 	if (substate() & OBJSUBFLAG_VDIR) {
 		if (x_pos < 219) {
 			move_right_by_var2();
@@ -567,7 +567,7 @@ void Shoot::move_left_or_right()
 		if (facing_right())
 			return;
 	}
-	mem_[wShootCanTurnAround] = TRUE;
+	mem_.shoot_can_turn_around() = TRUE;
 }
 
 // the next of the offsets ($80-terminated: stays on the last)
@@ -612,7 +612,7 @@ void Shoot::move_wario_up_by_neg(uint8_t b)
 void Shoot::ball_form()
 {
 	// can't be grabbed in the net
-	if (mem_[wCurObjXPos + 0] >= 219)
+	if (mem_.cur_obj_x().lo() >= 219)
 		flags() &= ~OBJFLAG_GRABBED;
 	else
 		flags() |= OBJFLAG_GRABBED;
@@ -631,8 +631,8 @@ void Shoot::return_to_regular_form()
 	state() = 0x05;
 	substate() &= ~(1 << 7);
 	interaction() = OBJ_INTERACTION_SHOOT | HEAVY_OBJ;
-	mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-32);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-8);
+	mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-32);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-8);
 }
 
 // a ball for a while (var1), wobbling at the end
@@ -657,14 +657,14 @@ void Shoot::ball_56b47()
 			wobble = true;
 		}
 	}
-	if (wobble && !(mem_[wGlobalCounter] & 0x0f))
+	if (wobble && !(mem_.global_counter() & 0x0f))
 		play_sfx(SFX_06A);
 	apply_y_movement_loop(ADDR_Data_60e40);
 }
 
 void Shoot::ball_56bc0(uint8_t s)
 {
-	mem_[wCurObjAction] = (1 << NO_ACTIONS_F) | 15;
+	mem_.cur_obj_action() = (1 << NO_ACTIONS_F) | 15;
 	state() = s;
 	set_frameset(ADDR_Frameset_69f5d);
 	state_duration() = 4;
@@ -683,7 +683,7 @@ void Shoot::ball_56c25(uint8_t s, uint16_t frameset)
 {
 	state() = s;
 	var3() = 0;
-	var2() = mem_[wCurObjYPos + 0] < 216 ? 0x04 : 0x02;
+	var2() = mem_.cur_obj_y().lo() < 216 ? 0x04 : 0x02;
 	set_frameset(frameset);
 }
 
@@ -703,9 +703,9 @@ void Shoot::set_defeated()
 // kicked: rolls along by var2, turning at the pitch's ends
 void Shoot::ball_move()
 {
-	uint8_t x_pos = mem_[wCurObjXPos + 0];
+	uint8_t x_pos = mem_.cur_obj_x().lo();
 	if (substate() & OBJSUBFLAG_VDIR) {
-		if (mem_[wCurObjYPos + 0] >= 208) { // in the net
+		if (mem_.cur_obj_y().lo() >= 208) { // in the net
 			if (x_pos < 243)
 				move_right_by_var2();
 			return;
@@ -722,7 +722,7 @@ void Shoot::ball_move()
 		}
 		substate() |= OBJSUBFLAG_VDIR;
 	}
-	mem_[wShootCanTurnAround] = TRUE;
+	mem_.shoot_can_turn_around() = TRUE;
 	play_sfx(SFX_01A);
 }
 
@@ -742,7 +742,7 @@ void Shoot::run_ball(uint16_t handler)
 		state() = 0x31;
 		var3() = 0;
 		// the ball's duration ($100, or 160 for the last goal)
-		var1() = mem_[wWarioGoals] < 2 ? 0 : 160;
+		var1() = mem_.wario_goals() < 2 ? 0 : 160;
 		set_frameset(ADDR_Frameset_69f5d);
 		ball_56b47();
 		return;
@@ -751,7 +751,7 @@ void Shoot::run_ball(uint16_t handler)
 		return;
 	case B_56B96: {
 		play_sfx(SFX_014);
-		uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+		uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 		ball_56bc0(static_cast<uint8_t>(screen_x() + 0x2a) >= wario ? 0x38 : 0x39);
 		return;
 	}
@@ -795,21 +795,21 @@ void Shoot::run_ball(uint16_t handler)
 		return;
 	case B_56C49: { // kicked
 		no_actions();
-		if (mem_[wShootCanTurnAround]) {
-			mem_[wShootCanTurnAround] = FALSE;
+		if (mem_.shoot_can_turn_around()) {
+			mem_.shoot_can_turn_around() = FALSE;
 			set_frameset(ADDR_Frameset_69f5d);
 		}
 		ball_move();
 		apply_y_movement(var2() == 0x04 ? ADDR_Data_60e70 : ADDR_Data_60e20);
-		if (mem_[wCurObjYPos + 0] < 240)
+		if (mem_.cur_obj_y().lo() < 240)
 			return;
-		mem_[wCurObjYPos + 0] = 240;
-		if (mem_[wShootBallState] == 0x04) {
-			if (mem_[wWarioGoals] == NUM_WARIO_GOALS_NEEDED) {
+		mem_.cur_obj_y().lo() = 240;
+		if (mem_.shoot_ball_state() == 0x04) {
+			if (mem_.wario_goals() == NUM_WARIO_GOALS_NEEDED) {
 				set_defeated();
 				return;
 			}
-			mem_[wShootBallState] = 0x01;
+			mem_.shoot_ball_state() = 0x01;
 			return_to_regular_form();
 			return;
 		}
@@ -817,16 +817,16 @@ void Shoot::run_ball(uint16_t handler)
 			state() = 0x09;
 			return;
 		}
-		if (mem_[wCurObjXPos + 0] < 219) {
+		if (mem_.cur_obj_x().lo() < 219) {
 			state() = 0x08;
 			return;
 		}
 		// in the net: a goal
 		state() = 0x2d;
-		mem_[wShootBallState] = 0x02;
+		mem_.shoot_ball_state() = 0x02;
 		play_sfx(SFX_0C7);
-		if (mem_[wWarioGoals] != NUM_WARIO_GOALS_NEEDED) {
-			if (++mem_[wWarioGoals] == NUM_WARIO_GOALS_NEEDED)
+		if (mem_.wario_goals() != NUM_WARIO_GOALS_NEEDED) {
+			if (++mem_.wario_goals() == NUM_WARIO_GOALS_NEEDED)
 				stop_music2(mem_);
 		}
 		set_frameset(ADDR_Frameset_69f9a);
@@ -835,13 +835,13 @@ void Shoot::run_ball(uint16_t handler)
 	case B_56D1C:
 		no_actions();
 		flags() &= ~OBJFLAG_GRABBED;
-		if (mem_[wShootBallState] != 0x04)
+		if (mem_.shoot_ball_state() != 0x04)
 			return;
 		set_frameset(ADDR_Frameset_69fa4);
 		state() = 0x35;
 		substate() &= ~OBJSUBFLAG_VDIR;
 		var3() = 0;
-		var2() = mem_[wWarioGoals] == NUM_WARIO_GOALS_NEEDED ? 0x01 : 0x03;
+		var2() = mem_.wario_goals() == NUM_WARIO_GOALS_NEEDED ? 0x01 : 0x03;
 		return;
 	case DEFEAT_RISE:
 		no_actions();
@@ -896,7 +896,7 @@ void Shoot::update_score(uint16_t goals, bool shoot)
 	case 3:
 		frame() = 0x3e;
 		if (shoot)
-			mem_[wBossState] = 0;
+			mem_.boss_state() = 0;
 		return;
 	}
 }
@@ -909,8 +909,8 @@ void GKTortoise::start()
 	set_update(GK_MAIN);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	substate() |= 1 << OBJSUBFLAG_UNK_4_F;
-	mem_[wCurObjCollBoxRight] = 5;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-6);
+	mem_.cur_obj_coll_box_right() = 5;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-6);
 	set_frameset(ADDR_Frameset_69fed);
 	var1() = GKTORTOISEPHASE_0;
 	// 64 pixels right and 16 pixels down
@@ -924,15 +924,15 @@ void GKTortoise::set_ducking()
 {
 	set_frameset(ADDR_Frameset_6a017);
 	var1() = GKTORTOISEPHASE_DUCKING;
-	mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-10);
+	mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-10);
 }
 
 void GKTortoise::main()
 {
-	if (mem_[wTransformation])
+	if (mem_.transformation())
 		no_actions();
 	// ducks when Shoot kicks Wario towards the net
-	if (mem_[wShootBallState] == SHOOTBALL_WARIO_KICKED && var1() != GKTORTOISEPHASE_DUCKING) {
+	if (mem_.shoot_ball_state() == SHOOTBALL_WARIO_KICKED && var1() != GKTORTOISEPHASE_DUCKING) {
 		set_ducking();
 		return;
 	}
@@ -946,10 +946,10 @@ void GKTortoise::main()
 
 void GKTortoise::catch_ball()
 {
-	mem_[wShootBallState] = 0x07;
+	mem_.shoot_ball_state() = 0x07;
 	set_frameset(ADDR_Frameset_69fba);
 	var1() = 0x06;
-	mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-20);
+	mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-20);
 	play_sfx(SFX_FAT_WALK);
 }
 
@@ -1000,10 +1000,8 @@ void GKTortoise::wario_to(int dy, int dx)
 {
 	uint16_t y_pos = static_cast<uint16_t>(y() + dy);
 	uint16_t x_pos = static_cast<uint16_t>(x() + dx);
-	mem_[wWarioYPos + 1] = static_cast<uint8_t>(y_pos);
-	mem_[wWarioYPos + 0] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[wWarioXPos + 1] = static_cast<uint8_t>(x_pos);
-	mem_[wWarioXPos + 0] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.wario_y() = y_pos;
+	mem_.wario_x() = x_pos;
 }
 
 void GKTortoise::stand_back()
@@ -1011,7 +1009,7 @@ void GKTortoise::stand_back()
 	state() = 0;
 	set_frameset(ADDR_Frameset_69fcf);
 	var1() = 0x02;
-	mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-10);
+	mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-10);
 	flags() |= OBJFLAG_NO_COLLISION;
 }
 
@@ -1020,19 +1018,19 @@ void GKTortoise::reset()
 	set_frameset(ADDR_Frameset_69fa9);
 	var1() = GKTORTOISEPHASE_1;
 	state() = 0;
-	mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-20);
+	mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-20);
 	flags() &= ~OBJFLAG_NO_COLLISION;
 }
 
 void GKTortoise::phase_56f2e()
 {
-	if (mem_[wShootBallState] == 0x02) {
-		mem_[wShootBallState] = 0x03;
+	if (mem_.shoot_ball_state() == 0x02) {
+		mem_.shoot_ball_state() = 0x03;
 		set_frameset(ADDR_Frameset_69fba);
 		var1() = 0x04;
 		return;
 	}
-	mem_[wCurObjAction] = 0;
+	mem_.cur_obj_action() = 0;
 	uint8_t s = state();
 	if (!s)
 		return;
@@ -1052,7 +1050,7 @@ void GKTortoise::phase_56f2e()
 	state() = 0;
 	set_frameset(ADDR_Frameset_69ff2);
 	var1() = GKTORTOISEPHASE_9;
-	mem_[wShootBallState] = 0x03;
+	mem_.shoot_ball_state() = 0x03;
 	play_sfx(SFX_FAT_WALK);
 	stop_shoot();
 	shoot_to(-16, -11);
@@ -1063,7 +1061,7 @@ bool GKTortoise::frame_ended(uint8_t &offset)
 {
 	if (frame_duration())
 		return false;
-	offset = mem_[wCurObjFramesetOffset];
+	offset = mem_.cur_obj_frameset_offset();
 	return true;
 }
 
@@ -1077,12 +1075,12 @@ void GKTortoise::run(uint16_t handler)
 			return;
 		flags() = 0;
 		set_block_object(0x08);
-		mem_[wBossState] = BOSS_DEFEATED;
+		mem_.boss_state() = BOSS_DEFEATED;
 		home::update_level_music(gb_);
-		mem_[wIsBossBattle] = 0;
+		mem_.is_boss_battle() = 0;
 		return;
 	case GK_DUCKING:
-		offset = mem_[wCurObjFramesetOffset];
+		offset = mem_.cur_obj_frameset_offset();
 		if (offset == 10) {
 			if (frame_duration())
 				return;
@@ -1092,12 +1090,12 @@ void GKTortoise::run(uint16_t handler)
 		if (offset < 6)
 			return;
 		// a delay if Wario's still not in the net
-		if (mem_[wShootBallState] == SHOOTBALL_WARIO_GOAL)
+		if (mem_.shoot_ball_state() == SHOOTBALL_WARIO_GOAL)
 			return;
 		frame_duration() = 16;
 		return;
 	case GK_56F27:
-		if (mem_[wShootBallState]) {
+		if (mem_.shoot_ball_state()) {
 			reset();
 			return;
 		}
@@ -1107,11 +1105,11 @@ void GKTortoise::run(uint16_t handler)
 		phase_56f2e();
 		return;
 	case GK_56FEF:
-		if (mem_[wShootBallState] != 0x02 && (state() & 0xfe)) {
+		if (mem_.shoot_ball_state() != 0x02 && (state() & 0xfe)) {
 			stand_back();
 			return;
 		}
-		if (mem_[wCurObjFramesetOffset] != 0x0c || frame_duration())
+		if (mem_.cur_obj_frameset_offset() != 0x0c || frame_duration())
 			return;
 		reset();
 		return;
@@ -1121,7 +1119,7 @@ void GKTortoise::run(uint16_t handler)
 			stand_back();
 			return;
 		}
-		if (mem_[wCurObjFramesetOffset] != 0x06 || frame_duration())
+		if (mem_.cur_obj_frameset_offset() != 0x06 || frame_duration())
 			return;
 		reset();
 		return;
@@ -1136,8 +1134,8 @@ void GKTortoise::run(uint16_t handler)
 			wario_to(-16, -11);
 			return;
 		case 6:
-			mem_[wAutoMoveState] = 0;
-			mem_[wCurObjAction] = (1 << NO_ACTIONS_F) | 15;
+			mem_.auto_move_state() = 0;
+			mem_.cur_obj_action() = (1 << NO_ACTIONS_F) | 15;
 			play_sfx(SFX_067);
 			return;
 		case 10:
@@ -1161,18 +1159,18 @@ void GKTortoise::run(uint16_t handler)
 			shoot_to(-0x10, -0x0b);
 			return;
 		case 0x10:
-			mem_[wShootBallState] = 0x04;
+			mem_.shoot_ball_state() = 0x04;
 			play_sfx(SFX_067);
 			return;
 		case 0x14:
-			if (mem_[wWarioGoals] != NUM_WARIO_GOALS_NEEDED) {
+			if (mem_.wario_goals() != NUM_WARIO_GOALS_NEEDED) {
 				reset();
 				return;
 			}
 			set_frameset(ADDR_Frameset_6a00e);
 			state_duration() = 180;
 			var1() = GKTORTOISEPHASE_8;
-			mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-10);
+			mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-10);
 			return;
 		}
 		return;
@@ -1187,7 +1185,7 @@ void GKTortoise::run(uint16_t handler)
 			shoot_to(-16, -11);
 			return;
 		case 6:
-			mem_[wShootBallState] = 0x04;
+			mem_.shoot_ball_state() = 0x04;
 			play_sfx(SFX_067);
 			return;
 		case 10:
@@ -1209,8 +1207,8 @@ void GKTortoise::run(uint16_t handler)
 			wario_to(-0x10, -0x0b);
 			return;
 		case 0x10:
-			mem_[wShootBallState] = 0x01;
-			mem_[wAutoMoveState] = 0;
+			mem_.shoot_ball_state() = 0x01;
+			mem_.auto_move_state() = 0;
 			play_sfx(SFX_067);
 			return;
 		case 0x14:
@@ -1231,8 +1229,8 @@ void GKTortoise::platform()
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(PLATFORM_MOVE_LEFT);
 	substate() = (substate() & ~(1 << OBJSUBFLAG_UNINITIALISED_F)) | (1 << OBJSUBFLAG_UNK_4_F);
-	mem_[wCurObjCollBoxRight] = 5;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-6);
+	mem_.cur_obj_coll_box_right() = 5;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-6);
 	set_frameset(ADDR_Frameset_69fdc);
 	state_duration() = 32;
 	var1() = 60;

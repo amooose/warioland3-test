@@ -20,7 +20,7 @@ constexpr uint8_t SRAM0 = BANK_s0a000;
 // the sramswitch macro
 void sram_switch(Memory mem, uint8_t bank)
 {
-	mem[wSRAMBank] = bank;
+	mem.sram_bank() = bank;
 	mem[rRAMB + 0x100] = bank;
 }
 
@@ -78,19 +78,19 @@ void LevelState::init()
 	routines_.call(ADDR_ClearParticles);
 
 	mem_[rSCY] = 0;
-	mem_[wSCY] = 0;
+	mem_.scy() = 0;
 	mem_[rSCX] = 0;
-	mem_[wSCX] = 0;
+	mem_.scx() = 0;
 
 	routines_.in_bank(BANK_LoadLevelCommonGfxAndTreasures, ADDR_LoadLevelCommonGfxAndTreasures, [&] { load_common_gfx(); });
 
 	routines_.call(ADDR_StartRoom_FromLevelStart);
 	home::update_level_music(gb_);
 
-	mem_[wRoomAnimatedTilesEnabled] = TRUE;
-	mem_[wceef] = 0;
+	mem_.room_animated_tiles_enabled() = TRUE;
+	mem_.unk_ceef() = 0;
 
-	uint8_t sram_bank = mem_[wSRAMBank];
+	uint8_t sram_bank = mem_.sram_bank();
 	sram_switch(mem_, SRAM0);
 	for (int i = 0; i < 4; i++) {
 		mem_[s0a000 + i] = 0;
@@ -105,7 +105,7 @@ void LevelState::init()
 	}
 	// the final battle: the window shows Hidden Figure
 	routines_.farcall(BANK_LoadHiddenFigureGfx, ADDR_LoadHiddenFigureGfx);
-	mem_[wc08d] = 0x88;
+	mem_.unk_c08d() = 0x88;
 	mem_[rWY] = 0x88;
 	mem_[rWX] = 0 + WX_OFS;
 	mem_[rLCDC] = LCDC_ON | LCDC_WIN_9C00 | LCDC_WIN_ON | LCDC_OBJ_16 | LCDC_OBJ_ON | LCDC_BG_ON;
@@ -121,13 +121,13 @@ void LevelState::load_common_gfx()
 // the game stays paused for 100 ticks
 void LevelState::collect_key_delay()
 {
-	uint8_t t = ++mem_[wTimer];
+	uint8_t t = ++mem_.timer();
 	SET_HL(gb_, wTimer);
 	gb_->cpu.f = flags::cp(t, 100);
 	gb_->cpu.a = t;
 	if (t < 100)
 		return;
-	mem_[wTimer] = 0;
+	mem_.timer() = 0;
 	wram_.state() = ST_LEVEL;
 	gb_->cpu.a = ST_LEVEL;
 }
@@ -156,7 +156,7 @@ bool LevelState::tick(uint16_t addr)
 // BCD), stopping at 59:59
 void LevelState::tick_time()
 {
-	uint8_t mode = mem_[wGameModeFlags];
+	uint8_t mode = mem_.game_mode_flags();
 	gb_->cpu.a = mode;
 	gb_->cpu.f = flags::bit(gb_->cpu.f, mode, MODE_TIME_ATTACK_F);
 	if (!(mode & (1 << MODE_TIME_ATTACK_F)))
@@ -182,7 +182,7 @@ void LevelState::tick_time()
 // of the level map, from $a000 up to end_h << 8
 void LevelState::switch_blocks(uint8_t bank, uint8_t end_h, bool on)
 {
-	uint8_t sram_bank = mem_[wSRAMBank];
+	uint8_t sram_bank = mem_.sram_bank();
 	sram_switch(mem_, bank);
 	uint8_t lo = on ? 0x68 : 0x60;
 	for (uint8_t h = 0xa0; h != end_h; h++) {
@@ -199,19 +199,19 @@ void LevelState::switch_blocks(uint8_t bank, uint8_t end_h, bool on)
 // with wSwitchStateUpdated set, the switchable blocks turn on or off
 void LevelState::update_switchable_blocks()
 {
-	uint8_t updated = mem_[wSwitchStateUpdated];
+	uint8_t updated = mem_.switch_state_updated();
 	if (!updated) {
 		gb_->cpu.a = 0;
 		gb_->cpu.f = flags::and_(0);
 		return;
 	}
-	mem_[wSwitchStateUpdated] = 0;
-	uint8_t state = mem_[wSwitchState];
+	mem_.switch_state_updated() = 0;
+	uint8_t state = mem_.switch_state();
 	bool on = state == 0x68;
 	switch_blocks(BANK_sLevelBlockObjectMap, 0xc0, on); // up to HIGH(STARTOF(SRAM) + SIZEOF(SRAM))
 	switch_blocks(BANK_s2a000, 0xb0, on);
 	// pop af: the SRAM bank, and cp $68's flags
-	gb_->cpu.a = mem_[wSRAMBank];
+	gb_->cpu.a = mem_.sram_bank();
 	gb_->cpu.f = flags::cp(state, 0x68);
 	SET_HL(gb_, 0xb000);
 }
@@ -233,13 +233,13 @@ uint16_t LevelState::write_tile_copies(uint16_t at, uint8_t count)
 void LevelState::set_tile_queue_functions()
 {
 	uint16_t at = wVBlankFunc + 0x10;
-	uint8_t size = mem_[wBGMapTileQueueSize];
+	uint8_t size = mem_.bg_map_tile_queue_size();
 	if (size) {
 		at = write_tile_copies(at, size);
 		mem_[at++] = 0xc3; // jp
 		mem_[at++] = static_cast<uint8_t>(ADDR_ProcessLevelTileQueue_VRAM1);
 		mem_[at] = static_cast<uint8_t>(ADDR_ProcessLevelTileQueue_VRAM1 >> 8);
-		at = write_tile_copies(wVBlankFuncExtended, mem_[wBGMapTileQueueSize]);
+		at = write_tile_copies(wVBlankFuncExtended, mem_.bg_map_tile_queue_size());
 		gb_->cpu.c = 0;
 		gb_->cpu.f = FLAG_N | FLAG_Z; // dec c: 1 -> 0
 	} else {
@@ -267,7 +267,7 @@ PORT_EX(LevelStateTable, 0, R_B | R_C | R_D | R_E | R_H | R_L)
 	uint8_t flags = gb->cpu.f;
 	wl3::Routines routines(gb);
 	routines.in_bank(BANK__LevelStateTable, ADDR__LevelStateTable, [&] { LevelState(gb).run_state(); });
-	gb->cpu.a = wl3::Memory(gb)[wROMBank];
+	gb->cpu.a = wl3::Memory(gb).rom_bank();
 	gb->cpu.f = flags;
 }
 

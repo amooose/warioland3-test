@@ -418,8 +418,8 @@ void Scenes::end()
 
 void Scenes::stop_sfx()
 {
-	mem_[hSFXID + 0] = 0xff;
-	mem_[hSFXID + 1] = 0x00;
+	mem_.sfx().hi() = 0xff;
+	mem_.sfx().lo() = 0x00;
 }
 
 // Func_8195d
@@ -496,8 +496,7 @@ bool Scenes::common_step(uint8_t step)
 		return true;
 	}
 	case NAME_FADE:
-		routines_.farcall(BANK_FadeInLevelName, ADDR_FadeInLevelName);
-		if (gb_->cpu.c & 1) // still fading in
+		if (Palettes(gb_).farcall_fade_in_level_name()) // still fading in
 			return true;
 		next_step();
 		return true;

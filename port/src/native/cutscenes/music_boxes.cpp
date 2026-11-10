@@ -33,7 +33,7 @@ void Cutscenes::music_box(uint8_t box)
 		break;
 	case 1: // .Func_9d70c
 		place(wSceneObj2, 176, 74, box);
-		mem_[wSceneObj1YCoord] = 1; // its shadows (draw_shadow)
+		mem_.scene_obj1_y_coord() = 1; // its shadows (draw_shadow)
 		advance();
 		break;
 	case 2: // .Func_9d723
@@ -43,7 +43,7 @@ void Cutscenes::music_box(uint8_t box)
 		wait(30);
 		break;
 	case 4: // .Func_9d738: open
-		set_state(wSceneObj2, static_cast<uint8_t>(mem_[wSceneObj2State] + 1));
+		set_state(wSceneObj2, static_cast<uint8_t>(mem_.scene_obj2_state() + 1));
 		advance();
 		break;
 	case 5: // .Func_9d744
@@ -52,7 +52,7 @@ void Cutscenes::music_box(uint8_t box)
 	case 6: { // .Func_9d749: its tune
 		advance();
 		static constexpr uint16_t TUNES[5] = {SFX_11E, SFX_11F, SFX_120, SFX_121, SFX_122};
-		uint8_t closed = static_cast<uint8_t>(mem_[wSceneObj2State] - 1);
+		uint8_t closed = static_cast<uint8_t>(mem_.scene_obj2_state() - 1);
 		if (closed < 10 && (closed & 1))
 			play_sfx(mem_, TUNES[closed / 2]);
 		break;
@@ -74,7 +74,7 @@ void Cutscenes::music_box(uint8_t box)
 void Cutscenes::draw_music_box()
 {
 	draw_shadow(wSceneObj2, wCurSceneObj, 0x01, 0x00); // Func_9fb4c
-	uint8_t state = mem_[wSceneObj2State]; // .Func_9fc2c
+	uint8_t state = mem_.scene_obj2_state(); // .Func_9fc2c
 	if (state)
 		draw(animate(wSceneObj2State, frameset(MUSIC_BOX_FRAMESETS, state)), ADDR_OAM_bc1f6);
 	draw_shadow(wSceneObj2, wCurSceneObjDuration, 0x01, 0x01); // Func_9fb6c
@@ -98,7 +98,7 @@ void Cutscenes::plant_seeds()
 		break;
 	case 1: // .Func_9d6b6
 		place(wSceneObj2, 176, 74, 0x01);
-		mem_[wSceneObj1YCoord] = 1;
+		mem_.scene_obj1_y_coord() = 1;
 		advance();
 		break;
 	case 2: // .Func_9d6ce
@@ -118,7 +118,7 @@ void Cutscenes::plant_seeds()
 void Cutscenes::draw_func_9fbfa()
 {
 	draw_shadow(wSceneObj2, wCurSceneObj, 0x01, 0x00); // Func_9fb4c
-	if (mem_[wSceneObj2State]) // .Func_9fc09
+	if (mem_.scene_obj2_state()) // .Func_9fc09
 		draw(animate(wSceneObj2State, ADDR_Frameset_bd1b4), ADDR_OAM_bcfb3);
 	draw_shadow(wSceneObj2, wCurSceneObjDuration, 0x01, 0x01); // Func_9fb6c
 }

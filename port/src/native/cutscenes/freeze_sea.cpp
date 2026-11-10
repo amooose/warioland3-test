@@ -30,8 +30,8 @@ void Cutscenes::freeze_sea()
 	// .asm_9d3aa: the sky's palettes, from pals
 	auto change_sky = [&](uint16_t pals) {
 		home::copy_far_bytes(gb_, BANK_Pals_b8040, pals, wTempPals1, 8 * PAL_SIZE);
-		mem_[wSceneObj1YCoord] = 0;
-		mem_[wSceneObj2State] = 0;
+		mem_.scene_obj1_y_coord() = 0;
+		mem_.scene_obj2_state() = 0;
 		wram_.collection_row() = 0x08;
 		set_bg_pals_to_load();
 		advance();
@@ -48,7 +48,7 @@ void Cutscenes::freeze_sea()
 	case 2: // .Func_9d37a
 	case 10:
 		place(wSceneObj2, 172, 88, 0x01);
-		mem_[wSceneObj1YCoord] = 1;
+		mem_.scene_obj1_y_coord() = 1;
 		advance();
 		break;
 	case 3: // .Func_9d392
@@ -69,11 +69,11 @@ void Cutscenes::freeze_sea()
 		break;
 	case 7: // .Func_9d3e1
 		place(wSceneObj2, 176, 50, 0x02);
-		mem_[wSceneObj1YCoord] = 3;
+		mem_.scene_obj1_y_coord() = 3;
 		advance();
 		break;
 	case 8: { // .Func_9d3f9: up 2 pixels a frame
-		Byte y = mem_[wSceneObj2YCoord];
+		Byte y = mem_.scene_obj2_y_coord();
 		y -= 2;
 		if (y == 0x74) {
 			play_sfx(mem_, SFX_113); // .asm_9d438
@@ -95,9 +95,9 @@ void Cutscenes::freeze_sea()
 		advance();
 		break;
 	case 17: { // .Func_9d426: up and right 2 pixels a frame
-		Byte y = mem_[wSceneObj2YCoord];
+		Byte y = mem_.scene_obj2_y_coord();
 		y -= 2;
-		mem_[wSceneObj2XCoord] += 2;
+		mem_.scene_obj2_x_coord() += 2;
 		if (y == 0x70) {
 			play_sfx(mem_, SFX_113);
 			break;
@@ -141,7 +141,7 @@ void Cutscenes::purify_water()
 		break;
 	case 1: // .Func_9d87f
 		place(wSceneObj2, 164, 112, 0x04);
-		mem_[wSceneObj1YCoord] = 3;
+		mem_.scene_obj1_y_coord() = 3;
 		advance();
 		break;
 	case 2: // .Func_9d897: up and left

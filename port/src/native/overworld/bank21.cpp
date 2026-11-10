@@ -29,12 +29,12 @@ public:
 	void port_VBlank_OWPalTransition__Func()
 	{
 		mem_[rWBK] = 0x02; // BANK("WRAM2")
-		mem_[rSCY] = mem_[wSCY];
-		mem_[rSCX] = mem_[wSCX];
-		mem_[rWY] = mem_[wWY];
-		mem_[rWX] = static_cast<uint8_t>(mem_[wWX] + WX_OFS);
+		mem_[rSCY] = mem_.scy();
+		mem_[rSCX] = mem_.scx();
+		mem_[rWY] = mem_.wy();
+		mem_[rWX] = static_cast<uint8_t>(mem_.wx() + WX_OFS);
 
-		uint8_t bank = mem_[wROMBank];
+		uint8_t bank = mem_.rom_bank();
 		bankswitch(BANK_Func_1d8c2c);
 		update_ow_tilemap_vdma(gb_);
 		bankswitch(bank);

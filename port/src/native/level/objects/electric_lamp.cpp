@@ -39,7 +39,7 @@ void ElectricLamp::init()
 void ElectricLamp::discharged()
 {
 	no_actions();
-	if (mem_[wGlobalCounter])
+	if (mem_.global_counter())
 		return;
 	set_frameset(ADDR_Frameset_68ccd);
 	state_duration() = 30;
@@ -61,10 +61,10 @@ void ElectricLamp::charging()
 
 void ElectricLamp::pos_to_hram()
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 }
 
 // down to the floor, then towards Wario
@@ -75,12 +75,12 @@ void ElectricLamp::spark()
 	pos_to_hram();
 	if (!hpos_block_unk1())
 		return;
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
-	mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-6);
-	mem_[wCurObjCollBoxBottom] = 5;
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
+	mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-6);
+	mem_.cur_obj_coll_box_bottom() = 5;
 	set_frameset(ADDR_Frameset_68ca0);
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	set_update(static_cast<uint8_t>(screen_x() + 0x2a) < wario ? GO_RIGHT : GO_LEFT);
 	play_sfx(SFX_06C);
 }
@@ -93,8 +93,8 @@ void ElectricLamp::spark_run(bool right)
 		pos_to_hram();
 		if (hpos_block_down()) {
 			uint16_t y_pos = static_cast<uint16_t>(y() - 4);
-			mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-			mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
+			mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+			mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
 			if (!hpos_block_unk4())
 				return;
 		}

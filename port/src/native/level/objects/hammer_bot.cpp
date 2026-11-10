@@ -99,7 +99,7 @@ private:
 
 bool HammerBot::wario_to_right() const
 {
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	return static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 }
 
@@ -123,7 +123,7 @@ void HammerBot::update()
 
 bool HammerBot::shaken()
 {
-	if (mem_[wGroundShakeCounter] < 0x10)
+	if (mem_.ground_shake_counter() < 0x10)
 		return false;
 	state() = 0x1a;
 	return true;
@@ -131,22 +131,22 @@ bool HammerBot::shaken()
 
 void HammerBot::box(uint8_t left, uint8_t right)
 {
-	mem_[wCurObjCollBoxRight] = right;
-	mem_[wCurObjCollBoxLeft] = left;
+	mem_.cur_obj_coll_box_right() = right;
+	mem_.cur_obj_coll_box_left() = left;
 }
 
 bool HammerBot::on_floor()
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_down()) {
 		state() = 0x11;
 		return false;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	return true;
 }
 
@@ -154,7 +154,7 @@ bool HammerBot::on_floor()
 // position past edge) or a wall stops it: then it turns (state $13)
 bool HammerBot::move_on(int edge, int ahead, uint16_t move)
 {
-	uint8_t in_block = mem_[wCurObjXPos + 0] & 0x0f;
+	uint8_t in_block = mem_.cur_obj_x().lo() & 0x0f;
 	bool right = ahead > 0;
 	if (right ? in_block + edge >= 0x10 : in_block < edge) {
 		if (!(block_beside(right) & 0x0f)) {
@@ -164,10 +164,10 @@ bool HammerBot::move_on(int edge, int ahead, uint16_t move)
 	}
 	uint16_t y_pos = static_cast<uint16_t>(y() - 4);
 	uint16_t x_pos = static_cast<uint16_t>(x() + ahead);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4()) {
 		state() = 0x13;
 		return false;
@@ -194,7 +194,7 @@ void HammerBot::hit(uint8_t s)
 
 void HammerBot::stunned(uint8_t s)
 {
-	mem_[wCurObjAction] = 0x8f;
+	mem_.cur_obj_action() = 0x8f;
 	hit(s);
 	state_duration() = 4;
 	var2() = 0x02;
@@ -235,7 +235,7 @@ void HammerBot::knocked(uint8_t s, uint8_t var2_)
 
 bool HammerBot::shrugs_off()
 {
-	return !mem_[wTransformation] && mem_[wEffectivePowerUp] < GARLIC && (interaction() & INTERACTION_MASK);
+	return !mem_.transformation() && mem_.effective_power_up() < GARLIC && (interaction() & INTERACTION_MASK);
 }
 
 void HammerBot::grab(uint8_t s)
@@ -259,7 +259,7 @@ void HammerBot::run(uint16_t handler)
 {
 	switch (handler) {
 	case VANISH_TOUCH: // pounded: wobbles, unless Wario's strong enough
-		if (!mem_[wCurObjAction] || mem_[wTransformation] || mem_[wEffectivePowerUp] >= SUPER_JUMP_SLAM_OVERALLS
+		if (!mem_.cur_obj_action() || mem_.transformation() || mem_.effective_power_up() >= SUPER_JUMP_SLAM_OVERALLS
 			|| !(interaction() & INTERACTION_MASK)) {
 			call_home(ADDR_VanishObject2);
 			return;
@@ -292,7 +292,7 @@ void HammerBot::run(uint16_t handler)
 			state() = 0x2e;
 		return;
 	case CHARGING: { // fast, until a wall or an edge
-		if (!(mem_[wGlobalCounter] & 0x0f))
+		if (!(mem_.global_counter() & 0x0f))
 			play_sfx(SFX_107);
 		if (shaken() || !on_floor())
 			return;
@@ -306,14 +306,14 @@ void HammerBot::run(uint16_t handler)
 		set_frameset(facing(ADDR_Frameset_68b12, ADDR_Frameset_68b17));
 		return;
 	case WALKING: { // swings when Wario's level and close in front
-		if ((flags() & OBJFLAG_ON_SCREEN) && !(mem_[wGlobalCounter] & 0x1f))
+		if ((flags() & OBJFLAG_ON_SCREEN) && !(mem_.global_counter() & 0x1f))
 			play_sfx(SFX_107);
 		if (shaken() || !on_floor())
 			return;
 		bool right = facing_right();
-		uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+		uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 		if (dy < 0x18 || dy >= 0xe8) {
-			uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+			uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 			if (right ? dx >= 0xc0 : dx < 0x40) {
 				set_frameset(right ? ADDR_Frameset_68b25 : ADDR_Frameset_68b1c);
 				state_duration() = 20;
@@ -362,7 +362,7 @@ void HammerBot::run(uint16_t handler)
 		flags() &= ~(1 << OBJFLAG_GRABBED_F);
 		[[fallthrough]];
 	case DAZED:
-		if (mem_[wGroundShakeCounter] >= 0x10) {
+		if (mem_.ground_shake_counter() >= 0x10) {
 			state() = 0x1c;
 			return;
 		}
@@ -429,7 +429,7 @@ void HammerBot::run(uint16_t handler)
 		grab(0x49);
 		[[fallthrough]];
 	case HELD_49: // carried facing the way Wario does
-		if (mem_[wDirection]) {
+		if (mem_.direction()) {
 			call_home(ADDR_Func_3353);
 			return;
 		}
@@ -440,7 +440,7 @@ void HammerBot::run(uint16_t handler)
 		grab(0x48);
 		[[fallthrough]];
 	case HELD_48:
-		if (!mem_[wDirection]) {
+		if (!mem_.direction()) {
 			call_home(ADDR_Func_3362);
 			return;
 		}
@@ -448,7 +448,7 @@ void HammerBot::run(uint16_t handler)
 		run(GRAB_49);
 		return;
 	case STATE_42:
-		mem_[wCurObjAction] = 0x9f;
+		mem_.cur_obj_action() = 0x9f;
 		state() = 0x42;
 		var3() = 0;
 		set_interaction(OBJ_INTERACTION_00);

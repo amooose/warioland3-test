@@ -68,11 +68,11 @@ void Webber::init()
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(UPDATE);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = static_cast<uint8_t>(-2);
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-16);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-4);
-	var1() = mem_[wCurObjYPos + 0]; // its start
-	var2() = mem_[wCurObjYPos + 1];
+	mem_.cur_obj_coll_box_right() = static_cast<uint8_t>(-2);
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-16);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-4);
+	var1() = mem_.cur_obj_y().lo(); // its start
+	var2() = mem_.cur_obj_y().hi();
 	var3() = 4; // webs before a rest
 	set_fire();
 }
@@ -102,7 +102,7 @@ void Webber::set_shake()
 
 bool Webber::shaken()
 {
-	if (mem_[wGroundShakeCounter] < 0x10)
+	if (mem_.ground_shake_counter() < 0x10)
 		return false;
 	set_shake();
 	return true;
@@ -186,7 +186,7 @@ void Webber::move_vertically(bool up)
 {
 	if (flags() & OBJFLAG_STEPPED) {
 		flags() &= ~OBJFLAG_STEPPED;
-		if (!(mem_[wGlobalCounter] & 1))
+		if (!(mem_.global_counter() & 1))
 			return;
 		move_wario(up ? ADDR_MoveWarioUp : ADDR_MoveWarioDown, 1);
 		call_home(up ? ADDR_HandleUpwardsFloorTransition : ADDR_HandleDownwardsFloorTransition);
@@ -198,10 +198,10 @@ void Webber::move_vertically(bool up)
 
 bool Webber::landed()
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	return hpos_block_unk1();
 }
 
@@ -212,15 +212,15 @@ void Webber::shaking()
 		apply_y_movement(ADDR_Data_604a0);
 		if (!landed())
 			return;
-		mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-		mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+		mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+		mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 		substate() |= OBJSUBFLAG_HDIR;
 	}
 	if (!--state_duration()) {
 		set_return();
 		return;
 	}
-	if (mem_[wGroundShakeCounter] >= 0x11)
+	if (mem_.ground_shake_counter() >= 0x11)
 		set_shake();
 }
 
@@ -233,7 +233,7 @@ void Webber::idle()
 		set_mode(STEPPED_ON, ADDR_Frameset_682d6);
 		return;
 	}
-	if (mem_[wGlobalCounter] & 0x7f)
+	if (mem_.global_counter() & 0x7f)
 		return;
 	if (--var3()) {
 		set_fire();
@@ -263,7 +263,7 @@ void Webber::smashed()
 	}
 	if (facing_right())
 		return;
-	bool super_jump_slam = mem_[wEffectivePowerUp] >= SUPER_JUMP_SLAM_OVERALLS;
+	bool super_jump_slam = mem_.effective_power_up() >= SUPER_JUMP_SLAM_OVERALLS;
 	apply_y_movement(super_jump_slam ? ADDR_Data_60490 : ADDR_Data_603f0);
 	if (!landed())
 		return;
@@ -271,8 +271,8 @@ void Webber::smashed()
 		call_home(ADDR_VanishObject);
 		return;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	substate() |= OBJSUBFLAG_HDIR;
 }
 
@@ -318,7 +318,7 @@ void Webber::resting()
 // drifts down towards Wario until it lands or hits something
 void Webber::web()
 {
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	bool right = static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 	call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	move_down();
@@ -326,8 +326,8 @@ void Webber::web()
 	if (!state()) {
 		if (!landed())
 			return;
-		mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-		mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+		mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+		mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	}
 	set_update(WEB_GONE);
 	set_frameset(ADDR_Frameset_682db);

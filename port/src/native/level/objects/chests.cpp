@@ -25,7 +25,7 @@ public:
 // none once its treasure's taken
 void Chest::chest(uint8_t treasure)
 {
-	if (mem_[wKeyAndTreasureFlags] & treasure)
+	if (mem_.key_and_treasure_flags() & treasure)
 		flags() = 0; // DeinitChest
 	else
 		init();
@@ -37,14 +37,14 @@ void Chest::init()
 	set_update(CLOSED);
 	substate() = (substate() & ~OBJSUBFLAG_UNINITIALISED) | (1 << OBJSUBFLAG_UNK_4_F);
 	set_frameset(ADDR_Frameset_68000);
-	mem_[wCurObjCollBoxRight] = 13;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-14);
+	mem_.cur_obj_coll_box_right() = 13;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-14);
 }
 
 // until Wario opens it with the key
 void Chest::closed()
 {
-	if (state() != OBJSTATE_18 || mem_[wAutoMoveState])
+	if (state() != OBJSTATE_18 || mem_.auto_move_state())
 		return;
 	set_frameset(ADDR_Frameset_68003);
 	state_duration() = 86;
@@ -85,7 +85,7 @@ void Chest::treasure(uint16_t frameset)
 
 using Chest = wl3::level::Chest;
 
-PORT_EX(DeinitChest, 0, ALL_REGISTERS) { wl3::Memory mem(gb); mem[wCurObjFlags] = 0; }
+PORT_EX(DeinitChest, 0, ALL_REGISTERS) { wl3::Memory mem(gb); mem.cur_obj_flags() = 0; }
 PORT_EX(GreyChestFunc, 0, ALL_REGISTERS) { Chest(gb).chest(GREY_TREASURE); }
 PORT_EX(RedChestFunc, 0, ALL_REGISTERS) { Chest(gb).chest(RED_TREASURE); }
 PORT_EX(GreenChestFunc, 0, ALL_REGISTERS) { Chest(gb).chest(GREEN_TREASURE); }

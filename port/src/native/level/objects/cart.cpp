@@ -35,9 +35,9 @@ private:
 void Cart::set_up(uint16_t update, uint16_t frameset)
 {
 	start(update, frameset);
-	mem_[wCurObjCollBoxRight] = 0x0e;
-	mem_[wCurObjCollBoxLeft] = 0xf1;
-	mem_[wCurObjCollBoxBottom] = 0xf4;
+	mem_.cur_obj_coll_box_right() = 0x0e;
+	mem_.cur_obj_coll_box_left() = 0xf1;
+	mem_.cur_obj_coll_box_bottom() = 0xf4;
 }
 
 void Cart::init() { set_up(WAITING, ADDR_Frameset_69199); }
@@ -76,28 +76,28 @@ void Cart::variable_waiting()
 	if (!stepped_on())
 		return;
 	set_update(VARIABLE_MOVING);
-	set_frameset(mem_[wCurObjId] == CART_VARIABLE_RIGHT ? ADDR_Frameset_691aa : ADDR_Frameset_691b3);
+	set_frameset(mem_.cur_obj_id() == CART_VARIABLE_RIGHT ? ADDR_Frameset_691aa : ADDR_Frameset_691b3);
 }
 
-void Cart::moving() { roll(mem_[wCurObjId] == CART_RIGHT, ADDR_Frameset_69199); }
-void Cart::variable_moving() { roll(mem_[wCurObjId] == CART_VARIABLE_RIGHT, ADDR_Frameset_691bf); }
+void Cart::moving() { roll(mem_.cur_obj_id() == CART_RIGHT, ADDR_Frameset_69199); }
+void Cart::variable_moving() { roll(mem_.cur_obj_id() == CART_VARIABLE_RIGHT, ADDR_Frameset_691bf); }
 
 // a pixel every other frame, and Wario with it (unless he's blocked);
 // stops at a wall in front
 void Cart::roll(bool right, uint16_t stopped)
 {
 	one_way_platform();
-	uint8_t counter = mem_[wGlobalCounter];
+	uint8_t counter = mem_.global_counter();
 	if (!(counter & 0x3f))
 		play_sfx(SFX_06D);
 	if (counter & 1)
 		return;
 	uint16_t y_pos = static_cast<uint16_t>(y() - 0x04);
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 0x0e) : static_cast<uint16_t>(x() - 0x0f);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4()) {
 		set_frameset(stopped);
 		set_update(ADDR_CartStoppedFunc);
@@ -107,11 +107,7 @@ void Cart::roll(bool right, uint16_t stopped)
 	if (!(flags() & OBJFLAG_STEPPED))
 		return;
 	flags() &= ~OBJFLAG_STEPPED;
-	if (right)
-		routines_.farcall(BANK_Func_19706, ADDR_Func_19706);
-	else
-		routines_.farcall(BANK_Func_19713, ADDR_Func_19713);
-	if (gb_->cpu.b)
+	if (wario_bottom_collision(right))
 		return;
 	move_wario(right ? ADDR_MoveWarioRight : ADDR_MoveWarioLeft, 0x01);
 }

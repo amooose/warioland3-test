@@ -35,7 +35,7 @@ public:
 private:
 	void switch_bank(uint8_t bank)
 	{
-		mem_[wROMBank] = bank;
+		mem_.rom_bank() = bank;
 		mem_[rROMB0 + 0x100] = bank;
 	}
 	// fn with bank mapped (ld a, [wROMBank] / push af / ld a, b /
@@ -43,7 +43,7 @@ private:
 	template <class F>
 	void in_bank(uint8_t bank, F fn)
 	{
-		uint8_t rom = mem_[wROMBank];
+		uint8_t rom = mem_.rom_bank();
 		switch_bank(bank);
 		fn();
 		switch_bank(rom);
@@ -75,17 +75,17 @@ void OverworldVblank::hdma_from(uint16_t params)
 void OverworldVblank::overworld()
 {
 	mem_[rWBK] = 0x02; // BANK("WRAM2")
-	mem_[rSCY] = mem_[wSCY];
-	mem_[rSCX] = mem_[wSCX];
-	mem_[rWY] = mem_[wWY];
-	mem_[rWX] = static_cast<uint8_t>(mem_[wWX] + WX_OFS);
+	mem_[rSCY] = mem_.scy();
+	mem_[rSCX] = mem_.scx();
+	mem_[rWY] = mem_.wy();
+	mem_[rWX] = static_cast<uint8_t>(mem_.wx() + WX_OFS);
 	in_bank(BANK_Func_1d8c2c, [&] { update_ow_tilemap_vdma(gb_); });
-	if (mem_[wPalConfig1])
+	if (mem_.pal_config1())
 		home::apply_pal_config(gb_, wPalConfig1);
-	in_bank(mem_[wHDMABank], [&] {
-		if (mem_[wHDMA])
+	in_bank(mem_.hdma_bank(), [&] {
+		if (mem_.hdma())
 			hdma_from(wHDMA);
-		if (mem_[w2d0b5]) {
+		if (mem_.unk_2d0b5()) {
 			mem_[rVBK] = 0x01; // BANK("VRAM1")
 			hdma_from(w2d0b5);
 		}
@@ -109,22 +109,22 @@ void OverworldVblank::hdma_15_rows(uint16_t src, uint16_t dest)
 void OverworldVblank::ow_scene()
 {
 	mem_[rWBK] = 0x02;
-	mem_[rSCY] = mem_[wSCY];
-	mem_[rSCX] = mem_[wSCX];
-	if (mem_[wOWPendingTileUpdate]) {
+	mem_[rSCY] = mem_.scy();
+	mem_[rSCX] = mem_.scx();
+	if (mem_.ow_pending_tile_update()) {
 		hdma_15_rows(wTilemap, v0BGMap0);
 		mem_[rVBK] = 0x01; // BANK("VRAM1")
 		hdma_15_rows(wAttrmap, v1BGMap0);
-		mem_[wOWPendingTileUpdate] = 0;
+		mem_.ow_pending_tile_update() = 0;
 	}
-	if (uint8_t bank = mem_[wHDMABank])
+	if (uint8_t bank = mem_.hdma_bank())
 		in_bank(bank, [&] { home::start_hdma(gb_); });
 	mem_[rVBK] = 0;
 	in_bank(BANK_Func_1d8c2c, [&] { update_ow_tilemap_vdma(gb_); });
 	in_bank(BANK_ApplyPalConfig1, [&] {
-		if (mem_[wPalConfig1Register])
+		if (mem_.pal_config1_register())
 			home::apply_pal_config(gb_, wPalConfig1);
-		if (mem_[wPalConfig2])
+		if (mem_.pal_config2())
 			home::apply_pal_config(gb_, wPalConfig2);
 	});
 	transfer_oam();

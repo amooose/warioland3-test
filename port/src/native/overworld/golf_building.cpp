@@ -76,10 +76,10 @@ void GolfBuilding::place_wario()
 	auto walk_in = [this] { // .Func_ada4a
 		static constexpr uint16_t DATA = ADDR__GolfBuilding + 0xbc; // .data
 		uint16_t side = static_cast<uint16_t>(DATA + static_cast<uint8_t>(wram_.next_map_side() * 4));
-		mem_[wOWUIObj1YCoord] = 0x58;
-		mem_[wOWUIObj1XCoord] = mem_[side];
+		mem_.owui_obj1_y_coord() = 0x58;
+		mem_.owui_obj1_x_coord() = mem_[side];
 		mem_[PHASE] = mem_[side + 2];
-		mem_[wOWUIObj2YCoord] = 0xff;
+		mem_.owui_obj2_y_coord() = 0xff;
 		wario_state(0);
 	};
 	if (wram_.crayon_flags() != ALL_CRAYONS) {
@@ -87,10 +87,10 @@ void GolfBuilding::place_wario()
 		return;
 	}
 	if (wram_.ow_level() == LEVEL_GOLF_BUILDING) {
-		mem_[wOWUIObj1YCoord] = 0x58;
-		mem_[wOWUIObj1XCoord] = 0x50;
+		mem_.owui_obj1_y_coord() = 0x58;
+		mem_.owui_obj1_x_coord() = 0x50;
 		mem_[PHASE] = 0x04;
-		mem_[wOWUIObj2YCoord] = 0xff;
+		mem_.owui_obj2_y_coord() = 0xff;
 		wario_state(1);
 		return;
 	}
@@ -152,9 +152,9 @@ void GolfBuilding::update()
 // Func_adbfe.exit: back to the map
 void GolfBuilding::leave()
 {
-	mem_[hSFXID + 0] = 0xff; // stop_sfx
-	mem_[hSFXID + 1] = 0x00;
-	mem_[wOWUIObj2Duration] = 0x01;
+	mem_.sfx().hi() = 0xff; // stop_sfx
+	mem_.sfx().lo() = 0x00;
+	mem_.owui_obj2_duration() = 0x01;
 	wram_.sub_state() = 0x08;
 }
 
@@ -219,7 +219,7 @@ void GolfBuilding::step()
 		case 0: case 3: case 5: case 7: { // .Func_add21 and the like: once
 			// Wario's in the state
 			static constexpr uint8_t STATES[] = {0x01, 0, 0, 0x02, 0, 0x0c, 0, 0x0d};
-			if (mem_[wOWUIObj1State] == STATES[s])
+			if (mem_.owui_obj1_state() == STATES[s])
 				next();
 			return;
 		}

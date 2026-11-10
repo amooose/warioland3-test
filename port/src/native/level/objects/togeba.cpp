@@ -39,8 +39,8 @@ void Togeba::init()
 {
 	flags() &= ~OBJFLAG_INVISIBLE;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 0x0b;
-	mem_[wCurObjCollBoxLeft] = 0xf4;
+	mem_.cur_obj_coll_box_right() = 0x0b;
+	mem_.cur_obj_coll_box_left() = 0xf4;
 	reset();
 }
 
@@ -56,7 +56,7 @@ void Togeba::reset()
 // spikes out for a while when hit; flipped by a strong ground shake
 void Togeba::idle()
 {
-	if (mem_[wGroundShakeCounter] >= 0x10) {
+	if (mem_.ground_shake_counter() >= 0x10) {
 		set_update(FLIPPED);
 		set_frameset(ADDR_Frameset_69256);
 		state_duration() = 0x30;
@@ -105,16 +105,16 @@ void Togeba::righting()
 
 bool Togeba::wall(uint16_t x_pos)
 {
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	return hpos_block_unk1();
 }
 
 // a pixel down every other frame, with Wario on it
 void Togeba::sinking()
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
 	if (wall(static_cast<uint16_t>(x() - 0x0c)) || wall(static_cast<uint16_t>(x() + 0x0b))) {
 		right_itself();
 		return;
@@ -130,7 +130,7 @@ void Togeba::sinking()
 		state() = 0;
 		set_frameset(ADDR_Frameset_6927c);
 		state_duration() = 0x0a;
-		if (mem_[wCurObjUnk1d] & 0x80) {
+		if (mem_.cur_obj_unk1d() & 0x80) {
 			set_update(RISING);
 			return;
 		}
@@ -140,7 +140,7 @@ void Togeba::sinking()
 
 void Togeba::sink()
 {
-	if (!(mem_[wGlobalCounter] & 1))
+	if (!(mem_.global_counter() & 1))
 		return;
 	if (flags() & OBJFLAG_STEPPED) {
 		flags() &= ~OBJFLAG_STEPPED;

@@ -131,7 +131,7 @@ void Doughnuteer::update()
 
 bool Doughnuteer::shaken(uint8_t s)
 {
-	if (mem_[wGroundShakeCounter] < 0x10)
+	if (mem_.ground_shake_counter() < 0x10)
 		return false;
 	state() = s;
 	return true;
@@ -153,28 +153,28 @@ bool Doughnuteer::turned()
 
 int Doughnuteer::walk(bool slow)
 {
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_down()) {
 		state() = 0x11;
 		return 0;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	bool right = facing_right();
-	uint8_t in_block = mem_[wCurObjXPos + 0] & 0x0f;
+	uint8_t in_block = mem_.cur_obj_x().lo() & 0x0f;
 	if (right ? in_block + 5 >= 0x10 : in_block < 6) {
 		if (!(block_beside(right) & 0x0f))
 			return right ? 2 : 1;
 	}
 	uint16_t y_pos = static_cast<uint16_t>(y() - 4);
 	uint16_t x_pos = static_cast<uint16_t>(right ? x() + 5 : x() - 6);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		return right ? 2 : 1;
 	if (slow)
@@ -236,7 +236,7 @@ void Doughnuteer::dazed(uint8_t s)
 
 void Doughnuteer::wobble(uint8_t s)
 {
-	mem_[wCurObjAction] = 0x8f;
+	mem_.cur_obj_action() = 0x8f;
 	state() = s;
 	set_frameset(facing(ADDR_Frameset_685b2, ADDR_Frameset_685bb));
 	state_duration() = 0x04;
@@ -319,11 +319,11 @@ void Doughnuteer::run(uint16_t handler)
 		return;
 	case DEFAULT: { // standing, facing Wario
 		set_interaction(OBJ_INTERACTION_01);
-		mem_[wCurObjCollBoxRight] = 0x05;
-		mem_[wCurObjCollBoxLeft] = 0xfa;
-		mem_[wCurObjCollBoxBottom] = 0xff;
+		mem_.cur_obj_coll_box_right() = 0x05;
+		mem_.cur_obj_coll_box_left() = 0xfa;
+		mem_.cur_obj_coll_box_bottom() = 0xff;
 		state() = 0x30;
-		bool right = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+		bool right = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 		if (right)
 			substate() |= OBJSUBFLAG_HDIR;
 		else
@@ -345,9 +345,9 @@ void Doughnuteer::run(uint16_t handler)
 	case WALKING: { // throws at Wario level and close in front; turns if he's behind
 		if (shaken(0x1a))
 			return;
-		uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+		uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 		if (dy < 0x20 || dy >= 0xe0) {
-			uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+			uint8_t dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 			bool wario_right = dx >= 0xc0;
 			if (wario_right || dx < 0x40) {
 				if (facing_right() != wario_right) {
@@ -462,7 +462,7 @@ void Doughnuteer::run(uint16_t handler)
 		grab(0x49);
 		[[fallthrough]];
 	case STATE_49: // carried, turning with Wario
-		if (mem_[wDirection]) {
+		if (mem_.direction()) {
 			call_home(ADDR_Func_3353);
 			return;
 		}
@@ -473,7 +473,7 @@ void Doughnuteer::run(uint16_t handler)
 		grab(0x48);
 		[[fallthrough]];
 	case STATE_48:
-		if (!mem_[wDirection]) {
+		if (!mem_.direction()) {
 			call_home(ADDR_Func_3362);
 			return;
 		}
@@ -481,7 +481,7 @@ void Doughnuteer::run(uint16_t handler)
 		run(STATE_19);
 		return;
 	case STATE_12:
-		mem_[wCurObjAction] = 0x9f;
+		mem_.cur_obj_action() = 0x9f;
 		state() = 0x42;
 		var3() = 0;
 		set_interaction(OBJ_INTERACTION_00);
@@ -494,7 +494,7 @@ void Doughnuteer::run(uint16_t handler)
 
 void Doughnut::aim()
 {
-	bool left = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	bool left = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	set_update(left ? DOUGHNUT_UPDATE_LEFT : DOUGHNUT_UPDATE_RIGHT);
 	var3() = 0;
 }
@@ -508,7 +508,7 @@ void Doughnut::fly(uint16_t page)
 void Doughnut::up()
 {
 	set_update(DOUGHNUT_UP_UPDATE);
-	mem_[wCurObjAction] = 0x8f;
+	mem_.cur_obj_action() = 0x8f;
 	flags() |= OBJFLAG_NO_COLLISION;
 	moving(ADDR_Data_60540);
 }

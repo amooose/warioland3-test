@@ -50,8 +50,8 @@ void hcall(GB *gb, uint16_t addr, F fn)
 	Memory mem(gb);
 	mem[hCallFuncPointer + 0] = static_cast<uint8_t>(addr);
 	mem[hCallFuncPointer + 1] = static_cast<uint8_t>(addr >> 8);
-	uint8_t bank = mem[wROMBank];
-	bankswitch(gb, mem[hCallFuncBank], hCallFunc);
+	uint8_t bank = mem.rom_bank();
+	bankswitch(gb, mem.call_func_bank(), hCallFunc);
 	fn();
 	bankswitch(gb, bank, hCallFunc);
 }
@@ -59,7 +59,7 @@ void hcall(GB *gb, uint16_t addr, F fn)
 template <class F>
 void farcall(GB *gb, uint8_t bank, uint16_t addr, F fn)
 {
-	Memory(gb).byte(hCallFuncBank) = bank;
+	Memory(gb).call_func_bank() = bank;
 	hcall(gb, addr, fn);
 }
 

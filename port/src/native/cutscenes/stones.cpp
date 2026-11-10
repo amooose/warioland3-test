@@ -25,15 +25,15 @@ void Cutscenes::foot_stone()
 		break;
 	case 1: // .Func_9d9a1
 		place(wSceneObj2, 176, 72, 0x01);
-		mem_[wSceneObj3YCoord] = mem_[wSceneObj2YCoord];
-		mem_[wSceneObj3XCoord] = mem_[wSceneObj2XCoord];
-		mem_[wSceneObj1YCoord] = 1;
+		mem_.scene_obj3_y_coord() = mem_.scene_obj2_y_coord();
+		mem_.scene_obj3_x_coord() = mem_.scene_obj2_x_coord();
+		mem_.scene_obj1_y_coord() = 1;
 		advance();
 		break;
 	case 2: { // .Func_9d9c5: up, with the shadow
-		Byte y = mem_[wSceneObj2YCoord];
+		Byte y = mem_.scene_obj2_y_coord();
 		--y;
-		mem_[wSceneObj3YCoord] = y;
+		mem_.scene_obj3_y_coord() = y;
 		if (y == 0x86) {
 			play_sfx(mem_, SFX_112); // Func_9ce1f
 			break;
@@ -43,7 +43,7 @@ void Cutscenes::foot_stone()
 		break;
 	}
 	case 3: { // .Func_9d9d8: on up, to y $40
-		Byte y = mem_[wSceneObj2YCoord];
+		Byte y = mem_.scene_obj2_y_coord();
 		--y;
 		if (y >= 0x40)
 			break;
@@ -54,14 +54,14 @@ void Cutscenes::foot_stone()
 	case 4: // .Func_9d9e5: the shadow down on odd frames, off the screen
 		if (!(frame() & 1))
 			break;
-		if (++mem_[wSceneObj3YCoord] == SCREEN_HEIGHT_PX)
+		if (++mem_.scene_obj3_y_coord() == SCREEN_HEIGHT_PX)
 			advance();
 		break;
 	case 5: // .Func_9d9f4
 		wait(30);
 		break;
 	case 6: { // .Func_9d9f9: the stone falls, 3 pixels a frame
-		Byte y = mem_[wSceneObj2YCoord];
+		Byte y = mem_.scene_obj2_y_coord();
 		y += 3;
 		if (y < 0xb0)
 			break;
@@ -102,10 +102,10 @@ void Cutscenes::init_snake_door(uint16_t pals1, uint16_t pals2)
 	cutscenes::load_cutscene_bg_maps(gb_, 13);
 	// Func_9da0e
 	set_state(wSceneObj4, 0x05);
-	mem_[wSceneObj4] = 96;
+	mem_.scene_obj4() = 96;
 	mem_[wSceneObj4 + 1] = 80;
 	set_state(wSceneObj5, 0x06);
-	mem_[wSceneObj5] = 96;
+	mem_.scene_obj5() = 96;
 	mem_[wSceneObj5 + 1] = 80;
 	draw_snake_door();
 }
@@ -123,14 +123,14 @@ void Cutscenes::snake_door()
 		break;
 	case 2: // .Func_9da52
 		set_state(wSceneObj2, 0x01);
-		mem_[wSceneObj2YCoord] = 0;
-		mem_[wSceneObj2XCoord] = 80;
+		mem_.scene_obj2_y_coord() = 0;
+		mem_.scene_obj2_x_coord() = 80;
 		advance();
 		break;
 	case 3: // .Func_9da65: down on even frames
 		if (frame() & 1)
 			break;
-		if (++mem_[wSceneObj2YCoord] != 0x45)
+		if (++mem_.scene_obj2_y_coord() != 0x45)
 			break;
 		play_sfx(mem_, SFX_CLICK);
 		advance();
@@ -142,22 +142,22 @@ void Cutscenes::snake_door()
 		advance();
 		break;
 	case 5: // .Func_9da8b: the bite (its sound at frame 3), until state 1
-		if (mem_[wSceneObj2State] != 0x01) {
-			if (mem_[wSceneObj2Frame] == 0x03 && !mem_[wSceneObj2Duration])
+		if (mem_.scene_obj2_state() != 0x01) {
+			if (mem_.scene_obj2_frame() == 0x03 && !mem_.scene_obj2_duration())
 				play_sfx(mem_, SFX_12C);
 			break;
 		}
 		set_state(wSceneObj2, 0x02);
 		set_state(wSceneObj3, 0x03);
-		mem_[wSceneObj3YCoord] = mem_[wSceneObj2YCoord];
-		mem_[wSceneObj3XCoord] = mem_[wSceneObj2XCoord];
+		mem_.scene_obj3_y_coord() = mem_.scene_obj2_y_coord();
+		mem_.scene_obj3_x_coord() = mem_.scene_obj2_x_coord();
 		advance();
 		break;
 	case 6: // .Func_9dac4
 		wait(40);
 		break;
 	case 7: { // .Func_9dac9: apart a pixel every 8 frames, rumbling
-		Byte rumble = mem_[wSceneObj4Unk7]; // .Func_9daf0
+		Byte rumble = mem_.scene_obj4_unk7(); // .Func_9daf0
 		++rumble;
 		if (rumble >= 0x11) {
 			rumble = 0;
@@ -166,11 +166,11 @@ void Cutscenes::snake_door()
 		if (frame() & 0x07)
 			break;
 		++wram_.cutscene_wx();
-		++mem_[wSceneObj5XCoord];
-		++mem_[wSceneObj3XCoord];
+		++mem_.scene_obj5_x_coord();
+		++mem_.scene_obj3_x_coord();
 		++wram_.scx();
-		--mem_[wSceneObj4XCoord];
-		if (--mem_[wSceneObj2XCoord] == 0x40)
+		--mem_.scene_obj4_x_coord();
+		if (--mem_.scene_obj2_x_coord() == 0x40)
 			advance();
 		break;
 	}

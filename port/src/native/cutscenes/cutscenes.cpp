@@ -237,8 +237,8 @@ void Cutscenes::finish()
 
 void Cutscenes::stop_sfx()
 {
-	mem_[hSFXID + 0] = 0xff;
-	mem_[hSFXID + 1] = 0x00;
+	mem_.sfx().hi() = 0xff;
+	mem_.sfx().lo() = 0x00;
 }
 
 // Func_9ccf9 (and the steps' own copies): the object at (x, y) in state
@@ -391,7 +391,7 @@ void Cutscenes::draw(uint16_t obj, uint16_t oam, uint8_t bank)
 // object's coords, through a 4-byte slot at dest (in wCurSceneObj)
 void Cutscenes::draw_shadow(uint16_t obj, uint16_t dest, uint8_t y_check, uint8_t frame)
 {
-	if (mem_[wSceneObj1YCoord] != y_check)
+	if (mem_.scene_obj1_y_coord() != y_check)
 		return;
 	mem_[dest] = mem_[obj];
 	mem_[static_cast<uint16_t>(dest + 1)] = mem_[static_cast<uint16_t>((obj & 0xff00) | static_cast<uint8_t>(obj + 1))];

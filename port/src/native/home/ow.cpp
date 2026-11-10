@@ -13,7 +13,7 @@ namespace {
 template <class F>
 auto in_bank(GB *gb, uint8_t bank, uint16_t routine, F fn)
 {
-	uint8_t saved = Memory(gb)[wROMBank];
+	uint8_t saved = Memory(gb).rom_bank();
 	bankswitch(gb, bank, routine);
 	auto result = fn();
 	bankswitch(gb, saved, routine);
@@ -24,10 +24,10 @@ auto in_bank(GB *gb, uint8_t bank, uint16_t routine, F fn)
 // scroll for a position on the BG map
 void set_cur_sprite(Memory mem, uint16_t obj, uint8_t scy, uint8_t scx)
 {
-	mem[wCurSpriteYCoord] = static_cast<uint8_t>(mem[obj] - scy + 0x10);
-	mem[wCurSpriteXCoord] = static_cast<uint8_t>(mem[static_cast<uint16_t>(obj + 1)] - scx + 0x08);
-	mem[wCurSpriteFrame] = mem[static_cast<uint16_t>(obj + 2)];
-	mem[wCurSpriteAttributes] = mem[static_cast<uint16_t>(obj + 3)];
+	mem.cur_sprite_y_coord() = static_cast<uint8_t>(mem[obj] - scy + 0x10);
+	mem.cur_sprite_x_coord() = static_cast<uint8_t>(mem[static_cast<uint16_t>(obj + 1)] - scx + 0x08);
+	mem.cur_sprite_frame() = mem[static_cast<uint16_t>(obj + 2)];
+	mem.cur_sprite_attributes() = mem[static_cast<uint16_t>(obj + 3)];
 }
 
 // where UpdateOWAnimation writes a new frame: two bytes before the
@@ -43,7 +43,7 @@ uint16_t ow_frame_addr(uint16_t duration)
 int update_ow_animation(GB *gb, uint8_t bank, uint16_t duration, uint16_t frameset)
 {
 	Memory mem(gb);
-	mem[wOWAnimationFinished] = 0;
+	mem.ow_animation_finished() = 0;
 	return in_bank(gb, bank, ADDR_UpdateOWAnimation, [&] {
 		uint8_t left = mem[duration];
 		mem[duration] = static_cast<uint8_t>(left - 1);
@@ -54,7 +54,7 @@ int update_ow_animation(GB *gb, uint8_t bank, uint16_t duration, uint16_t frames
 		uint16_t entry = static_cast<uint16_t>(frameset + offset);
 		uint8_t frame = mem[entry];
 		if (frame == 0xff) { // the end: start over
-			mem[wOWAnimationFinished] = frame;
+			mem.ow_animation_finished() = frame;
 			entry = frameset;
 			frame = mem[frameset];
 			offset = 0;
@@ -108,7 +108,7 @@ SpriteEnd load_ow_sprite(GB *gb, uint8_t bank, uint16_t table, uint16_t obj)
 SpriteEnd load_ow_sprite_with_scroll(GB *gb, uint8_t bank, uint16_t table, uint16_t obj)
 {
 	Memory mem(gb);
-	set_cur_sprite(mem, obj, mem[wSCY], mem[wSCX]);
+	set_cur_sprite(mem, obj, mem.scy(), mem.scx());
 	return load_ow_sprite_got_params(gb, bank, table);
 }
 
@@ -126,9 +126,9 @@ bool is_treasure_collected(GB *gb, uint8_t treasure)
 void play_overworld_music(GB *gb)
 {
 	Memory mem(gb);
-	uint16_t music = mem[w2d011] ? MUSIC_OVERWORLD_NIGHT : MUSIC_OVERWORLD_DAY;
-	mem[hMusicIDBackup + 0] = mem[hMusicID + 0] = static_cast<uint8_t>(music >> 8);
-	mem[hMusicIDBackup + 1] = mem[hMusicID + 1] = static_cast<uint8_t>(music);
+	uint16_t music = mem.unk_2d011() ? MUSIC_OVERWORLD_NIGHT : MUSIC_OVERWORLD_DAY;
+	mem[hMusicIDBackup + 0] = mem.music().hi() = static_cast<uint8_t>(music >> 8);
+	mem[hMusicIDBackup + 1] = mem.music().lo() = static_cast<uint8_t>(music);
 }
 
 uint16_t ow_anim_object(uint16_t duration, int frame)
@@ -148,7 +148,7 @@ namespace flags = wl3::flags;
 PORT_EX(UpdateOWAnimation, 0, 0)
 {
 	uint16_t duration = REG_HL(gb);
-	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t bank = wl3::Memory(gb).rom_bank();
 	int frame = update_ow_animation(gb, gb->cpu.b, duration, REG_DE(gb));
 	uint16_t hl = frame < 0 ? static_cast<uint16_t>(duration + 1) : ow_frame_addr(duration);
 	if (frame >= 0)
@@ -174,7 +174,7 @@ static void far_copied(GB *gb, uint8_t bank, uint16_t src, uint16_t dest, uint32
 // b = bank, hl = source, de = destination, c = count
 PORT_EX(CopyFarBytes, 0, 0)
 {
-	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t bank = wl3::Memory(gb).rom_bank();
 	uint16_t src = REG_HL(gb), dest = REG_DE(gb);
 	copy_far_bytes(gb, gb->cpu.b, src, dest, gb->cpu.c);
 	far_copied(gb, bank, src, dest, gb->cpu.c ? gb->cpu.c : 0x100);
@@ -183,7 +183,7 @@ PORT_EX(CopyFarBytes, 0, 0)
 // c = pages
 PORT_EX(CopyFarBytes_Long, 0, 0)
 {
-	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t bank = wl3::Memory(gb).rom_bank();
 	uint16_t src = REG_HL(gb), dest = REG_DE(gb);
 	uint8_t pages = gb->cpu.c;
 	copy_far_bytes_long(gb, gb->cpu.b, src, dest, pages);
@@ -193,7 +193,7 @@ PORT_EX(CopyFarBytes_Long, 0, 0)
 
 PORT_EX(LoadFarTiles, 0, 0)
 {
-	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t bank = wl3::Memory(gb).rom_bank();
 	uint16_t src = REG_HL(gb);
 	load_far_tiles(gb, gb->cpu.b, src);
 	far_copied(gb, bank, src, v0Tiles2, 0x80 * TILE_SIZE);
@@ -212,7 +212,7 @@ static void far_pals_regs(GB *gb, uint8_t bank, uint16_t pals, uint16_t dest)
 
 PORT_EX(LoadFarPalsToTempPals1, 0, 0)
 {
-	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t bank = wl3::Memory(gb).rom_bank();
 	uint16_t pals = REG_HL(gb);
 	load_far_pals_to_temp_pals1(gb, gb->cpu.b, pals);
 	far_pals_regs(gb, bank, pals, wTempPals1);
@@ -220,7 +220,7 @@ PORT_EX(LoadFarPalsToTempPals1, 0, 0)
 
 PORT_EX(LoadFarPalsToTempPals2, 0, 0)
 {
-	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t bank = wl3::Memory(gb).rom_bank();
 	uint16_t pals = REG_HL(gb);
 	load_far_pals_to_temp_pals2(gb, gb->cpu.b, pals);
 	far_pals_regs(gb, bank, pals, wTempPals2);
@@ -250,7 +250,7 @@ PORT_EX(LoadOWSprite, 0, 0)
 {
 	wl3::Memory mem(gb);
 	uint16_t obj = REG_HL(gb);
-	uint8_t bank = mem[wROMBank];
+	uint8_t bank = mem.rom_bank();
 	uint8_t f = flags::add(mem[static_cast<uint16_t>(obj + 1)], 0x08);
 	ow_sprite_regs(gb, bank, f, load_ow_sprite(gb, gb->cpu.b, REG_DE(gb), obj));
 }
@@ -259,21 +259,21 @@ PORT_EX(LoadOWSpriteWithScroll, 0, 0)
 {
 	wl3::Memory mem(gb);
 	uint16_t obj = REG_HL(gb);
-	uint8_t bank = mem[wROMBank];
-	uint8_t f = flags::add(static_cast<uint8_t>(mem[static_cast<uint16_t>(obj + 1)] - mem[wSCX]), 0x08);
+	uint8_t bank = mem.rom_bank();
+	uint8_t f = flags::add(static_cast<uint8_t>(mem[static_cast<uint16_t>(obj + 1)] - mem.scx()), 0x08);
 	ow_sprite_regs(gb, bank, f, load_ow_sprite_with_scroll(gb, gb->cpu.b, REG_DE(gb), obj));
 }
 
 // b = bank, hl = the OAM data
 PORT_EX(LoadOWSpriteWithScroll_GotParams, 0, 0)
 {
-	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t bank = wl3::Memory(gb).rom_bank();
 	ow_sprite_regs(gb, bank, gb->cpu.f, load_ow_sprite_got_params(gb, gb->cpu.b, REG_HL(gb)));
 }
 
 PORT_EX(PlayOverworldMusic, 0, 0)
 {
-	uint8_t night = wl3::Memory(gb)[w2d011];
+	uint8_t night = wl3::Memory(gb).unk_2d011();
 	play_overworld_music(gb);
 	gb->cpu.a = static_cast<uint8_t>(night ? MUSIC_OVERWORLD_NIGHT : MUSIC_OVERWORLD_DAY);
 	gb->cpu.f = flags::and_(night);

@@ -6,9 +6,9 @@
 PORT_EX(EpilogueStateTable, 0, ALL_REGISTERS)
 {
 	wl3::Memory mem(gb);
-	switch (mem[wSubState]) {
+	switch (mem.sub_state()) {
 	case 0: // .FadeToWhite
-		if (!(mem[wGlobalCounter] & 0b11))
+		if (!(mem.global_counter() & 0b11))
 			wl3::home::fade_bg_to_white(gb, FADE_SPEED_SLOW); // FastFadeToWhite
 		return;
 	case 1: // .Func_473c

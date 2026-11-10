@@ -9,9 +9,9 @@ namespace wl3::home {
 SpriteEnd load_sprite(GB *gb, uint16_t table)
 {
 	Memory mem(gb);
-	uint16_t data = mem.word(static_cast<uint16_t>(table + static_cast<uint8_t>(mem[wCurSpriteFrame] * 2)));
-	uint8_t y = mem[wCurSpriteYCoord], x = mem[wCurSpriteXCoord];
-	uint8_t oam = mem[wVirtualOAMByteSize];
+	uint16_t data = mem.word(static_cast<uint16_t>(table + static_cast<uint8_t>(mem.cur_sprite_frame() * 2)));
+	uint8_t y = mem.cur_sprite_y_coord(), x = mem.cur_sprite_x_coord();
+	uint8_t oam = mem.virtual_oam_byte_size();
 	for (;;) {
 		if (oam >= OAM_SIZE)
 			return {data, oam, true};
@@ -21,31 +21,31 @@ SpriteEnd load_sprite(GB *gb, uint16_t table)
 		mem[dest++] = static_cast<uint8_t>(mem[data++] + y);
 		mem[dest++] = static_cast<uint8_t>(mem[data++] + x);
 		mem[dest++] = mem[data++];
-		mem[dest++] = static_cast<uint8_t>(mem[data++] ^ mem[wCurSpriteAttributes]);
+		mem[dest++] = static_cast<uint8_t>(mem[data++] ^ mem.cur_sprite_attributes());
 		oam = static_cast<uint8_t>(dest);
-		mem[wVirtualOAMByteSize] = oam;
+		mem.virtual_oam_byte_size() = oam;
 	}
 }
 
 bool draw_wario(GB *gb, SpriteEnd *end)
 {
 	Memory mem(gb);
-	if (mem[wTransformation] == TRANSFORMATION_INVISIBLE_WARIO) {
+	if (mem.transformation() == TRANSFORMATION_INVISIBLE_WARIO) {
 		// seen while the counter's upper 4 bits are set and bit 2 is clear
-		uint8_t frame = ++mem[wInvisibleFrame];
+		uint8_t frame = ++mem.invisible_frame();
 		if ((frame & 0xf2) != 0xf0)
 			return false;
-	} else if (mem[wInvisibleFrame]) { // invincible: blinking
+	} else if (mem.invisible_frame()) { // invincible: blinking
 		return false;
 	}
-	mem[wTempBank] = mem[wWarioOAMBank];
-	uint8_t bank = mem[wROMBank];
-	bankswitch(gb, mem[wTempBank], ADDR_DrawWario);
+	mem.temp_bank() = mem.wario_oam_bank();
+	uint8_t bank = mem.rom_bank();
+	bankswitch(gb, mem.temp_bank(), ADDR_DrawWario);
 	uint16_t table = static_cast<uint16_t>(mem[wWarioOAMPtr + 0] << 8 | mem[wWarioOAMPtr + 1]);
-	mem[wCurSpriteYCoord] = mem[wWarioScreenYPos];
-	mem[wCurSpriteXCoord] = mem[wWarioScreenXPos];
-	mem[wCurSpriteFrame] = mem[wWarioFrame];
-	mem[wCurSpriteAttributes] = mem[wWarioAttributes];
+	mem.cur_sprite_y_coord() = mem.wario_screen_y_pos();
+	mem.cur_sprite_x_coord() = mem.wario_screen_x_pos();
+	mem.cur_sprite_frame() = mem.wario_frame();
+	mem.cur_sprite_attributes() = mem.wario_attributes();
 	SpriteEnd sprite = load_sprite(gb, table);
 	if (end)
 		*end = sprite;
@@ -123,11 +123,11 @@ AnimStep update_wario_animation(GB *gb)
 uint8_t queue_block_update(GB *gb, uint16_t block)
 {
 	Memory mem(gb);
-	uint8_t at = mem[wc19e];
+	uint8_t at = mem.unk_c19e();
 	uint16_t entry = static_cast<uint16_t>(wc18e + at);
-	mem[entry] = static_cast<uint8_t>(((mem[wBlockPtrBank] - 1) << 5) + (block >> 8));
+	mem[entry] = static_cast<uint8_t>(((mem.block_ptr_bank() - 1) << 5) + (block >> 8));
 	mem[static_cast<uint16_t>(entry + 1)] = static_cast<uint8_t>(block);
-	mem[wc19e] = static_cast<uint8_t>((at + 2) & 0x0f);
+	mem.unk_c19e() = static_cast<uint8_t>((at + 2) & 0x0f);
 	return at;
 }
 
@@ -136,15 +136,15 @@ namespace {
 // wCurSprite* from a sprite's 4 bytes, its position on screen made OAM's
 void set_cur_sprite(Memory mem, uint16_t obj)
 {
-	mem[wCurSpriteYCoord] = static_cast<uint8_t>(mem[obj] + OAM_Y_OFS);
-	mem[wCurSpriteXCoord] = static_cast<uint8_t>(mem[static_cast<uint16_t>(obj + 1)] + OAM_X_OFS);
-	mem[wCurSpriteFrame] = mem[static_cast<uint16_t>(obj + 2)];
-	mem[wCurSpriteAttributes] = mem[static_cast<uint16_t>(obj + 3)];
+	mem.cur_sprite_y_coord() = static_cast<uint8_t>(mem[obj] + OAM_Y_OFS);
+	mem.cur_sprite_x_coord() = static_cast<uint8_t>(mem[static_cast<uint16_t>(obj + 1)] + OAM_X_OFS);
+	mem.cur_sprite_frame() = mem[static_cast<uint16_t>(obj + 2)];
+	mem.cur_sprite_attributes() = mem[static_cast<uint16_t>(obj + 3)];
 }
 
 SpriteEnd load_sprite_in(GB *gb, uint8_t bank, uint16_t table, uint16_t routine)
 {
-	uint8_t saved = Memory(gb)[wROMBank];
+	uint8_t saved = Memory(gb).rom_bank();
 	bankswitch(gb, bank, routine);
 	SpriteEnd end = load_sprite(gb, table);
 	bankswitch(gb, saved, routine);
@@ -163,9 +163,9 @@ SpriteEnd load_credits_music_box_sprite(GB *gb, uint16_t obj)
 {
 	Memory mem(gb);
 	set_cur_sprite(mem, obj);
-	mem[wTempBank] = mem[wCreditsMusicBoxOAMBank];
+	mem.temp_bank() = mem.credits_music_box_oam_bank();
 	uint16_t table = static_cast<uint16_t>(mem[wCreditsMusicBoxOAMPtr + 0] << 8 | mem[wCreditsMusicBoxOAMPtr + 1]);
-	return load_sprite_in(gb, mem[wTempBank], table, ADDR_LoadCreditsMusicBoxSprite);
+	return load_sprite_in(gb, mem.temp_bank(), table, ADDR_LoadCreditsMusicBoxSprite);
 }
 
 bool update_golf_object_animation(GB *gb, uint16_t frameset, uint16_t duration, uint8_t *new_duration)
@@ -179,7 +179,7 @@ bool update_golf_object_animation(GB *gb, uint16_t frameset, uint16_t duration, 
 	uint16_t entry = static_cast<uint16_t>(frameset + mem[offset]);
 	uint8_t next = mem[entry];
 	if (next == 0xff) {
-		mem[wGolfAnimLastFrame] = mem[frame];
+		mem.golf_anim_last_frame() = mem[frame];
 		mem[frame] = mem[frameset];
 		mem[offset] = 2;
 		uint8_t next_duration = mem[static_cast<uint16_t>(frameset + 1)];
@@ -200,24 +200,24 @@ bool update_golf_object_animation(GB *gb, uint16_t frameset, uint16_t duration, 
 SpriteEnd load_golf_sprite(GB *gb, uint16_t obj)
 {
 	Memory mem(gb);
-	mem[wCurSpriteYCoord] = mem[obj];
-	mem[wCurSpriteXCoord] = mem[static_cast<uint16_t>(obj + 1)];
-	mem[wCurSpriteFrame] = mem[static_cast<uint16_t>(obj + 2)];
-	mem[wCurSpriteAttributes] = mem[static_cast<uint16_t>(obj + 3)];
+	mem.cur_sprite_y_coord() = mem[obj];
+	mem.cur_sprite_x_coord() = mem[static_cast<uint16_t>(obj + 1)];
+	mem.cur_sprite_frame() = mem[static_cast<uint16_t>(obj + 2)];
+	mem.cur_sprite_attributes() = mem[static_cast<uint16_t>(obj + 3)];
 	return load_sprite(gb, static_cast<uint16_t>(mem[wGolfOAMPtr + 0] << 8 | mem[wGolfOAMPtr + 1]));
 }
 
 void load_wario_gfx(GB *gb)
 {
 	Memory mem(gb);
-	mem[wPendingDMASourceBank] = mem[wDMASourceBank];
+	mem.pending_dma_source_bank() = mem.dma_source_bank();
 	mem[wPendingDMASourcePtr + 0] = mem[wDMASourcePtr + 0];
 	mem[wPendingDMASourcePtr + 1] = mem[wDMASourcePtr + 1];
 	mem[wPendingDMADestinationPtr + 0] = static_cast<uint8_t>(v0Tiles0 >> 8);
 	mem[wPendingDMADestinationPtr + 1] = static_cast<uint8_t>(v0Tiles0);
-	mem[wPendingDMADestinationBank] = BANK_v0Tiles0;
-	mem[wPendingDMALength] = 127;
-	mem[wIsDMATransferPending] = TRUE;
+	mem.pending_dma_destination_bank() = BANK_v0Tiles0;
+	mem.pending_dma_length() = 127;
+	mem.is_dma_transfer_pending() = TRUE;
 }
 
 namespace {
@@ -230,12 +230,12 @@ void backup_vram(GB *gb, bool save)
 	uint8_t wram_bank = mem[rWBK];
 	mem[rWBK] = BANK_w3d500;
 	if (save) {
-		mem[w3d500] = mem[wSCY];
-		mem[w3d501] = mem[wSCX];
+		mem.unk_3d500() = mem.scy();
+		mem.unk_3d501() = mem.scx();
 		copy(gb, wTempPals1, w3d280, 16 * PAL_SIZE);
 	} else {
-		mem[wSCY] = mem[w3d500];
-		mem[wSCX] = mem[w3d501];
+		mem.scy() = mem.unk_3d500();
+		mem.scx() = mem.unk_3d501();
 		copy(gb, w3d280, wTempPals1, 16 * PAL_SIZE);
 	}
 	mem[rWBK] = wram_bank;
@@ -266,8 +266,8 @@ void backup_vram(GB *gb, bool save)
 void set_sprite_regs(GB *gb, const SpriteEnd &end)
 {
 	Memory mem(gb);
-	gb->cpu.b = mem[wCurSpriteYCoord];
-	gb->cpu.c = mem[wCurSpriteXCoord];
+	gb->cpu.b = mem.cur_sprite_y_coord();
+	gb->cpu.c = mem.cur_sprite_x_coord();
 	SET_DE(gb, end.data);
 	SET_HL(gb, static_cast<uint16_t>((wVirtualOAM & 0xff00) | end.oam));
 	gb->cpu.a = end.full ? end.oam : 0x80;
@@ -327,8 +327,8 @@ PORT_EX(LoadSprite, 0, 0)
 PORT_EX(DrawWario, 0, 0)
 {
 	wl3::Memory mem(gb);
-	bool invisible = mem[wTransformation] == TRANSFORMATION_INVISIBLE_WARIO;
-	uint8_t bank = mem[wROMBank];
+	bool invisible = mem.transformation() == TRANSFORMATION_INVISIBLE_WARIO;
+	uint8_t bank = mem.rom_bank();
 	SpriteEnd end;
 	if (draw_wario(gb, &end)) {
 		set_sprite_regs(gb, end);
@@ -338,10 +338,10 @@ PORT_EX(DrawWario, 0, 0)
 	}
 	if (invisible) {
 		SET_HL(gb, wInvisibleFrame);
-		gb->cpu.a = mem[wInvisibleFrame] & 0xf2;
+		gb->cpu.a = mem.invisible_frame() & 0xf2;
 		gb->cpu.f = flags::cp(gb->cpu.a, 0xf0);
 	} else {
-		gb->cpu.a = mem[wInvisibleFrame];
+		gb->cpu.a = mem.invisible_frame();
 		gb->cpu.f = flags::and_(gb->cpu.a);
 	}
 }
@@ -370,21 +370,21 @@ PORT_EX(Func_e31, 0, 0)
 	uint16_t block = REG_HL(gb);
 	wl3::Memory mem(gb);
 	// the entry's first byte (not read back: the entry can overlap wc19e)
-	gb->cpu.b = static_cast<uint8_t>(((mem[wBlockPtrBank] - 1) << 5) + (block >> 8));
+	gb->cpu.b = static_cast<uint8_t>(((mem.block_ptr_bank() - 1) << 5) + (block >> 8));
 	uint8_t at = queue_block_update(gb, block);
 	uint16_t entry = static_cast<uint16_t>(wc18e + at);
 	gb->cpu.c = static_cast<uint8_t>(block);
 	gb->cpu.d = 0;
 	gb->cpu.e = at;
 	SET_HL(gb, static_cast<uint16_t>(entry + 1));
-	gb->cpu.a = mem[wc19e];
+	gb->cpu.a = mem.unk_c19e();
 	gb->cpu.f = flags::and_(gb->cpu.a);
 }
 
 // Func_e31 for an object on screen
 PORT_EX(Func_e2b, 0, 0)
 {
-	uint8_t obj_flags = wl3::Memory(gb)[wCurObjFlags];
+	uint8_t obj_flags = wl3::Memory(gb).cur_obj_flags();
 	if (!(obj_flags & (1 << OBJFLAG_ON_SCREEN_F))) {
 		gb->cpu.a = obj_flags;
 		gb->cpu.f = flags::bit(gb->cpu.f, obj_flags, OBJFLAG_ON_SCREEN_F);
@@ -431,7 +431,7 @@ static void loaded_sprite_regs(GB *gb, uint8_t bank, uint8_t f, const SpriteEnd 
 PORT_EX(LoadGameOverSprite, 0, 0)
 {
 	uint16_t obj = REG_HL(gb);
-	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t bank = wl3::Memory(gb).rom_bank();
 	uint8_t f = x_add_flags(gb, obj);
 	loaded_sprite_regs(gb, bank, f, load_game_over_sprite(gb, obj));
 }
@@ -439,7 +439,7 @@ PORT_EX(LoadGameOverSprite, 0, 0)
 PORT_EX(LoadCreditsMusicBoxSprite, 0, 0)
 {
 	uint16_t obj = REG_HL(gb);
-	uint8_t bank = wl3::Memory(gb)[wROMBank];
+	uint8_t bank = wl3::Memory(gb).rom_bank();
 	uint8_t f = x_add_flags(gb, obj);
 	loaded_sprite_regs(gb, bank, f, load_credits_music_box_sprite(gb, obj));
 }

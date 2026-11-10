@@ -26,7 +26,7 @@ void wait_ly(GB *gb, uint8_t ly)
 bool pan_intro_background_layers(GB *gb)
 {
 	Memory mem(gb);
-	if (mem[wceef])
+	if (mem.unk_ceef())
 		return false;
 	static const struct {
 		uint8_t ly;
@@ -51,7 +51,7 @@ bool pan_intro_background_layers(GB *gb)
 bool adjust_japanese_time_attack_description_window(GB *gb, uint8_t *last)
 {
 	Memory mem(gb);
-	if (mem[wLanguage])
+	if (mem.language())
 		return false;
 	static const uint8_t lines[] = {0x2f, 0x38, 0x41, 0x5a, 0x63, 0x6c};
 	for (uint8_t ly : lines) {
@@ -73,18 +73,18 @@ public:
 	// hTransferVirtualOAM (a = wVirtualOAM's page).
 	void port_VBlank_Title__Func()
 	{
-		uint8_t bank = mem_[wROMBank];
+		uint8_t bank = mem_.rom_bank();
 		bankswitch(BANK_TitleScreenBoxTilemap);
-		if (mem_[wcee4] & 0x80) {
+		if (mem_.unk_cee4() & 0x80) {
 			mem_[rVBK] = 0;
 			constexpr uint16_t dest = v0BGMap0 + 14 * TILEMAP_WIDTH + 4; // debgcoord 4, 14
 			home::copy(gb_, ADDR_TitleScreenBoxTilemap, dest, 12);
 			home::copy(gb_, ADDR_TitleScreenBoxTilemap + 12, dest + TILEMAP_WIDTH, 12);
-			mem_[wcee4] &= 0x7f;
+			mem_.unk_cee4() &= 0x7f;
 		}
 		bankswitch(bank);
-		mem_[rSCY] = mem_[wSCY];
-		mem_[rSCX] = mem_[wSCX];
+		mem_[rSCY] = mem_.scy();
+		mem_[rSCX] = mem_.scx();
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
 		transfer_virtual_oam(gb_);
 	}
@@ -102,10 +102,10 @@ namespace flags = wl3::flags;
 PORT_EX(PanIntroBackgroundLayers, 0, ALL_REGISTERS & ~(R_A | R_F))
 {
 	if (pan_intro_background_layers(gb)) {
-		gb->cpu.a = wl3::Memory(gb)[wSCX];
+		gb->cpu.a = wl3::Memory(gb).scx();
 		gb->cpu.f = FLAG_Z | FLAG_H;
 	} else {
-		gb->cpu.a = wl3::Memory(gb)[wceef];
+		gb->cpu.a = wl3::Memory(gb).unk_ceef();
 		gb->cpu.f = flags::and_(gb->cpu.a);
 	}
 }
@@ -117,7 +117,7 @@ PORT_EX(AdjustJapaneseTimeAttackDescriptionWindow, 0, ALL_REGISTERS & ~(R_A | R_
 		gb->cpu.a = static_cast<uint8_t>(last + 0x07);
 		gb->cpu.f = flags::add(last, 0x07);
 	} else {
-		gb->cpu.a = wl3::Memory(gb)[wLanguage];
+		gb->cpu.a = wl3::Memory(gb).language();
 		gb->cpu.f = flags::and_(gb->cpu.a);
 	}
 }

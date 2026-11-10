@@ -28,7 +28,7 @@ void Cutscenes::place_propeller()
 	case 2: // .Func_9e280: down on even frames
 		if (frame() & 1)
 			break;
-		if (++mem_[wSceneObj2YCoord] != 0x50)
+		if (++mem_.scene_obj2_y_coord() != 0x50)
 			break;
 		play_sfx(mem_, SFX_CLICK);
 		advance();
@@ -86,7 +86,7 @@ void Cutscenes::feed_octohon()
 	// .Func_9ebbc: the food sinks a pixel every 4 frames (wGlobalCounter)
 	auto sink = [&] {
 		if (!(wram_.global_counter() & 0x03))
-			++mem_[wSceneObj2YCoord];
+			++mem_.scene_obj2_y_coord();
 	};
 	switch (wram_.unk_2d013()) {
 	case 0:
@@ -99,9 +99,9 @@ void Cutscenes::feed_octohon()
 	case 2: // .Func_9eb05: down on even frames, out of sight
 		if (frame() & 1)
 			break;
-		if (++mem_[wSceneObj2YCoord] != 0xa8)
+		if (++mem_.scene_obj2_y_coord() != 0xa8)
 			break;
-		mem_[wSceneObj2State] = 0;
+		mem_.scene_obj2_state() = 0;
 		advance();
 		break;
 	case 3: // .Func_9eb18
@@ -130,13 +130,13 @@ void Cutscenes::feed_octohon()
 	case 7: // .Func_9eb5c
 		if (frame() < 0x02)
 			break;
-		mem_[wSceneObj3XCoord] -= 2;
+		mem_.scene_obj3_x_coord() -= 2;
 		advance();
 		break;
 	case 8: // .Func_9eb68
 		if (frame() < 0x06)
 			break;
-		mem_[wSceneObj2State] = 0;
+		mem_.scene_obj2_state() = 0;
 		advance();
 		break;
 	case 9: // .Func_9eb73
@@ -147,10 +147,10 @@ void Cutscenes::feed_octohon()
 		advance();
 		break;
 	case 10: // .Func_9eb8a
-		if (mem_[wSceneObj3State] != 0x03)
+		if (mem_.scene_obj3_state() != 0x03)
 			break;
-		mem_[wSceneObj3Unk7] = 0;
-		mem_[wSceneObj4YCoord] = 0;
+		mem_.scene_obj3_unk7() = 0;
+		mem_.scene_obj4_y_coord() = 0;
 		advance();
 		break;
 	case 11: // .Func_9eb9a
@@ -159,7 +159,7 @@ void Cutscenes::feed_octohon()
 	case 12: // .Func_9eb9f
 		if (octohon_step() != 0x88)
 			break;
-		mem_[wSceneObj3State] = 0;
+		mem_.scene_obj3_state() = 0;
 		advance();
 		break;
 	case 13: // .Func_9ebad
@@ -179,10 +179,10 @@ void Cutscenes::feed_octohon()
 		return;
 	}
 	// Func_9fab4: the food, bubbling in state 1
-	uint8_t state = mem_[wSceneObj2State];
+	uint8_t state = mem_.scene_obj2_state();
 	if (state) {
 		uint16_t obj = animate(wSceneObj2State, frameset(ADDR_Func_9fab4 + 0x19, state));
-		if (mem_[wSceneObj2State] == 0x01)
+		if (mem_.scene_obj2_state() == 0x01)
 			periodic_sound(wSceneObj2Unk7, 0x30, SFX_08E); // .Func_9fad6
 		draw(obj, ADDR_OAM_bf847);
 	}
@@ -190,11 +190,11 @@ void Cutscenes::feed_octohon()
 	// state 2 ends in 3; states 1 and 3 make sounds every $28 frames
 	// (counted in wSceneObj4YCoord)
 	for (;;) {
-		uint8_t s = mem_[wSceneObj3State];
+		uint8_t s = mem_.scene_obj3_state();
 		if (!s)
 			break;
 		uint16_t obj = animate(wSceneObj3State, frameset(ADDR_Func_9faea + 0x2a, s), 0x1a);
-		uint8_t now = mem_[wSceneObj3State];
+		uint8_t now = mem_.scene_obj3_state();
 		if (now == 0x01)
 			periodic_sound(wSceneObj4YCoord, 0x28, SFX_08F); // .Func_9fb1f
 		else if (now == 0x03)
@@ -210,7 +210,7 @@ void Cutscenes::feed_octohon()
 // round every $30 frames); its new x
 uint8_t Cutscenes::octohon_step()
 {
-	Byte i = mem_[wSceneObj3Unk7]; // .Func_9ebd3
+	Byte i = mem_.scene_obj3_unk7(); // .Func_9ebd3
 	uint8_t index = i;
 	++i;
 	if (index >= 0x30) {
@@ -219,7 +219,7 @@ uint8_t Cutscenes::octohon_step()
 		++i;
 	}
 	uint8_t dx = mem_[static_cast<uint16_t>(ADDR_Cutscene44Func + 0x11c + index)];
-	Byte x = mem_[wSceneObj3XCoord];
+	Byte x = mem_.scene_obj3_x_coord();
 	x += dx;
 	return x;
 }
@@ -240,7 +240,7 @@ void Cutscenes::init_sky_door()
 void Cutscenes::sky_door()
 {
 	auto at_frame = [&](uint8_t f, uint16_t sfx) {
-		if (mem_[wSceneObj2Frame] != f)
+		if (mem_.scene_obj2_frame() != f)
 			return;
 		if (sfx)
 			play_sfx(mem_, sfx);
@@ -251,7 +251,7 @@ void Cutscenes::sky_door()
 		wait(30);
 		break;
 	case 1: // .Func_9e469
-		if (--mem_[wSceneObj2XCoord] == 0x56)
+		if (--mem_.scene_obj2_x_coord() == 0x56)
 			advance();
 		break;
 	case 2: // .Func_9e474
@@ -290,7 +290,7 @@ void Cutscenes::init_extinguish_fire()
 	cutscenes::load_cutscene_bg_maps(gb_, 32);
 	place(wSceneObj2, 0x80, 0x40, 0x01);
 	place(wSceneObj3, 0x50, 0x5c, 0x01);
-	mem_[wSceneObj3Attributes] |= 1 << 1;
+	mem_.scene_obj3_attributes() |= 1 << 1;
 	draw_extinguish_fire();
 }
 
@@ -335,7 +335,7 @@ void Cutscenes::extinguish_fire()
 	case 8: // .Func_9e541
 		if (frame() < 0x3c)
 			break;
-		mem_[wSceneObj3State] = 0;
+		mem_.scene_obj3_state() = 0;
 		advance();
 		break;
 	case 9:
@@ -352,11 +352,11 @@ void Cutscenes::draw_extinguish_fire()
 {
 	// Func_9f7dc: the extinguisher; state 2 ends in 3, which hisses
 	for (;;) {
-		uint8_t s = mem_[wSceneObj2State];
+		uint8_t s = mem_.scene_obj2_state();
 		if (!s)
 			break;
 		uint16_t obj = animate(wSceneObj2State, frameset(ADDR_Func_9f7dc + 0x26, s));
-		uint8_t now = mem_[wSceneObj2State];
+		uint8_t now = mem_.scene_obj2_state();
 		if (now == 0x02 && next_state_when_done(obj, 0x03))
 			continue;
 		if (now == 0x03)
@@ -366,11 +366,11 @@ void Cutscenes::draw_extinguish_fire()
 	}
 	// Func_9f821: the fire (bank $1a's animations, bank $62's sprites),
 	// crackling in state 1
-	uint8_t state = mem_[wSceneObj3State];
+	uint8_t state = mem_.scene_obj3_state();
 	if (!state)
 		return;
 	uint16_t obj = animate(wSceneObj3State, frameset(ADDR_Func_9f821 + 0x19, state), 0x1a);
-	if (mem_[wSceneObj3State] == 0x01)
+	if (mem_.scene_obj3_state() == 0x01)
 		periodic_sound(wSceneObj3Unk7, 0x0e, SFX_01E); // .Func_9f843
 	draw(obj, ADDR_OAM_18aba0, 0x62);
 }
@@ -409,7 +409,7 @@ void Cutscenes::place_brick()
 	case 4: // .Func_9e58a: up on even frames
 		if (frame() & 1)
 			break;
-		if (--mem_[wSceneObj2YCoord] != 0x50)
+		if (--mem_.scene_obj2_y_coord() != 0x50)
 			break;
 		play_sfx(mem_, SFX_CLICK);
 		advance();
@@ -422,7 +422,7 @@ void Cutscenes::place_brick()
 		return;
 	}
 	// Func_9f857: one frameset
-	if (mem_[wSceneObj2State])
+	if (mem_.scene_obj2_state())
 		draw(animate(wSceneObj2State, ADDR_Frameset_bf154), ADDR_OAM_bf131);
 }
 
@@ -447,7 +447,7 @@ void Cutscenes::spray_iron_wall()
 	auto move = [&](bool down) {
 		if (frame() & 0x03)
 			return;
-		Byte y = mem_[wSceneObj2YCoord];
+		Byte y = mem_.scene_obj2_y_coord();
 		if (down)
 			++y;
 		else
@@ -462,7 +462,7 @@ void Cutscenes::spray_iron_wall()
 	case 1: { // .Func_9e5e2: down on even frames
 		if (frame() & 1)
 			break;
-		uint8_t y = ++mem_[wSceneObj2YCoord];
+		uint8_t y = ++mem_.scene_obj2_y_coord();
 		if (y == 0x31) {
 			play_sfx(mem_, SFX_112); // Func_9ce1f
 			break;
@@ -506,7 +506,7 @@ void Cutscenes::spray_iron_wall()
 		advance();
 		break;
 	case 13: // .Func_9e64c
-		if (mem_[wSceneObj3State] == 0x05)
+		if (mem_.scene_obj3_state() == 0x05)
 			advance();
 		break;
 	case 14:

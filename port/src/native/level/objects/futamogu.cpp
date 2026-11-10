@@ -37,11 +37,11 @@ void Futamogu::init()
 	set_update(UPDATE);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	set_frameset(ADDR_Frameset_68319);
-	var1() = mem_[wCurObjYPos + 0]; // its start
-	var2() = mem_[wCurObjYPos + 1];
-	mem_[wCurObjCollBoxRight] = 5;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-21);
-	mem_[wCurObjCollBoxBottom] = 4;
+	var1() = mem_.cur_obj_y().lo(); // its start
+	var2() = mem_.cur_obj_y().hi();
+	mem_.cur_obj_coll_box_right() = 5;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-21);
+	mem_.cur_obj_coll_box_bottom() = 4;
 }
 
 void Futamogu::update()
@@ -70,7 +70,7 @@ void Futamogu::update()
 
 bool Futamogu::at_start()
 {
-	return mem_[wCurObjYPos + 0] == var1() && mem_[wCurObjYPos + 1] == var2();
+	return mem_.cur_obj_y().lo() == var1() && mem_.cur_obj_y().hi() == var2();
 }
 
 void Futamogu::set_shake()
@@ -90,7 +90,7 @@ void Futamogu::set_idle()
 // at its start, annoyed when stood on; else climbs back
 void Futamogu::idle()
 {
-	if (mem_[wGroundShakeCounter] >= 0x10) {
+	if (mem_.ground_shake_counter() >= 0x10) {
 		set_shake();
 		return;
 	}
@@ -109,7 +109,7 @@ void Futamogu::idle()
 // a pixel a frame (half that, with Wario on it)
 void Futamogu::climb()
 {
-	if (mem_[wGroundShakeCounter] >= 0x10) {
+	if (mem_.ground_shake_counter() >= 0x10) {
 		set_shake();
 		return;
 	}
@@ -119,7 +119,7 @@ void Futamogu::climb()
 	}
 	if (flags() & OBJFLAG_STEPPED) {
 		flags() &= ~OBJFLAG_STEPPED;
-		if (!(mem_[wGlobalCounter] & 1))
+		if (!(mem_.global_counter() & 1))
 			return;
 		move_wario(ADDR_MoveWarioUp, 1);
 		home::handle_upwards_floor_transition(gb_);
@@ -160,20 +160,20 @@ void Futamogu::fall()
 	}
 	if (facing_right())
 		return;
-	bool super_jump_slam = mem_[wEffectivePowerUp] >= SUPER_JUMP_SLAM_OVERALLS;
+	bool super_jump_slam = mem_.effective_power_up() >= SUPER_JUMP_SLAM_OVERALLS;
 	apply_y_movement(super_jump_slam ? ADDR_Data_60490 : ADDR_Data_603f0);
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_unk1())
 		return;
 	if (super_jump_slam) {
 		knocked_out();
 		return;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	substate() |= OBJSUBFLAG_HDIR;
 }
 

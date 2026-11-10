@@ -84,14 +84,14 @@ void RoboMouse::init()
 	set_update(APPEAR);
 	// the asm sets OBJFLAG_INVISIBLE_F in the substate, not the flags
 	substate() = (substate() & ~OBJSUBFLAG_UNINITIALISED) | (1 << OBJFLAG_INVISIBLE_F);
-	mem_[wCurObjCollBoxRight] = 0x0b;
-	mem_[wCurObjCollBoxLeft] = 0xf4;
-	mem_[wCurObjCollBoxBottom] = 0xfc;
+	mem_.cur_obj_coll_box_right() = 0x0b;
+	mem_.cur_obj_coll_box_left() = 0xf4;
+	mem_.cur_obj_coll_box_bottom() = 0xfc;
 }
 
 bool RoboMouse::wario_to_right() const
 {
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	return static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 }
 
@@ -123,23 +123,23 @@ void RoboMouse::hpos_offset(int16_t dy, int16_t dx)
 {
 	uint16_t y_pos = static_cast<uint16_t>(y() + dy);
 	uint16_t x_pos = static_cast<uint16_t>(x() + dx);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 }
 
 // the robo mouse blocks dx to its side, at 3 heights
 void RoboMouse::break_blocks(bool right, uint8_t dx)
 {
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + dx) : static_cast<uint16_t>(x() - dx);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	for (uint8_t dy : {0x04, 0x14, 0x24}) {
 		uint16_t y_pos = static_cast<uint16_t>(y() - dy);
-		mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-		mem_[wBlockFuncSpecialCollision] = COLLISION_ROBO_MOUSE_BREAK;
+		mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+		mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+		mem_.block_func_special_collision() = COLLISION_ROBO_MOUSE_BREAK;
 		hpos_block_unk4();
 	}
 }
@@ -241,7 +241,7 @@ void RoboMouse::walk()
 		return;
 	var2() = 0x02;
 	uint16_t frameset = right ? ADDR_Frameset_691e5 : ADDR_Frameset_69213;
-	if (mem_[wCurObjFramesetPtr] != (frameset & 0xff))
+	if (mem_.cur_obj_frameset_ptr() != (frameset & 0xff))
 		set_frameset(frameset);
 }
 
@@ -258,20 +258,20 @@ bool RoboMouse::walk_floor(bool right)
 		set_frameset(right ? ADDR_Frameset_691de : ADDR_Frameset_69220);
 		return false;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	if (floor == 0x10)
 		return false;
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 7) : static_cast<uint16_t>(x() - 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (!hpos_block_down()) {
 		state() = right ? 0x23 : 0x22;
 		return true;
 	}
 	break_blocks(right, right ? 0x0b : 0x0c);
 	hpos_offset(-4, right ? 0x13 : -0x14);
-	mem_[wBlockFuncSpecialCollision] = COLLISION_ROBO_MOUSE_FREE;
+	mem_.block_func_special_collision() = COLLISION_ROBO_MOUSE_FREE;
 	if (!(hpos_block_unk4() & 0x0f))
 		return false;
 	y() = static_cast<uint16_t>(y() - 6);
@@ -286,7 +286,7 @@ void RoboMouse::recover()
 		call_home(ADDR_Func_3308);
 		return;
 	}
-	uint16_t wario_x = static_cast<uint16_t>(mem_[wWarioXPos + 0] << 8 | mem_[wWarioXPos + 1]);
+	uint16_t wario_x = mem_.wario_x();
 	bool wario_left = wario_x < x();
 	if (wario_left == !facing_right()) {
 		set_interaction_and_priority();

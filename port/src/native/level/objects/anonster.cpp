@@ -151,7 +151,7 @@ private:
 // carry if the object is left of Wario
 bool Anonster::left_of_wario() const
 {
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	return static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 }
 
@@ -165,7 +165,7 @@ void Anonster::face_wario()
 
 void Anonster::start()
 {
-	mem_[wIsBossBattle] = TRUE;
+	mem_.is_boss_battle() = TRUE;
 	var2() = 27;
 	move_up_by_var2();
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
@@ -179,7 +179,7 @@ void Anonster::enter()
 {
 	if (--state_duration())
 		return;
-	mem_[wBossState] = BOSS_REGULAR;
+	mem_.boss_state() = BOSS_REGULAR;
 	home::update_level_music(gb_);
 	hide();
 }
@@ -223,10 +223,10 @@ bool Anonster::wall_ahead(uint8_t right_offset, uint8_t left_offset)
 {
 	uint16_t y_pos = static_cast<uint16_t>(y() - 4);
 	uint16_t x_pos = facing_right() ? static_cast<uint16_t>(x() + right_offset) : static_cast<uint16_t>(x() - left_offset);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	return hpos_block_unk4();
 }
 
@@ -360,7 +360,7 @@ void Anonster::ground_box()
 // most), then drops
 void Anonster::run_to_wario()
 {
-	if ((mem_[wWarioScreenXPos] & 0xfe) != (screen_x() & 0xfe)) {
+	if ((mem_.wario_screen_x_pos() & 0xfe) != (screen_x() & 0xfe)) {
 		bool right = facing_right();
 		if (!wall_ahead(0x10, 0x11)) {
 			call_home(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
@@ -383,18 +383,18 @@ void Anonster::drop()
 {
 	bool landed = false;
 	if (screen_y() >= 0x50) {
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		landed = hpos_block_unk1();
 	}
 	if (!landed) {
 		apply_y_movement(ADDR_Data_607f0);
 		return;
 	}
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	set_update(LAND);
 	set_frameset(ADDR_Frameset_69450);
 	state_duration() = 0x20;
@@ -424,10 +424,10 @@ void Anonster::land()
 void Anonster::stand()
 {
 	bool right = facing_right();
-	mem_[wCurObjCollBoxRight] = right ? 0x07 : 0x10;
-	mem_[wCurObjCollBoxLeft] = right ? 0xef : 0xf8;
-	mem_[wCurObjCollBoxBottom] = 0x00;
-	mem_[wCurObjCollBoxTop] = 0xf0;
+	mem_.cur_obj_coll_box_right() = right ? 0x07 : 0x10;
+	mem_.cur_obj_coll_box_left() = right ? 0xef : 0xf8;
+	mem_.cur_obj_coll_box_bottom() = 0x00;
+	mem_.cur_obj_coll_box_top() = 0xf0;
 	set_interaction(OBJ_INTERACTION_48);
 	set_frameset(right ? ADDR_Frameset_69496 : ADDR_Frameset_69485);
 	state_duration() = 0;
@@ -454,11 +454,11 @@ void Anonster::rush()
 		}
 		frameset = ADDR_Frameset_69573;
 	} else {
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
 		uint16_t x_pos = static_cast<uint16_t>(x() + 0x17);
-		mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-		mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+		mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+		mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 		if (hpos_block_down()) {
 			move_right();
 			return;
@@ -488,7 +488,7 @@ bool Anonster::count_down()
 // hit: it's hurt only from behind
 void Anonster::hit()
 {
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	bool c = static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 	if (facing_right() ? c : !c) {
 		stand();
@@ -518,9 +518,9 @@ void Anonster::ground()
 	case 0x00: {
 		if (count_down())
 			return;
-		if (mem_[wGlobalCounter] & 1)
+		if (mem_.global_counter() & 1)
 			return;
-		bool c = screen_x() < mem_[wWarioScreenXPos];
+		bool c = screen_x() < mem_.wario_screen_x_pos();
 		bool right = facing_right();
 		if (right ? !c : c) {
 			rush();
@@ -547,7 +547,7 @@ void Anonster::ground()
 		create_object_at_offset(facing(ADDR_ObjParams_AnonsterWaveLeft, ADDR_ObjParams_AnonsterWaveRight));
 		return;
 	case 0x5c:
-		if (mem_[wTransformation] == TRANSFORMATION_BALL_O_STRING_WARIO) {
+		if (mem_.transformation() == TRANSFORMATION_BALL_O_STRING_WARIO) {
 			tangle();
 			return;
 		}
@@ -555,7 +555,7 @@ void Anonster::ground()
 			return;
 		if (frame_duration() >= 0x03)
 			frame_duration() -= 0x03;
-		if (!(mem_[wGlobalCounter] & 0x0f))
+		if (!(mem_.global_counter() & 0x0f))
 			play_sfx(SFX_0AF);
 		rush();
 		return;
@@ -615,7 +615,7 @@ void Anonster::climb_back()
 		apply_y_movement(ADDR_Data_607e0);
 		return;
 	}
-	if (mem_[wTransformation] != TRANSFORMATION_BALL_O_STRING_WARIO)
+	if (mem_.transformation() != TRANSFORMATION_BALL_O_STRING_WARIO)
 		hide();
 }
 
@@ -664,9 +664,9 @@ void Anonster::defeated()
 	if (--state_duration())
 		return;
 	set_block_object(0x05);
-	mem_[wBossState] = BOSS_DEFEATED;
+	mem_.boss_state() = BOSS_DEFEATED;
 	home::update_level_music(gb_);
-	mem_[wIsBossBattle] = 0;
+	mem_.is_boss_battle() = 0;
 	set_frameset(facing(ADDR_Frameset_694d7, ADDR_Frameset_694dc));
 	state() = 0x48;
 	face_wario();
@@ -762,13 +762,13 @@ void AnonsterHelper::sink()
 			destroy();
 		return;
 	}
-	if (mem_[wGlobalCounter] & 0x03)
+	if (mem_.global_counter() & 0x03)
 		return;
 	move_down();
-	mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-	mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+	mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 	if (!hpos_block_unk1())
 		return;
 	set_frameset(ADDR_Frameset_694f5);
@@ -785,14 +785,14 @@ void AnonsterHelper::drift()
 		return;
 	}
 	uint16_t y_pos = static_cast<uint16_t>(y() - 4);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
 	bool right = facing_right();
 	apply_x_movement_loop(right ? ADDR_Data_60800 : ADDR_Data_60830);
 	uint16_t x_pos = x();
 	x_pos = right ? static_cast<uint16_t>(x_pos - 5) : static_cast<uint16_t>(x_pos + 4);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		substate() ^= OBJSUBFLAG_HDIR;
 	else if (var2() == 0x2e)
@@ -810,10 +810,10 @@ void AnonsterHelper::silk_float(bool right)
 	call_home(right ? ADDR_MoveObjectRight_Fast : ADDR_MoveObjectLeft_Fast);
 	uint16_t y_pos = static_cast<uint16_t>(y() - 4);
 	uint16_t x_pos = right ? static_cast<uint16_t>(x() + 4) : static_cast<uint16_t>(x() - 5);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4()) {
 		set_update(right ? FLOAT_LEFT : FLOAT_RIGHT);
 		if (right)
@@ -865,7 +865,7 @@ void AnonsterHelper::grab(bool right)
 
 void AnonsterHelper::hold(bool right)
 {
-	if (right ? mem_[wDirection] != 0 : mem_[wDirection] == 0) {
+	if (right ? mem_.direction() != 0 : mem_.direction() == 0) {
 		call_home(right ? ADDR_Func_3353 : ADDR_Func_3362);
 		return;
 	}
@@ -919,7 +919,7 @@ void AnonsterHelper::run(uint16_t handler)
 			return;
 		}
 		if (state_duration() < 0x3c) {
-			if ((mem_[wGlobalCounter] & 0x07) < 0x04)
+			if ((mem_.global_counter() & 0x07) < 0x04)
 				flags() |= OBJFLAG_INVISIBLE;
 			else
 				flags() &= ~OBJFLAG_INVISIBLE;
@@ -957,7 +957,7 @@ void AnonsterHelper::run(uint16_t handler)
 		hold(false);
 		return;
 	case STATE_42:
-		mem_[wCurObjAction] = 31 | (1 << 7); // no_actions_for 31
+		mem_.cur_obj_action() = 31 | (1 << 7); // no_actions_for 31
 		state() = 0x42;
 		var3() = 0;
 		return;

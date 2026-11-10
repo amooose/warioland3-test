@@ -36,7 +36,7 @@ public:
 private:
 	void sram_switch(uint8_t bank)
 	{
-		mem_[wSRAMBank] = bank;
+		mem_.sram_bank() = bank;
 		mem_[rRAMB + 0x100] = bank;
 	}
 	// fn with the Level Objects WRAM bank mapped (push_wram / pop_wram)
@@ -48,11 +48,11 @@ private:
 		fn();
 		mem_[rWBK] = wbk;
 	}
-	void wario_flag(bool on) { mem_[wBlockFuncWarioFlag] = on ? TRUE : FALSE; }
+	void wario_flag(bool on) { mem_.block_func_wario_flag() = on ? TRUE : FALSE; }
 	void scroll_from_camera()
 	{
-		mem_[wSCY] = mem_[wCameraSCY + 1];
-		mem_[wSCX] = mem_[wCameraSCX + 1];
+		mem_.scy() = mem_[wCameraSCY + 1];
+		mem_.scx() = mem_[wCameraSCX + 1];
 	}
 	void cam_path(const CamPath &p);
 	void process_blocks(); // .asm_8229
@@ -82,8 +82,8 @@ void LevelFrame::cam_path(const CamPath &p)
 	home::draw_wario(gb_);
 	in_objects_wram([&] { routines_.in_bank(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, [&] { draw_objects_with_priority(gb_); }); });
 	home::clear_unused_virtual_oam(gb_);
-	mem_[wScrollUpEdge] = 0;
-	mem_[wScrollDownEdge] = 0;
+	mem_.scroll_up_edge() = 0;
+	mem_.scroll_down_edge() = 0;
 	level_scroll_vertical(gb_);
 	if (p.horizontal)
 		level_scroll_horizontal(gb_);
@@ -92,75 +92,75 @@ void LevelFrame::cam_path(const CamPath &p)
 // the level's end screens: game over, the epilogue, or the clear screen
 void LevelFrame::end_level()
 {
-	mem_[wResetDisabled] = TRUE;
+	mem_.reset_disabled() = TRUE;
 	for (uint16_t addr : {wGroundShakeCounter, wSCYShake, wAnimatedTilesFrameDuration, wRoomPalCycleDuration,
 		     wRoomAnimatedTilesEnabled, wRoomAnimatedPalsEnabled, wWaterCurrent, wLastWaterCurrent, wCurWaterCurrent,
 		     wSwimmingDirectionInput})
 		mem_[addr] = 0;
 
-	uint8_t end = mem_[wLevelEndScreen];
+	uint8_t end = mem_.level_end_screen();
 	if (end != LVLEND_GAME_OVER && end != LVLEND_EPILOGUE) { // the clear screen
-		mem_[wState] = static_cast<uint8_t>(mem_[wState] + 1); // ST_CLEAR
-		mem_[wSubState] = (mem_[wGameModeFlags] & (1 << MODE_TIME_ATTACK_F)) ? SST_CLEAR_TIME_ATTACK : 0;
+		mem_.state() = static_cast<uint8_t>(mem_.state() + 1); // ST_CLEAR
+		mem_.sub_state() = (mem_.game_mode_flags() & (1 << MODE_TIME_ATTACK_F)) ? SST_CLEAR_TIME_ATTACK : 0;
 		return;
 	}
 
-	Byte modes = mem_[wGameModeFlags];
+	Byte modes = mem_.game_mode_flags();
 	if (end == LVLEND_GAME_OVER) {
-		mem_[wTransitionParam] = TRANSITION_GAME_OVER;
+		mem_.transition_param() = TRANSITION_GAME_OVER;
 	} else {
-		if (mem_[wNumCollectedTreasures] == 1) {
-			mem_[wTransitionParam] = TRANSITION_EPILOGUE_PERFECT;
+		if (mem_.num_collected_treasures() == 1) {
+			mem_.transition_param() = TRANSITION_EPILOGUE_PERFECT;
 			modes |= 1 << MODE_TIME_ATTACK_F;
 		} else {
-			mem_[wTransitionParam] = TRANSITION_EPILOGUE_NOT_PERFECT;
+			mem_.transition_param() = TRANSITION_EPILOGUE_NOT_PERFECT;
 		}
 		modes |= 1 << MODE_GAME_CLEARED_F;
 	}
 	modes |= 1 << MODE_FOUGHT_A_HIDDEN_FIGURE_F;
-	mem_[wState] = ST_EPILOGUE;
-	mem_[wSubState] = 0;
+	mem_.state() = ST_EPILOGUE;
+	mem_.sub_state() = 0;
 }
 
 // SELECT or START: pauses (or just a sound, when blind or in a boss battle)
 void LevelFrame::pause()
 {
-	if (mem_[wTransformation] == TRANSFORMATION_BLIND || mem_[wIsBossBattle]) {
+	if (mem_.transformation() == TRANSFORMATION_BLIND || mem_.is_boss_battle()) {
 		play_sfx(mem_, SFX_0E5);
 		return;
 	}
 	play_sfx(mem_, SFX_0E4);
 	stop_music(mem_);
-	mem_[wRoomAnimatedPalsEnabled] = 0;
-	mem_[wUnused_IsPaused] = TRUE;
-	mem_[wPendingSubState] = mem_[wSubState];
-	mem_[wState] = ST_PAUSE_MENU;
-	mem_[wSubState] = 0;
+	mem_.room_animated_pals_enabled() = 0;
+	mem_.unused_is_paused() = TRUE;
+	mem_.pending_sub_state() = mem_.sub_state();
+	mem_.state() = ST_PAUSE_MENU;
+	mem_.sub_state() = 0;
 }
 
 // the end screens, multi-blocks, the clock and pausing
 void LevelFrame::check_end_screen()
 {
-	if (mem_[wState] != ST_LEVEL)
+	if (mem_.state() != ST_LEVEL)
 		return;
-	if (uint8_t end = mem_[wLevelEndScreen]) {
+	if (uint8_t end = mem_.level_end_screen()) {
 		if (!(end & 0x80))
 			end_level();
 		return;
 	}
 
 	// .no_end_screen
-	if (mem_[wMultiBlockParam]) { // the multi-block next frame
-		mem_[wPendingSubState] = mem_[wSubState];
-		mem_[wSubState] = SST_LEVEL_MULTI_BLOCK;
+	if (mem_.multi_block_param()) { // the multi-block next frame
+		mem_.pending_sub_state() = mem_.sub_state();
+		mem_.sub_state() = SST_LEVEL_MULTI_BLOCK;
 		return;
 	}
 
 	// .tick_time
 	tick_level_time(gb_);
-	if (mem_[wFloorTransitionDir] || mem_[wRoomTransitionParam])
+	if (mem_.floor_transition_dir() || mem_.room_transition_param())
 		return;
-	if (mem_[wJoypadPressed] & (PAD_SELECT | PAD_START))
+	if (mem_.joypad_pressed() & (PAD_SELECT | PAD_START))
 		pause();
 }
 
@@ -168,7 +168,7 @@ void LevelFrame::check_end_screen()
 // mapped), the queue's V-Blank code, then .check_end_screen
 void LevelFrame::process_blocks()
 {
-	uint8_t sram = mem_[wSRAMBank];
+	uint8_t sram = mem_.sram_bank();
 	sram_switch(BANK_sLevelBlockObjectMap); // BANK("SRAM1")
 	queue_scrolled_edge(gb_);
 	queue_changed_block(gb_);
@@ -182,10 +182,10 @@ void LevelFrame::process_blocks()
 
 void LevelFrame::update()
 {
-	mem_[wRoomAnimatedPalsEnabled] = TRUE;
+	mem_.room_animated_pals_enabled() = TRUE;
 	routines_.in_bank(BANK_UpdateParticles, ADDR_UpdateParticles, [&] { update_particles(gb_); });
 
-	uint8_t mode = mem_[wCameraConfigFlags] & CAM_SCROLLING_MASK;
+	uint8_t mode = mem_.camera_config_flags() & CAM_SCROLLING_MASK;
 	if (mode == CAM_FREE || mode == CAM_YSCROLL) {
 		cam_path(mode == CAM_FREE ? FREE_CAMERA : YSCROLL_CAMERA);
 		process_blocks();
@@ -193,17 +193,17 @@ void LevelFrame::update()
 	}
 
 	// no Wario state update during a floor transition
-	if (!mem_[wFloorTransitionDir]) {
+	if (!mem_.floor_transition_dir()) {
 		wario_flag(true);
 		routines_.in_bank(BANK_UpdateWarioStates, ADDR_UpdateWarioStates, [&] { update_wario_states(gb_); });
 	}
 
 	// .skip_update_wario_state
-	if (mem_[wCameraConfigFlags] == HIDDEN_FIGURE_CAMCONFIG) { // .shake_override
-		uint8_t shake = mem_[wSCYShake];
-		mem_[wSCY] = static_cast<uint8_t>(mem_[wHiddenFigureSCYShake] + shake);
-		mem_[wSCX] = mem_[wc08b];
-		mem_[rWY] = static_cast<uint8_t>(mem_[wc08d] + shake);
+	if (mem_.camera_config_flags() == HIDDEN_FIGURE_CAMCONFIG) { // .shake_override
+		uint8_t shake = mem_.scy_shake();
+		mem_.scy() = static_cast<uint8_t>(mem_.hidden_figure_scy_shake() + shake);
+		mem_.scx() = mem_.unk_c08b();
+		mem_[rWY] = static_cast<uint8_t>(mem_.unk_c08d() + shake);
 	} else {
 		scroll_from_camera();
 	}
@@ -215,7 +215,7 @@ void LevelFrame::update()
 
 	// in the Hidden Figure's battle, wAutoMoveState $02 starts the fence
 	// shake sliding
-	if (mem_[wLevel] == THE_TEMPLE && mem_[wAutoMoveState] == 0x02)
+	if (mem_.level() == THE_TEMPLE && mem_.auto_move_state() == 0x02)
 		routines_.farcall(BANK_SetState_FenceShakeSliding, ADDR_SetState_FenceShakeSliding);
 
 	// .process_interactions
@@ -229,9 +229,9 @@ void LevelFrame::update()
 	in_objects_wram([&] { routines_.in_bank(BANK_DrawObjects_WithPriority, ADDR_DrawObjects_WithPriority, [&] { draw_objects_with_priority(gb_); }); });
 	home::clear_unused_virtual_oam(gb_);
 
-	bool floor = (mem_[wFloorTransitionDir] & (FLOOR_TRANSITION_DOWN | FLOOR_TRANSITION_UP)) && !mem_[wIsDMATransferPending];
+	bool floor = (mem_.floor_transition_dir() & (FLOOR_TRANSITION_DOWN | FLOOR_TRANSITION_UP)) && !mem_.is_dma_transfer_pending();
 	if (!floor) { // .no_floor_transition
-		uint8_t config = mem_[wCameraConfigFlags];
+		uint8_t config = mem_.camera_config_flags();
 		if (config == HIDDEN_FIGURE_CAMCONFIG) {
 			check_end_screen();
 			return;
@@ -243,33 +243,33 @@ void LevelFrame::update()
 	}
 
 	// a floor transition: the camera moves 4 pixels a frame
-	mem_[wCameraYDelta] = 0;
-	mem_[wPrevWarioScreenYPos] = mem_[wWarioScreenYPos];
-	uint8_t timer = static_cast<uint8_t>(mem_[wFloorTransitionTimer] - 4);
-	if (!(mem_[wFloorTransitionDir] & (1 << FLOOR_TRANSITION_UP_F))) { // down
-		mem_[wCameraYDelta] = static_cast<uint8_t>(mem_[wCameraYDelta] - 4);
-		mem_[wFloorTransitionTimer] = timer;
+	mem_.camera_y_delta() = 0;
+	mem_.prev_wario_screen_y_pos() = mem_.wario_screen_y_pos();
+	uint8_t timer = static_cast<uint8_t>(mem_.floor_transition_timer() - 4);
+	if (!(mem_.floor_transition_dir() & (1 << FLOOR_TRANSITION_UP_F))) { // down
+		mem_.camera_y_delta() = static_cast<uint8_t>(mem_.camera_y_delta() - 4);
+		mem_.floor_transition_timer() = timer;
 		if (!timer) {
-			mem_[wFloorTransitionDir] = mem_[wFloorTransitionDir] & ~(1 << FLOOR_TRANSITION_DOWN_F);
-			mem_[wIsFloorTransition] = 0;
+			mem_.floor_transition_dir() = mem_.floor_transition_dir() & ~(1 << FLOOR_TRANSITION_DOWN_F);
+			mem_.is_floor_transition() = 0;
 		}
 	} else { // .transition_up: until the timer runs out or the camera's at the bottom
-		mem_[wCameraYDelta] = static_cast<uint8_t>(mem_[wCameraYDelta] + 4);
-		mem_[wFloorTransitionTimer] = timer;
+		mem_.camera_y_delta() = static_cast<uint8_t>(mem_.camera_y_delta() + 4);
+		mem_.floor_transition_timer() = timer;
 		bool end = !timer;
-		if (!end && mem_[wScrollDownEdge] == 1) {
-			mem_[wFloorTransitionTimer] = 0;
+		if (!end && mem_.scroll_down_edge() == 1) {
+			mem_.floor_transition_timer() = 0;
 			end = true;
 		}
 		if (end) { // .end_up_transition
-			mem_[wFloorTransitionDir] = mem_[wFloorTransitionDir] & ~(1 << FLOOR_TRANSITION_UP_F);
-			mem_[wIsFloorTransition] = 0;
+			mem_.floor_transition_dir() = mem_.floor_transition_dir() & ~(1 << FLOOR_TRANSITION_UP_F);
+			mem_.is_floor_transition() = 0;
 		}
 	}
 
 	// .asm_8209
-	mem_[wScrollUpEdge] = 0;
-	mem_[wScrollDownEdge] = 0;
+	mem_.scroll_up_edge() = 0;
+	mem_.scroll_down_edge() = 0;
 	level_scroll_vertical(gb_);
 	process_blocks();
 }

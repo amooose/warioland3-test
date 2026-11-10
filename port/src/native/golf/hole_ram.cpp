@@ -44,8 +44,8 @@ public:
 	void wx_lcdc()
 	{
 		Memory mem(gb_);
-		mem[rWX] = mem[wGolfWX];
-		mem[rLCDC] = mem[wGolfLCDConfig];
+		mem[rWX] = mem.golf_wx();
+		mem[rLCDC] = mem.golf_lcd_config();
 	}
 
 	void hdma(uint16_t src, uint16_t dest, uint8_t len)
@@ -63,7 +63,7 @@ public:
 	void wario_tiles_dma(uint8_t len)
 	{
 		Memory mem(gb_);
-		mem[rROMB0] = mem[wGolfWarioTilesBank];
+		mem[rROMB0] = mem.golf_wario_tiles_bank();
 		hdma(static_cast<uint16_t>(mem[wGolfWarioTilesPtr + 0] << 8 | mem[wGolfWarioTilesPtr + 1]), 0, len);
 	}
 
@@ -82,9 +82,9 @@ public:
 		Memory mem(gb_);
 		golf_wbk(true);
 		mem[v0BGMap0 + 10 * TILEMAP_WIDTH + 5] = 0x03; // ldcoord_a 5, 10
-		mem[rLCDC] = mem[wGolfLCDConfig];
+		mem[rLCDC] = mem.golf_lcd_config();
 		mem[rVBK] = 0;
-		mem[wGolfVBlankMode] = 0;
+		mem.golf_vblank_mode() = 0;
 		transfer_oam();
 	}
 
@@ -155,7 +155,7 @@ public:
 	{
 		Memory mem(gb_);
 		golf_wbk();
-		mem[wGolfVBlankMode] = 0;
+		mem.golf_vblank_mode() = 0;
 		scx();
 		mem[rVBK] = 1; // BANK("VRAM1")
 		home::start_golf_vdma(gb_, map);

@@ -41,7 +41,7 @@ void UnusedFlower::init()
 	set_update(GROW);
 	set_frameset(ADDR_Frameset_6837a);
 	state_duration() = 30;
-	var1() = mem_[wGlobalCounter];
+	var1() = mem_.global_counter();
 }
 
 // once on screen
@@ -64,7 +64,7 @@ bool UnusedFlower::waited()
 	if (state_duration() && --state_duration())
 		return false;
 	frame_duration() = 2;
-	return var1() == mem_[wGlobalCounter];
+	return var1() == mem_.global_counter();
 }
 
 void UnusedFlower::idle()
@@ -84,7 +84,7 @@ void UnusedFlower::preparing()
 	set_update(ATTACK);
 	set_frameset(ADDR_Frameset_683b1);
 	state_duration() = 35;
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	bool right = static_cast<uint8_t>(screen_x() + 0x2a) < wario;
 	create_object_at_offset(right ? ADDR_ObjParams_UnusedFlowerProjectileRight : ADDR_ObjParams_UnusedFlowerProjectileLeft);
 }
@@ -105,10 +105,10 @@ void UnusedFlower::set_destroy()
 void UnusedFlower::pos_to_hram(uint16_t pos, uint8_t dy)
 {
 	uint16_t y_pos = static_cast<uint16_t>(mem_.word(pos) - dy);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = mem_[static_cast<uint16_t>(pos + 2)];
-	mem_[hXPosHi] = mem_[static_cast<uint16_t>(pos + 3)];
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = mem_[static_cast<uint16_t>(pos + 2)];
+	mem_.x_pos_hi() = mem_[static_cast<uint16_t>(pos + 3)];
 }
 
 // thrown (state 0) and falling, rolling (1) until it reaches a wall
@@ -138,8 +138,8 @@ void UnusedFlower::projectile(uint16_t page)
 	pos_to_hram(wCurObjYPos, 0);
 	if (!hpos_block_unk1())
 		return;
-	mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-	mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+	mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+	mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	state() = OBJSTATE_SPECIAL_1;
 }
 

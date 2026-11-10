@@ -22,16 +22,16 @@ public:
 	// hTransferVirtualOAM (a = wVirtualOAM's page)
 	void port_VBlank_LanguageSelection__Func()
 	{
-		uint8_t queued = mem_[wcee4];
+		uint8_t queued = mem_.unk_cee4();
 		if (queued & 0x80) {
 			bool japanese = static_cast<uint8_t>((queued & 0x7f) - 1) != 0;
 			mem_[rVBK] = 1; // BANK("VRAM1")
 			home::fill(gb_, v0BGMap0 + 7 * TILEMAP_WIDTH + 5, japanese ? 0x07 : 0x06, 13);
 			home::fill(gb_, v0BGMap0 + 9 * TILEMAP_WIDTH + 5, japanese ? 0x06 : 0x07, 13);
-			mem_[wcee4] &= 0x7f;
+			mem_.unk_cee4() &= 0x7f;
 		}
-		mem_[rSCY] = mem_[wSCY];
-		mem_[rSCX] = mem_[wSCX];
+		mem_[rSCY] = mem_.scy();
+		mem_[rSCX] = mem_.scx();
 		cpu_.a = static_cast<uint8_t>(wVirtualOAM >> 8);
 		transfer_virtual_oam(gb_);
 	}

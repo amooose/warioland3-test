@@ -12,6 +12,8 @@
 #include "../home/memory.hpp"
 #include "object.hpp"
 
+#include <cstdlib>
+
 namespace wl3::level {
 
 namespace {
@@ -74,16 +76,16 @@ public:
 	// that are inside and outside the screen
 	void check_object_on_screen()
 	{
-		uint16_t y = mem_.word(wCurObjYPos);
-		uint16_t x = mem_.word(wCurObjXPos);
+		uint16_t y = mem_.cur_obj_y();
+		uint16_t x = mem_.cur_obj_x();
 		uint16_t cam_y = camera(wCameraSCY);
 		if (in_range(y, cam_y, 24, SCREEN_HEIGHT_PX, 56, false)) {
 			if (in_range(x, camera(wCameraSCX), 24, SCREEN_WIDTH_PX, 0x30, true))
-				wr8(wCurObjFlags, rd8(wCurObjFlags) | OBJFLAG_ON_SCREEN);
+				mem_.cur_obj_flags() = mem_.cur_obj_flags() | OBJFLAG_ON_SCREEN;
 			else
-				wr8(wCurObjFlags, rd8(wCurObjFlags) & ~OBJFLAG_ON_SCREEN);
-		} else if ((rd8(wCurObjState) & 0xfe) != OBJSTATE_48) {
-			wr8(wCurObjFlags, rd8(wCurObjFlags) & ~OBJFLAG_ON_SCREEN);
+				mem_.cur_obj_flags() = mem_.cur_obj_flags() & ~OBJFLAG_ON_SCREEN;
+		} else if ((mem_.cur_obj_state() & 0xfe) != OBJSTATE_48) {
+			mem_.cur_obj_flags() = mem_.cur_obj_flags() & ~OBJFLAG_ON_SCREEN;
 		}
 
 		// whether the object is far enough outside the screen to unload
@@ -92,7 +94,7 @@ public:
 			&& in_range(x, camera(wCameraSCX), 0x6f, SCREEN_WIDTH_PX, 0xde, true))
 			return;
 
-		uint8_t sub = rd8(wCurObjSubState) & (0xf | OBJSUBFLAG_UNK_4);
+		uint8_t sub = mem_.cur_obj_sub_state() & (0xf | OBJSUBFLAG_UNK_4);
 		if (sub >= (0x0 | OBJSUBFLAG_UNK_4))
 			return;
 		// OBJSUBFLAG_UNK_4 is not set
@@ -100,7 +102,7 @@ public:
 			routines_.in_bank(BANK_DespawnObject, ADDR_DespawnObject, [&] { despawn_object(gb_, wCurObjUnk02); });
 			return;
 		}
-		wr8(wCurObjFlags, 0);
+		mem_.cur_obj_flags() = 0;
 	}
 
 	// fills wObjects' first n bytes (0: 256) with value
@@ -125,31 +127,44 @@ public:
 	// they read no register on entry unless one is passed below, and their
 	// callers none after them (live.py).
 
-	bool heavy() const { return rd8(wCurObjInteractionType) & HEAVY_OBJ; }
+	bool heavy() const { return mem_.cur_obj_interaction_type() & HEAVY_OBJ; }
 	// the object's position (little-endian)
-	uint16_t obj_y() const { return mem_.word(wCurObjYPos); }
-	uint16_t obj_x() const { return mem_.word(wCurObjXPos); }
-	void set_obj_y(uint16_t v) { mem_.word(wCurObjYPos) = v; }
-	void set_obj_x(uint16_t v) { mem_.word(wCurObjXPos) = v; }
-	void set_hpos_y(uint16_t v) { wr8(hYPosLo, static_cast<uint8_t>(v)); wr8(hYPosHi, static_cast<uint8_t>(v >> 8)); }
-	void set_hpos_x(uint16_t v) { wr8(hXPosLo, static_cast<uint8_t>(v)); wr8(hXPosHi, static_cast<uint8_t>(v >> 8)); }
-	uint16_t hpos_y() const { return static_cast<uint16_t>(rd8(hYPosHi) << 8 | rd8(hYPosLo)); }
+	uint16_t obj_y() const { return mem_.cur_obj_y(); }
+	uint16_t obj_x() const { return mem_.cur_obj_x(); }
+	void set_obj_y(uint16_t v) { mem_.cur_obj_y() = v; }
+	void set_obj_x(uint16_t v) { mem_.cur_obj_x() = v; }
+	void set_hpos_y(uint16_t v) { mem_.y_pos_lo() = static_cast<uint8_t>(v); mem_.y_pos_hi() = static_cast<uint8_t>(v >> 8); }
+	void set_hpos_x(uint16_t v) { mem_.x_pos_lo() = static_cast<uint8_t>(v); mem_.x_pos_hi() = static_cast<uint8_t>(v >> 8); }
+	uint16_t hpos_y() const { return static_cast<uint16_t>(mem_.y_pos_hi() << 8 | mem_.y_pos_lo()); }
 	// hPos = the object's position
 	void hpos_at_obj() { set_hpos_y(obj_y()); set_hpos_x(obj_x()); }
 	// the x of its left edge (the box's left is negative) and right edge
-	uint16_t left_edge() const { return static_cast<uint16_t>(obj_x() - static_cast<uint8_t>(-rd8(wCurObjCollBoxLeft))); }
-	uint16_t right_edge() const { return static_cast<uint16_t>(obj_x() + rd8(wCurObjCollBoxRight)); }
+	uint16_t left_edge() const { return static_cast<uint16_t>(obj_x() - static_cast<uint8_t>(-mem_.cur_obj_coll_box_left())); }
+	uint16_t right_edge() const { return static_cast<uint16_t>(obj_x() + mem_.cur_obj_coll_box_right()); }
 	uint16_t edge(bool left) const { return left ? left_edge() : right_edge(); }
 	// its top (the box's top is negative)
-	uint16_t top() const { return static_cast<uint16_t>(obj_y() - static_cast<uint8_t>(-rd8(wCurObjCollBoxTop))); }
-	void res_flag(uint8_t bit) { wr8(wCurObjFlags, rd8(wCurObjFlags) & ~(1 << bit)); }
+	uint16_t top() const { return static_cast<uint16_t>(obj_y() - static_cast<uint8_t>(-mem_.cur_obj_coll_box_top())); }
+	void res_flag(uint8_t bit) { mem_.cur_obj_flags() = mem_.cur_obj_flags() & ~(1 << bit); }
 
-	// A block check through home's wrapper (Func_3513 and the like): the
+	// A block check as home's wrapper (Func_3513 and the like) runs it:
+	// collisions.asm's check by its collision points, in its bank; the
 	// block function's result
 	uint8_t block(uint16_t wrapper)
 	{
-		gb_call(gb_, wrapper);
-		return cpu_.a;
+		uint8_t bank, points;
+		switch (wrapper) {
+		case ADDR_Func_3513: bank = BANK_Func_19bc3; points = COLLISION_UNK4; break;
+		case ADDR_Func_352b: bank = BANK_Func_19b7b; points = COLLISION_UNK1; break;
+		case ADDR_Func_3543: bank = BANK_Func_19b51; points = COLLISION_DOWN; break;
+		case ADDR_Func_358b: bank = BANK_Func_19b9b; points = COLLISION_UNK3; break;
+		case ADDR_Func_35a3: bank = BANK_Func_19b8b; points = COLLISION_UNK2; break;
+		default: std::abort();
+		}
+		uint8_t saved = mem_.rom_bank();
+		home::bankswitch(gb_, bank, wrapper);
+		uint8_t r = level::check_block(gb_, points);
+		home::bankswitch(gb_, saved, wrapper);
+		return r;
 	}
 
 	// A velocity table's next entry: the one at index's offset (an 8-bit
@@ -189,7 +204,7 @@ public:
 			{OBJSTATE_STUN_RIGHT_START, OBJSTATE_21, OBJSTATE_23, OBJSTATE_25},
 			{OBJSTATE_STUN_LEFT_START, OBJSTATE_20, OBJSTATE_22, OBJSTATE_24},
 		};
-		uint8_t v = rd8(hffa0);
+		uint8_t v = mem_.unk_ffa0();
 		int i = v < 2 ? 0 : v < 3 ? 1 : v < 4 ? 2 : 3;
 		wr8(state, states[left][i]);
 		home_jump_ret();
@@ -202,14 +217,14 @@ public:
 	// state by its y velocity.
 	void land_by_slope(bool left)
 	{
-		wr8(wCurObjYPos + 0, rd8(hYPosLo));
-		wr8(wCurObjYPos + 1, rd8(hYPosHi));
-		uint8_t slope = rd8(wObjSlopeInteraction) & 0x0f;
+		wr8(wCurObjYPos + 0, mem_.y_pos_lo());
+		mem_.cur_obj_y().hi() = mem_.y_pos_hi();
+		uint8_t slope = mem_.obj_slope_interaction() & 0x0f;
 		if (slope != (left ? RIGHT_SLOPE : LEFT_SLOPE)) {
 			if (slope == (left ? 0x02 : 0x01))
-				wr8(wCurObjVar2, left ? static_cast<uint8_t>(slope - 1) : slope);
-			else if (rd8(wCurObjVar2))
-				wr8(wCurObjVar2, static_cast<uint8_t>(rd8(wCurObjVar2) - 1));
+				mem_.cur_obj_var2() = left ? static_cast<uint8_t>(slope - 1) : slope;
+			else if (mem_.cur_obj_var2())
+				mem_.cur_obj_var2() = static_cast<uint8_t>(mem_.cur_obj_var2() - 1);
 		}
 		set_state_by_y_vel(wCurObjState, left);
 	}
@@ -219,13 +234,13 @@ public:
 	void move_x_by_var2(bool left)
 	{
 		uint16_t x = obj_x();
-		set_obj_x(static_cast<uint16_t>(left ? x - rd8(wCurObjVar2) : x + rd8(wCurObjVar2)));
+		set_obj_x(static_cast<uint16_t>(left ? x - mem_.cur_obj_var2() : x + mem_.cur_obj_var2()));
 	}
 
 	// let go once it's far enough off screen on the side it moves to
 	void let_go_off_screen(bool left)
 	{
-		uint8_t x = static_cast<uint8_t>(rd8(wCurObjScreenXPos) + 0x28);
+		uint8_t x = static_cast<uint8_t>(mem_.cur_obj_screen_x_pos() + 0x28);
 		if (left ? x >= 0xf0 : x < 0x10)
 			res_flag(OBJFLAG_GRABBED_F);
 	}
@@ -239,10 +254,10 @@ public:
 		uint8_t v = table_step(wCurObjVar3, table, 0x10);
 		if (v) {
 			// an add with the carry taken as a negative's
-			uint8_t lo = rd8(wCurObjYPos);
-			wr8(wCurObjYPos, static_cast<uint8_t>(lo + v));
+			uint8_t lo = mem_.cur_obj_y().lo();
+			mem_.cur_obj_y().lo() = static_cast<uint8_t>(lo + v);
 			if (lo + v < 0x100)
-				wr8(wCurObjYPos + 1, static_cast<uint8_t>(rd8(wCurObjYPos + 1) - 1));
+				mem_.cur_obj_y().hi() = static_cast<uint8_t>(mem_.cur_obj_y().hi() - 1);
 		}
 		move_x_by_var2(left);
 		let_go_off_screen(left);
@@ -257,15 +272,15 @@ public:
 			collided = block(ADDR_Func_3513) & 0x0f;
 		}
 		if (!collided) {
-			uint8_t d = static_cast<uint8_t>(rd8(wCurObjStateDuration) - 1);
-			wr8(wCurObjStateDuration, d);
+			uint8_t d = static_cast<uint8_t>(mem_.cur_obj_state_duration() - 1);
+			mem_.cur_obj_state_duration() = d;
 			if (d) {
 				home_jump_ret();
 				return;
 			}
 		}
 		// stops when it lands or hits something, the other way after a hit
-		wr8(wCurObjState, (collided == left) ? OBJSTATE_27 : OBJSTATE_26);
+		mem_.cur_obj_state() = (collided == left) ? OBJSTATE_27 : OBJSTATE_26;
 		res_flag(OBJFLAG_NO_COLLISION_F);
 		home_jump_ret();
 	}
@@ -315,13 +330,13 @@ public:
 		set_obj_x(static_cast<uint16_t>(right ? x + dx : x - dx));
 		uint8_t v = table_step(wCurObjVar3, ADDR_Data_60180,
 			static_cast<uint8_t>(ADDR_Data_601a0 - ADDR_Data_60180));
-		wr8(hffa0, v);
+		mem_.unk_ffa0() = v;
 		add_signed_y(v);
 		no_actions();
 		home_jump_ret();
 	}
 
-	void no_actions() { wr8(wCurObjAction, (1 << NO_ACTIONS_F) | 1); } // no_actions_for 1
+	void no_actions() { mem_.cur_obj_action() = (1 << NO_ACTIONS_F) | 1; } // no_actions_for 1
 
 
 	// When there's no floor under it (Func_3543): `state`
@@ -329,7 +344,7 @@ public:
 	{
 		hpos_at_obj();
 		if (!block(ADDR_Func_3543))
-			wr8(wCurObjState, state);
+			mem_.cur_obj_state() = state;
 		home_jump_ret();
 	}
 
@@ -341,9 +356,9 @@ public:
 	// the state, OBJ_VAR_3 cleared and OBJ_STATE_DURATION by weight
 	void set_thrown_state(uint8_t state, uint8_t light, uint8_t heavy_duration)
 	{
-		wr8(wCurObjState, state);
-		wr8(wCurObjVar3, 0);
-		wr8(wCurObjStateDuration, heavy() ? heavy_duration : light);
+		mem_.cur_obj_state() = state;
+		mem_.cur_obj_var3() = 0;
+		mem_.cur_obj_state_duration() = heavy() ? heavy_duration : light;
 	}
 
 	void port_Func_62e74() { set_thrown_state(OBJSTATE_54, 0x06, 0x02); thrown(true, ADDR_Data_60300); }
@@ -364,8 +379,8 @@ public:
 	// OBJ_VAR_2, times 4 if `garlic` and the power up is at least GARLIC
 	uint8_t arc_dx(bool garlic)
 	{
-		uint8_t v = rd8(wCurObjVar2);
-		if (garlic && rd8(wEffectivePowerUp) >= GARLIC)
+		uint8_t v = mem_.cur_obj_var2();
+		if (garlic && mem_.effective_power_up() >= GARLIC)
 			v = static_cast<uint8_t>(v << 2);
 		return v;
 	}
@@ -381,7 +396,7 @@ public:
 	uint8_t obj_y_vel(uint16_t light, uint16_t heavy_table)
 	{
 		uint8_t v = table_step(wCurObjVar3, light, static_cast<uint8_t>(heavy_table - light));
-		wr8(hffa0, v);
+		mem_.unk_ffa0() = v;
 		return v;
 	}
 
@@ -390,22 +405,22 @@ public:
 	void obj_fall_and_land(uint16_t ret, uint8_t land_state)
 	{
 		hpos_at_obj();
-		wr8(wObjSlopeInteraction, 0);
+		mem_.obj_slope_interaction() = 0;
 		if (!block(ADDR_Func_352b)) {
-			if (rd8(wIsInWaterOrSand))
-				wr8(wCurObjState, OBJSTATE_VANISH_TOUCH);
+			if (mem_.is_in_water_or_sand())
+				mem_.cur_obj_state() = OBJSTATE_VANISH_TOUCH;
 			home_jump_ret();
 			return;
 		}
-		wr8(wCurObjYPos + 0, rd8(hYPosLo));
-		wr8(wCurObjYPos + 1, rd8(hYPosHi));
-		uint8_t slope = rd8(wObjSlopeInteraction);
+		wr8(wCurObjYPos + 0, mem_.y_pos_lo());
+		mem_.cur_obj_y().hi() = mem_.y_pos_hi();
+		uint8_t slope = mem_.obj_slope_interaction();
 		if (!slope) {
-			wr8(wCurObjState, land_state);
+			mem_.cur_obj_state() = land_state;
 			home_jump_ret();
 			return;
 		}
-		wr8(wCurObjVar2, 0x02);
+		mem_.cur_obj_var2() = 0x02;
 		set_state_by_y_vel(wCurObjState, (slope & 0x0f) == 0x01);
 	}
 
@@ -425,8 +440,8 @@ public:
 	void port__ObjState_StandingFall()
 	{
 		// speed up animation by 3x
-		if (rd8(wCurObjFrameDuration) >= 3)
-			wr8(wCurObjFrameDuration, static_cast<uint8_t>(rd8(wCurObjFrameDuration) - 3));
+		if (mem_.cur_obj_frame_duration() >= 3)
+			mem_.cur_obj_frame_duration() = static_cast<uint8_t>(mem_.cur_obj_frame_duration() - 3);
 		add_signed_y(obj_y_vel(ADDR_StandingFallYVel_Light, ADDR_StandingFallYVel_Heavy));
 		obj_fall_and_land(ADDR__ObjState_StandingFall + 0x53, OBJSTATE_TURN_AROUND_START);
 	}
@@ -447,14 +462,14 @@ public:
 	{
 		page &= 0xff00;
 		uint8_t v = table_step(static_cast<uint16_t>(page | OBJ_VAR_3), b == 1 ? table_z : table_nz, 0x20);
-		wr8(hffa0, v);
+		mem_.unk_ffa0() = v;
 		if (v) {
 			uint16_t ypos = static_cast<uint16_t>(page | OBJ_Y_POS);
 			bool negative = v >= 0x80;
 			uint8_t lo = rd8(ypos);
 			wr8(ypos, static_cast<uint8_t>(lo + v));
 			bool carry = lo + v >= 0x100;
-			wr8(wCurObjStateDuration, negative ? 0x00 : 0x01);
+			mem_.cur_obj_state_duration() = negative ? 0x00 : 0x01;
 			uint16_t hi = static_cast<uint16_t>(ypos + 1);
 			if (negative && !carry)
 				wr8(hi, static_cast<uint8_t>(rd8(hi) - 1));
@@ -469,30 +484,30 @@ public:
 
 	void port_Func_6303f()
 	{
-		wr8(wCurObjState, OBJSTATE_1B);
-		wr8(wCurObjVar3, 0);
-		wr8(wCurObjStateDuration, 0x07);
+		mem_.cur_obj_state() = OBJSTATE_1B;
+		mem_.cur_obj_var3() = 0;
+		mem_.cur_obj_state_duration() = 0x07;
 		home_jump_ret();
 	}
 
 	void port_Func_63050()
 	{
-		uint8_t d = static_cast<uint8_t>(rd8(wCurObjStateDuration) - 1);
-		wr8(wCurObjStateDuration, d);
+		uint8_t d = static_cast<uint8_t>(mem_.cur_obj_state_duration() - 1);
+		mem_.cur_obj_state_duration() = d;
 		if (d) {
 			port_Func_629a6();
 			return;
 		}
-		wr8(wCurObjState, OBJSTATE_STANDING_FALL_START);
+		mem_.cur_obj_state() = OBJSTATE_STANDING_FALL_START;
 		home_jump_ret();
 	}
 
 	void port_Func_6305f()
 	{
-		wr8(wCurObjState, (rd8(rDIV) & 1) ? OBJSTATE_WOBBLE_LEFT : OBJSTATE_WOBBLE_RIGHT);
-		wr8(wCurObjVar3, 0);
-		wr8(wCurObjVar2, 0x01);
-		wr8(wCurObjStateDuration, 0x04);
+		mem_.cur_obj_state() = (rd8(rDIV) & 1) ? OBJSTATE_WOBBLE_LEFT : OBJSTATE_WOBBLE_RIGHT;
+		mem_.cur_obj_var3() = 0;
+		mem_.cur_obj_var2() = 0x01;
+		mem_.cur_obj_state_duration() = 0x04;
 		home_jump_ret();
 	}
 
@@ -506,23 +521,23 @@ public:
 		set_hpos_x(edge(left));
 		if (block(ADDR_Func_3513) & 0x0f) {
 			play_sfx(SFX_01A);
-			wr8(wCurObjState, left ? OBJSTATE_STUN_RIGHT_START : OBJSTATE_STUN_LEFT_START);
+			mem_.cur_obj_state() = left ? OBJSTATE_STUN_RIGHT_START : OBJSTATE_STUN_LEFT_START;
 		} else {
 			move_x_by_var2(left);
 			let_go_off_screen(left);
 			hpos_at_obj();
-			wr8(wObjSlopeInteraction, 0);
+			mem_.obj_slope_interaction() = 0;
 			uint8_t floor = block(ADDR_Func_3543);
-			wr8(wCurObjYPos + 0, rd8(hYPosLo));
-			wr8(wCurObjYPos + 1, rd8(hYPosHi));
+			wr8(wCurObjYPos + 0, mem_.y_pos_lo());
+			mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 			if (floor == 0x10) {
 				// on a slope: down it, or stunned against it
 				res_flag(OBJFLAG_GRABBED_F);
-				bool slope_bit = rd8(wObjSlopeInteraction) & 1;
+				bool slope_bit = mem_.obj_slope_interaction() & 1;
 				if (left ? !slope_bit : slope_bit)
-					wr8(wCurObjState, left ? OBJSTATE_STUN_RIGHT_START : OBJSTATE_STUN_LEFT_START);
-				else if (rd8(wCurObjState) != (left ? OBJSTATE_STUN_LEFT : OBJSTATE_STUN_RIGHT))
-					wr8(wCurObjState, left ? OBJSTATE_14 : OBJSTATE_15);
+					mem_.cur_obj_state() = left ? OBJSTATE_STUN_RIGHT_START : OBJSTATE_STUN_LEFT_START;
+				else if (mem_.cur_obj_state() != (left ? OBJSTATE_STUN_LEFT : OBJSTATE_STUN_RIGHT))
+					mem_.cur_obj_state() = left ? OBJSTATE_14 : OBJSTATE_15;
 				home_jump_ret();
 				return;
 			}
@@ -533,11 +548,11 @@ public:
 				hit = block(ADDR_Func_35a3) != 0;
 			}
 			if (!hit)
-				wr8(wCurObjState, left ? OBJSTATE_14 : OBJSTATE_15);
+				mem_.cur_obj_state() = left ? OBJSTATE_14 : OBJSTATE_15;
 		}
 		// slows down every 8 frames (4 if heavy)
-		if (!(rd8(wGlobalCounter) & (heavy() ? 0x3 : 0x7)))
-			wr8(wCurObjVar2, static_cast<uint8_t>(rd8(wCurObjVar2) - 1));
+		if (!(mem_.global_counter() & (heavy() ? 0x3 : 0x7)))
+			mem_.cur_obj_var2() = static_cast<uint8_t>(mem_.cur_obj_var2() - 1);
 		home_jump_ret();
 	}
 
@@ -548,14 +563,14 @@ public:
 	// OBJ_STATE_DURATION runs out
 	void obj_bump(bool left)
 	{
-		if (rd8(wCurObjVar2)) {
+		if (mem_.cur_obj_var2()) {
 			obj_bump_slide(left);
 			return;
 		}
-		uint8_t d = static_cast<uint8_t>(rd8(wCurObjStateDuration) - 1);
-		wr8(wCurObjStateDuration, d);
+		uint8_t d = static_cast<uint8_t>(mem_.cur_obj_state_duration() - 1);
+		mem_.cur_obj_state_duration() = d;
 		if (!d)
-			wr8(wCurObjState, OBJSTATE_TURN_AROUND_START);
+			mem_.cur_obj_state() = OBJSTATE_TURN_AROUND_START;
 		home_jump_ret();
 	}
 
@@ -570,21 +585,21 @@ public:
 		let_go_off_screen(left);
 		set_obj_y(static_cast<uint16_t>(obj_y() + obj_y_vel(ADDR_FallingYVel_Light, ADDR_FallingYVel_Heavy)));
 		hpos_at_obj();
-		wr8(wObjSlopeInteraction, 0);
-		wr8(wc1ca, 0);
+		mem_.obj_slope_interaction() = 0;
+		mem_.unk_c1ca() = 0;
 		if (block(ADDR_Func_352b)) {
 			land_by_slope(left);
 			return;
 		}
-		if (rd8(wIsInWaterOrSand)) {
-			wr8(wCurObjState, OBJSTATE_VANISH_TOUCH);
+		if (mem_.is_in_water_or_sand()) {
+			mem_.cur_obj_state() = OBJSTATE_VANISH_TOUCH;
 			home_jump_ret();
 			return;
 		}
 		set_hpos_y(static_cast<uint16_t>(obj_y() - 4));
 		set_hpos_x(edge(left));
 		if (block(ADDR_Func_3513) & 0x0f)
-			wr8(wCurObjState, left ? OBJSTATE_15 : OBJSTATE_14);
+			mem_.cur_obj_state() = left ? OBJSTATE_15 : OBJSTATE_14;
 		home_jump_ret();
 	}
 
@@ -593,15 +608,15 @@ public:
 
 	void port_Func_62c9f()
 	{
-		wr8(wCurObjState, OBJSTATE_56);
-		wr8(wCurObjVar3, 0);
+		mem_.cur_obj_state() = OBJSTATE_56;
+		mem_.cur_obj_var3() = 0;
 		obj_knocked_fall(true);
 	}
 
 	void port_Func_62d7d()
 	{
-		wr8(wCurObjState, OBJSTATE_57);
-		wr8(wCurObjVar3, 0);
+		mem_.cur_obj_state() = OBJSTATE_57;
+		mem_.cur_obj_var3() = 0;
 		obj_knocked_fall(false);
 	}
 
@@ -611,13 +626,13 @@ public:
 	void stars()
 	{
 		// (BANK(StarsFunc) - BANK("Object Functions 1")) << 4
-		wr8(wCurObjId, 0x30);
+		mem_.cur_obj_id() = 0x30;
 		mem_.word(wCurObjOAMPtr) = ADDR_OAM_18c000;
 		mem_.word(wCurObjFramesetPtr) = ADDR_Frameset_680c5;
-		wr8(wCurObjFrameDuration, 0);
-		wr8(wCurObjFramesetOffset, 0);
-		wr8(wCurObjStateDuration, 33);
-		wr8(wCurObjFlags, (rd8(wCurObjFlags) & ~(1 << OBJFLAG_GRABBED_F)) | (1 << OBJFLAG_NO_COLLISION_F));
+		mem_.cur_obj_frame_duration() = 0;
+		mem_.cur_obj_frameset_offset() = 0;
+		mem_.cur_obj_state_duration() = 33;
+		mem_.cur_obj_flags() = (mem_.cur_obj_flags() & ~(1 << OBJFLAG_GRABBED_F)) | (1 << OBJFLAG_NO_COLLISION_F);
 		no_actions();
 		set_obj_y(static_cast<uint16_t>(obj_y() - 8));
 	}
@@ -629,7 +644,7 @@ public:
 			play_sfx(SFX_VANISH);
 		wr8(wCurObjUpdateFunction + 1, static_cast<uint8_t>(ADDR_StarsFunc >> 8));
 		wr8(wCurObjUpdateFunction + 0, static_cast<uint8_t>(ADDR_StarsFunc));
-		wr8(wCurObjSubState, rd8(wCurObjSubState) & OBJSUBFLAGS_MASK);
+		mem_.cur_obj_sub_state() = mem_.cur_obj_sub_state() & OBJSUBFLAGS_MASK;
 		stars();
 	}
 
@@ -643,12 +658,12 @@ public:
 		clear_objects(0, 0);
 		clear_obj_data_pointers(0);
 		if (level_start)
-			wr8(wFlameBlockCleared, 0);
-		wr8(wDollBoyNoFlashingBarrel, 0);
-		wr8(wDollBoyRemainingParts, 0);
-		wr8(wNumLitTorches, 0);
-		wr8(wShootGoals, 0);
-		wr8(wWarioGoals, 0);
+			mem_.flame_block_cleared() = 0;
+		mem_.doll_boy_no_flashing_barrel() = 0;
+		mem_.doll_boy_remaining_parts() = 0;
+		mem_.num_lit_torches() = 0;
+		mem_.shoot_goals() = 0;
+		mem_.wario_goals() = 0;
 	}
 
 	void port_InitObjectVars_FromLevelStart() { init_object_vars(true); }
@@ -719,9 +734,9 @@ public:
 	{
 		uint8_t v = movement_step(wCurObjVar3, table, false);
 		add_signed_at(wCurObjYPos, v);
-		if (!(rd8(wCurObjFlags) & (1 << OBJFLAG_STEPPED_F)))
+		if (!(mem_.cur_obj_flags() & (1 << OBJFLAG_STEPPED_F)))
 			return;
-		wr8(wCurObjFlags, rd8(wCurObjFlags) & ~(1 << OBJFLAG_STEPPED_F));
+		mem_.cur_obj_flags() = mem_.cur_obj_flags() & ~(1 << OBJFLAG_STEPPED_F);
 		home::move_wario_y(gb_, static_cast<uint8_t>(v));
 		FARCALL(Func_19720);
 	}
@@ -733,21 +748,21 @@ public:
 	// OBJ_VAR_2/3, the steps starting over at `start` at the 0 end.
 	void apply_obj_set_movement(uint16_t start)
 	{
-		uint8_t d = static_cast<uint8_t>(rd8(wCurObjVar1) - 1);
-		wr8(wCurObjVar1, d);
+		uint8_t d = static_cast<uint8_t>(mem_.cur_obj_var1() - 1);
+		mem_.cur_obj_var1() = d;
 		if (d)
 			return;
-		uint16_t p = static_cast<uint16_t>(rd8(wCurObjVar3) << 8 | rd8(wCurObjVar2));
+		uint16_t p = static_cast<uint16_t>(mem_.cur_obj_var3() << 8 | mem_.cur_obj_var2());
 		uint8_t duration = rd8(p++);
 		if (!duration) {
 			p = start;
 			duration = rd8(p++);
 		}
-		wr8(wCurObjVar1, duration);
+		mem_.cur_obj_var1() = duration;
 		uint8_t dy = rd8(p++);
 		uint8_t dx = rd8(p++);
-		wr8(wCurObjVar2, static_cast<uint8_t>(p));
-		wr8(wCurObjVar3, static_cast<uint8_t>(p >> 8));
+		mem_.cur_obj_var2() = static_cast<uint8_t>(p);
+		mem_.cur_obj_var3() = static_cast<uint8_t>(p >> 8);
 		add_signed_at(wCurObjYPos, dy);
 		add_signed_at(wCurObjXPos, dx);
 	}
@@ -763,7 +778,7 @@ public:
 		for (int i = 0; i < NUM_OBJECTS; i++) {
 			uint16_t obj = static_cast<uint16_t>((wObj1 & 0xff00) | (i * 0x20));
 			if ((rd8(obj) & (OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT)) == (OBJFLAG_ACTIVE | OBJFLAG_TRANSIENT)
-				&& rd8(obj + 1) == rd8(wCurObjUnk01) && rd8(obj + 2) == rd8(wCurObjUnk01 + 1))
+				&& rd8(obj + 1) == mem_.cur_obj_unk01() && rd8(obj + 2) == rd8(wCurObjUnk01 + 1))
 				n++;
 		}
 		return n;
@@ -791,7 +806,7 @@ public:
 
 		// the thrown object's box on screen (+$2a, so that it stays positive)
 		uint8_t type = rd8(OBJ_N(wObj1InteractionType, g));
-		wr8(hThrownObjInteractionType, type);
+		mem_.thrown_obj_interaction_type() = type;
 		uint8_t sy = static_cast<uint8_t>(rd8(OBJ_N(wObj1ScreenYPos, g)) + 0x2a);
 		uint8_t sx = static_cast<uint8_t>(rd8(OBJ_N(wObj1ScreenXPos, g)) + 0x2a);
 		uint8_t top = static_cast<uint8_t>(sy + rd8(OBJ_N(wObj1CollBoxTop, g)));
@@ -819,7 +834,7 @@ public:
 				{OBJSTATE_WOBBLE_RIGHT_START, OBJSTATE_WOBBLE_LEFT_START},
 				{OBJSTATE_WOBBLE_LEFT_START, OBJSTATE_WOBBLE_RIGHT_START},
 			};
-			wr8(hCollidedObjState_Light, states[to_right][0]);
+			mem_.collided_obj_state_light() = states[to_right][0];
 			wr8(static_cast<uint16_t>(hCollidedObjState_Light + 1), states[to_right][1]);
 		}
 
@@ -844,15 +859,15 @@ public:
 			uint16_t collided;
 			if (s == OBJSTATE_4A || s == OBJSTATE_48) {
 				// .CollideWithObject
-				wr8(wGrabState, 0);
-				wr8(thrown_state, rd8(hThrownObjState_Light));
+				mem_.grab_state() = 0;
+				wr8(thrown_state, mem_.thrown_obj_state_light());
 				collided = hCollidedObjState_Light;
 			} else {
 				bool heavy_other = rd8(OBJ_N(wObj1InteractionType, n)) & HEAVY_OBJ;
 				wr8(thrown_state, rd8(heavy_other ? hThrownObjState_Heavy : hThrownObjState_Light));
 				uint8_t o = rd8(other_state) & 0xfe;
 				if (o == OBJSTATE_PICKED_UP_LEFT || o == OBJSTATE_48)
-					wr8(wGrabState, 0);
+					mem_.grab_state() = 0;
 				collided = heavy_other ? hCollidedObjState_Heavy : hCollidedObjState_Light;
 			}
 			wr8(other_state, rd8(collided));
@@ -868,14 +883,14 @@ public:
 	// the action and state, by the side Wario touched it from (OBJ_UNK_1D)
 	void action_by_interaction(uint8_t left, uint8_t right)
 	{
-		wr8(wCurObjAction, 15 | (1 << 7));
-		wr8(wCurObjState, (rd8(wCurObjUnk1d) & INTERACTION_RIGHT) ? left : right);
+		mem_.cur_obj_action() = 15 | (1 << 7);
+		mem_.cur_obj_state() = (mem_.cur_obj_unk1d() & INTERACTION_RIGHT) ? left : right;
 	}
 
 	void set_action_state(uint8_t action, uint8_t state)
 	{
-		wr8(wCurObjAction, action);
-		wr8(wCurObjState, state);
+		mem_.cur_obj_action() = action;
+		mem_.cur_obj_state() = state;
 	}
 
 	void action_wobble()
@@ -888,47 +903,47 @@ public:
 	// (OBJ_UNK_1D's top bits: down, up, right, else left)
 	void action_06(uint8_t action)
 	{
-		uint8_t from = rd8(wCurObjUnk1d);
-		wr8(wCurObjAction, action);
-		wr8(wCurObjState, (from & 0x80) ? OBJSTATE_0E : (from & 0x40) ? OBJSTATE_0D
-			: (from & 0x20) ? OBJSTATE_0B : OBJSTATE_0C);
+		uint8_t from = mem_.cur_obj_unk1d();
+		mem_.cur_obj_action() = action;
+		mem_.cur_obj_state() = (from & 0x80) ? OBJSTATE_0E : (from & 0x40) ? OBJSTATE_0D
+			: (from & 0x20) ? OBJSTATE_0B : OBJSTATE_0C;
 	}
 
 	// What Wario (or another object) did to the object last frame
 	// (OBJ_ACTION, from the interactions), or a count of frames with none
 	void do_object_action()
 	{
-		uint8_t action = rd8(wCurObjAction);
+		uint8_t action = mem_.cur_obj_action();
 		if (!action)
 			return;
 		if (action & (1 << NO_ACTIONS_F)) {
 			action--;
-			wr8(wCurObjAction, action == (1 << NO_ACTIONS_F) ? 0 : action); // no_actions_for 0
+			mem_.cur_obj_action() = action == (1 << NO_ACTIONS_F) ? 0 : action; // no_actions_for 0
 			return;
 		}
 		switch (action) {
 		case OBJACTION_NONE:
 			break;
 		case OBJACTION_BUMP:
-			if (!(rd8(wCurObjInteractionType) & INTERACTION_MASK))
+			if (!(mem_.cur_obj_interaction_type() & INTERACTION_MASK))
 				action_wobble();
 			else
 				action_by_interaction(OBJSTATE_BUMP_LEFT_START, OBJSTATE_BUMP_RIGHT_START);
 			break;
 		case OBJACTION_ATTACK:
-			wr8(wCurObjFlags, (rd8(wCurObjFlags) & ~(1 << OBJFLAG_GRABBED_F)) | (1 << OBJFLAG_NO_COLLISION_F));
+			mem_.cur_obj_flags() = (mem_.cur_obj_flags() & ~(1 << OBJFLAG_GRABBED_F)) | (1 << OBJFLAG_NO_COLLISION_F);
 			action_by_interaction(OBJSTATE_ATTACKED_LEFT_START, OBJSTATE_ATTACKED_RIGHT_START);
 			break;
 		case OBJACTION_PICK_UP:
 			res_flag(OBJFLAG_GRABBED_F);
 			set_action_state(15 | (1 << 7),
-				rd8(wDirection) ? OBJSTATE_PICKED_UP_LEFT_START : OBJSTATE_PICKED_UP_RIGHT_START);
+				mem_.direction() ? OBJSTATE_PICKED_UP_LEFT_START : OBJSTATE_PICKED_UP_RIGHT_START);
 			break;
 		case OBJACTION_WOBBLE:
 			action_wobble();
 			break;
 		case OBJACTION_VANISH_TOUCH:
-			wr8(wCurObjFlags, (rd8(wCurObjFlags) & ~(1 << OBJFLAG_GRABBED_F)) | (1 << OBJFLAG_NO_COLLISION_F));
+			mem_.cur_obj_flags() = (mem_.cur_obj_flags() & ~(1 << OBJFLAG_GRABBED_F)) | (1 << OBJFLAG_NO_COLLISION_F);
 			set_action_state(15 | (1 << 7), OBJSTATE_VANISH_TOUCH);
 			break;
 		case OBJACTION_06:
@@ -941,11 +956,11 @@ public:
 			vanish(false);
 			break;
 		case OBJACTION_STEP_ON:
-			wr8(wCurObjAction, 0);
-			wr8(wCurObjFlags, rd8(wCurObjFlags) | (1 << OBJFLAG_STEPPED_F));
+			mem_.cur_obj_action() = 0;
+			mem_.cur_obj_flags() = mem_.cur_obj_flags() | (1 << OBJFLAG_STEPPED_F);
 			break;
 		case OBJACTION_0A:
-			wr8(wCurObjAction, 15 | (1 << 7));
+			mem_.cur_obj_action() = 15 | (1 << 7);
 			break;
 		case OBJACTION_FLATTEN:
 		case OBJACTION_0C:
@@ -997,18 +1012,18 @@ public:
 	void throw_object(bool right, uint8_t grab)
 	{
 		play_sfx(SFX_THROW);
-		uint8_t type = static_cast<uint8_t>((rd8(wCurObjInteractionType) & HEAVY_OBJ) | OBJ_INTERACTION_00);
-		wr8(wCurObjInteractionType, type);
-		wr8(wCurObjStateDuration, 0);
+		uint8_t type = static_cast<uint8_t>((mem_.cur_obj_interaction_type() & HEAVY_OBJ) | OBJ_INTERACTION_00);
+		mem_.cur_obj_interaction_type() = type;
+		mem_.cur_obj_state_duration() = 0;
 		bool full = grab & (1 << 6);
 		uint8_t strength = full ? 0x04 : (type & HEAVY_OBJ) ? 0x02 : 0x03;
-		if (rd8(wJoypadDown) & (1 << B_PAD_UP))
+		if (mem_.joypad_down() & (1 << B_PAD_UP))
 			strength = 0x01;
-		wr8(wCurObjVar2, strength);
-		wr8(wCurObjVar3, 0);
-		wr8(wCurObjState, full ? (right ? OBJSTATE_FULL_THROW_RIGHT_START : OBJSTATE_FULL_THROW_LEFT_START)
-			: (right ? OBJSTATE_4F : OBJSTATE_4E));
-		wr8(wCurObjAction, 31 | (1 << 7));
+		mem_.cur_obj_var2() = strength;
+		mem_.cur_obj_var3() = 0;
+		mem_.cur_obj_state() = full ? (right ? OBJSTATE_FULL_THROW_RIGHT_START : OBJSTATE_FULL_THROW_LEFT_START)
+			: (right ? OBJSTATE_4F : OBJSTATE_4E);
+		mem_.cur_obj_action() = 31 | (1 << 7);
 		home_jump_ret();
 	}
 
@@ -1024,44 +1039,44 @@ public:
 		uint8_t wall_state, bool tables_627f0, uint8_t wall_ret)
 	{
 		set_hpos_x(obj_x());
-		if (rd8(wCurObjStateDuration)) {
+		if (mem_.cur_obj_state_duration()) {
 			set_hpos_y(obj_y());
-			wr8(wc1ca, FALSE);
-			wr8(wBlockFuncSpecialCollision, COLLISION_THROWN_OBJ);
+			mem_.unk_c1ca() = FALSE;
+			mem_.block_func_special_collision() = COLLISION_THROWN_OBJ;
 			uint8_t floor = block(ADDR_Func_352b);
-			wr8(hffa0, 0x03);
+			mem_.unk_ffa0() = 0x03;
 			if (floor) {
 				land_by_slope(left);
 				return;
 			}
-			if (rd8(wIsInWaterOrSand)) {
-				wr8(wCurObjState, OBJSTATE_VANISH_TOUCH);
+			if (mem_.is_in_water_or_sand()) {
+				mem_.cur_obj_state() = OBJSTATE_VANISH_TOUCH;
 				home_jump_ret();
 				return;
 			}
 		}
 
 		set_hpos_y(top());
-		wr8(wBlockFuncSpecialCollision, COLLISION_THROWN_OBJ);
+		mem_.block_func_special_collision() = COLLISION_THROWN_OBJ;
 		if (block(ADDR_Func_358b)) {
-			wr8(wCurObjState, ceil_state);
+			mem_.cur_obj_state() = ceil_state;
 			home_jump_ret();
 			return;
 		}
 		set_hpos_y(static_cast<uint16_t>(obj_y() - 8));
 		set_hpos_x(edge(left));
-		wr8(wBlockFuncSpecialCollision, COLLISION_THROWN_OBJ);
+		mem_.block_func_special_collision() = COLLISION_THROWN_OBJ;
 		if (block(ADDR_Func_3513) & 0x0f) {
-			wr8(wCurObjState, wall_state);
+			mem_.cur_obj_state() = wall_state;
 			home_jump_ret();
 			return;
 		}
 		move_x_by_var2(left);
 		if (tables_627f0) {
 			let_go_off_screen(left);
-			obj_y_by_table(ADDR_Data_60140, ADDR_Data_600c0, rd8(wCurObjVar2), wCurObjVar3);
+			obj_y_by_table(ADDR_Data_60140, ADDR_Data_600c0, mem_.cur_obj_var2(), wCurObjVar3);
 		} else {
-			obj_y_by_table(ADDR_Data_60100, ADDR_Data_60080, rd8(wCurObjVar2), wCurObjVar3);
+			obj_y_by_table(ADDR_Data_60100, ADDR_Data_60080, mem_.cur_obj_var2(), wCurObjVar3);
 		}
 	}
 
@@ -1075,17 +1090,17 @@ public:
 	// a grabbed object let go: it falls off sideways
 	void drop_grabbed(uint8_t state)
 	{
-		wr8(wGrabState, 0);
+		mem_.grab_state() = 0;
 		play_sfx(SFX_01A);
-		wr8(wCurObjVar2, 0x02);
-		wr8(wCurObjAction, 31 | (1 << 7));
-		wr8(wCurObjState, state);
+		mem_.cur_obj_var2() = 0x02;
+		mem_.cur_obj_action() = 31 | (1 << 7);
+		mem_.cur_obj_state() = state;
 		home_jump_ret();
 	}
 
 	// Wario's position (big-endian)
-	uint16_t wario_y() const { return static_cast<uint16_t>(rd8(wWarioYPos + 0) << 8 | rd8(wWarioYPos + 1)); }
-	uint16_t wario_x() const { return static_cast<uint16_t>(rd8(wWarioXPos + 0) << 8 | rd8(wWarioXPos + 1)); }
+	uint16_t wario_y() const { return static_cast<uint16_t>(rd8(wWarioYPos + 0) << 8 | mem_.wario_y().lo()); }
+	uint16_t wario_x() const { return static_cast<uint16_t>(rd8(wWarioXPos + 0) << 8 | mem_.wario_x().lo()); }
 
 	// hPickedUpObjPos (y, x, little-endian)
 	uint16_t picked_y() const { return mem_.word(hPickedUpObjPos); }
@@ -1106,7 +1121,7 @@ public:
 	// to the right or left
 	void hold_above_wario(bool right)
 	{
-		uint8_t up = static_cast<uint8_t>(30 - rd8(wIsSmashAttacking) * 4);
+		uint8_t up = static_cast<uint8_t>(30 - mem_.is_smash_attacking() * 4);
 		set_obj_y(static_cast<uint16_t>(wario_y() - up));
 		set_obj_x(static_cast<uint16_t>(right ? wario_x() + 7 : wario_x() - 7));
 	}
@@ -1120,19 +1135,19 @@ public:
 		uint8_t idle_state = right ? OBJSTATE_19 : OBJSTATE_18;
 		no_actions();
 
-		uint8_t grab = rd8(wGrabState) & GRAB_STATE_MASK;
+		uint8_t grab = mem_.grab_state() & GRAB_STATE_MASK;
 		if (grab != GRAB_PICK_UP) {
 			if (grab != GRAB_IDLE) {
-				wr8(wCurObjState, OBJSTATE_12);
+				mem_.cur_obj_state() = OBJSTATE_12;
 				home_jump_ret();
 				return;
 			}
 			// GrabIdle: held above Wario, until a floor's above him
 			hold_above_wario(right);
 			hpos_at_obj();
-			wr8(wc1ca, FALSE);
-			if (!block(ADDR_Func_352b) || rd8(wc1ca)) {
-				wr8(wCurObjState, idle_state);
+			mem_.unk_c1ca() = FALSE;
+			if (!block(ADDR_Func_352b) || mem_.unk_c1ca()) {
+				mem_.cur_obj_state() = idle_state;
 				home_jump_ret();
 				return;
 			}
@@ -1141,32 +1156,32 @@ public:
 			return;
 		}
 
-		uint8_t d = static_cast<uint8_t>(rd8(wCurObjVar1) - 1);
-		wr8(wCurObjVar1, d);
+		uint8_t d = static_cast<uint8_t>(mem_.cur_obj_var1() - 1);
+		mem_.cur_obj_var1() = d;
 		if (d) {
 			home_jump_ret();
 			return;
 		}
-		uint16_t p = static_cast<uint16_t>(rd8(wCurObjVar3) << 8 | rd8(wCurObjVar2));
+		uint16_t p = static_cast<uint16_t>(mem_.cur_obj_var3() << 8 | mem_.cur_obj_var2());
 		uint8_t duration = rd8(p++);
 		if (!duration) {
 			p = static_cast<uint16_t>((p & 0xff00) | static_cast<uint8_t>(p - 4)); // dec l x4
 			duration = rd8(p++);
 		}
-		wr8(wCurObjVar1, duration);
+		mem_.cur_obj_var1() = duration;
 		uint8_t dy = rd8(p++);
 		uint8_t dx = rd8(p++);
-		wr8(wCurObjVar2, static_cast<uint8_t>(p));
-		wr8(wCurObjVar3, static_cast<uint8_t>(p >> 8));
+		mem_.cur_obj_var2() = static_cast<uint8_t>(p);
+		mem_.cur_obj_var3() = static_cast<uint8_t>(p >> 8);
 		set_picked(static_cast<uint16_t>(wario_y() + static_cast<int8_t>(dy)),
 			static_cast<uint16_t>(wario_x() + static_cast<int8_t>(dx)));
 
 		// the side it's held on, then its top
 		set_hpos_y(static_cast<uint16_t>(picked_y() - 4));
-		set_hpos_x(right ? static_cast<uint16_t>(picked_x() + rd8(wCurObjCollBoxRight))
-			: static_cast<uint16_t>(picked_x() - static_cast<uint8_t>(-rd8(wCurObjCollBoxLeft))));
+		set_hpos_x(right ? static_cast<uint16_t>(picked_x() + mem_.cur_obj_coll_box_right())
+			: static_cast<uint16_t>(picked_x() - static_cast<uint8_t>(-mem_.cur_obj_coll_box_left())));
 		if (!(block(ADDR_Func_3513) & 0x0f)) {
-			set_hpos_y(static_cast<uint16_t>(picked_y() - static_cast<uint8_t>(-rd8(wCurObjCollBoxTop))));
+			set_hpos_y(static_cast<uint16_t>(picked_y() - static_cast<uint8_t>(-mem_.cur_obj_coll_box_top())));
 			set_hpos_x(picked_x());
 			if (!(block(ADDR_Func_358b) & 0x0f)) {
 				obj_to_picked();
@@ -1175,12 +1190,12 @@ public:
 			}
 		}
 		// hit a wall or a ceiling
-		if (rd8(wCurObjInteractionType) & HEAVY_OBJ) {
+		if (mem_.cur_obj_interaction_type() & HEAVY_OBJ) {
 			drop_grabbed(drop_state);
 			return;
 		}
-		wr8(wGrabState, GRAB_UNK_02);
-		wr8(wCurObjState, idle_state);
+		mem_.grab_state() = GRAB_UNK_02;
+		mem_.cur_obj_state() = idle_state;
 		home_jump_ret();
 	}
 
@@ -1191,11 +1206,11 @@ public:
 	void held_object(bool right)
 	{
 		no_actions();
-		uint8_t grab = rd8(wGrabState);
+		uint8_t grab = mem_.grab_state();
 		uint8_t g = grab & 0x0f;
 		if (g != GRAB_IDLE) {
 			if (g == GRAB_CHARGE_THROW) {
-				wr8(wCurObjState, right ? OBJSTATE_4B : OBJSTATE_4A);
+				mem_.cur_obj_state() = right ? OBJSTATE_4B : OBJSTATE_4A;
 				home_jump_ret();
 				return;
 			}
@@ -1204,11 +1219,11 @@ public:
 				return;
 			}
 			res_flag(OBJFLAG_GRABBED_F);
-			if (rd8(wIsCrouching)) {
-				wr8(wCurObjVar2, 0x01);
-				wr8(wCurObjState, right ? OBJSTATE_15 : OBJSTATE_14);
+			if (mem_.is_crouching()) {
+				mem_.cur_obj_var2() = 0x01;
+				mem_.cur_obj_state() = right ? OBJSTATE_15 : OBJSTATE_14;
 			} else {
-				wr8(wCurObjState, OBJSTATE_12);
+				mem_.cur_obj_state() = OBJSTATE_12;
 			}
 			home_jump_ret();
 			return;
@@ -1226,11 +1241,11 @@ public:
 				return;
 			}
 		}
-		wr8(wGrabState, 0);
+		mem_.grab_state() = 0;
 		play_sfx(SFX_01A);
-		wr8(wCurObjVar2, 0x02);
-		wr8(wCurObjAction, 31 | (1 << 7));
-		wr8(wCurObjState, right ? OBJSTATE_14 : OBJSTATE_15);
+		mem_.cur_obj_var2() = 0x02;
+		mem_.cur_obj_action() = 31 | (1 << 7);
+		mem_.cur_obj_state() = right ? OBJSTATE_14 : OBJSTATE_15;
 		res_flag(OBJFLAG_GRABBED_F);
 		home_jump_ret();
 	}
@@ -1242,7 +1257,7 @@ public:
 	void charging_throw(bool right)
 	{
 		no_actions();
-		uint8_t grab = rd8(wGrabState);
+		uint8_t grab = mem_.grab_state();
 		uint8_t g = grab & 0x0f;
 		if (g == GRAB_CHARGE_THROW || g == GRAB_THROW_FULLY_CHARGED) {
 			hold_above_wario(right);
@@ -1260,14 +1275,14 @@ public:
 				home_jump_ret();
 				return;
 			}
-			wr8(wGrabState, 0);
+			mem_.grab_state() = 0;
 			play_sfx(SFX_01A);
 		} else if (g == GRAB_THROW) {
 			throw_object(right, grab);
 			return;
 		}
 		res_flag(OBJFLAG_GRABBED_F);
-		wr8(wCurObjState, OBJSTATE_12);
+		mem_.cur_obj_state() = OBJSTATE_12;
 		home_jump_ret();
 	}
 
@@ -1287,11 +1302,11 @@ public:
 	void call_update_function(uint8_t bank, bool by_id)
 	{
 		if (by_id) {
-			uint8_t id = rd8(wCurObjId);
+			uint8_t id = mem_.cur_obj_id();
 			bank = static_cast<uint8_t>((((id << 4) | (id >> 4)) & 0x0f) | OBJFUNCS1_BANK);
 			cpu_.f = 0; // or BANK("Object Functions 1")
 		}
-		wr8(hCallFuncBank, bank);
+		mem_.call_func_bank() = bank;
 		wr8(hCallFuncPointer + 0, rd8(wCurObjUpdateFunction + 0));
 		wr8(hCallFuncPointer + 1, rd8(wCurObjUpdateFunction + 1));
 		// Update functions read the a and f this leaves (and, as the
@@ -1302,7 +1317,7 @@ public:
 		// leaves) isn't comparable.
 		if (gb_->test.active && rd8(wCurObjUpdateFunction + 1) < 0x40)
 			gb_->test.unrealistic = true;
-		uint8_t entry_bank = rd8(wROMBank);
+		uint8_t entry_bank = mem_.rom_bank();
 		gb_call(gb_, hCallFunc);
 		if (gb_->test.active && gb_->rom_bank != entry_bank)
 			gb_->test.unrealistic = true;
@@ -1320,7 +1335,7 @@ public:
 	// (all but OBJFLAG_STEPPED, unk01, unk02 and unk1d).
 	void update_object(int kind, uint16_t obj, uint8_t flags)
 	{
-		wr8(wCurObjFlags, flags);
+		mem_.cur_obj_flags() = flags;
 		uint16_t src = next_in_page(obj);
 		for (int n = 1; n < OBJ_STRUCT_LENGTH; n++)
 			wr8(static_cast<uint16_t>(wCurObj + n), rd8(static_cast<uint16_t>(src + n - 1)));
@@ -1342,20 +1357,20 @@ public:
 		case UPD_FLOOR:
 			// during a floor transition only an object's first update runs
 			SET_HL(gb_, wCurObjSubState);
-			if (rd8(wCurObjSubState) & (1 << OBJSUBFLAG_UNINITIALISED_F))
+			if (mem_.cur_obj_sub_state() & (1 << OBJSUBFLAG_UNINITIALISED_F))
 				call_update_function(0, true);
 			gb_call(gb_, ADDR_UpdateObjectFrame);
 			check_object_on_screen();
 			break;
 		}
 
-		wr8(wCurObjScreenYPos, static_cast<uint8_t>(rd8(wCurObjYPos) + OAM_Y_OFS - rd8(wSCY)));
-		wr8(wCurObjScreenXPos, static_cast<uint8_t>(rd8(wCurObjXPos) + OAM_X_OFS - rd8(wSCX)));
+		mem_.cur_obj_screen_y_pos() = static_cast<uint8_t>(mem_.cur_obj_y().lo() + OAM_Y_OFS - mem_.scy());
+		mem_.cur_obj_screen_x_pos() = static_cast<uint8_t>(mem_.cur_obj_x().lo() + OAM_X_OFS - mem_.scx());
 		if (kind == UPD_TEMPLE) {
-			wr8(wSCY, static_cast<uint8_t>(rd8(wHiddenFigureSCYShake) + rd8(wSCYShake)));
-			wr8(wSCX, rd8(wc08b));
+			mem_.scy() = static_cast<uint8_t>(mem_.hidden_figure_scy_shake() + mem_.scy_shake());
+			mem_.scx() = mem_.unk_c08b();
 		}
-		wr8(obj, rd8(wCurObjFlags) & (0xff ^ OBJFLAG_STEPPED));
+		wr8(obj, mem_.cur_obj_flags() & (0xff ^ OBJFLAG_STEPPED));
 		uint16_t dst = next_in_page(next_in_page(static_cast<uint16_t>(obj + 1)));
 		for (int n = OBJ_Y_POS; n <= OBJ_ACTION; n++)
 			wr8(dst++, rd8(static_cast<uint16_t>(wCurObj + n)));
@@ -1384,10 +1399,10 @@ public:
 
 	void port_UpdateObjects()
 	{
-		wr8(wEffectivePowerUp, (rd8(wTransformation) & 0x80) ? SUPER_JUMP_SLAM_OVERALLS : rd8(wPowerUpLevel));
-		if (rd8(wLevel) == THE_TEMPLE)
+		mem_.effective_power_up() = (mem_.transformation() & 0x80) ? SUPER_JUMP_SLAM_OVERALLS : mem_.power_up_level();
+		if (mem_.level() == THE_TEMPLE)
 			update_objects_temple();
-		else if (rd8(wIsFloorTransition))
+		else if (mem_.is_floor_transition())
 			update_all(UPD_FLOOR);
 		else {
 			handle_grabbed_object_collisions();
@@ -1454,7 +1469,7 @@ bool object_state(GB *gb, uint16_t wrapper)
 	for (const Entry &e : entries) {
 		if (e.wrapper != wrapper)
 			continue;
-		uint8_t bank = Memory(gb)[wROMBank];
+		uint8_t bank = Memory(gb).rom_bank();
 		home::bankswitch(gb, e.bank, wrapper);
 		ObjectEngine engine(gb);
 		engine.plain_ = true;

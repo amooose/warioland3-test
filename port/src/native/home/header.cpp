@@ -36,12 +36,12 @@ public:
 		gb_push16(gb_, REG_BC(gb_));
 		gb_push16(gb_, REG_DE(gb_));
 		gb_push16(gb_, REG_HL(gb_));
-		cpu_.a = rd8(wEnableVBlankFunc);
+		cpu_.a = mem_.enable_vblank_func();
 		alu_.and_(cpu_.a, cpu_.a);
 		if (cpu_.a) {
-			cpu_.a = rd8(wROMBank);
+			cpu_.a = mem_.rom_bank();
 			push_af();
-			cpu_.a = rd8(wSRAMBank);
+			cpu_.a = mem_.sram_bank();
 			push_af();
 			cpu_.a = rd8(rWBK);
 			push_af();
@@ -62,7 +62,7 @@ public:
 			pop_af();
 			bankswitch(cpu_.a);
 			cpu_.a = TRUE;
-			wr8(wVBlankFuncExecuted, cpu_.a);
+			mem_.vblank_func_executed() = cpu_.a;
 		}
 		uint16_t v = gb_pop16(gb_);
 		SET_HL(gb_, v);

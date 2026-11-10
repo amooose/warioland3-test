@@ -24,7 +24,7 @@ void move_pos(Memory mem, uint16_t pos, int delta)
 void move_wario_x(GB *gb, int delta)
 {
 	Memory mem(gb);
-	mem[wCameraXDelta] = static_cast<uint8_t>(mem[wCameraXDelta] + delta);
+	mem.camera_x_delta() = static_cast<uint8_t>(mem.camera_x_delta() + delta);
 	move_pos(mem, wWarioXPos, delta);
 }
 
@@ -32,7 +32,7 @@ void move_wario_y(GB *gb, int delta, bool with_camera)
 {
 	Memory mem(gb);
 	if (with_camera)
-		mem[wCameraYDelta] = static_cast<uint8_t>(mem[wCameraYDelta] + delta);
+		mem.camera_y_delta() = static_cast<uint8_t>(mem.camera_y_delta() + delta);
 	move_pos(mem, wWarioYPos, delta);
 }
 
@@ -44,24 +44,24 @@ void clear_particles(GB *gb)
 void do_ground_shake(GB *gb, uint8_t frames)
 {
 	Memory mem(gb);
-	if (mem[wGroundShakeCounter])
+	if (mem.ground_shake_counter())
 		return;
-	mem[wGroundShakeCounter] = frames;
-	mem[wIsWarioGroundShaking] = 0;
+	mem.ground_shake_counter() = frames;
+	mem.is_wario_ground_shaking() = 0;
 }
 
 void open_action_help(GB *gb)
 {
 	Memory mem(gb);
-	mem[wState] = ST_ACTION_HELP;
-	mem[wSubState] = 0;
+	mem.state() = ST_ACTION_HELP;
+	mem.sub_state() = 0;
 }
 
 namespace {
 
 bool falling(Memory mem)
 {
-	return mem[wJumpVelIndex] >= FALLING_JUMP_VEL_INDEX;
+	return mem.jump_vel_index() >= FALLING_JUMP_VEL_INDEX;
 }
 
 } // namespace
@@ -70,8 +70,8 @@ void cap_walk_vel(GB *gb)
 {
 	Memory mem(gb);
 	bool fall = falling(mem);
-	if (mem[wWalkVelIndex] >= (fall ? 0x08 : 0x10))
-		mem[wWalkVelIndex] = fall ? 0x04 : 0x0c;
+	if (mem.walk_vel_index() >= (fall ? 0x08 : 0x10))
+		mem.walk_vel_index() = fall ? 0x04 : 0x0c;
 }
 
 namespace {
@@ -95,7 +95,7 @@ void apply_pals_in_hblank(GB *gb, uint16_t src, uint16_t data_reg, int count)
 void clear_transformation_values(GB *gb)
 {
 	Memory mem(gb);
-	if (mem[wTransformation] == TRANSFORMATION_BLIND) { // .RestoreBlindPalettes
+	if (mem.transformation() == TRANSFORMATION_BLIND) { // .RestoreBlindPalettes
 		mem[rBGPI] = BGPI_AUTOINC | 0;
 		apply_pals_in_hblank(gb, wTempPals1, rBGPD, 8);
 		mem[rOBPI] = OBPI_AUTOINC | (3 * PAL_SIZE);
@@ -165,7 +165,7 @@ PORT_EX(ClearParticles, 0, 0)
 // b = the frames
 PORT_EX(DoGroundShake, 0, 0)
 {
-	uint8_t counter = wl3::Memory(gb)[wGroundShakeCounter];
+	uint8_t counter = wl3::Memory(gb).ground_shake_counter();
 	do_ground_shake(gb, gb->cpu.b);
 	gb->cpu.a = counter;
 	gb->cpu.f = flags::and_(counter);
@@ -186,17 +186,17 @@ PORT_EX(OpenActionHelp, 0, 0)
 PORT_EX(Func_1762, 0, 0)
 {
 	wl3::Memory mem(gb);
-	uint8_t walk = mem[wWalkVelIndex];
-	bool fall = mem[wJumpVelIndex] >= FALLING_JUMP_VEL_INDEX;
+	uint8_t walk = mem.walk_vel_index();
+	bool fall = mem.jump_vel_index() >= FALLING_JUMP_VEL_INDEX;
 	cap_walk_vel(gb);
 	gb->cpu.f = flags::cp(walk, fall ? 0x08 : 0x10);
-	gb->cpu.a = mem[wWalkVelIndex];
+	gb->cpu.a = mem.walk_vel_index();
 }
 
 // after Blind, the palette copies' hl, b and c
 PORT_EX(ClearTransformationValues, 0, 0)
 {
-	bool blind = wl3::Memory(gb)[wTransformation] == TRANSFORMATION_BLIND;
+	bool blind = wl3::Memory(gb).transformation() == TRANSFORMATION_BLIND;
 	clear_transformation_values(gb);
 	if (blind) {
 		SET_HL(gb, wTempPals2 + 3 * PAL_SIZE + 4 * PAL_SIZE);

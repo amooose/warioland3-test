@@ -8,8 +8,8 @@ PORT_LOCAL_EX(_InitBestTimeList, func, 0, ALL_REGISTERS & ~R_A)
 {
 	wl3::Memory mem(gb);
 	mem[rWBK] = 0x02;
-	mem[rSCY] = mem[wSCY];
-	mem[rSCX] = mem[wSCX];
+	mem[rSCY] = mem.scy();
+	mem[rSCX] = mem.scx();
 	mem[rVBK] = 0;
 	gb->cpu.a = static_cast<uint8_t>(wVirtualOAM >> 8);
 	gb_tail_jump(gb, hTransferVirtualOAM);

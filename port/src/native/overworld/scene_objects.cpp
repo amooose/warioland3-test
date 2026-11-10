@@ -318,14 +318,14 @@ void SceneObjects::after(uint8_t special)
 {
 	switch (static_cast<Special>(special)) {
 	case Special::NextObj8: // Func_b4ea9
-		if (mem_[wSceneObj7State])
+		if (mem_.scene_obj7_state())
 			return;
-		mem_[wSceneObj8Duration] = 0;
-		mem_[wSceneObj8State] = 0x08;
+		mem_.scene_obj8_duration() = 0;
+		mem_.scene_obj8_state() = 0x08;
 		return;
 	case Special::BgPal5: { // Func_b4f58: BG palette 5 lit while wSceneObj11 shows
 		uint16_t pal = wTempPals1 + 5 * PAL_SIZE;
-		if (mem_[wSceneObj11Frame] != 0x57 && mem_[wSceneObj11State])
+		if (mem_.scene_obj11_frame() != 0x57 && mem_.scene_obj11_state())
 			pal = BG_PAL5_LIT;
 		routines_.copy(pal, wTempBGPals + 5 * PAL_SIZE, PAL_SIZE);
 		wram_.pal_config1() = static_cast<uint8_t>(rBGPI);

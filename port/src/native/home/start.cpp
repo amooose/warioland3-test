@@ -23,32 +23,32 @@ public:
 	// unreferenced
 	void port_UnreferencedMuteSound()
 	{
-		cpu_.a = alu_.and_(rd8(wSoundMuted), rd8(wSoundMuted));
+		cpu_.a = alu_.and_(mem_.sound_muted(), mem_.sound_muted());
 		if (cpu_.a)
 			return;
 		cpu_.f = FLAG_Z; // xor a
 		wr8(hSFXID + 0, 0);
-		wr8(hSFXID + 1, 0);
+		mem_.sfx().lo() = 0;
 		CALL(TurnMusicOff);
 		SET_BC(gb_, SOUND_OFF);
 		CALL(TurnOffSFXID);
 		CALL(UpdateAudio);
 		cpu_.a = TRUE;
-		wr8(wSoundMuted, TRUE);
+		mem_.sound_muted() = TRUE;
 	}
 
 	// unreferenced
 	// ends with bc and de as PlayNewMusic_SetNoise leaves them (unreferenced)
 	void port_UnreferencedUnmuteSound()
 	{
-		cpu_.a = alu_.and_(rd8(wSoundMuted), rd8(wSoundMuted));
+		cpu_.a = alu_.and_(mem_.sound_muted(), mem_.sound_muted());
 		if (!cpu_.a)
 			return;
 		cpu_.a = 0;
 		cpu_.f = FLAG_Z; // xor a
-		wr8(wSoundMuted, 0);
+		mem_.sound_muted() = 0;
 		wr8(hSFXID + 0, 0);
-		wr8(hSFXID + 1, 0);
+		mem_.sfx().lo() = 0;
 		cpu_.b = rd8(hMusicIDBackup + 0);
 		cpu_.c = cpu_.a = rd8(hMusicIDBackup + 1);
 		CALL(PlayNewMusic_SetNoise);
@@ -60,7 +60,7 @@ public:
 	void port_HandleSound()
 	{
 		Memory mem(gb_);
-		if (mem[wSoundMuted])
+		if (mem.sound_muted())
 			return;
 		auto take = [&](uint16_t at) {
 			uint16_t id = static_cast<uint16_t>(mem[at] << 8 | mem[at + 1]);
@@ -112,7 +112,7 @@ public:
 			// to have run the frame's V-Blank function
 			cpu_.pc = GAME_LOOP_HALT + 1;
 			cpu_.halted = true;
-			while (cpu_.halted || !mem[wVBlankFuncExecuted]) {
+			while (cpu_.halted || !mem.vblank_func_executed()) {
 				if (!cpu_.halted)
 					cpu_.pc = WAIT_VBLANK_EXEC;
 				uint8_t pending = gb_->ie & gb_->io[0x0f] & 0x1f;
@@ -136,8 +136,8 @@ public:
 		Memory mem(gb_);
 		update_joypad(gb_);
 		// restart the game if all four buttons are down
-		if (!mem[wResetDisabled]
-			&& (mem[wJoypadDown] & PAD_BUTTONS) == (PAD_A | PAD_B | PAD_SELECT | PAD_START)) {
+		if (!mem.reset_disabled()
+			&& (mem.joypad_down() & PAD_BUTTONS) == (PAD_A | PAD_B | PAD_SELECT | PAD_START)) {
 			audio::turn_music_off(gb_);
 			audio::turn_off_sfx(gb_, SOUND_OFF);
 			audio::update(gb_);
@@ -156,14 +156,14 @@ public:
 			while (mem[rLY] >= LY_VBLANK)
 				idle(32);
 
-		if (mem[wRoomAnimatedTilesEnabled])
+		if (mem.room_animated_tiles_enabled())
 			routines_.in_bank(BANK_UpdateRoomAnimatedTiles, ADDR_UpdateRoomAnimatedTiles,
 				[&] { level::update_room_animated_tiles(gb_); });
-		if (mem[wRoomAnimatedPalsEnabled])
+		if (mem.room_animated_pals_enabled())
 			update_room_animated_pals(gb_);
 
 		// enable the V-Blank handler (and wait for it)
-		mem[wEnableVBlankFunc] = TRUE;
+		mem.enable_vblank_func() = TRUE;
 		return true;
 	}
 
@@ -171,9 +171,9 @@ public:
 	void end_of_frame()
 	{
 		Memory mem(gb_);
-		++mem[wGlobalCounter];
-		mem[wEnableVBlankFunc] = FALSE;
-		mem[wVBlankFuncExecuted] = FALSE;
+		++mem.global_counter();
+		mem.enable_vblank_func() = FALSE;
+		mem.vblank_func_executed() = FALSE;
 		port_HandleSound();
 	}
 
@@ -196,7 +196,7 @@ public:
 	void port_InitWithoutDemoPowerUpReset__wait_vblank_exec()
 	{
 		Memory mem(gb_);
-		if (!mem[wVBlankFuncExecuted]) {
+		if (!mem.vblank_func_executed()) {
 			// not yet: back here, with interrupts serviced in between
 			JUMP_TO(WAIT_VBLANK_EXEC);
 			return;
@@ -214,14 +214,14 @@ public:
 	void port_Start()
 	{
 		Memory mem(gb_);
-		mem[hCGB] = cpu_.a == BOOTUP_A_CGB ? TRUE : FALSE;
-		mem[hUnused_fffd] = 0;
+		mem.cgb() = cpu_.a == BOOTUP_A_CGB ? TRUE : FALSE;
+		mem.unused_fffd() = 0;
 		port_Init(); // falls through
 	}
 
 	void port_Init()
 	{
-		Memory(gb_).byte(hDemoPowerUp) = 0; // reset power up to show in Demo
+		Memory(gb_).demo_power_up() = 0; // reset power up to show in Demo
 		port_InitWithoutDemoPowerUpReset(); // falls through
 	}
 
@@ -256,7 +256,7 @@ public:
 		mem[rLCDC] = LCDC_BG_ON | LCDC_OBJ_ON;
 		routines_.call(ADDR_ClearVRAM);
 		routines_.call(ADDR_EnableDoubleSpeed);
-		if (mem[hCGB]) {
+		if (mem.cgb()) {
 			mem[rVBK] = 0;
 			mem[rWBK] = 0;
 			mem[rRP] = 0;
@@ -302,13 +302,13 @@ public:
 
 		// if not playing on CGB, then show the GB Incompatible screen,
 		// otherwise init the game state
-		if (!mem[hCGB]) {
-			mem[wState] = ST_GB_INCOMPATIBLE;
-			mem[wSubState] = 0;
+		if (!mem.cgb()) {
+			mem.state() = ST_GB_INCOMPATIBLE;
+			mem.sub_state() = 0;
 		} else {
 			routines_.call(ADDR_InitGameState);
 		}
-		mem[wJoypadPressed] = 0;
+		mem.joypad_pressed() = 0;
 		routines_.call(ADDR_FillWhiteBGPal);
 		mem[rLCDC] = LCDC_ON;
 

@@ -16,9 +16,9 @@ public:
 	void port_SetState_Splitting()
 	{
 		home::trigger_floor_transition(gb_);
-		wr8(wWarioState, WST_SPLITTING);
-		wr8(wJumpVelTable, 0);
-		wr8(wJumpVelIndex, 0);
+		mem_.wario_state() = WST_SPLITTING;
+		mem_.jump_vel_table() = 0;
+		mem_.jump_vel_index() = 0;
 	}
 
 	void port_UpdateState_SplitHit()
@@ -26,7 +26,7 @@ public:
 		anim(OAM2);
 		if (!anim_ended())
 			return;
-		wr8(wWarioState, WST_SPLIT_KNOCKED_BACK);
+		mem_.wario_state() = WST_SPLIT_KNOCKED_BACK;
 		reset_anim();
 		frameset_by_dir(ADDR_Frameset_1ffd19, ADDR_Frameset_1ffd13);
 		anim(OAM2);
@@ -34,7 +34,7 @@ public:
 
 	void port_SetState_BlindIdling()
 	{
-		wr8(wWarioState, WST_BLIND_IDLING);
+		mem_.wario_state() = WST_BLIND_IDLING;
 		clear({wSFXLoopCounter, wWalkVelIndex, wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter,
 			wIsCrouching, wIsRolling, wIsSmashAttacking, wJumpVelTable, wJumpVelIndex, wInvisibleFrame});
 		collision_box(-1, -27, -9, 9);
@@ -50,7 +50,7 @@ public:
 	// the d-pad decides the direction (left first), else wDirection
 	bool pad_right_left_first()
 	{
-		uint8_t pad = rd8(wJoypadDown);
+		uint8_t pad = mem_.joypad_down();
 		if (pad & PAD_LEFT)
 			return false;
 		if (pad & PAD_RIGHT)
@@ -60,10 +60,10 @@ public:
 
 	void port_SetState_BlindWalking()
 	{
-		wr8(wWalkVelIndex, 0);
-		wr8(wWarioState, WST_BLIND_WALKING);
-		wr8(wSFXLoopCounter, 0);
-		wr8(wJumpVelIndex, 0);
+		mem_.walk_vel_index() = 0;
+		mem_.wario_state() = WST_BLIND_WALKING;
+		mem_.sfx_loop_counter() = 0;
+		mem_.jump_vel_index() = 0;
 		reset_anim();
 		load_gfx(BANK_WarioWalkGfx, ADDR_WarioWalkGfx);
 		set_oam(BANK_OAM_1426c, ADDR_OAM_1426c);
@@ -87,29 +87,29 @@ public:
 
 	void port_SetState_SnowballRolling()
 	{
-		wr8(wWarioState, WST_SNOWBALL_ROLLING);
+		mem_.wario_state() = WST_SNOWBALL_ROLLING;
 		clear({wSFXLoopCounter, wJumpVelTable, wJumpVelIndex, wIsSmashAttacking});
 	}
 
 	void port_SetState_SnowmanAirborne()
 	{
-		wr8(wWarioState, WST_SNOWMAN_AIRBORNE);
+		mem_.wario_state() = WST_SNOWMAN_AIRBORNE;
 		clear({wWarioStateCycles, wFrameDuration, wAnimationFrame});
 		anim(OAM2);
 	}
 
 	void port_Func_1edd24()
 	{
-		wr8(wJumpVelTable, 0);
-		wr8(wJumpVelIndex, 0);
-		wr8(wWarioState, WST_BALL_BOUNCING);
+		mem_.jump_vel_table() = 0;
+		mem_.jump_vel_index() = 0;
+		mem_.wario_state() = WST_BALL_BOUNCING;
 		reset_anim();
 		anim(OAM3);
 	}
 
 	void port_SetState_FanSpinning()
 	{
-		wr8(wWarioState, WST_FAN_SPINNING);
+		mem_.wario_state() = WST_FAN_SPINNING;
 		reset_anim();
 		set_frameset(ADDR_Frameset_1dc393);
 		anim(OAM3);
@@ -120,19 +120,19 @@ public:
 		anim(OAM2);
 		if (!anim_ended())
 			return;
-		wr8(wWarioState, WST_FALLING_FROM_OWL);
-		wr8(wWarioStateCounter, 0);
-		wr8(wWarioStateCycles, 0);
-		wr8(wJumpVelTable, 0x02);
-		wr8(wJumpVelIndex, 0x18);
+		mem_.wario_state() = WST_FALLING_FROM_OWL;
+		mem_.wario_state_counter() = 0;
+		mem_.wario_state_cycles() = 0;
+		mem_.jump_vel_table() = 0x02;
+		mem_.jump_vel_index() = 0x18;
 	}
 
 	void port_SetState_BallShot()
 	{
-		wr8(wWarioState, WST_BALL_SHOT);
+		mem_.wario_state() = WST_BALL_SHOT;
 		clear({wSFXLoopCounter, wWarioStateCounter, wWarioStateCycles, wJumpVelTable, wJumpVelIndex});
-		wr8(wAutoMoveState, 1);
-		wr8(wIsIntangible, 1);
+		mem_.auto_move_state() = 1;
+		mem_.is_intangible() = 1;
 		reset_anim();
 		set_frameset(ADDR_Frameset_1dd26c);
 		anim(OAM3);
@@ -140,7 +140,7 @@ public:
 
 	void port_SetState_FanRecovering()
 	{
-		wr8(wWarioState, WST_FAN_RECOVERING);
+		mem_.wario_state() = WST_FAN_RECOVERING;
 		reset_anim();
 		frameset_by_dir(ADDR_Frameset_1dc384, ADDR_Frameset_1dc3c8);
 		anim(OAM3);
@@ -148,7 +148,7 @@ public:
 
 	void port_SetState_SnowmanTurning()
 	{
-		wr8(wWarioState, WST_SNOWMAN_TURNING);
+		mem_.wario_state() = WST_SNOWMAN_TURNING;
 		reset_anim();
 		frameset_by_dir(ADDR_Frameset_1ff605, ADDR_Frameset_1ff5fe);
 		anim(OAM2);
@@ -156,7 +156,7 @@ public:
 
 	void port_SetState_IceSkatin()
 	{
-		wr8(wWarioState, WST_ICE_SKATIN);
+		mem_.wario_state() = WST_ICE_SKATIN;
 		clear({wSFXLoopCounter, wFrameDuration, wAnimationFrame});
 		frameset_by_dir(ADDR_Frameset_1fdd97, ADDR_Frameset_1fdd94);
 		anim(OAM2);
@@ -165,8 +165,8 @@ public:
 	void port_SetState_BallAirborne()
 	{
 		play_sfx(SFX_066);
-		wr8(wJumpVelTable, JUMP_VEL_KNOCK_BACK);
-		wr8(wWarioState, WST_BALL_AIRBORNE);
+		mem_.jump_vel_table() = JUMP_VEL_KNOCK_BACK;
+		mem_.wario_state() = WST_BALL_AIRBORNE;
 		reset_anim();
 		frameset_by_dir(ADDR_Frameset_1dd2f3, ADDR_Frameset_1dd2f6);
 		anim(OAM3);
@@ -174,8 +174,8 @@ public:
 
 	void port_SetState_FanLifting()
 	{
-		wr8(wWalkVelIndex, 0);
-		wr8(wWarioState, WST_FAN_LIFTING);
+		mem_.walk_vel_index() = 0;
+		mem_.wario_state() = WST_FAN_LIFTING;
 		clear({wSFXLoopCounter, wFrameDuration, wAnimationFrame});
 		frameset_by_dir(ADDR_Frameset_1dc374, ADDR_Frameset_1dc3b8);
 		anim(OAM3);
@@ -184,7 +184,7 @@ public:
 	void port_SetState_IceSkatinCrash()
 	{
 		play_sfx(SFX_02E);
-		wr8(wWarioState, WST_ICE_SKATIN_CRASH);
+		mem_.wario_state() = WST_ICE_SKATIN_CRASH;
 		reset_anim();
 		set_frameset(flip_dir() ? ADDR_Frameset_1fdd9a : ADDR_Frameset_1fdda7);
 		anim(OAM2);
@@ -192,9 +192,9 @@ public:
 
 	void port_SetState_SnowmanBumped()
 	{
-		wr8(wWarioState, WST_SNOWMAN_BUMPED);
-		wr8(wJumpVelIndex, 0);
-		wr8(wJumpVelTable, 0);
+		mem_.wario_state() = WST_SNOWMAN_BUMPED;
+		mem_.jump_vel_index() = 0;
+		mem_.jump_vel_table() = 0;
 		reset_anim();
 		frameset_by_dir(ADDR_Frameset_1ff628, ADDR_Frameset_1ff639);
 		anim(OAM2);
@@ -202,8 +202,8 @@ public:
 
 	void port_SetState_SnowmanIdle()
 	{
-		wr8(wWalkVelIndex, 0);
-		wr8(wWarioState, WST_SNOWMAN_IDLE);
+		mem_.walk_vel_index() = 0;
+		mem_.wario_state() = WST_SNOWMAN_IDLE;
 		clear({wSFXLoopCounter, wFrameDuration, wAnimationFrame});
 		frameset_by_dir(ADDR_Frameset_1ff5f8, ADDR_Frameset_1ff5fb);
 		anim(OAM2);
@@ -211,9 +211,9 @@ public:
 
 	void port_SetState_BallTurning()
 	{
-		wr8(wJumpVelTable, 0);
-		wr8(wJumpVelIndex, 0);
-		wr8(wWarioState, WST_BALL_TURNING);
+		mem_.jump_vel_table() = 0;
+		mem_.jump_vel_index() = 0;
+		mem_.wario_state() = WST_BALL_TURNING;
 		reset_anim();
 		set_frameset(flip_dir() ? ADDR_Frameset_1dd287 : ADDR_Frameset_1dd28e);
 		anim(OAM3);
@@ -222,7 +222,7 @@ public:
 	void port_SetState_FanTurning()
 	{
 		flip_dir();
-		wr8(wWarioState, WST_FAN_TURNING);
+		mem_.wario_state() = WST_FAN_TURNING;
 		reset_anim();
 		frameset_by_dir(ADDR_Frameset_1dc38e, ADDR_Frameset_1dc389);
 		anim(OAM3);
@@ -230,11 +230,11 @@ public:
 
 	void port_SetState_SnowballCrash()
 	{
-		wr8(wTransformationProgress, 0);
-		wr8(wWarioState, WST_SNOWBALL_CRASH);
+		mem_.transformation_progress() = 0;
+		mem_.wario_state() = WST_SNOWBALL_CRASH;
 		move_x(flip_dir() ? 2 : -2);
-		wr8(wWarioStateCounter, 0);
-		wr8(wWarioStateCycles, 0);
+		mem_.wario_state_counter() = 0;
+		mem_.wario_state_cycles() = 0;
 		reset_anim();
 		set_frameset(ADDR_Frameset_1ff981);
 		anim(OAM2);
@@ -242,10 +242,10 @@ public:
 
 	void port_SetState_SnowmanWalking()
 	{
-		wr8(wWalkVelIndex, 0);
-		wr8(wWarioState, WST_SNOWMAN_WALKING);
-		wr8(wSFXLoopCounter, 0);
-		wr8(wJumpVelIndex, 0);
+		mem_.walk_vel_index() = 0;
+		mem_.wario_state() = WST_SNOWMAN_WALKING;
+		mem_.sfx_loop_counter() = 0;
+		mem_.jump_vel_index() = 0;
 		reset_anim();
 		set_frameset(pad_right_left_first() ? ADDR_Frameset_1ff5ef : ADDR_Frameset_1ff5e6);
 		anim(OAM2);
@@ -253,7 +253,7 @@ public:
 
 	void port_SetState_BlindTurning()
 	{
-		wr8(wWarioState, WST_BLIND_TURNING);
+		mem_.wario_state() = WST_BLIND_TURNING;
 		reset_anim();
 		load_gfx(BANK_WarioIdleGfx, ADDR_WarioIdleGfx);
 		set_oam(BANK_OAM_14a82, ADDR_OAM_14a82);
@@ -263,7 +263,7 @@ public:
 
 	void port_SetState_OwlWario()
 	{
-		wr8(wWarioState, WST_OWL_SLOW);
+		mem_.wario_state() = WST_OWL_SLOW;
 		clear({wSFXLoopCounter, wWarioStateCounter, wWarioStateCycles});
 		reset_anim();
 		if (ld_mask(wSwimmingDirectionInput, PAD_UP | PAD_DOWN))
@@ -315,13 +315,13 @@ public:
 		anim(OAM2);
 		if (!anim_ended())
 			return;
-		wr8(wWalkVelIndex, 0);
+		mem_.walk_vel_index() = 0;
 		port_SetState_IceSkatin(); // fallthrough
 	}
 
 	void port_UpdateWarioOwlDirection()
 	{
-		wr8(wSwimmingDirectionInput, facing_right() ? PAD_RIGHT : PAD_LEFT);
+		mem_.swimming_direction_input() = facing_right() ? PAD_RIGHT : PAD_LEFT;
 		port_SetState_OwlWario(); // fallthrough
 	}
 
@@ -336,10 +336,10 @@ public:
 
 	void port_Func_1ec64d()
 	{
-		wr8(wWarioState, WST_RELEASING_OWL);
+		mem_.wario_state() = WST_RELEASING_OWL;
 		home::release_owl(gb_);
-		wr8(wWarioStateCounter, 0);
-		wr8(wWarioStateCycles, 0);
+		mem_.wario_state_counter() = 0;
+		mem_.wario_state_cycles() = 0;
 		reset_anim();
 		set_frameset(ADDR_Frameset_1fedfe);
 		anim(OAM2);
@@ -364,10 +364,10 @@ public:
 
 	void port_SetState_SnowmanAirborne_Fall()
 	{
-		wr8(wJumpVelIndex, 0x18);
-		wr8(wIsSmashAttacking, 0x01);
-		wr8(wWarioStateCounter, 0x01);
-		wr8(wJumpVelTable, 0x02);
+		mem_.jump_vel_index() = 0x18;
+		mem_.is_smash_attacking() = 0x01;
+		mem_.wario_state_counter() = 0x01;
+		mem_.jump_vel_table() = 0x02;
 		frameset_by_dir(ADDR_Frameset_1ff622, ADDR_Frameset_1ff625);
 		port_SetState_SnowmanAirborne();
 	}
@@ -376,35 +376,35 @@ public:
 	{
 		play_sfx(SFX_JUMP);
 		clear({wJumpVelIndex, wIsSmashAttacking, wWarioStateCounter});
-		wr8(wJumpVelTable, 0x01);
+		mem_.jump_vel_table() = 0x01;
 		frameset_by_dir(ADDR_Frameset_1ff60c, ADDR_Frameset_1ff617);
 		port_SetState_SnowmanAirborne();
 	}
 
 	void port_SetState_Swallowed()
 	{
-		wr8(wWarioState, WST_SWALLOWED);
+		mem_.wario_state() = WST_SWALLOWED;
 		clear({wSFXLoopCounter, wWalkVelIndex, wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter,
 			wIsCrouching, wIsRolling, wIsSmashAttacking, wJumpVelTable, wJumpVelIndex});
-		wr8(wIsIntangible, 1);
-		wr8(wAutoMoveState, 1);
+		mem_.is_intangible() = 1;
+		mem_.auto_move_state() = 1;
 		clear({wFrameDuration, wAnimationFrame, wIsTurning});
 		set_pal(ADDR_WarioDefaultPal);
 		load_gfx(BANK_WarioLaunchGfx, ADDR_WarioLaunchGfx);
 		set_oam(BANK_OAM_1dc3cd, ADDR_OAM_1dc3cd);
-		uint8_t dir = rd8(wObjDirection);
-		wr8(wDirection, dir);
+		uint8_t dir = mem_.obj_direction();
+		mem_.direction() = dir;
 		set_frameset(dir ? ADDR_Frameset_1dc42c : ADDR_Frameset_1dc40f);
 		anim(OAM3);
 	}
 
 	void port_SetState_FanStart()
 	{
-		wr8(wWarioState, WST_FAN_START);
+		mem_.wario_state() = WST_FAN_START;
 		collision_box(-1, -27, -9, 9);
 		clear({wSFXLoopCounter, wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching,
 			wIsRolling, wIsSmashAttacking, wJumpVelIndex});
-		wr8(wJumpVelTable, 1);
+		mem_.jump_vel_table() = 1;
 		home::update_level_music(gb_);
 		reset_anim();
 		load_gfx(BANK_WarioFanGfx, ADDR_WarioFanGfx);
@@ -415,7 +415,7 @@ public:
 
 	void port_SetState_IceSkatinStart()
 	{
-		wr8(wWarioState, WST_ICE_SKATIN_START);
+		mem_.wario_state() = WST_ICE_SKATIN_START;
 		collision_box(-1, -27, -9, 9);
 		clear({wInvisibleFrame, wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching,
 			wIsRolling, wIsSmashAttacking, wJumpVelTable, wJumpVelIndex});
@@ -424,30 +424,30 @@ public:
 		set_pal(ADDR_WarioIceSkatinPal);
 		load_gfx(BANK_WarioBubbleGfx, ADDR_WarioBubbleGfx);
 		set_oam(BANK_OAM_1fdb6d, ADDR_OAM_1fdb6d);
-		uint8_t dir = rd8(wObjDirection);
-		wr8(wDirection, dir);
+		uint8_t dir = mem_.obj_direction();
+		mem_.direction() = dir;
 		set_frameset(dir ? ADDR_Frameset_1fdd82 : ADDR_Frameset_1fdd8b);
 		anim(OAM2);
 	}
 
 	void port_HandleWarioOwlInput()
 	{
-		wr8(wWarioState, WST_OWL_FAST);
-		wr8(wSFXLoopCounter, 0);
-		uint8_t joy = rd8(wJoypadDown);
+		mem_.wario_state() = WST_OWL_FAST;
+		mem_.sfx_loop_counter() = 0;
+		uint8_t joy = mem_.joypad_down();
 		uint8_t in;
 		if (joy & PAD_UP) {
 			in = PAD_UP;
 		} else if (joy & PAD_DOWN) {
 			in = PAD_DOWN;
 		} else if (joy & PAD_RIGHT) {
-			wr8(wDirection, DIRECTION_RIGHT);
+			mem_.direction() = DIRECTION_RIGHT;
 			in = PAD_RIGHT;
 		} else {
-			wr8(wDirection, DIRECTION_LEFT);
+			mem_.direction() = DIRECTION_LEFT;
 			in = PAD_LEFT;
 		}
-		wr8(wSwimmingDirectionInput, in);
+		mem_.swimming_direction_input() = in;
 		clear({wWarioStateCounter, wWarioStateCycles});
 		reset_anim();
 		if (ld_mask(wSwimmingDirectionInput, PAD_UP | PAD_DOWN))
@@ -459,18 +459,18 @@ public:
 
 	void port_SetState_SplitHit()
 	{
-		wr8(wWarioState, WST_SPLIT_HIT);
+		mem_.wario_state() = WST_SPLIT_HIT;
 		collision_box(-1, -27, -9, 9);
 		clear({wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching, wIsRolling,
 			wIsSmashAttacking});
-		wr8(wJumpVelTable, 0x01);
-		wr8(wJumpVelIndex, 0x0e);
+		mem_.jump_vel_table() = 0x01;
+		mem_.jump_vel_index() = 0x0e;
 		home::update_level_music(gb_);
 		reset_anim();
 		set_pal(ADDR_WarioSplitPal);
 		load_gfx(BANK_WarioSnowballGfx, ADDR_WarioSnowballGfx);
 		set_oam(BANK_OAM_1ffa12, ADDR_OAM_1ffa12);
-		wr8(wDirection, rd8(wObjDirection));
+		mem_.direction() = mem_.obj_direction();
 		frameset_by_dir(ADDR_Frameset_1ffd16, ADDR_Frameset_1ffd10);
 		anim(OAM2);
 	}
@@ -478,12 +478,12 @@ public:
 	void port_SetState_TurningIntoSnowman()
 	{
 		play_sfx(SFX_047);
-		wr8(wWarioState, WST_SNOWMAN_START);
+		mem_.wario_state() = WST_SNOWMAN_START;
 		collision_box(-1, -27, -9, 9);
 		clear({wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching, wIsRolling,
 			wIsSmashAttacking, wJumpVelIndex});
-		if (rd8(wJumpVelTable))
-			wr8(wJumpVelIndex, 0x18);
+		if (mem_.jump_vel_table())
+			mem_.jump_vel_index() = 0x18;
 		home::update_level_music(gb_);
 		reset_anim();
 		set_pal(ADDR_WarioSnowmanPal);
@@ -495,10 +495,10 @@ public:
 
 	void port_SetState_Launched()
 	{
-		wr8(wIsIntangible, 0);
-		wr8(wTransformation, TRANSFORMATION_LAUNCHED);
+		mem_.is_intangible() = 0;
+		mem_.transformation() = TRANSFORMATION_LAUNCHED;
 		touch_states(TOUCH_VANISH, 0x02);
-		wr8(wWarioState, WST_LAUNCHED);
+		mem_.wario_state() = WST_LAUNCHED;
 		clear({wSFXLoopCounter, wWalkVelIndex, wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter,
 			wIsCrouching, wIsRolling, wIsSmashAttacking, wJumpVelTable, wJumpVelIndex});
 		collision_box(-1, -15, -9, 9);
@@ -514,11 +514,11 @@ public:
 	{
 		particle_at_wario(PARTICLE_MAGIC_1);
 		particle_at_wario(PARTICLE_MAGIC_2);
-		wr8(wWarioState, WST_MAGIC_RISING);
+		mem_.wario_state() = WST_MAGIC_RISING;
 		collision_box(-1, -27, -9, 9);
 		clear({wSFXLoopCounter, wWarioStateCounter, wWarioStateCycles, wGrabState, wAttackCounter, wIsCrouching,
 			wIsRolling, wIsSmashAttacking, wJumpVelIndex});
-		wr8(wJumpVelTable, 1);
+		mem_.jump_vel_table() = 1;
 		home::update_level_music(gb_);
 		reset_anim();
 		set_pal(ADDR_WarioMagicPal);
@@ -530,13 +530,13 @@ public:
 
 	void port_UpdateState_BallShot()
 	{
-		uint8_t state = rd8(wAutoMoveState);
+		uint8_t state = mem_.auto_move_state();
 		if (!state) {
-			wr8(wDirection, DIRECTION_LEFT);
-			wr8(wWarioState, WST_BALL_THROWN);
+			mem_.direction() = DIRECTION_LEFT;
+			mem_.wario_state() = WST_BALL_THROWN;
 			clear({wSFXLoopCounter, wWarioStateCounter, wWarioStateCycles});
-			wr8(wJumpVelIndex, 0x6);
-			wr8(wJumpVelTable, JUMP_VEL_HIGH_JUMP);
+			mem_.jump_vel_index() = 0x6;
+			mem_.jump_vel_table() = JUMP_VEL_HIGH_JUMP;
 			reset_anim();
 			set_frameset(ADDR_Frameset_1dd2ee);
 			anim(OAM3);
@@ -544,7 +544,7 @@ public:
 		}
 		if (state & (1 << 7)) {
 			state &= 0x7f;
-			wr8(wAutoMoveState, state);
+			mem_.auto_move_state() = state;
 			switch (state) {
 			case 1: // .phase_3
 				set_pal(ADDR_WarioBallPal);
@@ -565,22 +565,22 @@ public:
 			}
 		}
 		anim(OAM3);
-		if (rd8(wAutoMoveState) != 0x02)
+		if (mem_.auto_move_state() != 0x02)
 			return;
 		if (!anim_ended())
 			return;
-		wr8(wAutoMoveState, 0x03 | (1 << 7));
+		mem_.auto_move_state() = 0x03 | (1 << 7);
 	}
 
 	void port_TurnIntoSmallSnowball()
 	{
-		wr8(wTransformationProgress, 1);
-		wr8(wWarioStateCounter, 0);
+		mem_.transformation_progress() = 1;
+		mem_.wario_state_counter() = 0;
 		load_gfx(BANK_WarioSnowballGfx, ADDR_WarioSnowballGfx);
 		set_oam(BANK_OAM_1ff64a, ADDR_OAM_1ff64a);
 		reset_anim();
-		uint8_t dir = static_cast<uint8_t>((rd8(wWarioSlopeInteraction) & 0x0f) - 1);
-		wr8(wDirection, dir);
+		uint8_t dir = static_cast<uint8_t>((mem_.wario_slope_interaction() & 0x0f) - 1);
+		mem_.direction() = dir;
 		set_frameset(dir ? ADDR_Frameset_1ff92b : ADDR_Frameset_1ff956);
 		anim(OAM2);
 		port_SetState_SnowballRolling();
@@ -617,14 +617,14 @@ public:
 			port_SetState_SnowmanTurning();
 			return;
 		}
-		if (rd8(wWalkVelIndex) >= 0x08)
-			wr8(wWalkVelIndex, 0x04);
+		if (mem_.walk_vel_index() >= 0x08)
+			mem_.walk_vel_index() = 0x04;
 	}
 
 	void port_Func_1edf47()
 	{
 		bool right = facing_right();
-		uint8_t pad = rd8(wJoypadDown);
+		uint8_t pad = mem_.joypad_down();
 		if (pad & (right ? PAD_LEFT : PAD_RIGHT)) {
 			port_SetState_FanTurning();
 			return;
@@ -678,7 +678,7 @@ public:
 	void port_UpdateStart_FanTurning()
 	{
 		port_Func_1edf2b();
-		if (rd8(wWarioState) != WST_FAN_TURNING)
+		if (mem_.wario_state() != WST_FAN_TURNING)
 			return;
 		sfx_loop(0x0c, SFX_07D);
 		if (anim_and_ended(OAM3))
@@ -687,28 +687,28 @@ public:
 
 	void port_UpdateState_Swallowed()
 	{
-		if (rd8(wIsTurning)) {
+		if (mem_.is_turning()) {
 			clear({wIsTurning, wFrameDuration, wAnimationFrame});
 			set_frameset(flip_dir() ? ADDR_Frameset_1dc42c : ADDR_Frameset_1dc40f);
 		}
 		anim(OAM3);
 		if (ld_and(wAutoMoveState))
 			return;
-		wr8(wDirection, DIRECTION_LEFT);
+		mem_.direction() = DIRECTION_LEFT;
 		port_SetState_Launched(); // fallthrough
 	}
 
 	void port_UpdateState_BallSentUpwards()
 	{
 		anim(OAM3);
-		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
+		if (mem_.jump_vel_index() < FALLING_JUMP_VEL_INDEX) {
 			move_y(-3);
 			if (!up_collision()) {
 				home::handle_upwards_floor_transition(gb_);
 				return;
 			}
-			wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
-			wr8(wJumpVelTable, JUMP_VEL_NORMAL);
+			mem_.jump_vel_index() = FALLING_JUMP_VEL_INDEX;
+			mem_.jump_vel_table() = JUMP_VEL_NORMAL;
 			return;
 		}
 		home::apply_jump_velocity(gb_);
@@ -724,8 +724,8 @@ public:
 		collision(BANK_Func_19b25, ADDR_Func_19b25, check_func_19b25);
 		if (up_collision()) {
 			particle_at_wario(PARTICLE_MAGIC_STOP);
-			wr8(wWarioState, WST_MAGIC_STOPPING);
-			wr8(wWarioStateCounter, 0);
+			mem_.wario_state() = WST_MAGIC_STOPPING;
+			mem_.wario_state_counter() = 0;
 			reset_anim();
 			anim(0x77);
 			return;
@@ -750,7 +750,7 @@ public:
 			return;
 		}
 		play_sfx(SFX_048);
-		wr8(wWarioState, WST_LAUCH_CRASH);
+		mem_.wario_state() = WST_LAUCH_CRASH;
 		reset_anim();
 		frameset_by_dir(ADDR_Frameset_1dc926, ADDR_Frameset_1dc90d);
 		anim(OAM3);
@@ -760,7 +760,7 @@ public:
 	{
 		anim(OAM3);
 		home::apply_jump_velocity(gb_);
-		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
+		if (mem_.jump_vel_index() < FALLING_JUMP_VEL_INDEX) {
 			move_x(-3);
 			return;
 		}
@@ -772,16 +772,16 @@ public:
 		// push_wram BANK(wShootGoals) / pop_wram
 		uint8_t wbk = rd8(rWBK);
 		wr8(rWBK, BANK_wShootGoals);
-		bool three = rd8(wShootGoals) == 3;
+		bool three = mem_.shoot_goals() == 3;
 		wr8(rWBK, wbk);
 		if (!three) {
 			FARCALL(Func_206eb);
 			return;
 		}
-		wr8(wWarioState, WST_BALL_SENT_UPWARDS);
+		mem_.wario_state() = WST_BALL_SENT_UPWARDS;
 		play_sfx(SFX_066);
 		clear({wSFXLoopCounter, wWarioStateCounter, wWarioStateCycles, wJumpVelIndex});
-		wr8(wIsIntangible, 1);
+		mem_.is_intangible() = 1;
 		reset_anim();
 		set_frameset(ADDR_Frameset_1dd2ee);
 		anim(OAM3);
@@ -799,9 +799,9 @@ public:
 			port_Func_1edaca();
 			return;
 		}
-		wr8(wWarioState, WST_BALL_START);
+		mem_.wario_state() = WST_BALL_START;
 		clear({wSFXLoopCounter, wWarioStateCounter, wWarioStateCycles});
-		wr8(wJumpVelIndex, 0x18);
+		mem_.jump_vel_index() = 0x18;
 		reset_anim();
 		set_frameset(ADDR_Frameset_1dd313);
 		anim(OAM3);
@@ -837,9 +837,9 @@ public:
 			update_pos_y();
 			return;
 		}
-		wr8(wWarioState, WST_ICE_SKATIN_AIRBORNE);
-		wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
-		wr8(wJumpVelTable, JUMP_VEL_NORMAL);
+		mem_.wario_state() = WST_ICE_SKATIN_AIRBORNE;
+		mem_.jump_vel_index() = FALLING_JUMP_VEL_INDEX;
+		mem_.jump_vel_table() = JUMP_VEL_NORMAL;
 	}
 
 	void port_UpdateState_IceSkatinAirborne()
@@ -868,7 +868,7 @@ public:
 		home::trigger_floor_transition(gb_);
 		if (!still_in(WST_ICE_SKATIN_AIRBORNE))
 			return;
-		wr8(wWalkVelIndex, 0x10);
+		mem_.walk_vel_index() = 0x10;
 		port_SetState_IceSkatin();
 	}
 
@@ -913,7 +913,7 @@ public:
 	// wSwimmingDirectionInput's direction, in the order the owl tests it
 	uint8_t owl_dir() const
 	{
-		uint8_t in = rd8(wSwimmingDirectionInput);
+		uint8_t in = mem_.swimming_direction_input();
 		if (in & PAD_RIGHT)
 			return PAD_RIGHT;
 		if (in & PAD_UP)
@@ -944,19 +944,19 @@ public:
 		// blocked: turn back
 		switch (pad) {
 		case PAD_RIGHT:
-			wr8(wDirection, DIRECTION_LEFT);
+			mem_.direction() = DIRECTION_LEFT;
 			port_UpdateWarioOwlDirection();
 			break;
 		case PAD_UP:
-			wr8(wSwimmingDirectionInput, PAD_DOWN);
+			mem_.swimming_direction_input() = PAD_DOWN;
 			port_SetState_OwlWario();
 			break;
 		case PAD_DOWN:
-			wr8(wSwimmingDirectionInput, PAD_UP);
+			mem_.swimming_direction_input() = PAD_UP;
 			port_SetState_OwlWario();
 			break;
 		default:
-			wr8(wDirection, DIRECTION_RIGHT);
+			mem_.direction() = DIRECTION_RIGHT;
 			port_UpdateWarioOwlDirection();
 			break;
 		}
@@ -1011,20 +1011,20 @@ public:
 	{
 		if (room_transition_check())
 			return;
-		uint8_t size = rd8(wTransformationProgress);
+		uint8_t size = mem_.transformation_progress();
 		if (size == 2) {
 			// .medium_snowball
-			if (rd8(wWarioStateCounter) >= 0xe0) {
-				wr8(wTransformationProgress, 3);
-				wr8(wFrameDuration, 0);
-				wr8(wAnimationFrame, static_cast<uint8_t>(rd8(wAnimationFrame) + 0x02));
+			if (mem_.wario_state_counter() >= 0xe0) {
+				mem_.transformation_progress() = 3;
+				mem_.frame_duration() = 0;
+				mem_.animation_frame() = static_cast<uint8_t>(mem_.animation_frame() + 0x02);
 				frameset_by_dir(ADDR_Frameset_1ff970, ADDR_Frameset_1ff945);
 			}
 		} else if (size != 3) {
 			// small snowball
-			if (rd8(wWarioStateCounter) >= 0x70) {
-				wr8(wTransformationProgress, 2);
-				wr8(wFrameDuration, 0);
+			if (mem_.wario_state_counter() >= 0x70) {
+				mem_.transformation_progress() = 2;
+				mem_.frame_duration() = 0;
 				frameset_by_dir(ADDR_Frameset_1ff963, ADDR_Frameset_1ff938);
 			}
 		}
@@ -1033,10 +1033,10 @@ public:
 		anim(OAM2);
 		uint8_t moved = walk_with_velocity(facing_right());
 		// .increment_counter_if_not_big
-		if (rd8(wTransformationProgress) < 3) {
-			uint8_t count = rd8(wWarioStateCounter);
+		if (mem_.transformation_progress() < 3) {
+			uint8_t count = mem_.wario_state_counter();
 			if (count < 0xf8)
-				wr8(wWarioStateCounter, static_cast<uint8_t>(count + moved));
+				mem_.wario_state_counter() = static_cast<uint8_t>(count + moved);
 		}
 		cap_walk(0x18, 0x14);
 		if (front_collision() & 0x0f) {
@@ -1047,9 +1047,9 @@ public:
 			update_pos_y();
 			return;
 		}
-		wr8(wWarioState, WST_SNOWBALL_AIRBORNE);
-		wr8(wJumpVelIndex, 0x18);
-		wr8(wJumpVelTable, 0x03);
+		mem_.wario_state() = WST_SNOWBALL_AIRBORNE;
+		mem_.jump_vel_index() = 0x18;
+		mem_.jump_vel_table() = 0x03;
 	}
 
 	void port_UpdateStart_FanLifting()
@@ -1084,15 +1084,15 @@ public:
 		home::apply_jump_velocity(gb_);
 		FARCALL(Func_2b17a);
 		cap_walk(0x08, 0x04);
-		if (rd8(wJumpVelIndex) == 0x18)
-			wr8(wIsSmashAttacking, TRUE);
+		if (mem_.jump_vel_index() == 0x18)
+			mem_.is_smash_attacking() = TRUE;
 	}
 
 	void port_UpdateState_BallAirborne()
 	{
 		anim(OAM3);
 		port_Func_1ee02e();
-		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX)
+		if (mem_.jump_vel_index() < FALLING_JUMP_VEL_INDEX)
 			return;
 		if (!airborne_collision())
 			return;
@@ -1186,8 +1186,8 @@ public:
 				return;
 			}
 			home::trigger_floor_transition(gb_);
-			wr8(wJumpVelTable, 0);
-			wr8(wJumpVelIndex, 0);
+			mem_.jump_vel_table() = 0;
+			mem_.jump_vel_index() = 0;
 		}
 		anim(OAM2);
 		if (anim_ended())
@@ -1210,12 +1210,12 @@ public:
 	void port_UpdateState_HangingRail()
 	{
 		if (!ld_and(wWarioStateCounter) && anim_ended()) {
-			wr8(wWarioStateCounter, 0x01);
+			mem_.wario_state_counter() = 0x01;
 			reset_anim();
 			set_frameset(ADDR_Frameset_1feeb4);
 		}
 		anim(OAM2);
-		uint8_t pressed = rd8(wJoypadPressed);
+		uint8_t pressed = mem_.joypad_pressed();
 		if (pressed & PAD_B) {
 			home::recover_from_transformation(gb_, false);
 			return;
@@ -1255,14 +1255,14 @@ public:
 		anim(OAM2);
 		if (!ld_and(wWarioStateCounter) && anim_ended()) {
 			reset_anim();
-			wr8(wWarioStateCounter, 1);
+			mem_.wario_state_counter() = 1;
 			set_frameset(facing_right() ? ADDR_Frameset_1ff625 : ADDR_Frameset_1ff622);
 			anim(OAM2);
 		}
 		port_Func_1edf01();
 		if (!still_in(WST_SNOWMAN_AIRBORNE))
 			return;
-		if (rd8(wJumpVelIndex) < 0x18) {
+		if (mem_.jump_vel_index() < 0x18) {
 			if (up_collision() && still_in(WST_SNOWMAN_AIRBORNE))
 				port_SetState_SnowmanAirborne_Fall();
 			return;
@@ -1277,13 +1277,13 @@ public:
 			port_TurnIntoSmallSnowball();
 			return;
 		}
-		if (!rd8(wGroundShakeCounter)) {
-			wr8(wGroundShakeCounter, 0x20);
-			wr8(wIsWarioGroundShaking, TRUE);
+		if (!mem_.ground_shake_counter()) {
+			mem_.ground_shake_counter() = 0x20;
+			mem_.is_wario_ground_shaking() = TRUE;
 		}
-		if (!rd8(wFloorTransitionDir))
+		if (!mem_.floor_transition_dir())
 			play_sfx(SFX_024);
-		wr8(wWarioState, WST_SNOWMAN_LANDING);
+		mem_.wario_state() = WST_SNOWMAN_LANDING;
 		clear({wJumpVelTable, wJumpVelIndex, wIsSmashAttacking, wWarioStateCounter, wFrameDuration, wAnimationFrame});
 		set_frameset(facing_right() ? ADDR_Frameset_1ff617 : ADDR_Frameset_1ff60c);
 		anim(OAM2);
@@ -1298,9 +1298,9 @@ public:
 		}
 		if (centre_collision())
 			return;
-		wr8(wWarioState, WST_SPLITTING_AIRBORNE);
-		wr8(wJumpVelTable, JUMP_VEL_NORMAL);
-		wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
+		mem_.wario_state() = WST_SPLITTING_AIRBORNE;
+		mem_.jump_vel_table() = JUMP_VEL_NORMAL;
+		mem_.jump_vel_index() = FALLING_JUMP_VEL_INDEX;
 	}
 
 	void port_UpdateState_SplittingAirborne()
@@ -1324,7 +1324,7 @@ public:
 	// wWarioState - $b0, as the asm's jumptable
 	void port_UpdateWarioStates_Group4()
 	{
-		switch (static_cast<uint8_t>(rd8(wWarioState) - 0xb0)) {
+		switch (static_cast<uint8_t>(mem_.wario_state() - 0xb0)) {
 		case 0x00: port_UpdateState_IceSkatinStart(); return;
 		case 0x01: port_UpdateState_IceSkatin(); return;
 		case 0x02: port_UpdateState_IceSkatinAirborne(); return;
@@ -1384,8 +1384,8 @@ public:
 
 	void port_SetState_BlindAirborne()
 	{
-		wr8(wWarioSlopeInteraction, 0);
-		wr8(wWarioState, WST_BLIND_AIRBORNE);
+		mem_.wario_slope_interaction() = 0;
+		mem_.wario_state() = WST_BLIND_AIRBORNE;
 		clear({wFrameDuration, wAnimationFrame, wWarioStateCounter, wWarioStateCycles, wIsCrouching, wAttackCounter});
 		load_gfx(BANK_WarioAirborneGfx, ADDR_WarioAirborneGfx);
 		set_oam(BANK_OAM_15955, ADDR_OAM_15955);
@@ -1397,19 +1397,19 @@ public:
 
 	void port_Func_1ed548()
 	{
-		wr8(wJumpingUpwards, 0);
-		wr8(wJumpVelIndex, FALLING_JUMP_VEL_INDEX);
-		wr8(wJumpVelTable, JUMP_VEL_HIGH_JUMP);
+		mem_.jumping_upwards() = 0;
+		mem_.jump_vel_index() = FALLING_JUMP_VEL_INDEX;
+		mem_.jump_vel_table() = JUMP_VEL_HIGH_JUMP;
 		port_SetState_BlindAirborne();
 	}
 
 	void port_Func_1ed558()
 	{
 		play_sfx(SFX_JUMP);
-		wr8(wJumpVelIndex, 0);
-		wr8(wIsSmashAttacking, 0);
-		wr8(wJumpingUpwards, TRUE);
-		wr8(wJumpVelTable, JUMP_VEL_NORMAL);
+		mem_.jump_vel_index() = 0;
+		mem_.is_smash_attacking() = 0;
+		mem_.jumping_upwards() = TRUE;
+		mem_.jump_vel_table() = JUMP_VEL_NORMAL;
 		port_SetState_BlindAirborne(); // fallthrough
 	}
 
@@ -1429,7 +1429,7 @@ public:
 		port_Func_1ee00f();
 		if (!still_in(WST_BLIND_AIRBORNE))
 			return;
-		if (rd8(wJumpVelIndex) < FALLING_JUMP_VEL_INDEX) {
+		if (mem_.jump_vel_index() < FALLING_JUMP_VEL_INDEX) {
 			if (up_collision() && still_in(WST_BLIND_AIRBORNE))
 				port_Func_1ed548();
 			return;
@@ -1533,7 +1533,7 @@ public:
 			wJumpVelIndex, 0};
 		clear(zero);
 		cpu_.a = alu_.inc(cpu_.a);
-		wr8(wJumpVelTable, cpu_.a);
+		mem_.jump_vel_table() = cpu_.a;
 		home::update_level_music(gb_);
 		reset_anim();
 		load_gfx(BANK_WarioFanGfx, ADDR_WarioFanGfx);

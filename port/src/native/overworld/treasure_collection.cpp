@@ -121,9 +121,9 @@ void TreasureCollection::init()
 
 	set_scene_obj_state(wSceneObj1State, 0x01); // the cursor
 	// the page arrows
-	mem_[wSceneObj9XCoord] = 0x08;
+	mem_.scene_obj9_x_coord() = 0x08;
 	mem_[wSceneObj9XCoord - 1] = 0x10;
-	mem_[wSceneObj10XCoord] = 0x98;
+	mem_.scene_obj10_x_coord() = 0x98;
 	mem_[wSceneObj10XCoord - 1] = 0x10;
 	mem_[rLCDC] = LCDC_ON | LCDC_BG_9C00 | LCDC_OBJ_16 | LCDC_OBJ_ON | LCDC_BG_ON;
 	++wram_.sub_state();
@@ -147,8 +147,8 @@ void TreasureCollection::load_page_gfx()
 // hidden.
 void TreasureCollection::apply_page_pals()
 {
-	Byte cell = mem_[w2dffe];
-	Byte treasure = mem_[w2dfff];
+	Byte cell = mem_.unk_2dffe();
+	Byte treasure = mem_.unk_2dfff();
 	cell = 0;
 	treasure = static_cast<uint8_t>(wram_.collection_page() * NUM_COLLECTION_CELLS + 1);
 	do {
@@ -203,8 +203,8 @@ void TreasureCollection::set_row_and_column(uint16_t dest, uint8_t cell)
 // GetCollectionCellCoords: the cursor (scene object 1) on the cell
 void TreasureCollection::move_cursor()
 {
-	mem_[wSceneObj1YCoord] = mem_[static_cast<uint16_t>(CELL_Y + wram_.collection_row())];
-	mem_[wSceneObj1XCoord] = mem_[static_cast<uint16_t>(CELL_X + wram_.collection_col())];
+	mem_.scene_obj1_y_coord() = mem_[static_cast<uint16_t>(CELL_Y + wram_.collection_row())];
+	mem_.scene_obj1_x_coord() = mem_[static_cast<uint16_t>(CELL_X + wram_.collection_col())];
 }
 
 void TreasureCollection::update()
@@ -221,8 +221,8 @@ void TreasureCollection::handle_input()
 {
 	if (wram_.joypad_pressed().bit(B_PAD_B)) {
 		stop_music2(mem_);
-		mem_[hSFXID + 0] = 0xff; // stop_sfx
-		mem_[hSFXID + 1] = 0x00;
+		mem_.sfx().hi() = 0xff; // stop_sfx
+		mem_.sfx().lo() = 0x00;
 		wram_.sub_state() = 0x08;
 		return;
 	}

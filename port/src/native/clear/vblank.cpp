@@ -40,8 +40,8 @@ public:
 	// VBlank_ClearScreen.Func: the scroll, and tile $71's rows rotated
 	void port_VBlank_ClearScreen__Func()
 	{
-		mem_[rSCY] = mem_[wSCY];
-		mem_[rSCX] = mem_[wSCX];
+		mem_[rSCY] = mem_.scy();
+		mem_[rSCX] = mem_.scx();
 		mem_[rVBK] = 0;
 		rotate_tile_plane(v0Tiles2 + 0x71 * TILE_SIZE + (TILE_SIZE - 2));
 		rotate_tile_plane(v0Tiles2 + 0x71 * TILE_SIZE + (TILE_SIZE - 1));
@@ -60,9 +60,9 @@ public:
 	// (wcee4 bit 7): an attribute (with its low bits set) or two tiles
 	void port_VBlank_MusicalCoinsScreen__Func()
 	{
-		mem_[rSCY] = mem_[wSCY];
-		mem_[rSCX] = mem_[wSCX];
-		uint8_t queued = mem_[wcee4];
+		mem_[rSCY] = mem_.scy();
+		mem_[rSCX] = mem_.scx();
+		uint8_t queued = mem_.unk_cee4();
 		if (queued & 0x80) {
 			if (queued & 0x7f) { // .asm_d47d9
 				mem_[rVBK] = 1; // BANK("VRAM1")
@@ -70,7 +70,7 @@ public:
 			} else {
 				write_queued(write_queued(wBGMapTileVRAM0Queue));
 			}
-			mem_[wcee4] &= 0x7f;
+			mem_.unk_cee4() &= 0x7f;
 		}
 		transfer_oam();
 	}

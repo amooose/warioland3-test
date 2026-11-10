@@ -87,11 +87,11 @@ void Omodonmeka::start()
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(UPDATE);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 0xfd;
-	mem_[wCurObjCollBoxLeft] = 0xf3;
-	mem_[wCurObjCollBoxBottom] = 0xf9;
-	var1() = mem_[wCurObjYPos + 0];
-	var2() = mem_[wCurObjYPos + 1];
+	mem_.cur_obj_coll_box_right() = 0xfd;
+	mem_.cur_obj_coll_box_left() = 0xf3;
+	mem_.cur_obj_coll_box_bottom() = 0xf9;
+	var1() = mem_.cur_obj_y().lo();
+	var2() = mem_.cur_obj_y().hi();
 	run(START_HOVER);
 }
 
@@ -111,7 +111,7 @@ void Omodonmeka::got_on(uint16_t at)
 	mem_[at] = 0;
 	set_frameset(ADDR_Frameset_68f14);
 	uint8_t e, d;
-	if (mem_[wTransformation] == TRANSFORMATION_FLAT_WARIO) {
+	if (mem_.transformation() == TRANSFORMATION_FLAT_WARIO) {
 		state_duration() = 0x18;
 		e = 0x07;
 		d = 0x07;
@@ -119,13 +119,12 @@ void Omodonmeka::got_on(uint16_t at)
 		e = 0x05;
 		d = 0x1a;
 	}
-	uint16_t wario_y = static_cast<uint16_t>(mem_[wWarioYPos + 0] << 8 | mem_[wWarioYPos + 1]);
+	uint16_t wario_y = mem_.wario_y();
 	y() = static_cast<uint16_t>(wario_y - d);
 	uint16_t wario_x = static_cast<uint16_t>(x() - 8);
-	mem_[wWarioXPos + 1] = static_cast<uint8_t>(wario_x);
-	mem_[wWarioXPos + 0] = static_cast<uint8_t>(wario_x >> 8);
+	mem_.wario_x() = wario_x;
 	set_substate(0xf0, e);
-	mem_[wCurObjCollBoxBottom] = 0xf9;
+	mem_.cur_obj_coll_box_bottom() = 0xf9;
 	dispatch();
 }
 
@@ -167,7 +166,7 @@ bool Omodonmeka::hit(uint8_t s)
 bool Omodonmeka::auto_move_over()
 {
 	no_actions();
-	if (mem_[wAutoMoveState])
+	if (mem_.auto_move_state())
 		return false;
 	state() = 1;
 	return true;
@@ -176,20 +175,20 @@ bool Omodonmeka::auto_move_over()
 // its y position at the given offset above Wario's
 void Omodonmeka::wario_above(uint8_t offset)
 {
-	uint16_t wario_y = static_cast<uint16_t>(mem_[wWarioYPos + 0] << 8 | mem_[wWarioYPos + 1]);
+	uint16_t wario_y = mem_.wario_y();
 	y() = static_cast<uint16_t>(wario_y - offset);
 }
 
 // back at its starting position (var1/var2)
 bool Omodonmeka::at_start() const
 {
-	return mem_[wCurObjYPos + 1] == var2() && mem_[wCurObjYPos + 0] == var1();
+	return mem_.cur_obj_y().hi() == var2() && mem_.cur_obj_y().lo() == var1();
 }
 
 // Wario's within $28 pixels across (dx: its distance)
 bool Omodonmeka::wario_near(uint8_t &dx)
 {
-	dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x22) - static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a));
+	dx = static_cast<uint8_t>(static_cast<uint8_t>(screen_x() + 0x22) - static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a));
 	return dx < 0x28 || dx >= 0xd8;
 }
 
@@ -230,10 +229,10 @@ void Omodonmeka::run(uint16_t handler)
 		if (auto_move_over())
 			return;
 		uint16_t y_pos = static_cast<uint16_t>(y() - 0x1d);
-		mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+		mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		bool stop = hpos_block_unk3() & 0x0f;
 		if (!stop)
 			stop = y() == static_cast<uint16_t>((var1() | var2() << 8) - 0x40);
@@ -243,7 +242,7 @@ void Omodonmeka::run(uint16_t handler)
 			set_frameset(ADDR_Frameset_68f14);
 			return;
 		}
-		if (!(mem_[wGlobalCounter] & 0x07))
+		if (!(mem_.global_counter() & 0x07))
 			play_sfx(SFX_087);
 		move_wario(ADDR_MoveWarioUp, 0x01);
 		home::handle_upwards_floor_transition(gb_);
@@ -255,20 +254,19 @@ void Omodonmeka::run(uint16_t handler)
 			return;
 		apply_y_movement_loop(ADDR_Data_604c0);
 		uint16_t wario_y = static_cast<uint16_t>(y() + 0x1a);
-		mem_[wWarioYPos + 1] = static_cast<uint8_t>(wario_y);
-		mem_[wWarioYPos + 0] = static_cast<uint8_t>(wario_y >> 8);
+		mem_.wario_y() = wario_y;
 		return;
 	}
 	case HOVER: { // opens its mouth when Wario's close and above
 		apply_y_movement_loop(ADDR_Data_604c0);
 		if (!(flags() & (1 << OBJFLAG_ON_SCREEN_F)))
 			return;
-		if (mem_[wTransformation] == TRANSFORMATION_PUFFY_WARIO)
+		if (mem_.transformation() == TRANSFORMATION_PUFFY_WARIO)
 			return;
 		uint8_t dx;
 		if (!wario_near(dx))
 			return;
-		if (static_cast<uint8_t>(screen_y() + 0x2a) >= static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a))
+		if (static_cast<uint8_t>(screen_y() + 0x2a) >= static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a))
 			return;
 		set_frameset(ADDR_Frameset_68f1d);
 		set_substate(0xf0, 0x08);
@@ -276,19 +274,19 @@ void Omodonmeka::run(uint16_t handler)
 		return;
 	}
 	case MOUTH_OPEN: { // closes it when Wario moves away, or swallows him
-		if (!(mem_[wGlobalCounter] & 0x1f))
+		if (!(mem_.global_counter() & 0x1f))
 			play_sfx(SFX_08C);
 		apply_y_movement_loop(ADDR_Data_604c0);
 		uint8_t dx;
 		if (wario_near(dx)) {
-			bool above = static_cast<uint8_t>(screen_y() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a);
+			bool above = static_cast<uint8_t>(screen_y() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a);
 			if (dx < 0x10 || dx >= 0xf0) {
 				if (!above)
 					return;
 				set_frameset(ADDR_Frameset_68f2b);
 				set_substate(0xf0, 0x02);
 				var3() = 0;
-				mem_[wCurObjCollBoxBottom] = 0x00;
+				mem_.cur_obj_coll_box_bottom() = 0x00;
 				play_sfx(SFX_088);
 				return;
 			}
@@ -301,16 +299,16 @@ void Omodonmeka::run(uint16_t handler)
 	}
 	case FALL_BACK: // falls back to the ground
 		apply_y_movement(ADDR_Data_60500);
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		if (!hpos_block_unk1())
 			return;
-		mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-		mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+		mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+		mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 		set_interaction(OBJ_INTERACTION_01);
-		mem_[wCurObjCollBoxBottom] = 0xf9;
+		mem_.cur_obj_coll_box_bottom() = 0xf9;
 		set_frameset(ADDR_Frameset_68f14);
 		set_substate(0xf0, 0x03);
 		return;
@@ -331,11 +329,11 @@ void Omodonmeka::run(uint16_t handler)
 		no_actions();
 		apply_y_movement(ADDR_Data_604e0);
 		apply_x_movement_loop(ADDR_Data_60650);
-		if (mem_[wTransformation] != TRANSFORMATION_FLAT_WARIO)
+		if (mem_.transformation() != TRANSFORMATION_FLAT_WARIO)
 			return;
 		if (!at_start())
 			return;
-		mem_[wCurObjCollBoxBottom] = 0xf9;
+		mem_.cur_obj_coll_box_bottom() = 0xf9;
 		run(START_HOVER);
 		return;
 	default:
@@ -350,9 +348,9 @@ void Omodonmeka::with_omodon_start(uint16_t omodon)
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(ADDR_OmodonmekaWithOmodonFunc);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 0xfd;
-	mem_[wCurObjCollBoxLeft] = 0xf3;
-	mem_[wCurObjCollBoxBottom] = 0xf9;
+	mem_.cur_obj_coll_box_right() = 0xfd;
+	mem_.cur_obj_coll_box_left() = 0xf3;
+	mem_.cur_obj_coll_box_bottom() = 0xf9;
 	if (same_transient_objects()) {
 		swallow();
 		return;
@@ -398,7 +396,7 @@ void Omodonmeka::swallow()
 // own (the one that spawned it); the slot's offset, or -1
 int Omodonmeka::find(uint8_t mask, uint8_t want) const
 {
-	uint8_t lo = mem_[wCurObjUnk01], hi = mem_[wCurObjUnk02];
+	uint8_t lo = mem_.cur_obj_unk01(), hi = mem_.cur_obj_unk02();
 	for (int base = 0; base < 0x100; base += 0x20) {
 		uint16_t at = static_cast<uint16_t>((wObj1 & 0xff00) | base);
 		if ((mem_[at] & mask) == want && mem_[at + 1] == lo && mem_[at + 2] == hi)
@@ -411,7 +409,7 @@ void Omodonmeka::run_owo(uint16_t handler)
 {
 	switch (handler) {
 	case WAIT_STEP: // waits for Wario to step on it
-		if (mem_[wTransformation] == TRANSFORMATION_FLAT_WARIO) {
+		if (mem_.transformation() == TRANSFORMATION_FLAT_WARIO) {
 			bob();
 			return;
 		}
@@ -461,7 +459,7 @@ void Omodonmeka::run_owo(uint16_t handler)
 	}
 	case RISE: { // rises, carrying Wario if he's on it
 		if (flags() & OBJFLAG_STEPPED) {
-			if (mem_[wGlobalCounter] & 1)
+			if (mem_.global_counter() & 1)
 				return;
 			move_wario(ADDR_MoveWarioUp, 0x01);
 			home::handle_upwards_floor_transition(gb_);
@@ -547,7 +545,7 @@ void Omodonmeka::omodon()
 			--state_duration();
 			return;
 		}
-		if ((flags() & OBJFLAG_STEPPED) && (mem_[wGlobalCounter] & 1))
+		if ((flags() & OBJFLAG_STEPPED) && (mem_.global_counter() & 1))
 			return;
 		if (--state_duration()) {
 			move_up();
@@ -556,18 +554,18 @@ void Omodonmeka::omodon()
 		set_frameset(ADDR_Frameset_68f50);
 		state() = 0;
 		var3() = 0;
-		mem_[wCurObjCollBoxBottom] = 0x0b;
+		mem_.cur_obj_coll_box_bottom() = 0x0b;
 		return;
 	case 0x2e: { // falls, and shakes the ground when it lands
 		apply_y_movement(ADDR_Data_605e0);
 		uint16_t y_pos = static_cast<uint16_t>(y() + 0x0f);
-		mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+		mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		if (!hpos_block_unk1())
 			return;
-		y() = static_cast<uint16_t>((mem_[hYPosLo] | mem_[hYPosHi] << 8) - 0x0f);
+		y() = static_cast<uint16_t>((mem_.y_pos_lo() | mem_.y_pos_hi() << 8) - 0x0f);
 		play_sfx(SFX_063);
 		ground_shake(0x18);
 		set_frameset(ADDR_Frameset_68f45);
@@ -585,7 +583,7 @@ void Omodonmeka::omodon()
 		return;
 	case 0x5a: // .Func_4286b
 		if (state_duration() == 0x14) {
-			if (mem_[wAutoMoveState]) {
+			if (mem_.auto_move_state()) {
 				call_home(ADDR_MoveObjectDown_Fast);
 				return;
 			}
@@ -593,7 +591,7 @@ void Omodonmeka::omodon()
 		}
 		if (--state_duration())
 			return;
-		mem_[wCurObjAction] = (1 << NO_ACTIONS_F) | 31; // no_actions_for 31
+		mem_.cur_obj_action() = (1 << NO_ACTIONS_F) | 31; // no_actions_for 31
 		omodon_land();
 		return;
 	default:
@@ -606,7 +604,7 @@ void Omodonmeka::omodon()
 void Omodonmeka::omodon_idle()
 {
 	flags() |= OBJFLAG_NO_COLLISION;
-	if (mem_[wTransformation] == TRANSFORMATION_FLAT_WARIO) {
+	if (mem_.transformation() == TRANSFORMATION_FLAT_WARIO) {
 		bob();
 		owner_stepped();
 		flags() &= ~OBJFLAG_STEPPED;
@@ -621,8 +619,8 @@ void Omodonmeka::omodon_fall()
 	var3() = 0;
 	set_frameset(ADDR_Frameset_68f42);
 	set_interaction(OBJ_INTERACTION_OMODON);
-	++mem_[wCurObjCollBoxLeft];
-	--mem_[wCurObjCollBoxRight];
+	++mem_.cur_obj_coll_box_left();
+	--mem_.cur_obj_coll_box_right();
 }
 
 // passes being stepped on to the Omodonmeka it rides; falls if that's

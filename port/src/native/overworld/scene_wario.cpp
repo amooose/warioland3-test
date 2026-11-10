@@ -113,32 +113,32 @@ void SceneWario::unrealistic()
 // OAM and (by HDMA) tiles. The registers as the asm leaves them: C calls it.
 void SceneWario::set_state(uint8_t state)
 {
-	mem_[wSceneWarioState] = state;
+	mem_.scene_wario_state() = state;
 	uint8_t group = 0;
 	while (group < 13 && state >= GROUPS[group])
 		++group;
 	gb_->cpu.b = group;
-	if (mem_[wSceneWarioStateGroup] != group) { // .LoadGfx
-		mem_[wSceneWarioStateGroup] = group;
+	if (mem_.scene_wario_state_group() != group) { // .LoadGfx
+		mem_.scene_wario_state_group() = group;
 		gb_->cpu.c = static_cast<uint8_t>(group * 2);
 		uint16_t entry = static_cast<uint16_t>(SPRITE_POINTERS + static_cast<uint8_t>(group * 6));
-		mem_[wSceneWarioOAMPtr] = mem_[entry]; // dab: the sprites
+		mem_.scene_wario_oam_ptr() = mem_[entry]; // dab: the sprites
 		mem_[wSceneWarioOAMPtr + 1] = mem_[entry + 1];
-		mem_[wSceneWarioOAMBank] = mem_[entry + 2];
-		mem_[wHDMABank] = mem_[entry + 3]; // dba: the tiles
+		mem_.scene_wario_oam_bank() = mem_[entry + 2];
+		mem_.hdma_bank() = mem_[entry + 3]; // dba: the tiles
 		uint8_t lo = mem_[entry + 4];
 		mem_[wHDMA + 0] = mem_[entry + 5];
 		mem_[wHDMA + 1] = lo;
 		mem_[wHDMA + 2] = 0;
 		mem_[wHDMA + 3] = 0;
 		mem_[wHDMA + 4] = 0x80 - 1; // $80 dma_tiles
-		mem_[wHDMADestVRAMBank] = 0;
+		mem_.hdma_dest_vram_bank() = 0;
 		gb_->cpu.b = lo;
 		SET_DE(gb_, static_cast<uint16_t>(entry + 5));
 	}
-	mem_[wSceneWarioDuration] = 0;
+	mem_.scene_wario_duration() = 0;
 	mem_[wSceneWarioDuration + 1] = 0;
-	mem_[w2d14c] = 0;
+	mem_.unk_2d14c() = 0;
 	SET_HL(gb_, static_cast<uint16_t>(wSceneWarioDuration + 1));
 	gb_->cpu.a = 0;
 	gb_->cpu.f = FLAG_Z;
@@ -149,7 +149,7 @@ void SceneWario::set_state(uint8_t state)
 void SceneWario::update()
 {
 	animate();
-	if (!mem_[wSceneWarioState]) {
+	if (!mem_.scene_wario_state()) {
 		// as the asm leaves them (InitTempleScene, in C, passes them on):
 		// JumpTable's to .None, then and a
 		SET_DE(gb_, 0x0000);
@@ -158,8 +158,8 @@ void SceneWario::update()
 		gb_->cpu.f = FLAG_Z | FLAG_H;
 		return;
 	}
-	bool scroll = !mem_[wSceneWarioIgnoreScroll];
-	uint8_t oam_bank = mem_[wSceneWarioOAMBank];
+	bool scroll = !mem_.scene_wario_ignore_scroll();
+	uint8_t oam_bank = mem_.scene_wario_oam_bank();
 	uint16_t oam = mem_.word(wSceneWarioOAMPtr);
 	if (scroll)
 		home::load_ow_sprite_with_scroll(gb_, oam_bank, oam, wSceneWario);
@@ -171,7 +171,7 @@ void SceneWario::update()
 // the next state at its end (and that one's first frame)
 void SceneWario::animate()
 {
-	uint8_t state = mem_[wSceneWarioState];
+	uint8_t state = mem_.scene_wario_state();
 	if (state >= NUM_SCENEWARIO_STATES) {
 		unrealistic();
 		return;
@@ -180,20 +180,20 @@ void SceneWario::animate()
 		return;
 	const Animation &anim = ANIMATIONS[state];
 	// .UpdateAnimation
-	home::update_ow_animation(gb_, mem_[wSceneWarioOAMBank], wSceneWarioDuration, anim.frameset);
-	bool finished = mem_[wOWAnimationFinished] == 0xff;
+	home::update_ow_animation(gb_, mem_.scene_wario_oam_bank(), wSceneWarioDuration, anim.frameset);
+	bool finished = mem_.ow_animation_finished() == 0xff;
 
 	switch (anim.extra) {
 	case Extra::WALK: footsteps(); return;
 	case Extra::PANIC_RUN: panic_steps(); return;
 	case Extra::SLEEP: // the snoring
-		mem_[w2d14e] = mem_[wOWAnimationFinished];
+		mem_.unk_2d14e() = mem_.ow_animation_finished();
 		if (finished)
 			play_sfx(mem_, SFX_SNORE);
 		return;
 	case Extra::JUMP_AND_BOW: // .Func_ac7b7
-		if (mem_[wSceneWarioFrame] == 0x07 && !mem_[wSceneWarioUnk7]) {
-			mem_[wSceneWarioUnk7] = 0x01;
+		if (mem_.scene_wario_frame() == 0x07 && !mem_.scene_wario_unk7()) {
+			mem_.scene_wario_unk7() = 0x01;
 			play_sfx(mem_, SFX_LAND);
 		}
 		break;
@@ -217,7 +217,7 @@ void SceneWario::animate()
 // Func_ac4fa: a footstep every 0x24 frames
 void SceneWario::footsteps()
 {
-	Byte steps = mem_[w2d14c];
+	Byte steps = mem_.unk_2d14c();
 	if (!steps)
 		play_sfx(mem_, SFX_12A);
 	++steps;
@@ -228,7 +228,7 @@ void SceneWario::footsteps()
 // Func_ac515: and a panicked one every 8
 void SceneWario::panic_steps()
 {
-	Byte steps = mem_[w2d14c];
+	Byte steps = mem_.unk_2d14c();
 	++steps;
 	if (steps < 0x08)
 		return;
@@ -240,11 +240,11 @@ void SceneWario::panic_steps()
 // 0 and 4), once each (w2d14c)
 void SceneWario::look_around_sounds()
 {
-	if (mem_[wSceneWarioState] == SCENEWARIO_LOOK_BACK)
+	if (mem_.scene_wario_state() == SCENEWARIO_LOOK_BACK)
 		return;
-	uint8_t frame = mem_[wSceneWarioFrame];
+	uint8_t frame = mem_.scene_wario_frame();
 	bool turning = frame == 0x00 || frame == 0x04;
-	Byte played = mem_[w2d14c];
+	Byte played = mem_.unk_2d14c();
 	if (played == 0) {
 		if (turning) {
 			play_sfx(mem_, SFX_0F1);
@@ -258,10 +258,10 @@ void SceneWario::look_around_sounds()
 // UpdateSceneWario.LookUp's: frame 0x0c's sound and 0x0d's, once each
 void SceneWario::look_up_sounds()
 {
-	if (mem_[wSceneWarioState] == SCENEWARIO_IDLE_RIGHT)
+	if (mem_.scene_wario_state() == SCENEWARIO_IDLE_RIGHT)
 		return;
-	uint8_t frame = mem_[wSceneWarioFrame];
-	Byte played = mem_[w2d14c];
+	uint8_t frame = mem_.scene_wario_frame();
+	Byte played = mem_.unk_2d14c();
 	switch (played) {
 	case 0:
 		if (frame == 0x0c) {

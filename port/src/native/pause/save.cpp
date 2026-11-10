@@ -213,7 +213,7 @@ void SaveScreen::load_gfx() // LoadSaveScreenGfx
 	mem_[rVBK] = 0;
 	// an hcall, though SaveBoxGfx is in this bank
 	routines_.in_bank(BANK_SaveBoxGfx, ADDR_Decompress, [&] { routines_.decompress(ADDR_SaveBoxGfx, v0Tiles0); });
-	mem_[wTempBank] = BANK_WarioSleepGfx;
+	mem_.temp_bank() = BANK_WarioSleepGfx;
 	routines_.far_copy(ADDR_WarioSleepGfx, v0Tiles0, 0x800); // FarCopyHLToDE_BC
 }
 

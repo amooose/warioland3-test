@@ -70,9 +70,9 @@ void Wormwould::start()
 	set_update(INIT);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	substate() = (substate() & OBJSUBFLAGS_MASK) | (3 + 1) | OBJSUBFLAG_UNK_4 | OBJSUBFLAG_HDIR;
-	mem_[wCurObjCollBoxRight] = 7;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-8);
-	mem_[wCurObjCollBoxBottom] = 30;
+	mem_.cur_obj_coll_box_right() = 7;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-8);
+	mem_.cur_obj_coll_box_bottom() = 30;
 	set_frameset(ADDR_Frameset_696ce);
 }
 
@@ -80,20 +80,20 @@ void Wormwould::start()
 void Wormwould::init()
 {
 	no_actions();
-	if (mem_[wCurObjYPos + 0] != mem_[wWarioYPos + 1])
+	if (mem_.cur_obj_y().lo() != mem_.wario_y().lo())
 		return;
 	var2() = 0x20;
 	move_down_by_var2();
-	mem_[wBossState] = BOSS_REGULAR;
+	mem_.boss_state() = BOSS_REGULAR;
 	home::update_level_music(gb_);
-	mem_[wIsBossBattle] = TRUE;
+	mem_.is_boss_battle() = TRUE;
 	change_side();
 }
 
 void Wormwould::leave()
 {
 	set_update(DO_NOTHING);
-	mem_[wBossState] = NONE;
+	mem_.boss_state() = NONE;
 	home::update_level_music(gb_);
 }
 
@@ -105,7 +105,7 @@ void Wormwould::change_side()
 	bool change = false;
 	if (flags() & (1 << OBJFLAG_ON_SCREEN_F)) {
 		uint8_t own = static_cast<uint8_t>(screen_x() + 0x2a);
-		uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+		uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 		uint8_t ahead = left_side ? static_cast<uint8_t>(wario - own) : static_cast<uint8_t>(own - wario);
 		change = (left_side ? wario < own : own < wario) || ahead < 0x38;
 	}
@@ -116,21 +116,19 @@ void Wormwould::change_side()
 		substate() &= ~OBJSUBFLAG_HDIR;
 		frameset = ADDR_Frameset_6970a;
 		uint16_t x_pos = static_cast<uint16_t>(x() + 0x70);
-		mem_[wCurObjXPos + 0] = static_cast<uint8_t>(x_pos);
-		mem_[wCurObjXPos + 1] = static_cast<uint8_t>(x_pos >> 8);
+		mem_.cur_obj_x() = x_pos;
 	} else {
 		substate() |= OBJSUBFLAG_HDIR;
 		frameset = ADDR_Frameset_696ce;
 		uint16_t x_pos = static_cast<uint16_t>(x() - 0x70);
-		mem_[wCurObjXPos + 0] = static_cast<uint8_t>(x_pos);
-		mem_[wCurObjXPos + 1] = static_cast<uint8_t>(x_pos >> 8);
+		mem_.cur_obj_x() = x_pos;
 	}
 	set_frameset(frameset);
 	set_update(MAIN);
 	flags() &= ~OBJFLAG_INVISIBLE;
 	state_duration() = 0;
-	var1() = mem_[wCurObjYPos + 0];
-	var2() = mem_[wCurObjYPos + 1];
+	var1() = mem_.cur_obj_y().lo();
+	var2() = mem_.cur_obj_y().hi();
 	var3() = 0x41;
 	state() = 0x2d;
 	set_interaction(OBJ_INTERACTION_WORMWOULD);
@@ -223,9 +221,9 @@ void Wormwould::main()
 		set_burrowing();
 		return;
 	case 0x5c: // down to where it rose from (slowly at first)
-		if ((substate() & 0x0f) >= 3 + 1 && !state_duration() && !(mem_[wGlobalCounter] & 1))
+		if ((substate() & 0x0f) >= 3 + 1 && !state_duration() && !(mem_.global_counter() & 1))
 			return;
-		if (mem_[wCurObjYPos + 0] != var1() || mem_[wCurObjYPos + 1] != var2()) {
+		if (mem_.cur_obj_y().lo() != var1() || mem_.cur_obj_y().hi() != var2()) {
 			move_down();
 			return;
 		}
@@ -260,7 +258,7 @@ void Wormwould::main()
 		set_frameset(facing(ADDR_Frameset_69721, ADDR_Frameset_696e5));
 		state_duration() = WORMWOULD_HURT_DURATION;
 		set_interaction(OBJ_INTERACTION_0B);
-		mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-16);
+		mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-16);
 		decrement_boss_hits();
 		var3() = 0;
 		play_sfx(SFX_VANISH);
@@ -277,7 +275,7 @@ void Wormwould::main()
 			stop_music2(mem_);
 			return;
 		}
-		mem_[wCurObjCollBoxTop] = static_cast<uint8_t>(-26);
+		mem_.cur_obj_coll_box_top() = static_cast<uint8_t>(-26);
 		set_frameset(facing(ADDR_Frameset_69726, ADDR_Frameset_696ea));
 		return;
 	}
@@ -320,7 +318,7 @@ void Wormwould::defeated_wait()
 	}
 	if (--state_duration())
 		return;
-	if (static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a))
+	if (static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a))
 		substate() |= OBJSUBFLAG_HDIR;
 	else
 		substate() &= ~OBJSUBFLAG_HDIR;
@@ -328,9 +326,9 @@ void Wormwould::defeated_wait()
 	substate() &= 0x80;
 	var3() = 0;
 	flags() |= OBJFLAG_PRIORITY;
-	mem_[wBossState] = BOSS_DEFEATED;
+	mem_.boss_state() = BOSS_DEFEATED;
 	home::update_level_music(gb_);
-	mem_[wIsBossBattle] = 0;
+	mem_.is_boss_battle() = 0;
 }
 
 void Wormwould::defeated_fall()

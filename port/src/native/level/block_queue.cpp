@@ -42,7 +42,7 @@ public:
 private:
 	void sram_switch(uint8_t bank)
 	{
-		mem_[wSRAMBank] = bank;
+		mem_.sram_bank() = bank;
 		mem_[rRAMB + 0x100] = bank;
 	}
 	Banks push_banks();
@@ -66,7 +66,7 @@ struct Banks {
 // ld a, $01 / sramswitch
 Banks BlockQueue::push_banks()
 {
-	Banks banks{mem_[rWBK], mem_[wSRAMBank]};
+	Banks banks{mem_[rWBK], mem_.sram_bank()};
 	mem_[rWBK] = BANK_wObjects;
 	sram_switch(SRAM1);
 	return banks;
@@ -96,9 +96,9 @@ MapLoc BlockQueue::map_loc(uint16_t at)
 home::ObjMapBlock BlockQueue::obj_block(uint16_t at, MapLoc &loc)
 {
 	loc = map_loc(at);
-	mem_[wBlockPtrBank] = loc.bank;
+	mem_.block_ptr_bank() = loc.bank;
 	home::ObjMapBlock block = home::obj_map_col(gb_, static_cast<uint8_t>(loc.ptr >> 8), static_cast<uint8_t>(loc.ptr));
-	sram_switch(mem_[wccec]);
+	sram_switch(mem_.unk_ccec());
 	return block;
 }
 
@@ -135,7 +135,7 @@ void BlockQueue::set_block(uint16_t at, uint8_t nybble)
 	mem_[loc.ptr] = mem_[loc.ptr] | 0x80;
 	pop_banks(inner);
 
-	mem_[wBlockPtrBank] = loc.bank;
+	mem_.block_ptr_bank() = loc.bank;
 	uint8_t row = static_cast<uint8_t>(loc.ptr >> 8), col = static_cast<uint8_t>(loc.ptr);
 	home::level_block_to_hpos(gb_, row, col);
 	routines_.in_bank(BANK_SpawnObject, ADDR_SpawnObject, [&] { spawn_object(gb_, nybble, loc.ptr); });
@@ -162,7 +162,7 @@ static uint8_t next_tile(uint8_t l)
 // the 4 bytes at entry to the queue (its index wrapping in its page)
 void BlockQueue::copy_block_entry(uint16_t entry, uint16_t queue)
 {
-	uint8_t at = static_cast<uint8_t>(queue + mem_[wBGMapTileQueueSize]);
+	uint8_t at = static_cast<uint8_t>(queue + mem_.bg_map_tile_queue_size());
 	for (int i = 0; i < 4; i++)
 		mem_[static_cast<uint16_t>((queue & 0xff00) | at++)] = mem_[entry++];
 }
@@ -171,20 +171,20 @@ void BlockQueue::copy_block_entry(uint16_t entry, uint16_t queue)
 // block in wc18e
 bool BlockQueue::queue_changed_block()
 {
-	if (mem_[wIsDMATransferPending])
+	if (mem_.is_dma_transfer_pending())
 		return false; // a DMA's pending
-	uint16_t entry = static_cast<uint16_t>(wc18e + mem_[wc19f]);
+	uint16_t entry = static_cast<uint16_t>(wc18e + mem_.unk_c19f());
 	if (!mem_[entry])
 		return true; // nothing to do
 	MapLoc loc = map_loc(static_cast<uint16_t>(entry));
 	// (map_loc reads the low byte before; the queue holds high, low)
 	loc.ptr = static_cast<uint16_t>((loc.ptr & 0xff00) | mem_[static_cast<uint16_t>(entry + 1)]);
-	mem_[wBlockPtrBank] = loc.bank;
+	mem_.block_ptr_bank() = loc.bank;
 	sram_switch(loc.bank);
 	uint16_t bg = home::block_bg_map_address(gb_, loc.ptr);
 
 	// each block is 2x2 tiles: top-left, top-right, bottom-left, bottom-right
-	uint8_t at = static_cast<uint8_t>(wBGMapAddressQueue + mem_[wBGMapAddressQueueSize]);
+	uint8_t at = static_cast<uint8_t>(wBGMapAddressQueue + mem_.bg_map_address_queue_size());
 	uint16_t page = wBGMapAddressQueue & 0xff00;
 	uint16_t below = static_cast<uint16_t>((bg + TILEMAP_WIDTH) & 0xfbff); // wraps within the BG map
 	for (uint16_t row : {bg, below}) {
@@ -193,7 +193,7 @@ bool BlockQueue::queue_changed_block()
 		mem_[static_cast<uint16_t>(page | at++)] = static_cast<uint8_t>(row >> 8);
 		mem_[static_cast<uint16_t>(page | at++)] = next_tile(static_cast<uint8_t>(row));
 	}
-	mem_[wBGMapAddressQueueSize] = static_cast<uint8_t>(mem_[wBGMapAddressQueueSize] + 2 * 4);
+	mem_.bg_map_address_queue_size() = static_cast<uint8_t>(mem_.bg_map_address_queue_size() + 2 * 4);
 
 	// sla e / sla e / rl d: block * 4, losing bit 7
 	uint16_t offset = static_cast<uint16_t>((mem_[loc.ptr] * 4) & 0x1ff);
@@ -201,12 +201,12 @@ bool BlockQueue::queue_changed_block()
 	mem_[rWBK] = GFX_RAM;
 	copy_block_entry(static_cast<uint16_t>(wRoomBlockTiles + offset), wBGMapTileVRAM0Queue);
 	copy_block_entry(static_cast<uint16_t>(wRoomBlockAttributes + offset), wBGMapTileVRAM1Queue);
-	mem_[wBGMapTileQueueSize] = static_cast<uint8_t>(mem_[wBGMapTileQueueSize] + 4);
+	mem_.bg_map_tile_queue_size() = static_cast<uint8_t>(mem_.bg_map_tile_queue_size() + 4);
 
-	uint8_t done = mem_[wc19f];
+	uint8_t done = mem_.unk_c19f();
 	mem_[static_cast<uint16_t>(wc18e + done)] = 0;
 	mem_[static_cast<uint16_t>(wc18e + done + 1)] = 0;
-	mem_[wc19f] = static_cast<uint8_t>((done + 2) & 0x0f);
+	mem_.unk_c19f() = static_cast<uint8_t>((done + 2) & 0x0f);
 	mem_[rWBK] = wram; // pop_wram
 	return true;
 }
@@ -236,7 +236,7 @@ PORT_EX(Func_bb85, 0, ALL_REGISTERS & ~R_B) { wl3::level::queue_changed_block(gb
 namespace wl3::level {
 void queue_changed_block(GB *gb)
 {
-	uint16_t entry = static_cast<uint16_t>(wc18e + wl3::Memory(gb)[wc19f]);
+	uint16_t entry = static_cast<uint16_t>(wc18e + wl3::Memory(gb).unk_c19f());
 	bool nothing = !wl3::Memory(gb)[entry];
 	if (BlockQueue(gb).queue_changed_block())
 		gb->cpu.b = nothing ? SRAM1 : 0;

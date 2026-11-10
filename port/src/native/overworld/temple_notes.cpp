@@ -104,8 +104,8 @@ void TempleNotes::staff()
 		counter = 0;
 		return;
 	case 1:
-		mem_[wSceneObj1] = 0x18;
-		mem_[wSceneObj1 + OBJ_X] = mem_[wSceneObj9XCoord];
+		mem_.scene_obj1() = 0x18;
+		mem_[wSceneObj1 + OBJ_X] = mem_.scene_obj9_x_coord();
 		set_scene_obj_state(wSceneObj1State, STAFF_STATE);
 		counter = 0;
 		++action;
@@ -113,11 +113,11 @@ void TempleNotes::staff()
 	case 2: {
 		if (counter & 0x03)
 			return;
-		Byte y = mem_[wSceneObj1];
+		Byte y = mem_.scene_obj1();
 		++y;
 		if (y != 0x58)
 			return;
-		mem_[wSceneObj1State] = 0;
+		mem_.scene_obj1_state() = 0;
 		action = 0;
 		return;
 	}
@@ -149,7 +149,7 @@ void TempleNotes::note(uint16_t note, uint16_t obj, bool waits, uint8_t dy, uint
 			return;
 		}
 		if (step == 4) {
-			action = mem_[wSceneObj1State] ? 2 : 0;
+			action = mem_.scene_obj1_state() ? 2 : 0;
 			return;
 		}
 		step = static_cast<uint8_t>(step - 1);
@@ -157,12 +157,12 @@ void TempleNotes::note(uint16_t note, uint16_t obj, bool waits, uint8_t dy, uint
 	uint16_t state = static_cast<uint16_t>(obj + OBJ_STATE_OFFSET);
 	switch (step) {
 	case 0:
-		if (!mem_[wSceneObj1State])
+		if (!mem_.scene_obj1_state())
 			return;
 		next();
 		return;
 	case 1:
-		mem_[obj] = static_cast<uint8_t>(mem_[wSceneObj1] + dy);
+		mem_[obj] = static_cast<uint8_t>(mem_.scene_obj1() + dy);
 		mem_[static_cast<uint16_t>(obj + OBJ_X)] = static_cast<uint8_t>(mem_[wSceneObj1 + OBJ_X] + dx);
 		set_scene_obj_state(state, NOTE_STATE);
 		next();

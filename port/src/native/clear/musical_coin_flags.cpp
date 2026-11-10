@@ -11,7 +11,7 @@ namespace wl3::home {
 bool level_musical_coin_flag(GB *gb)
 {
 	Memory mem(gb);
-	auto level = static_cast<uint8_t>(mem[wOWLevel] - 1);
+	auto level = static_cast<uint8_t>(mem.ow_level() - 1);
 	return mem[static_cast<uint16_t>(wMusicalCoinFlags + (level >> 3))] >> (level & 0x07) & 1;
 }
 

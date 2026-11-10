@@ -27,7 +27,7 @@ public:
 	void load_level_treasures()
 	{
 		Memory mem(gb_);
-		uint16_t src = static_cast<uint16_t>(ADDR_LevelTreasureIDs + static_cast<uint8_t>(mem[wOWLevel] * 4));
+		uint16_t src = static_cast<uint16_t>(ADDR_LevelTreasureIDs + static_cast<uint8_t>(mem.ow_level() * 4));
 		uint8_t at = static_cast<uint8_t>(wLevelTreasureIDs);
 		for (int i = 0; i < NUM_LEVEL_TREASURES; i++)
 			mem[static_cast<uint16_t>((wLevelTreasureIDs & 0xff00) | at++)] = mem[src++];
@@ -60,10 +60,10 @@ public:
 	{
 		Memory mem(gb_);
 		uint16_t dest = wTileBuffer;
-		copy_treasure_gfx(mem[wLevelGreyTreasureID], dest);
-		copy_treasure_gfx(mem[wLevelRedTreasureID], dest);
-		copy_treasure_gfx(mem[wLevelGreenTreasureID], dest);
-		uint8_t last = copy_treasure_gfx(mem[wLevelBlueTreasureID], dest);
+		copy_treasure_gfx(mem.level_grey_treasure_id(), dest);
+		copy_treasure_gfx(mem.level_red_treasure_id(), dest);
+		copy_treasure_gfx(mem.level_green_treasure_id(), dest);
+		uint8_t last = copy_treasure_gfx(mem.level_blue_treasure_id(), dest);
 		copy_treasure_gfx(last, dest); // bug: falls through into .CopyGfx once more
 	}
 
@@ -79,7 +79,7 @@ public:
 		Memory mem(gb_);
 		if (!home::level_musical_coins_collected(gb_))
 			return;
-		mem[wBottomBarFlags] |= 1 << 6;
+		mem.bottom_bar_flags() |= 1 << 6;
 		mem[wCompassObjState + 0] = 0;
 		mem[wCompassObjState + 1] = 0;
 	}
@@ -89,7 +89,7 @@ public:
 	void write_uncollected_bottom_bar_treasure_ids()
 	{
 		Memory mem(gb_);
-		uint8_t collected = mem[wKeyAndTreasureFlags] >> 4;
+		uint8_t collected = mem.key_and_treasure_flags() >> 4;
 		uint8_t at = static_cast<uint8_t>(wLevelTreasureIDs);
 		for (int i = 0; i < NUM_LEVEL_TREASURES; i++, at++) {
 			if (!(collected >> i & 1))
@@ -117,18 +117,18 @@ public:
 
 	void func_9ab1c()
 	{
-		if (is_level(Memory(gb_)[wOWLevel]))
+		if (is_level(Memory(gb_).ow_level()))
 			FARCALL(GetOWLevelCollectedTreasures);
 	}
 
 	void get_level_time_attack_score()
 	{
 		Memory mem(gb_);
-		uint8_t level = mem[wOWLevel];
+		uint8_t level = mem.ow_level();
 		if (!is_level(level))
 			return;
 		uint16_t src = static_cast<uint16_t>(wLevelTimeAttackScores + static_cast<uint8_t>((level - 1) * 2));
-		mem[w2d0ee] = mem[src];
+		mem.unk_2d0ee() = mem[src];
 		mem[static_cast<uint16_t>((w2d0ee & 0xff00) | static_cast<uint8_t>(w2d0ee + 1))] = mem[src + 1]; // inc e
 	}
 
@@ -137,12 +137,12 @@ public:
 	void func_9aab5()
 	{
 		Memory mem(gb_);
-		if (mem[wMapSideLevelID] >= OW_EXITS)
+		if (mem.map_side_level_id() >= OW_EXITS)
 			return;
 		clear_treasure_data();
 		func_9aaf4();
 		func_9ab1c();
-		if (mem[wGameModeFlags] & (1 << MODE_TIME_ATTACK_F)) {
+		if (mem.game_mode_flags() & (1 << MODE_TIME_ATTACK_F)) {
 			get_level_time_attack_score();
 			return;
 		}
@@ -151,11 +151,11 @@ public:
 		write_uncollected_bottom_bar_treasure_ids();
 		load_treasure_pals();
 		load_treasure_tiles();
-		mem[wHDMASourceHi] = static_cast<uint8_t>(wTileBuffer >> 8);
-		mem[wHDMASourceLo] = static_cast<uint8_t>(wTileBuffer);
-		mem[wHDMADestHi] = 0x09;
-		mem[wHDMADestLo] = 0;
-		mem[wHDMAMode] = 0x10 - 1; // $10 dma_tiles
+		mem.hdma_source_hi() = static_cast<uint8_t>(wTileBuffer >> 8);
+		mem.hdma_source_lo() = static_cast<uint8_t>(wTileBuffer);
+		mem.hdma_dest_hi() = 0x09;
+		mem.hdma_dest_lo() = 0;
+		mem.hdma_mode() = 0x10 - 1; // $10 dma_tiles
 	}
 
 	// VBlank_TreasureCollection.Func, as copied to wVBlankFunc (see ram_code.c)
@@ -163,8 +163,8 @@ public:
 	{
 		cpu_.a = 0x02;
 		wr8(rWBK, cpu_.a);
-		wr8(rSCY, rd8(wSCY));
-		wr8(rSCX, rd8(wSCX));
+		wr8(rSCY, mem_.scy());
+		wr8(rSCX, mem_.scx());
 		cpu_.a = 0;
 		cpu_.f = FLAG_Z; // xor a
 		wr8(rVBK, 0);

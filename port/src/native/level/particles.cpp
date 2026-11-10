@@ -47,7 +47,7 @@ public:
 	void load_sprite(uint16_t oam); // LoadParticleSprite
 
 private:
-	uint16_t by_direction(uint16_t left, uint16_t right) const { return mem_[wDirection] ? right : left; }
+	uint16_t by_direction(uint16_t left, uint16_t right) const { return mem_.direction() ? right : left; }
 	void anim(uint16_t frameset, uint16_t y_dest, uint16_t oam, uint16_t at);
 	void deinit(uint16_t particle);
 
@@ -61,7 +61,7 @@ private:
 // the particle's id)
 void Particles::update()
 {
-	if (!mem_[wNumParticles])
+	if (!mem_.num_particles())
 		return;
 	for (int n = 0; n < MAX_NUM_PARTICLES; n++) {
 		uint16_t slot = static_cast<uint16_t>(wParticle0 + n * (wParticle1 - wParticle0));
@@ -82,14 +82,14 @@ void Particles::update()
 void Particles::deinit(uint16_t particle)
 {
 	mem_[particle] = 0;
-	mem_[wNumParticles] = static_cast<uint8_t>(mem_[wNumParticles] - 1);
+	mem_.num_particles() = static_cast<uint8_t>(mem_.num_particles() - 1);
 }
 
 // starts the particle (or moves it along), animates it, and ends it when
 // it's done
 void Particles::run(const ParticleFunc &f, uint16_t particle)
 {
-	uint8_t state = mem_[wWarioState];
+	uint8_t state = mem_.wario_state();
 	if ((f.pre == Pre::BOUNCY && state != WST_BOUNCY_AIRBORNE) || (f.pre == Pre::MAGIC && state == WST_MAGIC_STOPPING)) {
 		deinit(particle);
 		return;
@@ -118,13 +118,13 @@ void Particles::run(const ParticleFunc &f, uint16_t particle)
 		case Init::SLIDE_LEFT: {
 			// 12 pixels behind Wario, and 12 up
 			bool right = f.init == Init::SLIDE_RIGHT;
-			uint16_t x = static_cast<uint16_t>(mem_[wWarioXPos + 0] << 8 | mem_[wWarioXPos + 1]);
+			uint16_t x = mem_.wario_x();
 			x = static_cast<uint16_t>(right ? x - 0x0c : x + 0x0c);
-			uint16_t y = static_cast<uint16_t>((mem_[wWarioYPos + 0] << 8 | mem_[wWarioYPos + 1]) - 0x0c);
-			mem_[hYPosHi] = static_cast<uint8_t>(y >> 8);
-			mem_[hYPosLo] = static_cast<uint8_t>(y);
-			mem_[hXPosHi] = static_cast<uint8_t>(x >> 8);
-			mem_[hXPosLo] = static_cast<uint8_t>(x);
+			uint16_t y = static_cast<uint16_t>(mem_.wario_y() - 0x0c);
+			mem_.y_pos_hi() = static_cast<uint8_t>(y >> 8);
+			mem_.y_pos_lo() = static_cast<uint8_t>(y);
+			mem_.x_pos_hi() = static_cast<uint8_t>(x >> 8);
+			mem_.x_pos_lo() = static_cast<uint8_t>(x);
 			for (int i = 0; i < 4; i++)
 				mem_[field(2 + i)] = mem_[hYPosHi + i];
 			break;
@@ -142,15 +142,15 @@ void Particles::run(const ParticleFunc &f, uint16_t particle)
 	case End::NEVER:
 		return;
 	case End::ANIM:
-		if (!mem_[wCurParticleAnimEnded])
+		if (!mem_.cur_particle_anim_ended())
 			return;
 		break;
 	case End::SLIDING:
-		if (mem_[wWarioState] == WST_SLIDING)
+		if (mem_.wario_state() == WST_SLIDING)
 			return;
 		break;
 	case End::OFF_SCREEN: // until off the bottom of the screen
-		if (mem_[wCurSpriteYCoord] < 0xc0)
+		if (mem_.cur_sprite_y_coord() < 0xc0)
 			return;
 		break;
 	}
@@ -159,7 +159,7 @@ void Particles::run(const ParticleFunc &f, uint16_t particle)
 
 uint16_t Particles::update_animation(uint16_t at, uint16_t frameset)
 {
-	mem_[wCurParticleAnimEnded] = FALSE;
+	mem_.cur_particle_anim_ended() = FALSE;
 	uint8_t duration = mem_[at];
 	mem_[at] = static_cast<uint8_t>(duration - 1);
 	if (duration) // .no_new_frame
@@ -170,7 +170,7 @@ uint16_t Particles::update_animation(uint16_t at, uint16_t frameset)
 	if (frame == 0xff) { // .reset_anim
 		mem_[static_cast<uint16_t>(at + 1)] = 0; // frameset offset
 		mem_[at] = 0; // duration
-		mem_[wCurParticleAnimEnded] = TRUE;
+		mem_.cur_particle_anim_ended() = TRUE;
 		return static_cast<uint16_t>(at + 2);
 	}
 	mem_[static_cast<uint16_t>(at + 2)] = frame;
@@ -188,12 +188,12 @@ void Particles::anim(uint16_t frameset, uint16_t y_dest, uint16_t oam, uint16_t 
 	// ld a, [hld] (the frame) / dec l / dec l / ld a, [hld] (x) / dec l /
 	// ld a, [hld] (y): hld is 16-bit, dec l 8-bit
 	auto dec_l = [](uint16_t v) { return static_cast<uint16_t>((v & 0xff00) | static_cast<uint8_t>(v - 1)); };
-	mem_[wCurParticleFrame] = mem_[hl--];
+	mem_.cur_particle_frame() = mem_[hl--];
 	hl = dec_l(dec_l(hl));
-	mem_[wCurParticleXCoord] = mem_[hl--];
+	mem_.cur_particle_x_coord() = mem_[hl--];
 	hl = dec_l(hl);
 	mem_[y_dest] = mem_[hl];
-	mem_[wCurParticleAttributes] = 0;
+	mem_.cur_particle_attributes() = 0;
 	load_sprite(oam);
 }
 
@@ -224,14 +224,14 @@ void Particles::animate(uint16_t anim_func, uint16_t at)
 void Particles::load_sprite(uint16_t oam)
 {
 	uint16_t scy = wSCY, scx = wSCX;
-	if (mem_[wCameraConfigFlags] == (CAM_XSCROLL2 | CAM_TRANSITIONS | CAM_BORDER_RIGHT | CAM_BORDER_LEFT)) {
+	if (mem_.camera_config_flags() == (CAM_XSCROLL2 | CAM_TRANSITIONS | CAM_BORDER_RIGHT | CAM_BORDER_LEFT)) {
 		scy = wCameraSCY + 1;
 		scx = wCameraSCX + 1;
 	}
-	mem_[wCurSpriteYCoord] = static_cast<uint8_t>(mem_[wCurParticleYCoord] + OAM_Y_OFS - mem_[scy]);
-	mem_[wCurSpriteXCoord] = static_cast<uint8_t>(mem_[wCurParticleXCoord] + OAM_X_OFS - mem_[scx]);
-	mem_[wCurSpriteFrame] = mem_[wCurParticleFrame];
-	mem_[wCurSpriteAttributes] = mem_[wCurParticleAttributes];
+	mem_.cur_sprite_y_coord() = static_cast<uint8_t>(mem_.cur_particle_y_coord() + OAM_Y_OFS - mem_[scy]);
+	mem_.cur_sprite_x_coord() = static_cast<uint8_t>(mem_.cur_particle_x_coord() + OAM_X_OFS - mem_[scx]);
+	mem_.cur_sprite_frame() = mem_.cur_particle_frame();
+	mem_.cur_sprite_attributes() = mem_.cur_particle_attributes();
 	home::load_sprite(gb_, oam);
 }
 
@@ -268,19 +268,19 @@ const ParticleFunc *particle_func(uint8_t id)
 uint16_t create_particle(GB *gb, uint8_t id)
 {
 	Memory mem(gb);
-	uint8_t index = mem[wCurParticleIndex];
+	uint8_t index = mem.cur_particle_index();
 	uint8_t offset = static_cast<uint8_t>(index * 16);
-	mem[wCurParticleIndex] = (index + 1) & 0x03;
+	mem.cur_particle_index() = (index + 1) & 0x03;
 	uint16_t slot = static_cast<uint16_t>(wParticles + offset);
 	if (!mem[slot])
-		++mem[wNumParticles]; // a free slot: one more particle
+		++mem.num_particles(); // a free slot: one more particle
 	mem[slot] = id; // PARTICLE_STRUCT_ID
 	uint16_t at = static_cast<uint16_t>((slot & 0xff00) | static_cast<uint8_t>(slot + 1)); // inc l
 	mem[at++] = FALSE; // PARTICLE_STRUCT_INITIALISED
-	mem[at++] = mem[hYPosHi];
-	mem[at++] = mem[hYPosLo];
-	mem[at++] = mem[hXPosHi];
-	mem[at++] = mem[hXPosLo];
+	mem[at++] = mem.y_pos_hi();
+	mem[at++] = mem.y_pos_lo();
+	mem[at++] = mem.x_pos_hi();
+	mem[at++] = mem.x_pos_lo();
 	return at;
 }
 
@@ -288,13 +288,13 @@ void block_to_hpos(GB *gb, uint16_t block)
 {
 	Memory mem(gb);
 	uint8_t row = static_cast<uint8_t>((block >> 8) - 0xa0), column = static_cast<uint8_t>(block);
-	uint8_t y_hi = static_cast<uint8_t>((mem[wBlockPtrBank] - 1) * 2 + (row >> 4));
+	uint8_t y_hi = static_cast<uint8_t>((mem.block_ptr_bank() - 1) * 2 + (row >> 4));
 	unsigned y_lo = ((row & 0x0f) << 4) + 0x10;
-	mem[hYPosLo] = static_cast<uint8_t>(y_lo);
-	mem[hYPosHi] = static_cast<uint8_t>(y_hi + (y_lo > 0xff));
+	mem.y_pos_lo() = static_cast<uint8_t>(y_lo);
+	mem.y_pos_hi() = static_cast<uint8_t>(y_hi + (y_lo > 0xff));
 	unsigned x_lo = ((column & 0x0f) << 4) + 0x08;
-	mem[hXPosLo] = static_cast<uint8_t>(x_lo);
-	mem[hXPosHi] = static_cast<uint8_t>((column >> 4) + (x_lo > 0xff));
+	mem.x_pos_lo() = static_cast<uint8_t>(x_lo);
+	mem.x_pos_hi() = static_cast<uint8_t>((column >> 4) + (x_lo > 0xff));
 }
 
 void create_particle_in_block(GB *gb, uint16_t block, uint8_t id)

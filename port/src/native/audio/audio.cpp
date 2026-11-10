@@ -223,7 +223,7 @@ PORT(Func_101e)
 {
 	uint8_t active = 0;
 	// (read in the call, with the Audio RAM bank mapped)
-	if (engine_call(gb, ADDR_Func_3f30, [&](Engine &) { active = Memory(gb).byte(wActiveChannels); })) {
+	if (engine_call(gb, ADDR_Func_3f30, [&](Engine &) { active = Memory(gb).active_channels(); })) {
 		gb->cpu.d = active & SFX_CHANNELS;
 		gb->cpu.e = static_cast<uint8_t>((active & MUSIC_CHANNELS) >> 4);
 	}
@@ -240,7 +240,7 @@ PORT(ExecuteAudioMod)
 {
 	uint8_t mod = gb->cpu.a, b = gb->cpu.b, c = gb->cpu.c, d = gb->cpu.d, e = gb->cpu.e;
 	Memory mem(gb);
-	mem[hffac] = mod;
+	mem.unk_ffac() = mod;
 	if (!engine_call(gb, ADDR_AudioFunc_ExecuteAudioMod, [&](Engine &en) { en.execute_audio_mod(mod, b, c, d, e); }) ||
 		mod >= NUM_AUDIOMOD_FUNCTIONS)
 		return;
@@ -265,7 +265,7 @@ PORT(UnreferencedMusicFadeOut)
 {
 	uint8_t period = gb->cpu.a;
 	Memory mem(gb);
-	mem[hffac] = period;
+	mem.unk_ffac() = period;
 	engine_call(gb, ADDR_AudioFunc_MusicFadeOut, [&](Engine &e) { e.set_music_fade_out(period); });
 }
 
@@ -275,7 +275,7 @@ PORT(UnreferencedGetPlayingSoundID)
 {
 	uint8_t which = gb->cpu.a;
 	Memory mem(gb);
-	mem[hffac] = which;
+	mem.unk_ffac() = which;
 	uint16_t id = 0;
 	if (engine_call(gb, ADDR_AudioFunc_GetPlayingSoundID, [&](Engine &e) { id = e.playing_sound_id(which); }))
 		SET_BC(gb, id);
@@ -452,7 +452,7 @@ void update(GB *gb)
 void execute_audio_mod(GB *gb, uint8_t mod, uint8_t value, uint8_t sfx_channels, uint8_t music_channels)
 {
 	Memory mem(gb);
-	mem[hffac] = mod;
+	mem.unk_ffac() = mod;
 	engine_call(gb, ADDR_AudioFunc_ExecuteAudioMod, [&](Engine &e) {
 		e.execute_audio_mod(mod, value, 0, sfx_channels, music_channels);
 	}, true);

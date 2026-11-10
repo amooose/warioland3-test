@@ -94,21 +94,21 @@ void Pesce::start()
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(PESCE_UPDATE);
 	substate() = (substate() & ~OBJSUBFLAG_UNINITIALISED) | (1 << OBJSUBFLAG_UNK_4_F);
-	mem_[wCurObjCollBoxRight] = 0x0f;
-	mem_[wCurObjCollBoxLeft] = 0xf0;
-	mem_[wCurObjCollBoxBottom] = 0xfe;
+	mem_.cur_obj_coll_box_right() = 0x0f;
+	mem_.cur_obj_coll_box_left() = 0xf0;
+	mem_.cur_obj_coll_box_bottom() = 0xfe;
 	set_frameset(ADDR_Frameset_6990a);
-	mem_[w1d147] = 0;
-	mem_[wDollBoyHammerRange] = 0;
+	mem_.unk_1d147() = 0;
+	mem_.doll_boy_hammer_range() = 0;
 	state_duration() = 0;
 	var1() = 0;
 	var2() = 0x0a;
 	var3() = 0;
 	move_down_by_var2();
 	var2() = 0x3c;
-	mem_[wBossState] = BOSS_REGULAR;
+	mem_.boss_state() = BOSS_REGULAR;
 	home::update_level_music(gb_);
-	mem_[wIsBossBattle] = TRUE;
+	mem_.is_boss_battle() = TRUE;
 }
 
 // the phase (var1), after a knock (states 8 and 9) or Wario caught ($2a)
@@ -144,14 +144,14 @@ void Pesce::knocked(uint16_t at)
 	mem_[at] = 0;
 	state_duration() = 0;
 	play_sfx(SFX_0BB);
-	uint8_t knocks = ++mem_[w1d147];
+	uint8_t knocks = ++mem_.unk_1d147();
 	uint8_t top;
 	if (knocks == 0x01) {
 		top = 0xef;
 	} else if (knocks == 0x02) {
 		top = 0xeb;
 	} else if (knocks == 0x03) {
-		mem_[wCurObjCollBoxTop] = 0xe6;
+		mem_.cur_obj_coll_box_top() = 0xe6;
 		set_update(PESCE_BEATEN);
 		set_interaction(OBJ_INTERACTION_51);
 		stop_music2(mem_);
@@ -159,10 +159,10 @@ void Pesce::knocked(uint16_t at)
 		swim_frameset();
 		return;
 	} else {
-		mem_[w1d147] = 0;
+		mem_.unk_1d147() = 0;
 		top = 0xf2;
 	}
-	mem_[wCurObjCollBoxTop] = top;
+	mem_.cur_obj_coll_box_top() = top;
 	var1() = 0;
 	swim_frameset();
 }
@@ -176,21 +176,18 @@ void Pesce::swallow(uint16_t at)
 	uint16_t page = at & 0xff00;
 	uint16_t y_pos = static_cast<uint16_t>(mem_[page | OBJ_Y_POS] | mem_[page | (OBJ_Y_POS + 1)] << 8);
 	y_pos = static_cast<uint16_t>(y_pos + 0x04);
-	mem_[wWarioYPos + 1] = static_cast<uint8_t>(y_pos);
-	mem_[wWarioYPos + 0] = static_cast<uint8_t>(y_pos >> 8);
+	mem_.wario_y() = y_pos;
 	uint16_t x_pos = static_cast<uint16_t>(mem_[page | OBJ_X_POS] | mem_[page | (OBJ_X_POS + 1)] << 8);
 	if (facing_right()) {
-		mem_[wWarioXPos + 1] = static_cast<uint8_t>(x_pos);
-		mem_[wWarioXPos + 0] = static_cast<uint8_t>(x_pos >> 8);
+		mem_.wario_x() = x_pos;
 		set_frameset(ADDR_Frameset_69a15);
 		state_duration() = 0x0d;
 		var1() = 0x02;
-		mem_[wIsTurning] = TRUE;
+		mem_.is_turning() = TRUE;
 		return;
 	}
 	x_pos = static_cast<uint16_t>(x_pos - 0x14);
-	mem_[wWarioXPos + 1] = static_cast<uint8_t>(x_pos);
-	mem_[wWarioXPos + 0] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.wario_x() = x_pos;
 	set_frameset(ADDR_Frameset_6992d);
 	state_duration() = 0x3c;
 	var1() = 0x03;
@@ -214,8 +211,7 @@ void Pesce::spit(uint16_t page)
 		return;
 	uint16_t x_pos = static_cast<uint16_t>(mem_[page | OBJ_X_POS] | mem_[page | (OBJ_X_POS + 1)] << 8);
 	x_pos = static_cast<uint16_t>(x_pos - 0x14);
-	mem_[wWarioXPos + 1] = static_cast<uint8_t>(x_pos);
-	mem_[wWarioXPos + 0] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.wario_x() = x_pos;
 	set_frameset(ADDR_Frameset_6992d);
 	state_duration() = 0x3c;
 	var1() = 0x03;
@@ -225,7 +221,7 @@ void Pesce::spit(uint16_t page)
 // down to the floor with Wario, then lets him go
 void Pesce::sink_wario(uint16_t page)
 {
-	if (!(mem_[wGlobalCounter] & 0x5f))
+	if (!(mem_.global_counter() & 0x5f))
 		play_sfx(SFX_WATER_SURFACE);
 	Byte duration = mem_[page | OBJ_STATE_DURATION];
 	if (duration) {
@@ -234,13 +230,13 @@ void Pesce::sink_wario(uint16_t page)
 	}
 	hpos(page, 0x06, 0);
 	if (!hpos_block_unk1()) {
-		if (mem_[wGlobalCounter] & 0x03)
+		if (mem_.global_counter() & 0x03)
 			return;
 		move_wario(ADDR_MoveWarioDown, 0x01);
 		move_down();
 		return;
 	}
-	mem_[wAutoMoveState] = 0;
+	mem_.auto_move_state() = 0;
 	play_sfx(SFX_0B9);
 	var1() = 0x04;
 	var2() = 0x04;
@@ -252,20 +248,20 @@ void Pesce::hpos(uint16_t page, int dy, int dx)
 {
 	uint16_t y_pos = static_cast<uint16_t>((mem_[page | OBJ_Y_POS] | mem_[page | (OBJ_Y_POS + 1)] << 8) + dy);
 	uint16_t x_pos = static_cast<uint16_t>((mem_[page | OBJ_X_POS] | mem_[page | (OBJ_X_POS + 1)] << 8) + dx);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 }
 
 // up towards Wario's height
 void Pesce::rising()
 {
-	if (mem_[wCurObjFramesetOffset] == 0x02 && frame_duration() == 0x01)
+	if (mem_.cur_obj_frameset_offset() == 0x02 && frame_duration() == 0x01)
 		play_sfx(SFX_0AE);
 	hpos(wCurObjYPos & 0xff00, -0x18, 0);
 	hpos_block_unk3();
-	if (mem_[wIsInWaterOrSand] && screen_y() >= mem_[wWarioScreenYPos] && !(mem_[wGlobalCounter] & 0x03)) {
+	if (mem_.is_in_water_or_sand() && screen_y() >= mem_.wario_screen_y_pos() && !(mem_.global_counter() & 0x03)) {
 		++var3();
 		move_up();
 	}
@@ -299,16 +295,16 @@ void Pesce::chase()
 	}
 	bool right;
 	if (var3()) {
-		if (!(mem_[wGlobalCounter] & 1)) {
+		if (!(mem_.global_counter() & 1)) {
 			--var3();
 			move_down();
 		}
 		right = facing_right();
 	} else {
-		uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+		uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 		uint8_t own = static_cast<uint8_t>(screen_x() + 0x2a);
 		right = facing_right();
-		if (mem_[wWaterInteraction] && (right ? own < wario : own >= wario)) {
+		if (mem_.water_interaction() && (right ? own < wario : own >= wario)) {
 			lunge();
 			return;
 		}
@@ -351,10 +347,10 @@ void Pesce::chase()
 // direction
 uint16_t Pesce::pick(int n, const uint16_t (*framesets)[2], bool right)
 {
-	uint8_t knocks = mem_[w1d147];
+	uint8_t knocks = mem_.unk_1d147();
 	int level = knocks >= 1 && knocks < n ? knocks : 0;
 	if (!level)
-		mem_[w1d147] = 0;
+		mem_.unk_1d147() = 0;
 	return framesets[level][right];
 }
 
@@ -369,7 +365,7 @@ void Pesce::turn(uint16_t page)
 	static const uint8_t DURATIONS[4] = {0x17, 0x1b, 0x1f, 0x25};
 	uint8_t sub = mem_[page | OBJ_SUBSTATE] ^ OBJSUBFLAG_HDIR;
 	mem_[page | OBJ_SUBSTATE] = sub;
-	uint8_t knocks = mem_[w1d147];
+	uint8_t knocks = mem_.unk_1d147();
 	uint8_t duration = DURATIONS[knocks >= 1 && knocks <= 3 ? knocks : 0];
 	set_frameset(pick(4, FRAMESETS, sub & 0x80));
 	state_duration() = duration;
@@ -443,7 +439,7 @@ void Pesce::beaten()
 		set_interaction(OBJ_INTERACTION_51);
 		var1() = 0x03;
 		set_block_object(0x07);
-		mem_[wDollBoyHammerRange] = 0x01;
+		mem_.doll_boy_hammer_range() = 0x01;
 		return;
 	case 3:
 		flags() = 0;
@@ -458,9 +454,9 @@ void PesceHelper::current()
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(CURRENT_UPDATE);
 	substate() = (substate() & ~OBJSUBFLAG_UNINITIALISED) | (1 << OBJSUBFLAG_UNK_4_F);
-	mem_[wCurObjCollBoxRight] = 0x0f;
-	mem_[wCurObjCollBoxLeft] = 0xf0;
-	mem_[wCurObjCollBoxBottom] = 0xfe;
+	mem_.cur_obj_coll_box_right() = 0x0f;
+	mem_.cur_obj_coll_box_left() = 0xf0;
+	mem_.cur_obj_coll_box_bottom() = 0xfe;
 	set_frameset(ADDR_Frameset_69965);
 	var2() = 0x2a;
 	move_down_by_var2();
@@ -500,7 +496,7 @@ void PesceHelper::dragonfly_wait()
 void PesceHelper::dragonfly_spawning()
 {
 	spawner_frame();
-	if (mem_[w1d147] == 0x03) {
+	if (mem_.unk_1d147() == 0x03) {
 		set_update(DS(0x6e));
 		return;
 	}
@@ -513,15 +509,15 @@ void PesceHelper::dragonfly_spawning()
 void PesceHelper::dragonfly_done()
 {
 	spawner_frame();
-	if (!mem_[wDollBoyHammerRange])
+	if (!mem_.doll_boy_hammer_range())
 		return;
 	flags() = 0;
 	spawner_done(0x08);
-	mem_[wBossState] = BOSS_DEFEATED;
+	mem_.boss_state() = BOSS_DEFEATED;
 	home::update_level_music(gb_);
-	mem_[wIsBossBattle] = 0;
-	mem_[wSwitchStateUpdated] = 0x01;
-	mem_[wSwitchState] = 0x60;
+	mem_.is_boss_battle() = 0;
+	mem_.switch_state_updated() = 0x01;
+	mem_.switch_state() = 0x60;
 }
 
 void PesceHelper::dragonfly1_down()
@@ -546,7 +542,7 @@ void PesceHelper::dragonfly1_flying()
 		set_frameset(facing_right() ? ADDR_Frameset_699d5 : ADDR_Frameset_699d0);
 		return;
 	}
-	if (mem_[w1d147] == 0x03) {
+	if (mem_.unk_1d147() == 0x03) {
 		set_update(D1(0x9a));
 		no_actions();
 		return;
@@ -579,9 +575,9 @@ void PesceHelper::dragonfly2()
 	state_duration() = 0x28;
 	set_update(D2(0x32));
 	substate() = (substate() & ~OBJSUBFLAG_UNINITIALISED) | (1 << OBJSUBFLAG_UNK_4_F);
-	mem_[wCurObjCollBoxRight] = 0x06;
-	mem_[wCurObjCollBoxLeft] = 0xf9;
-	mem_[wCurObjCollBoxBottom] = 0xf9;
+	mem_.cur_obj_coll_box_right() = 0x06;
+	mem_.cur_obj_coll_box_left() = 0xf9;
+	mem_.cur_obj_coll_box_bottom() = 0xf9;
 	var2() = 0x40;
 	move_left_by_var2();
 	var2() = 0x50;
@@ -612,7 +608,7 @@ void PesceHelper::move_wario_on(uint16_t flags_addr, uint16_t routine, uint16_t 
 void PesceHelper::dragonfly2_flying()
 {
 	one_way_platform();
-	if (!(mem_[wGlobalCounter] & 1))
+	if (!(mem_.global_counter() & 1))
 		return;
 	uint8_t dir = var1();
 	if (dir > 1)
@@ -647,20 +643,20 @@ void PesceHelper::fly_wait()
 	if (--state_duration())
 		return;
 	set_update(FS(0x39));
-	mem_[wDollBoyActiveBarrels] = 0;
+	mem_.doll_boy_active_barrels() = 0;
 }
 
 // a fly whenever the last's gone, until Pesce's beaten
 void PesceHelper::fly_spawning()
 {
 	spawner_frame();
-	if (mem_[w1d147] == 0x03) {
+	if (mem_.unk_1d147() == 0x03) {
 		set_update(FS(0x8d));
 		return;
 	}
-	if (mem_[wDollBoyActiveBarrels] || mem_[wTransformation])
+	if (mem_.doll_boy_active_barrels() || mem_.transformation())
 		return;
-	if (mem_[wAutoMoveState]) {
+	if (mem_.auto_move_state()) {
 		flags() = 0;
 		return;
 	}
@@ -672,7 +668,7 @@ void PesceHelper::fly_spawning()
 void PesceHelper::fly_done()
 {
 	spawner_frame();
-	if (!mem_[wDollBoyHammerRange])
+	if (!mem_.doll_boy_hammer_range())
 		return;
 	spawner_done(0x09);
 	flags() = 0;
@@ -683,7 +679,7 @@ void PesceHelper::fly()
 {
 	set_update(FLY_UPDATE);
 	flags() |= OBJFLAG_NO_COLLISION;
-	mem_[wDollBoyActiveBarrels] = 0x03;
+	mem_.doll_boy_active_barrels() = 0x03;
 	play_sfx(SFX_0BE);
 	create_object_here(ADDR_ObjParams_Cheese);
 }
@@ -699,11 +695,11 @@ void PesceHelper::fly_update()
 		}
 		state_duration() = 0x70;
 		state() = 0x5b;
-		mem_[wDollBoyActiveBarrels] = 0x01;
+		mem_.doll_boy_active_barrels() = 0x01;
 		return;
 	case 0x5b: // left, bobbing
 		apply_y_movement_loop(ADDR_Data_604c0);
-		if (mem_[wDollBoyActiveBarrels] && !(mem_[wGlobalCounter] & 1))
+		if (mem_.doll_boy_active_barrels() && !(mem_.global_counter() & 1))
 			return;
 		move_left();
 		if (--state_duration())
@@ -717,15 +713,15 @@ void PesceHelper::fly_update()
 			return;
 		}
 		flags() = 0;
-		mem_[wDollBoyActiveBarrels] = 0;
+		mem_.doll_boy_active_barrels() = 0;
 		return;
 	default: { // hit: drops the cheese
-		bool left = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+		bool left = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 		set_update(left ? ADDR_Func_33f8 : ADDR_Func_3407);
 		var3() = 0;
 		var2() = 0x01;
-		if (mem_[wDollBoyActiveBarrels])
-			mem_[wDollBoyActiveBarrels] = 0x02;
+		if (mem_.doll_boy_active_barrels())
+			mem_.doll_boy_active_barrels() = 0x02;
 		return;
 	}
 	}
@@ -735,23 +731,23 @@ void PesceHelper::fly_update()
 void PesceHelper::cheese()
 {
 	no_actions();
-	uint8_t barrels = mem_[wDollBoyActiveBarrels];
+	uint8_t barrels = mem_.doll_boy_active_barrels();
 	if (state() || !barrels) {
 		if (state())
-			mem_[wDollBoyActiveBarrels] = 0;
+			mem_.doll_boy_active_barrels() = 0;
 		flags() = 0;
 		return;
 	}
 	if (barrels == 0x02) {
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		hpos_block_unk1();
-		if (mem_[wIsInWaterOrSand]) {
+		if (mem_.is_in_water_or_sand()) {
 			no_actions();
 			if (!(flags() & (1 << OBJFLAG_ON_SCREEN_F))) {
-				mem_[wDollBoyActiveBarrels] = 0;
+				mem_.doll_boy_active_barrels() = 0;
 				flags() = 0;
 				return;
 			}
@@ -766,7 +762,7 @@ void PesceHelper::cheese()
 			call_home(ADDR_MoveObjectDown_Fast);
 			return;
 		}
-		mem_[wDollBoyActiveBarrels] = 0;
+		mem_.doll_boy_active_barrels() = 0;
 		flags() = 0;
 		return;
 	}
@@ -776,10 +772,9 @@ void PesceHelper::cheese()
 	if (!fly_obj)
 		return;
 	uint16_t y_pos = static_cast<uint16_t>((mem_[fly_obj + OBJ_Y_POS] | mem_[fly_obj + OBJ_Y_POS + 1] << 8) + 0x0b);
-	mem_[wCurObjYPos + 0] = static_cast<uint8_t>(y_pos);
-	mem_[wCurObjYPos + 1] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[wCurObjXPos + 0] = mem_[fly_obj + OBJ_X_POS];
-	mem_[wCurObjXPos + 1] = mem_[fly_obj + OBJ_X_POS + 1];
+	mem_.cur_obj_y() = y_pos;
+	mem_.cur_obj_x().lo() = mem_[fly_obj + OBJ_X_POS];
+	mem_.cur_obj_x().hi() = mem_[fly_obj + OBJ_X_POS + 1];
 }
 
 } // namespace wl3::level

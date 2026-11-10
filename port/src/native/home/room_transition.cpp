@@ -15,13 +15,13 @@ void trigger_room_transition(GB *gb)
 	for (uint16_t at : {wGrabState, wRoomPalCycleDuration, wRoomAnimatedPalsEnabled, wWaterCurrent,
 			wLastWaterCurrent, wCurWaterCurrent, wBossState, wIsBossBattle})
 		mem[at] = 0;
-	mem[wIsIntangible] = TRUE;
+	mem.is_intangible() = TRUE;
 
-	uint8_t param = mem[wRoomTransitionParam];
+	uint8_t param = mem.room_transition_param();
 	if (param >> ROOMTRANSITIONF_DELAY_F & 1)
 		return; // delayed, don't transition for now
 	if (param >> ROOMTRANSITIONF_DOOR_F & 1) {
-		mem[wSubState] = static_cast<uint8_t>(mem[wSubState] + 1);
+		mem.sub_state() = static_cast<uint8_t>(mem.sub_state() + 1);
 		uint16_t ptr = 0;
 		Routines(gb).in_bank(BANK_GetWarioBGPtr, ADDR_GetWarioBGPtr, [&] { ptr = level::wario_bg_ptr(gb); });
 		uint8_t wbk = mem[rWBK]; // push_wram $03
@@ -31,11 +31,11 @@ void trigger_room_transition(GB *gb)
 		mem[rWBK] = wbk;
 		return;
 	}
-	mem[wSubState] = static_cast<uint8_t>(mem[wSubState] + 2);
-	mem[hMusicID + 0] = 0xff; // stop_music
-	mem[hMusicID + 1] = 0x00;
-	mem[hSFXID + 0] = 0xff; // stop_sfx
-	mem[hSFXID + 1] = 0x00;
+	mem.sub_state() = static_cast<uint8_t>(mem.sub_state() + 2);
+	mem.music().hi() = 0xff; // stop_music
+	mem.music().lo() = 0x00;
+	mem.sfx().hi() = 0xff; // stop_sfx
+	mem.sfx().lo() = 0x00;
 }
 
 } // namespace wl3::home

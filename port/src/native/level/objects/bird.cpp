@@ -43,12 +43,12 @@ void Bird::init()
 {
 	flags() &= ~OBJFLAG_INVISIBLE;
 	set_update(UPDATE);
-	mem_[wCurObjCollBoxRight] = 0x06;
-	mem_[wCurObjCollBoxLeft] = 0xf9;
-	mem_[wCurObjCollBoxBottom] = 0xfa;
+	mem_.cur_obj_coll_box_right() = 0x06;
+	mem_.cur_obj_coll_box_left() = 0xf9;
+	mem_.cur_obj_coll_box_bottom() = 0xfa;
 	state_duration() = 0;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	if (static_cast<uint8_t>(screen_x() + 0x2a) < wario) {
 		substate() |= OBJSUBFLAG_HDIR;
 		set_frameset(ADDR_Frameset_687e4);
@@ -100,11 +100,11 @@ void Bird::perched(uint16_t page)
 			set_frameset(ADDR_Frameset_687e4);
 		}
 	}
-	uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_[wWarioScreenYPos] + 0x2a));
+	uint8_t dy = static_cast<uint8_t>(static_cast<uint8_t>(screen_y() + 0x2a) - static_cast<uint8_t>(mem_.wario_screen_y_pos() + 0x2a));
 	if (dy >= 0x18 && dy < 0xe8)
 		return;
 	uint8_t bird_x = static_cast<uint8_t>(screen_x() + 0x2a);
-	uint8_t wario_x = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario_x = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	uint8_t dx = static_cast<uint8_t>(bird_x - wario_x);
 	bool wario_right = bird_x < wario_x;
 	bool facing = (turned ? substate() : sub) & OBJSUBFLAG_HDIR;
@@ -154,7 +154,7 @@ void Bird::hit(uint16_t stars)
 		return;
 	}
 	flags() |= OBJFLAG_NO_COLLISION;
-	if (mem_[wCurObjId] == BLUE_BIRD) {
+	if (mem_.cur_obj_id() == BLUE_BIRD) {
 		set_update(BLUE_STUNNED);
 		state_duration() = 0x14;
 		return;
@@ -175,7 +175,7 @@ void Bird::knocked(uint16_t routine)
 
 void Bird::blue_stunned()
 {
-	mem_[wCurObjAction] = 0x81;
+	mem_.cur_obj_action() = 0x81;
 	if (--state_duration())
 		return;
 	set_frameset(ADDR_Frameset_687ff);
@@ -186,7 +186,7 @@ void Bird::blue_stunned()
 // turns round and flies off the other way
 void Bird::blue_recover()
 {
-	mem_[wCurObjAction] = 0x81;
+	mem_.cur_obj_action() = 0x81;
 	if (state()) {
 		swoop(wCurObjState & 0xff00);
 		return;

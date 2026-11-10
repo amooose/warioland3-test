@@ -19,11 +19,11 @@ public:
 	// step 1); hTransferVirtualOAM (a = wVirtualOAM's page) at the end.
 	void port_VBlank_160439__Func()
 	{
-		mem_[rSCY] = mem_[wSCY];
-		mem_[rSCX] = mem_[wSCX];
-		uint8_t step = mem_[wcee4];
+		mem_[rSCY] = mem_.scy();
+		mem_[rSCX] = mem_.scx();
+		uint8_t step = mem_.unk_cee4();
 		if (step & 0x80) {
-			uint16_t bg_map = static_cast<uint16_t>(mem_[wCreditsBGMapPtr] << 8 | mem_[wCreditsBGMapPtr + 1]);
+			uint16_t bg_map = static_cast<uint16_t>(mem_.credits_bg_map_ptr() << 8 | mem_[wCreditsBGMapPtr + 1]);
 			switch (step & 0x7f) {
 			case 1: // .write_text, to the '\n' (the e of de wraps in its page)
 				for (uint16_t src = wCreditsTextBuffer;; src++) {
@@ -33,20 +33,20 @@ public:
 					mem_[bg_map] = c;
 					bg_map = static_cast<uint16_t>((bg_map & 0xff00) | static_cast<uint8_t>(bg_map + 1));
 				}
-				mem_[wcee4] &= 0x7f;
+				mem_.unk_cee4() &= 0x7f;
 				break;
 			case 2: // .asm_160499
 				home::apply_bg_pals(gb_, wTempPals1);
 				home::apply_ob_pals(gb_, wTempPals2);
 				mem_[rLCDC] |= LCDC_WIN_ON | LCDC_WIN_9C00;
-				mem_[wcee4] &= 0x7f;
+				mem_.unk_cee4() &= 0x7f;
 				break;
 			default:
 				mem_[rVBK] = 1; // BANK("VRAM1")
 				home::copy(gb_, wCreditsTextPals, bg_map, CREDITS_TEXT_LENGTH);
 				mem_[rVBK] = 0;
 				home::fill(gb_, bg_map, 0x7e, CREDITS_TEXT_LENGTH);
-				mem_[wcee4] = 0x01 | (1 << 7);
+				mem_.unk_cee4() = 0x01 | (1 << 7);
 				break;
 			}
 		}

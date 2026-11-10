@@ -86,10 +86,10 @@ private:
 void Scowler::hpos(int dy)
 {
 	uint16_t y_pos = static_cast<uint16_t>(y() + dy);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-	mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+	mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 }
 
 // and $0f / swap a / add a / add $48
@@ -105,21 +105,21 @@ void Scowler::start()
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
 	substate() = (substate() & 0xf0) | 0x04;
 	reset_var3();
-	mem_[wCurObjCollBoxRight] = 0x08;
-	mem_[wCurObjCollBoxLeft] = 0xf7;
-	mem_[wCurObjCollBoxBottom] = 0xf8;
+	mem_.cur_obj_coll_box_right() = 0x08;
+	mem_.cur_obj_coll_box_left() = 0xf7;
+	mem_.cur_obj_coll_box_bottom() = 0xf8;
 	set_frameset(ADDR_Frameset_69a5f);
 	state_duration() = 0;
 	var1() = 0;
 	var2() = 0;
-	mem_[wDollBoyActiveBarrels] = 0;
-	mem_[w1d147] = 0;
+	mem_.doll_boy_active_barrels() = 0;
+	mem_.unk_1d147() = 0;
 }
 
 void Scowler::begin()
 {
-	mem_[wIsBossBattle] = TRUE;
-	mem_[wBossState] = BOSS_REGULAR;
+	mem_.is_boss_battle() = TRUE;
+	mem_.boss_state() = BOSS_REGULAR;
 	home::update_level_music(gb_);
 	set_update(WALKING);
 	create_object_here(ADDR_ObjParams_ScrowlerTentacleRight);
@@ -134,10 +134,10 @@ void Scowler::leaving()
 	if (--state_duration())
 		return;
 	set_frameset(ADDR_Frameset_69b03);
-	mem_[wWarioYPos + 1] = mem_[wCurObjYPos + 0];
-	mem_[wWarioYPos + 0] = mem_[wCurObjYPos + 1];
-	mem_[wWarioXPos + 1] = mem_[wCurObjXPos + 0];
-	mem_[wWarioXPos + 0] = mem_[wCurObjXPos + 1];
+	mem_.wario_y().lo() = mem_.cur_obj_y().lo();
+	mem_.wario_y().hi() = mem_.cur_obj_y().hi();
+	mem_.wario_x().lo() = mem_.cur_obj_x().lo();
+	mem_.wario_x().hi() = mem_.cur_obj_x().hi();
 }
 
 bool Scowler::walk()
@@ -145,10 +145,10 @@ bool Scowler::walk()
 	bool right = facing_right();
 	uint16_t y_pos = static_cast<uint16_t>(y() - 0x04);
 	uint16_t x_pos = static_cast<uint16_t>(right ? x() + 0x10 : x() - 0x11);
-	mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-	mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[hXPosLo] = static_cast<uint8_t>(x_pos);
-	mem_[hXPosHi] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+	mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+	mem_.x_pos_lo() = static_cast<uint8_t>(x_pos);
+	mem_.x_pos_hi() = static_cast<uint8_t>(x_pos >> 8);
 	if (hpos_block_unk4())
 		return true;
 	call_home(right ? ADDR_MoveObjectRight : ADDR_MoveObjectLeft);
@@ -173,7 +173,7 @@ void Scowler::up(bool tail)
 	(void)tail;
 	hpos(-0x2c);
 	hpos_block_unk3();
-	if (mem_[wIsInWaterOrSand]) {
+	if (mem_.is_in_water_or_sand()) {
 		move_up();
 		return;
 	}
@@ -185,7 +185,7 @@ void Scowler::stand()
 	reset_var3();
 	var1() = 0;
 	state() = 0;
-	if (static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a)) {
+	if (static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a)) {
 		substate() |= 1 << 7;
 		set_frameset(ADDR_Frameset_69a68);
 		return;
@@ -206,7 +206,7 @@ void Scowler::walking()
 		stop_music2(mem_);
 		return;
 	}
-	if (mem_[wRoomTransitionParam]) {
+	if (mem_.room_transition_param()) {
 		set_update(LEAVING);
 		state_duration() = 0x1e;
 		return;
@@ -214,7 +214,7 @@ void Scowler::walking()
 	if (!s) {
 		if (var1()) {
 			if (--var1()) { // to Wario's height
-				uint8_t wario = mem_[wWarioScreenYPos] & 0xfe;
+				uint8_t wario = mem_.wario_screen_y_pos() & 0xfe;
 				uint8_t own = screen_y() & 0xfe;
 				if (own == wario)
 					return;
@@ -227,9 +227,9 @@ void Scowler::walking()
 			set_frameset(facing_right() ? ADDR_Frameset_69a68 : ADDR_Frameset_69a5f);
 			return;
 		}
-		if (!mem_[w1d147] && !--var3()) {
+		if (!mem_.unk_1d147() && !--var3()) {
 			reset_var3();
-			if (screen_y() >= mem_[wWarioScreenYPos]) {
+			if (screen_y() >= mem_.wario_screen_y_pos()) {
 				state() = 0x2f;
 				set_frameset(ADDR_Frameset_69a7a);
 				state_duration() = 0x48;
@@ -302,7 +302,7 @@ void Scowler::underwater()
 	uint8_t s = state();
 	if (s) {
 		if ((s & 0xfe) == 0x08) {
-			if (screen_y() < mem_[wWarioScreenYPos]) {
+			if (screen_y() < mem_.wario_screen_y_pos()) {
 				play_sfx(SFX_0B4);
 				set_frameset(ADDR_Frameset_69abc);
 				state_duration() = 0x1e;
@@ -318,7 +318,7 @@ void Scowler::underwater()
 			state() = 0;
 		}
 	}
-	if (!(mem_[wGlobalCounter] & 0x07))
+	if (!(mem_.global_counter() & 0x07))
 		play_sfx(SFX_0AB);
 	if (!--state_duration() && !--var2()) {
 		surface();
@@ -364,7 +364,7 @@ void Scowler::hurt_sinking()
 	}
 	hpos(-0x2c);
 	hpos_block_unk3();
-	if (!mem_[wIsInWaterOrSand])
+	if (!mem_.is_in_water_or_sand())
 		return;
 	apply_y_movement(ADDR_Data_60a70);
 }
@@ -385,7 +385,7 @@ void Scowler::defeated_rising()
 	flashes();
 	hpos(-0x18);
 	hpos_block_unk3();
-	if (mem_[wIsInWaterOrSand]) {
+	if (mem_.is_in_water_or_sand()) {
 		apply_y_movement(ADDR_Data_60a70);
 		return;
 	}
@@ -415,11 +415,11 @@ void Scowler::defeated_gone()
 	flashes();
 	if (state_duration() && !--state_duration()) {
 		set_block_object(0x05);
-		mem_[wBossState] = BOSS_DEFEATED;
+		mem_.boss_state() = BOSS_DEFEATED;
 		home::update_level_music(gb_);
-		mem_[wIsBossBattle] = 0;
-		if (mem_[w1d147]) {
-			mem_[w1d147] = 0;
+		mem_.is_boss_battle() = 0;
+		if (mem_.unk_1d147()) {
+			mem_.unk_1d147() = 0;
 			ob_pals(ADDR_Pals_54c87);
 			bg_pals(ADDR_Pals_54cb7);
 		}
@@ -432,14 +432,14 @@ void Scowler::defeated_gone()
 // wDollBoyActiveBarrels counts down)
 void Scowler::flashes()
 {
-	uint8_t t = mem_[w1d147];
+	uint8_t t = mem_.unk_1d147();
 	if (!t)
 		return;
-	if (mem_[wDollBoyActiveBarrels]) {
-		--mem_[wDollBoyActiveBarrels];
+	if (mem_.doll_boy_active_barrels()) {
+		--mem_.doll_boy_active_barrels();
 		return;
 	}
-	++mem_[w1d147];
+	++mem_.unk_1d147();
 	if (t == 0x02 || t == 0x3d) {
 		play_sfx(t == 0x02 ? SFX_0B5 : SFX_0B7);
 		ob_pals(ADDR_Pals_54c9f);
@@ -448,7 +448,7 @@ void Scowler::flashes()
 	}
 	if (t == 0x3c) {
 		play_sfx(SFX_0B6);
-		mem_[wDollBoyActiveBarrels] = 0xff;
+		mem_.doll_boy_active_barrels() = 0xff;
 		black_out_ob_pals(3, 5);
 		black_out_bg_pals(8, 0);
 		return;
@@ -456,7 +456,7 @@ void Scowler::flashes()
 	if (t != 0x78)
 		return;
 	play_sfx(SFX_0B8);
-	mem_[w1d147] = 0;
+	mem_.unk_1d147() = 0;
 	ob_pals(ADDR_Pals_54c87);
 	bg_pals(ADDR_Pals_54cb7);
 }
@@ -492,7 +492,7 @@ void ScowlerHelper::ring()
 void ScowlerHelper::ring_rising()
 {
 	no_actions();
-	if (mem_[wGlobalCounter] & 1)
+	if (mem_.global_counter() & 1)
 		return;
 	if (--state_duration()) {
 		move_up();
@@ -500,8 +500,8 @@ void ScowlerHelper::ring_rising()
 	}
 	state_duration() = 0x3c;
 	set_update(RING_WAITING);
-	var2() = mem_[wCurObjYPos + 0];
-	var3() = mem_[wCurObjYPos + 1];
+	var2() = mem_.cur_obj_y().lo();
+	var3() = mem_.cur_obj_y().hi();
 }
 
 void ScowlerHelper::ring_waiting()
@@ -517,7 +517,7 @@ void ScowlerHelper::ring_waiting()
 void ScowlerHelper::ring_up()
 {
 	one_way_platform();
-	if (!(mem_[wGlobalCounter] & 1))
+	if (!(mem_.global_counter() & 1))
 		return;
 	if (!--state_duration()) {
 		set_update(RING_DOWN);
@@ -536,7 +536,7 @@ void ScowlerHelper::ring_up()
 void ScowlerHelper::ring_down()
 {
 	one_way_platform();
-	if (mem_[wCurObjYPos + 0] == var2() && mem_[wCurObjYPos + 1] == var3()) {
+	if (mem_.cur_obj_y().lo() == var2() && mem_.cur_obj_y().hi() == var3()) {
 		if (!(flags() & OBJFLAG_STEPPED))
 			return;
 		flags() &= ~OBJFLAG_STEPPED;
@@ -549,7 +549,7 @@ void ScowlerHelper::ring_down()
 		return;
 	}
 	flags() &= ~(1 << 5);
-	if (!(mem_[wGlobalCounter] & 1))
+	if (!(mem_.global_counter() & 1))
 		return;
 	move_wario(ADDR_MoveWarioDown, 0x01);
 	home::handle_downwards_floor_transition(gb_);
@@ -565,7 +565,7 @@ void ScowlerHelper::tentacle()
 // beside the body: y = body y - dy, x = body x + dx
 void ScowlerHelper::tentacle_follow(uint16_t body_y, uint16_t body_x, bool other_side)
 {
-	bool right = mem_[wCurObjId] == SCROWLER_TENTACLE_RIGHT;
+	bool right = mem_.cur_obj_id() == SCROWLER_TENTACLE_RIGHT;
 	int dy, dx;
 	if (!other_side) {
 		dy = right ? 0x04 : 0x0b;
@@ -576,18 +576,16 @@ void ScowlerHelper::tentacle_follow(uint16_t body_y, uint16_t body_x, bool other
 	}
 	uint16_t y_pos = static_cast<uint16_t>(body_y - dy);
 	uint16_t x_pos = static_cast<uint16_t>(body_x + dx);
-	mem_[wCurObjYPos + 0] = static_cast<uint8_t>(y_pos);
-	mem_[wCurObjYPos + 1] = static_cast<uint8_t>(y_pos >> 8);
-	mem_[wCurObjXPos + 0] = static_cast<uint8_t>(x_pos);
-	mem_[wCurObjXPos + 1] = static_cast<uint8_t>(x_pos >> 8);
+	mem_.cur_obj_y() = y_pos;
+	mem_.cur_obj_x() = x_pos;
 }
 
 void ScowlerHelper::tentacle_interaction(uint8_t type, uint8_t top, uint8_t bottom)
 {
 	no_actions();
 	set_interaction(type);
-	mem_[wCurObjCollBoxTop] = top;
-	mem_[wCurObjCollBoxBottom] = bottom;
+	mem_.cur_obj_coll_box_top() = top;
+	mem_.cur_obj_coll_box_bottom() = bottom;
 }
 
 // with the body (var1: its phase)
@@ -599,7 +597,7 @@ void ScowlerHelper::tentacle_update()
 		stop_music2(mem_);
 		return;
 	}
-	if (mem_[wRoomTransitionParam])
+	if (mem_.room_transition_param())
 		return;
 	state() = 0;
 	uint16_t body = 0;
@@ -614,7 +612,7 @@ void ScowlerHelper::tentacle_update()
 	}
 	uint16_t body_y = static_cast<uint16_t>(mem_[body + OBJ_Y_POS] | mem_[body + OBJ_Y_POS + 1] << 8);
 	uint16_t body_x = static_cast<uint16_t>(mem_[body + OBJ_X_POS] | mem_[body + OBJ_X_POS + 1] << 8);
-	bool right = mem_[wCurObjId] == SCROWLER_TENTACLE_RIGHT;
+	bool right = mem_.cur_obj_id() == SCROWLER_TENTACLE_RIGHT;
 	switch (static_cast<uint8_t>(mem_[body + OBJ_VAR_1])) {
 	case 0x00:
 		tentacle_follow(body_y, body_x, mem_[body + OBJ_SUBSTATE] & (1 << 7));
@@ -642,20 +640,20 @@ void ScowlerHelper::ink(bool right)
 		--state_duration();
 		call_home(right ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	} else {
-		bool left_of_wario = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+		bool left_of_wario = static_cast<uint8_t>(screen_x() + 0x2a) < static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 		call_home(left_of_wario ? ADDR_MoveObjectRight_Slow : ADDR_MoveObjectLeft_Slow);
 	}
 	if (state()) {
-		mem_[w1d147] = 0x01;
+		mem_.unk_1d147() = 0x01;
 	} else {
 		uint16_t y_pos = static_cast<uint16_t>(y() - 0x10);
-		mem_[hYPosLo] = static_cast<uint8_t>(y_pos);
-		mem_[hYPosHi] = static_cast<uint8_t>(y_pos >> 8);
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = static_cast<uint8_t>(y_pos);
+		mem_.y_pos_hi() = static_cast<uint8_t>(y_pos >> 8);
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		hpos_block_unk3();
-		if (mem_[wIsInWaterOrSand]) {
-			if (mem_[wGlobalCounter] & 0x03)
+		if (mem_.is_in_water_or_sand()) {
+			if (mem_.global_counter() & 0x03)
 				return;
 			move_up();
 			return;

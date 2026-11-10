@@ -58,9 +58,9 @@ void Torch::set_up(uint16_t frameset)
 	state_duration() = 0;
 	flags() = (flags() & ~OBJFLAG_INVISIBLE) | OBJFLAG_NO_COLLISION;
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 6;
-	mem_[wCurObjCollBoxLeft] = static_cast<uint8_t>(-7);
-	mem_[wCurObjCollBoxBottom] = static_cast<uint8_t>(-3);
+	mem_.cur_obj_coll_box_right() = 6;
+	mem_.cur_obj_coll_box_left() = static_cast<uint8_t>(-7);
+	mem_.cur_obj_coll_box_bottom() = static_cast<uint8_t>(-3);
 }
 
 // out until hit
@@ -75,7 +75,7 @@ void Torch::unlit()
 	set_interaction(OBJ_INTERACTION_FIRE);
 	set_frameset(ADDR_Frameset_68360);
 	relight();
-	if (++mem_[wNumLitTorches] == NUM_FLAME_BLOCK_TORCHES)
+	if (++mem_.num_lit_torches() == NUM_FLAME_BLOCK_TORCHES)
 		play_sfx(SFX_0FA);
 }
 
@@ -88,7 +88,7 @@ void Torch::relight()
 // for 512 frames (from the last hit), unless all are lit by then
 void Torch::lit()
 {
-	if (mem_[wNumLitTorches] == NUM_FLAME_BLOCK_TORCHES)
+	if (mem_.num_lit_torches() == NUM_FLAME_BLOCK_TORCHES)
 		return;
 	if (state()) {
 		state() = 0;
@@ -100,7 +100,7 @@ void Torch::lit()
 	if (--var1())
 		return;
 	despawn();
-	--mem_[wNumLitTorches];
+	--mem_.num_lit_torches();
 }
 
 // an ember every 128 frames, alternately both ways
@@ -110,7 +110,7 @@ void Torch::burning()
 	uint16_t params;
 	switch (state_duration()) {
 	case 0:
-		if (mem_[wGlobalCounter] & 0x7f)
+		if (mem_.global_counter() & 0x7f)
 			return;
 		next = 1;
 		params = ADDR_ObjParams_TorchEmberLeft1;
@@ -120,7 +120,7 @@ void Torch::burning()
 		params = ADDR_ObjParams_TorchEmberRight1;
 		break;
 	case 2:
-		if (mem_[wGlobalCounter] & 0x7f)
+		if (mem_.global_counter() & 0x7f)
 			return;
 		next = 3;
 		params = ADDR_ObjParams_TorchEmberLeft2;
@@ -138,7 +138,7 @@ void Torch::burning()
 
 void Torch::ember_towards_wario()
 {
-	uint8_t wario = static_cast<uint8_t>(mem_[wWarioScreenXPos] + 0x2a);
+	uint8_t wario = static_cast<uint8_t>(mem_.wario_screen_x_pos() + 0x2a);
 	if (static_cast<uint8_t>(screen_x() + 0x2a) < wario)
 		move_right();
 	else
@@ -153,14 +153,14 @@ void Torch::ember()
 	apply_y_movement(ADDR_Data_60320);
 	flags() |= OBJFLAG_NO_COLLISION;
 	if (!state()) {
-		mem_[hYPosLo] = mem_[wCurObjYPos + 0];
-		mem_[hYPosHi] = mem_[wCurObjYPos + 1];
-		mem_[hXPosLo] = mem_[wCurObjXPos + 0];
-		mem_[hXPosHi] = mem_[wCurObjXPos + 1];
+		mem_.y_pos_lo() = mem_.cur_obj_y().lo();
+		mem_.y_pos_hi() = mem_.cur_obj_y().hi();
+		mem_.x_pos_lo() = mem_.cur_obj_x().lo();
+		mem_.x_pos_hi() = mem_.cur_obj_x().hi();
 		if (!hpos_block_unk1())
 			return;
-		mem_[wCurObjYPos + 0] = mem_[hYPosLo];
-		mem_[wCurObjYPos + 1] = mem_[hYPosHi];
+		mem_.cur_obj_y().lo() = mem_.y_pos_lo();
+		mem_.cur_obj_y().hi() = mem_.y_pos_hi();
 	}
 	set_update(EMBER_OUT);
 	set_frameset(ADDR_Frameset_68359);

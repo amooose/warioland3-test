@@ -15,9 +15,9 @@ namespace {
 // ReturnToPendingLevelState: back to the level's pending sub-state
 uint8_t return_to_pending_level_state(Memory mem)
 {
-	mem[wState] = ST_LEVEL;
-	uint8_t sub_state = mem[wPendingSubState];
-	mem[wSubState] = sub_state;
+	mem.state() = ST_LEVEL;
+	uint8_t sub_state = mem.pending_sub_state();
+	mem.sub_state() = sub_state;
 	return sub_state;
 }
 
@@ -26,7 +26,7 @@ uint8_t return_to_pending_level_state(Memory mem)
 void return_to_map(GB *gb)
 {
 	Memory mem(gb);
-	mem[wTransitionParam] = TRANSITION_RETURN_TO_MAP;
+	mem.transition_param() = TRANSITION_RETURN_TO_MAP;
 	Routines(gb).farcall(BANK_StartOverworldState, ADDR_StartOverworldState);
 }
 
@@ -38,15 +38,15 @@ void return_to_level_from_golf(GB *gb)
 	disable_lcd(gb);
 	uint8_t wbk = mem[rWBK]; // push_wram $03
 	mem[rWBK] = 0x03;
-	mem[wAnimatedTilesFrameDuration] = mem[wTempAnimatedTilesFrameDuration];
-	mem[wAnimatedTilesGfx] = mem[wTempAnimatedTilesGroup];
+	mem.animated_tiles_frame_duration() = mem.temp_animated_tiles_frame_duration();
+	mem.animated_tiles_gfx() = mem.temp_animated_tiles_group();
 	mem[rWBK] = wbk;
-	mem[wAnimatedTilesFrameCount] = 0;
-	mem[wAnimatedTilesFrame] = 0;
-	mem[wRoomAnimatedTilesEnabled] = TRUE;
+	mem.animated_tiles_frame_count() = 0;
+	mem.animated_tiles_frame() = 0;
+	mem.room_animated_tiles_enabled() = TRUE;
 	load_backup_vram(gb);
-	uint8_t param = (mem[wRoomTransitionParam] & ROOMTRANSITION_FLAGS_MASK) | ROOMTRANSITION_DOOR;
-	mem[wRoomTransitionParam] = param;
+	uint8_t param = (mem.room_transition_param() & ROOMTRANSITION_FLAGS_MASK) | ROOMTRANSITION_DOOR;
+	mem.room_transition_param() = param;
 	gb->cpu.f = flags::or_(param); // the or's flags survive the farcall, for the state table
 	Routines(gb).farcall(BANK_DrawLevelObjectsAfterLevelReturn, ADDR_DrawLevelObjectsAfterLevelReturn);
 	mem[rLCDC] = LCDC_DEFAULT;
@@ -66,7 +66,7 @@ PORT_EX(ReturnToMap, 0, ALL_REGISTERS & ~(R_A | R_F)) { return_to_map(gb); }
 PORT_EX(ReturnToMapFromLevel, 0, ALL_REGISTERS & ~(R_A | R_F))
 {
 	wl3::Memory mem(gb);
-	mem[wDayNight] = mem[wDayNight] | 0x80;
+	mem.day_night() = mem.day_night() | 0x80;
 	return_to_map(gb);
 }
 // f from the or before the farcall

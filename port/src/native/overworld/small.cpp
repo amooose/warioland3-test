@@ -12,15 +12,15 @@ namespace wl3::overworld {
 void switch_day_night(GB *gb)
 {
 	Memory mem(gb);
-	mem[wDayNight] = static_cast<uint8_t>(mem[wDayNight] ^ (1 << 4));
+	mem.day_night() = static_cast<uint8_t>(mem.day_night() ^ (1 << 4));
 }
 
 // the East side stays by day without the Sun Medallion
 void do_day_night_spell(GB *gb)
 {
 	Memory mem(gb);
-	if (mem[wCurMapSide] == EAST && !mem[wGotSunMedallion]) {
-		mem[wDayNight] = static_cast<uint8_t>(mem[wDayNight] & ~(1 << 4));
+	if (mem.cur_map_side() == EAST && !mem.got_sun_medallion()) {
+		mem.day_night() = static_cast<uint8_t>(mem.day_night() & ~(1 << 4));
 		return;
 	}
 	switch_day_night(gb);
@@ -32,7 +32,7 @@ void get_crayon_flags(GB *gb)
 	Memory mem(gb);
 	uint16_t hi = wTreasuresCollected + CRAYON_YELLOW_T / 8;
 	uint8_t flags = static_cast<uint8_t>(mem[hi] << 2 | mem[static_cast<uint16_t>(hi - 1)] >> 6);
-	mem[wCrayonFlags] = flags & 0x7f;
+	mem.crayon_flags() = flags & 0x7f;
 }
 
 // Func_80bd9: no BG priority for the tile at (0, 14) and the 3x4 block
@@ -52,7 +52,7 @@ void clear_bottom_left_bg_priority(GB *gb)
 void save_after_level(GB *gb)
 {
 	Memory mem(gb);
-	if (!mem[wTransitionParam] || mem[wOWBarsState] || mem[wMapSideLevelID] >= OW_EXITS)
+	if (!mem.transition_param() || mem.ow_bars_state() || mem.map_side_level_id() >= OW_EXITS)
 		return;
 	home::save_game_or_enter_perfect_screen(gb);
 }
@@ -61,8 +61,8 @@ void save_after_level(GB *gb)
 void check_best_times(GB *gb)
 {
 	Memory mem(gb);
-	if ((mem[wGameModeFlags] & (1 << MODE_TIME_ATTACK_F)) && (mem[wJoypadPressed] & (1 << B_PAD_START)))
-		mem[wSubState] = SST_OVERWORLD_BEST_TIMES;
+	if ((mem.game_mode_flags() & (1 << MODE_TIME_ATTACK_F)) && (mem.joypad_pressed() & (1 << B_PAD_START)))
+		mem.sub_state() = SST_OVERWORLD_BEST_TIMES;
 }
 
 // DrawCoinCount (bank26.asm): wNumCoins's three BCD digits as tiles, from
@@ -98,11 +98,11 @@ uint8_t level_with_treasure(GB *gb, uint8_t treasure)
 void check_if_event_has_cutscene(GB *gb)
 {
 	Memory mem(gb);
-	uint8_t event = mem[wCurEvent];
-	mem[wEventWithCutscene] = 0;
+	uint8_t event = mem.cur_event();
+	mem.event_with_cutscene() = 0;
 	uint16_t init = mem.word(static_cast<uint16_t>(ADDR_CutsceneInitFunctions + event * 2));
 	if (init != ADDR_NoInitCutscene)
-		mem[wEventWithCutscene] = event;
+		mem.event_with_cutscene() = event;
 }
 
 // _InitCutscene (cutscene/init.asm): the screen off and cleared, the
@@ -118,17 +118,17 @@ void init_cutscene(GB *gb)
 	home::copy(gb, ADDR_VBlank_Cutscene + 0x0c, wVBlankFunc, 0x51); // VBlank_Cutscene
 	cutscenes::Cutscenes(gb).init(); // InitEventCutscene
 	mem[rSCY] = 0;
-	mem[wSCY] = 0;
+	mem.scy() = 0;
 	mem[rSCX] = 0;
-	mem[wSCX] = 0;
-	mem[w2d801] = 0;
-	mem[w2d013] = 0;
-	mem[w2d014] = 0;
-	mem[wPalConfig1TotalSteps] = 0;
-	mem[wPalConfig2TotalSteps] = 0;
-	mem[rLCDC] = static_cast<uint8_t>((LCDC_BG_ON | LCDC_OBJ_ON | LCDC_OBJ_16 | LCDC_WIN_9C00 | LCDC_ON) ^ mem[wLCDCFlagsToFlip]);
-	mem[wLCDCFlagsToFlip] = 0;
-	++mem[wSubState];
+	mem.scx() = 0;
+	mem.unk_2d801() = 0;
+	mem.unk_2d013() = 0;
+	mem.unk_2d014() = 0;
+	mem.pal_config1_total_steps() = 0;
+	mem.pal_config2_total_steps() = 0;
+	mem[rLCDC] = static_cast<uint8_t>((LCDC_BG_ON | LCDC_OBJ_ON | LCDC_OBJ_16 | LCDC_WIN_9C00 | LCDC_ON) ^ mem.lcdc_flags_to_flip());
+	mem.lcdc_flags_to_flip() = 0;
+	++mem.sub_state();
 }
 
 // SetObjPositionToLevelCoords (treasure_collection/common.asm): a scene

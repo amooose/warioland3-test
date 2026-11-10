@@ -61,8 +61,8 @@ void Overworld::handle()
 	if (level == GOLF_BUILDING) {
 		wram_.state() = ST_GOLF_BUILDING;
 	} else if (level == THE_TEMPLE) {
-		mem_[hSFXID + 0] = 0xff; // stop_sfx
-		mem_[hSFXID + 1] = 0x00;
+		mem_.sfx().hi() = 0xff; // stop_sfx
+		mem_.sfx().lo() = 0x00;
 	}
 }
 
@@ -116,7 +116,7 @@ void Overworld::run_state()
 // it's past its first step
 void Overworld::update_cutscene()
 {
-	if (mem_[wOWBarsState] && mem_[w2d013] >= 0x01 && (mem_[wJoypadPressed] & (1 << B_PAD_B))) {
+	if (mem_.ow_bars_state() && mem_.unk_2d013() >= 0x01 && (mem_.joypad_pressed() & (1 << B_PAD_B))) {
 		++wram_.sub_state();
 		stop_sfx(mem_);
 		return;
@@ -128,7 +128,7 @@ void Overworld::update_cutscene()
 // Func_80e33: B back to the map, or on (the temple scene's end)
 void Overworld::leave_temple_scene()
 {
-	if (mem_[wJoypadDown] & (1 << B_PAD_B))
+	if (mem_.joypad_down() & (1 << B_PAD_B))
 		wram_.sub_state() = SST_OVERWORLD_08;
 	else
 		++wram_.sub_state();
@@ -137,7 +137,7 @@ void Overworld::leave_temple_scene()
 // SetCompassSprite: the compass, top left, pointing at the side
 void Overworld::set_compass()
 {
-	mem_[wCompassObj] = 0x14; // .coords
+	mem_.compass_obj() = 0x14; // .coords
 	mem_[wCompassObj + 1] = 0x14;
 	mem_[wCompassObj + 2] = wram_.cur_map_side();
 }

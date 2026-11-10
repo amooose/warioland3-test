@@ -59,7 +59,7 @@ void Nobiiru::init()
 	flags() = (flags() & ~OBJFLAG_INVISIBLE) | OBJFLAG_NO_COLLISION;
 	set_update(UPDATE);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	if (mem_[wCurObjId] == NOBIIRU_LEFT)
+	if (mem_.cur_obj_id() == NOBIIRU_LEFT)
 		substate() &= ~OBJSUBFLAG_HDIR;
 	else
 		substate() |= OBJSUBFLAG_HDIR;
@@ -68,9 +68,9 @@ void Nobiiru::init()
 
 void Nobiiru::reset()
 {
-	mem_[wCurObjCollBoxBottom] = 0xfc;
-	mem_[wCurObjCollBoxLeft] = 0xfd;
-	mem_[wCurObjCollBoxRight] = 0x02;
+	mem_.cur_obj_coll_box_bottom() = 0xfc;
+	mem_.cur_obj_coll_box_left() = 0xfd;
+	mem_.cur_obj_coll_box_right() = 0x02;
 	set_frameset(ADDR_Frameset_698ff);
 	state_duration() = 60;
 	var1() = 0;
@@ -114,8 +114,8 @@ void Nobiiru::step(const Step &s, uint8_t index)
 	if (s.box) {
 		// bug? (docs/ASM_BUGS.md): the asm's sting step leaves the new interaction type in a, which
 		// .SetCollisionAndFrameset then stores as the box's left
-		mem_[wCurObjCollBoxLeft] = index == STING ? interaction() : (right ? s.right_box_left : s.left_box_left);
-		mem_[wCurObjCollBoxRight] = right ? s.right_box_right : s.left_box_right;
+		mem_.cur_obj_coll_box_left() = index == STING ? interaction() : (right ? s.right_box_left : s.left_box_left);
+		mem_.cur_obj_coll_box_right() = right ? s.right_box_right : s.left_box_right;
 	}
 	set_frameset(right ? s.right_frameset : s.left_frameset);
 	state_duration() = s.duration;

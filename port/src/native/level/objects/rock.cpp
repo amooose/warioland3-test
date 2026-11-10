@@ -70,9 +70,9 @@ void Rock::init()
 	set_update(UPDATE);
 	set_frameset(ADDR_Frameset_69bfe);
 	substate() &= ~OBJSUBFLAG_UNINITIALISED;
-	mem_[wCurObjCollBoxRight] = 0x06;
-	mem_[wCurObjCollBoxLeft] = 0xf9;
-	mem_[wCurObjCollBoxBottom] = 0x00;
+	mem_.cur_obj_coll_box_right() = 0x06;
+	mem_.cur_obj_coll_box_left() = 0xf9;
+	mem_.cur_obj_coll_box_bottom() = 0x00;
 	state() = 0x31;
 }
 
@@ -142,7 +142,7 @@ void Rock::run(uint16_t handler)
 		run(HELD_49);
 		return;
 	case HELD_49: // carried facing the way Wario does
-		if (mem_[wDirection]) {
+		if (mem_.direction()) {
 			call_home(ADDR_Func_3353);
 			return;
 		}
@@ -155,7 +155,7 @@ void Rock::run(uint16_t handler)
 		run(HELD_48);
 		return;
 	case HELD_48:
-		if (!mem_[wDirection]) {
+		if (!mem_.direction()) {
 			call_home(ADDR_Func_3362);
 			return;
 		}
@@ -163,7 +163,7 @@ void Rock::run(uint16_t handler)
 		run(GRAB_49);
 		return;
 	case STATE_42:
-		mem_[wCurObjAction] = 0x9f;
+		mem_.cur_obj_action() = 0x9f;
 		state() = 0x42;
 		var3() = 0;
 		return;
