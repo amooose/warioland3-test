@@ -41,6 +41,11 @@ void create_particle_in_block(GB *gb, uint16_t block, uint8_t id);
 void block_to_hpos(GB *gb, uint16_t block); // Func_ce3e
 // _CreateObjectFromCurObjPos: an object from its creation data, at wCurObj's position
 void create_object_from_cur_obj_pos(GB *gb, uint16_t params);
+// _CreateObjectAtRelativePos: the same, at the data's offset from wCurObj
+void create_object_at_relative_pos(GB *gb, uint16_t params);
+// collisions.cpp's block checks (see collisions.hpp)
+uint8_t check_block(GB *gb, uint8_t points);
+uint8_t check_block_beside(GB *gb, bool right);
 // SpawnObject: index = its wObjDataPointers entry, at = its object map entry
 void spawn_object(GB *gb, uint8_t index, uint16_t at);
 // The object's place in the level map, from its OBJ_UNK_02 at `at`:
@@ -141,16 +146,29 @@ protected:
 	}
 	// The block at hPos through ProcessBlock, by the collision points it's
 	// processed with (Func_3513 and the like: homecalls of collisions.asm's
-	// routines): the block function's result, which they leave in a. The
-	// CPU keeps the rest of the block function's registers, which some
-	// objects read on.
-	uint8_t hpos_block_unk4() { return call_a(ADDR_Func_3513); } // COLLISION_UNK4
-	uint8_t hpos_block_unk1() { return call_a(ADDR_Func_352b); } // COLLISION_UNK1
-	uint8_t hpos_block_down() { return call_a(ADDR_Func_3543); } // COLLISION_DOWN
-	uint8_t hpos_block_unk3() { return call_a(ADDR_Func_358b); } // COLLISION_UNK3
-	uint8_t hpos_block_unk2() { return call_a(ADDR_Func_35a3); } // COLLISION_UNK2
-	// ProcessBlockOnRight / Left: the block beside the one at hl
-	uint8_t block_beside(bool right) { return call_a(right ? ADDR_ProcessBlockOnRight : ADDR_ProcessBlockOnLeft); }
+	// routines): the block function's result. The CPU keeps the rest of the
+	// block function's registers, which some objects read on.
+	uint8_t hpos_block(uint8_t bank, uint16_t wrapper, uint8_t points)
+	{
+		uint8_t r = 0;
+		homecall(bank, wrapper, [&] { r = level::check_block(gb_, points); });
+		return r;
+	}
+	uint8_t hpos_block_unk4() { return hpos_block(BANK_Func_19bc3, ADDR_Func_3513, COLLISION_UNK4); }
+	uint8_t hpos_block_unk1() { return hpos_block(BANK_Func_19b7b, ADDR_Func_352b, COLLISION_UNK1); }
+	uint8_t hpos_block_down() { return hpos_block(BANK_Func_19b51, ADDR_Func_3543, COLLISION_DOWN); }
+	uint8_t hpos_block_unk3() { return hpos_block(BANK_Func_19b9b, ADDR_Func_358b, COLLISION_UNK3); }
+	uint8_t hpos_block_unk2() { return hpos_block(BANK_Func_19b8b, ADDR_Func_35a3, COLLISION_UNK2); }
+	// ProcessBlockOnRight / Left: the block beside the one at wBlockPtr
+	uint8_t block_beside(bool right)
+	{
+		uint8_t r = 0;
+		if (right)
+			homecall(BANK__ProcessBlockOnRight, ADDR_ProcessBlockOnRight, [&] { r = level::check_block_beside(gb_, true); });
+		else
+			homecall(BANK__ProcessBlockOnLeft, ADDR_ProcessBlockOnLeft, [&] { r = level::check_block_beside(gb_, false); });
+		return r;
+	}
 	// The movement tables (bc): the next velocity at var3 (y) or var2 (x),
 	// staying on the last entry, or the _Loop ones starting over
 	// The homecall macro around a plain fn: bank mapped, then the caller's
@@ -200,24 +218,20 @@ protected:
 	}
 	// a new object from its creation data (bc), at the data's offset from
 	// this one, or where this one is
-	void create_object_at_offset(uint16_t params) { call_bc(ADDR_CreateObjectAtRelativePos, params); }
-	void create_object_here(uint16_t params) { call_bc(ADDR_CreateObjectFromCurObjPos, params); }
+	void create_object_at_offset(uint16_t params)
+	{
+		homecall(BANK__CreateObjectAtRelativePos, ADDR_CreateObjectAtRelativePos,
+			[&] { level::create_object_at_relative_pos(gb_, params); });
+	}
+	void create_object_here(uint16_t params)
+	{
+		homecall(BANK__CreateObjectFromCurObjPos, ADDR_CreateObjectFromCurObjPos,
+			[&] { level::create_object_from_cur_obj_pos(gb_, params); });
+	}
 	// DoGroundShake: the ground shakes for `frames` (b), unless it already does
 	void ground_shake(uint8_t frames)
 	{
 		home::do_ground_shake(gb_, frames);
-	}
-	// a home routine that takes bc
-	void call_bc(uint16_t routine, uint16_t bc)
-	{
-		SET_BC(gb_, bc);
-		routines_.call(routine);
-	}
-	// a home routine that returns its result in a
-	uint8_t call_a(uint16_t routine)
-	{
-		routines_.call(routine);
-		return gb_->cpu.a;
 	}
 	// CopyAndApplyOBPals: count OB palettes from src to dest (wTempPals2's)
 	// and applied from OB palette `first`, one per H-Blank

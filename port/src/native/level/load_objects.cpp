@@ -250,6 +250,7 @@ void ObjectLoader::load_group()
 
 void spawn_object(GB *gb, uint8_t index, uint16_t at) { ObjectLoader(gb).spawn(index, at); }
 void create_object_from_cur_obj_pos(GB *gb, uint16_t params) { ObjectLoader(gb).create_from_cur_obj_pos(params); }
+void create_object_at_relative_pos(GB *gb, uint16_t params) { ObjectLoader(gb).create_at_relative_pos(params); }
 
 } // namespace wl3::level
 

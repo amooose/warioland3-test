@@ -48,9 +48,6 @@ public:
 
 private:
 	void unrealistic();
-	// a routine still in C taking a, and its result: a, or the Z flag
-	uint8_t call_a(uint16_t addr, uint8_t a);
-	bool call_z(uint16_t addr, uint8_t a);
 	bool treasure_collected(uint8_t treasure) { return home::is_treasure_collected(gb_, treasure); }
 	void set_compass(); // SetCompassSprite
 	void load_compass(); // LoadCompassSprite
@@ -837,7 +834,6 @@ private:
 	void unrealistic();
 	void wario_state(uint8_t state); // SetSceneWarioState
 	void decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vram1);
-	void load_far(uint16_t routine, uint8_t bank, uint16_t src);
 	void next_state(); // .NextState
 	void step(); // .UpdateScene
 	void leave(); // .exit

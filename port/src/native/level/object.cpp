@@ -3,6 +3,8 @@
 #include "../home/wario.hpp"
 #include "../home/floor_transition.hpp"
 
+#include <cstdlib>
+
 namespace wl3::level {
 
 void Object::set_coll_box(uint8_t top, uint8_t bottom, uint8_t left, uint8_t right)
@@ -54,10 +56,7 @@ void Object::move_wario(uint16_t routine, uint8_t n)
 	case ADDR_MoveWarioLeft: home::move_wario_x(gb_, -n); break;
 	case ADDR_MoveWarioDown: home::move_wario_y(gb_, n); break;
 	case ADDR_MoveWarioUp: home::move_wario_y(gb_, -n); break;
-	default:
-		gb_->cpu.b = n;
-		routines_.call(routine);
-		break;
+	default: std::abort(); // the callers pass only the four above
 	}
 }
 

@@ -59,6 +59,20 @@ scripting and expansion on top. The approach:
   after_halt, wait_vblank_exec) stay for the difftest and for states taken
   mid-frame. The trace check no longer syncs on pc = .GameLoop: its frame
   ends come from loop_cb.
+- **Register glue, step 1: calls by address that pass registers.** The
+  objects' block checks (hpos_block_*, block_beside: collisions.cpp
+  check_block / check_block_beside), their object creation
+  (create_object_at_relative_pos) and the temple scene's loads call plain
+  functions inside the homecall's bank switch; Overworld::call_a / call_z
+  and Object::call_a / call_bc are gone, and move_wario takes only its
+  four routines. Their home wrappers (object_mechanics.cpp's homecalls,
+  Func_3513 and the like) are now reached only by the difftest and
+  fuzzer. Still passing registers in play: the block functions (their
+  result in a; BlockFuncs reads b and hl from the CPU, process_block's
+  default calls by address), the copied V-Blank functions' palette calls
+  (fades.cpp apply_vblank, exact-register hooks reached through
+  wVBlankFunc), and object_mechanics' homejp states. Then step 2: the
+  wrappers nothing reaches in play go under WL3_INTERPRETER.
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`.
 - **Progress (2026-10-31):** 3497 / 3497 routines are ported. While the
   port plays the recordings, the interpreter runs no instructions at all

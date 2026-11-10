@@ -369,6 +369,18 @@ void result(GB *gb, uint8_t b) { gb->cpu.b = b; }
 
 } // namespace
 
+namespace wl3::level {
+
+uint8_t check_block(GB *gb, uint8_t points) { return Collisions(gb).block(points); }
+
+uint8_t check_block_beside(GB *gb, bool right)
+{
+	Collisions(gb).process_adjacent(right);
+	return gb->cpu.b;
+}
+
+} // namespace wl3::level
+
 PORT_EX(Func_19b51, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).block(COLLISION_DOWN); }
 PORT_EX(Func_19b7b, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).block(COLLISION_UNK1); }
 PORT_EX(Func_19b8b, 0, ALL_REGISTERS & ~R_B) { Collisions(gb).block(COLLISION_UNK2); }

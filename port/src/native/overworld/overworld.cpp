@@ -42,20 +42,6 @@ void Overworld::unrealistic()
 		gb_->test.unrealistic = true;
 }
 
-uint8_t Overworld::call_a(uint16_t addr, uint8_t a)
-{
-	gb_->cpu.a = a;
-	routines_.call(addr);
-	return gb_->cpu.a;
-}
-
-bool Overworld::call_z(uint16_t addr, uint8_t a)
-{
-	gb_->cpu.a = a;
-	routines_.call(addr);
-	return gb_->cpu.f & FLAG_Z;
-}
-
 // ---------------------------------------------------------------------------
 // common.asm, state_table.asm, level_select.asm
 

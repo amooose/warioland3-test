@@ -31,13 +31,6 @@ void TempleScene::decompress(uint8_t bank, uint16_t src, uint16_t dest, bool vra
 		mem_[rVBK] = 0;
 }
 
-void TempleScene::load_far(uint16_t routine, uint8_t bank, uint16_t src)
-{
-	SET_HL(gb_, src);
-	gb_->cpu.b = bank;
-	routines_.call(routine);
-}
-
 // _InitTempleScene: the temple, and the hidden figure's words: the next
 // objective's, or with the gold music box (once the game's cleared, in
 // time attack) his reveal
@@ -55,9 +48,9 @@ void TempleScene::init()
 	SceneCommon(gb_).set_vblank();
 	SceneCommon(gb_).clear_scene_ram();
 	SceneCommon(gb_).clear_scene_objs();
-	load_far(ADDR_LoadFarPalsToTempPals1, BANK_Pals_86a4d, ADDR_Pals_86a4d);
+	home::load_far_pals_to_temp_pals1(gb_, BANK_Pals_86a4d, ADDR_Pals_86a4d);
 	decompress(BANK_FontGfx, ADDR_FontGfx, v1Tiles0, true);
-	load_far(ADDR_LoadFarTiles, BANK_TempleGfx, ADDR_TempleGfx);
+	home::load_far_tiles(gb_, BANK_TempleGfx, ADDR_TempleGfx);
 	home::load_far_bg_map(gb_, BANK_TempleTilemap, ADDR_TempleTilemap);
 	mem_[rVBK] = 1;
 	home::load_far_bg_map(gb_, BANK_TempleAttrmap, ADDR_TempleAttrmap);
