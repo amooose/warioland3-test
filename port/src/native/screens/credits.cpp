@@ -55,13 +55,13 @@ void Credits::init()
 	routines_.disable_lcd();
 	home::fill_bg_map0(gb_, 0x7f);
 	routines_.clear_virtual_oam();
-	routines_.load_pals_to_temp_pals1(ADDR_Pals_1604cc);
-	routines_.load_pals_to_temp_pals2(ADDR_Pals_16050c);
+	routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_1604cc));
+	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_16050c));
 	load_gfx();
 	mem_[rVBK] = VRAM1;
-	routines_.decompress(ADDR_CreditsAttrmap, v1BGMap1);
+	routines_.decompress(ROM(gb_, CreditsAttrmap), v1BGMap1);
 	mem_[rVBK] = 0;
-	routines_.decompress(ADDR_CreditsTilemap, v0BGMap1);
+	routines_.decompress(ROM(gb_, CreditsTilemap), v0BGMap1);
 	routines_.copy(VBLANK_CREDITS_FUNC, wVBlankFunc, VBLANK_CREDITS_FUNC_SIZE);
 
 	mem_[rSCX] = 0x04;
@@ -100,8 +100,8 @@ void Credits::load_gfx()
 	routines_.in_bank(BANK_PrologueGfx, ADDR_Decompress, [&] { home::decompress(gb_, ROM(gb_, PrologueGfx), v0Tiles0); });
 	routines_.copy_bc(ADDR_MusicBoxGfx, v1Tiles1, 0x30 * TILE_SIZE, BANK_MusicBoxGfx);
 	mem_[rVBK] = 0;
-	routines_.decompress(ADDR_CreditsFontGfx, v0Tiles0);
-	routines_.decompress(ADDR_CreditsMusicBoxGfx, v0Tiles0);
+	routines_.decompress(ROM(gb_, CreditsFontGfx), v0Tiles0);
+	routines_.decompress(ROM(gb_, CreditsMusicBoxGfx), v0Tiles0);
 }
 
 // the music box at (y, x), its frameset and OAM data
@@ -242,8 +242,8 @@ void Credits::close_up()
 	Byte timer = wram_.timer();
 	if (!--timer) {
 		set_music_box(0x50, 0x50, ADDR_Frameset_15e7ed, ADDR_OAM_15e44a, BANK_OAM_15e44a);
-		routines_.load_pals_to_temp_pals1(ADDR_Pals_16054c);
-		routines_.load_pals_to_temp_pals2(ADDR_Pals_16058c);
+		routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_16054c));
+		routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_16058c));
 		wram_.unk_cee4() = 0x2 | (1 << 7);
 		++wram_.sub_state();
 		animate_music_box();
@@ -260,8 +260,8 @@ void Credits::music_box_stops()
 	animate_music_box();
 	draw_music_box();
 	routines_.clear_unused_virtual_oam();
-	routines_.load_pals_to_temp_pals1(ADDR_Pals_1605cc);
-	routines_.load_pals_to_temp_pals2(ADDR_Pals_16060c);
+	routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_1605cc));
+	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_16060c));
 	++wram_.sub_state();
 }
 

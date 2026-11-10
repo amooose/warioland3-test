@@ -11,6 +11,7 @@ namespace wl3::home {
 // CopyHLToDE_Short: count bytes (0 is 256), stepping only the destination's
 // low byte (it stays in its page); returns the last byte
 uint8_t copy_short(GB *gb, uint16_t src, uint16_t dest, int count);
+uint8_t copy_short(GB *gb, RomPtr src, uint16_t dest, int count); // from ROM by bank
 
 // 8 palettes from src to the palette data register, from palette 0
 // (LoadBG/OBPalettesFromWRAM, FillWhiteBG/OBPal, ApplyTempPals1ToBGPals,
@@ -25,6 +26,10 @@ uint8_t store_ob_pals(GB *gb, uint16_t dest);
 void load_pals_to_temp_pals1(GB *gb, uint16_t pals); // LoadPalsToTempPals1
 void load_pals_to_temp_pals2(GB *gb, uint16_t pals); // LoadPalsToTempPals2
 void load_obj_pals(GB *gb, uint16_t pals); // LoadObjPals: 4, to OB palettes 4-7
+// the same, from ROM by bank
+void load_pals_to_temp_pals1(GB *gb, RomPtr pals);
+void load_pals_to_temp_pals2(GB *gb, RomPtr pals);
+void load_obj_pals(GB *gb, RomPtr pals);
 
 // Wario's palettes (in the "Wario Palettes" bank) to wTempPals2 and the
 // first two OB palettes, a palette per H-Blank

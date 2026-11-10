@@ -131,20 +131,20 @@ void RoomLoader::update_animated_pals()
 
 	uint8_t rom = mem_.rom_bank();
 	switch_bank(BANK_RoomPalCycles);
-	uint8_t pal = mem_[static_cast<uint16_t>(cycle + index)];
-	uint16_t pals = Word(gb_, static_cast<uint16_t>(ADDR_RoomPals + pal * 2));
+	uint8_t pal = RomPtr(gb_, BANK_RoomPalCycles, static_cast<uint16_t>(cycle + index))[0];
+	RomPtr pals(gb_, LEVEL_PALETTES, RomPtr(gb_, BANK_RoomPalCycles, static_cast<uint16_t>(ADDR_RoomPals + pal * 2)).word());
 	switch_bank(rom);
 
 	switch_bank(LEVEL_PALETTES);
 	mem_[rBGPI] = BGPI_AUTOINC | 0;
 	for (int i = 0; i < 5; i++) {
 		wait_next_hblank();
-		for (int j = 0; j < 12; j++)
-			mem_[rBGPD] = mem_[pals++];
+		for (int j = 0; j < 12; j++, ++pals)
+			mem_[rBGPD] = *pals;
 	}
 	wait_next_hblank();
-	for (int j = 0; j < 4; j++)
-		mem_[rBGPD] = mem_[pals++];
+	for (int j = 0; j < 4; j++, ++pals)
+		mem_[rBGPD] = *pals;
 	switch_bank(rom);
 }
 
@@ -156,7 +156,7 @@ void RoomLoader::load_block_function_table()
 	uint16_t at = static_cast<uint16_t>(ADDR_BlockFunctionTablePointers + offset);
 	uint8_t rom = mem_.rom_bank();
 	switch_bank(BANK_BlockFunctionTablePointers);
-	uint16_t src = Word(gb_, at);
+	uint16_t src = RomPtr(gb_, BANK_BlockFunctionTablePointers, at).word();
 	if (src >> 8 == 0xff) { // .reset; push af saved add a / add hl, de's flags
 		uint8_t f = static_cast<uint8_t>((offset ? 0 : FLAG_Z)
 			| ((ADDR_BlockFunctionTablePointers & 0xfff) + offset > 0xfff ? FLAG_H : 0)
@@ -167,7 +167,8 @@ void RoomLoader::load_block_function_table()
 	bool group_2 = table >= NUM_BLOCK_FUNCTION_TABLES_GROUP_1 - 1;
 	if (group_2)
 		switch_bank(BANK_BLOCK_FUNCTION_TABLES_2);
-	copy(gb_, src, wBlockFunctionTable, 0x100);
+	copy(gb_, RomPtr(gb_, group_2 ? BANK_BLOCK_FUNCTION_TABLES_2 : BANK_BlockFunctionTablePointers, src),
+		wBlockFunctionTable, 0x100);
 	if (group_2)
 		switch_bank(BANK_BlockFunctionTablePointers);
 	switch_bank(rom);
@@ -183,7 +184,7 @@ void RoomLoader::load()
 	uint8_t rom = mem_.rom_bank();
 	switch_bank(BANK_LevelHeaders);
 	uint8_t level = mem_.level();
-	uint16_t rooms = Word(gb_, static_cast<uint16_t>(ADDR_LevelHeaders + level * 2));
+	uint16_t rooms = RomPtr(gb_, BANK_LevelHeaders, static_cast<uint16_t>(ADDR_LevelHeaders + level * 2)).word();
 	if (rooms >> 8 == 0xff) {
 		reset(rom, 0); // the flags of add $58
 		return;
@@ -192,32 +193,34 @@ void RoomLoader::load()
 
 	level = mem_.level();
 	rom = mem_.rom_bank();
-	switch_bank(level < THE_GRASSLANDS_NIGHT_1 ? 0x30 : 0x31);
-	uint16_t header = Word(gb_, static_cast<uint16_t>(rooms + static_cast<uint8_t>(mem_.level_room_id() * 2)));
-	if (header >> 8 == 0xff) {
+	uint8_t headers = level < THE_GRASSLANDS_NIGHT_1 ? 0x30 : 0x31;
+	switch_bank(headers);
+	uint16_t header_at = RomPtr(gb_, headers, static_cast<uint16_t>(rooms + static_cast<uint8_t>(mem_.level_room_id() * 2))).word();
+	RomPtr header(gb_, headers, header_at);
+	if (header_at >> 8 == 0xff) {
 		reset(rom, flags::cp(level, THE_GRASSLANDS_NIGHT_1));
 		return;
 	}
-	mem_.wario_spawn_pos() = mem_[header + 0];
-	uint8_t y_limits = mem_[header + 1];
+	mem_.wario_spawn_pos() = header[0];
+	uint8_t y_limits = header[1];
 	mem_.room_upper_y_limit() = y_limits >> 4;
 	mem_.room_lower_y_limit() = y_limits & 0x0f;
-	uint8_t x_limits = mem_[header + 2];
+	uint8_t x_limits = header[2];
 	mem_.room_left_x_limit() = x_limits >> 4;
 	mem_.room_right_x_limit() = x_limits & 0x0f;
-	mem_.camera_config_flags() = mem_[header + 3];
+	mem_.camera_config_flags() = header[3];
 
-	mem_.object_group() = mem_[header + 4];
+	mem_.object_group() = header[4];
 	uint8_t wbk = mem_[rWBK]; // push_wram
 	mem_[rWBK] = LEVEL_OBJECTS_WRAM;
 	routines_.farcall(BANK_LoadObjectGroupData, ADDR_LoadObjectGroupData);
 	mem_[rWBK] = wbk; // pop_wram
 
-	mem_.animated_tiles_group() = mem_[header + 5];
+	mem_.animated_tiles_group() = header[5];
 	routines_.farcall(BANK_InitRoomAnimatedTiles, ADDR_InitRoomAnimatedTiles);
-	mem_.room_pal_cycle() = mem_[header + 6];
+	mem_.room_pal_cycle() = header[6];
 	routines_.farcall(BANK_InitRoomAnimatedPals, ADDR_InitRoomAnimatedPals);
-	mem_.room() = mem_[header + 7];
+	mem_.room() = header[7];
 	routines_.farcall(BANK_LoadRoomGfx, ADDR_LoadRoomGfx);
 	switch_bank(rom);
 

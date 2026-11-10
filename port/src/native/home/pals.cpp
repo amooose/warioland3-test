@@ -81,6 +81,20 @@ uint8_t copy_short(GB *gb, uint16_t src, uint16_t dest, int count)
 	return last;
 }
 
+uint8_t copy_short(GB *gb, RomPtr src, uint16_t dest, int count)
+{
+	Memory mem(gb);
+	if (!count)
+		count = 256;
+	uint8_t page = dest >> 8, low = static_cast<uint8_t>(dest);
+	uint8_t last = 0;
+	while (count--) {
+		mem[static_cast<uint16_t>(page << 8 | low++)] = last = *src;
+		++src;
+	}
+	return last;
+}
+
 uint8_t apply_bg_pals(GB *gb, uint16_t src)
 {
 	return apply_pals(gb, src, rBGPI, BGPI_AUTOINC | 0, rBGPD);
@@ -112,6 +126,21 @@ void load_pals_to_temp_pals2(GB *gb, uint16_t pals)
 }
 
 void load_obj_pals(GB *gb, uint16_t pals)
+{
+	copy_short(gb, pals, wTempPals2 + 4 * PAL_SIZE, 4 * PAL_SIZE);
+}
+
+void load_pals_to_temp_pals1(GB *gb, RomPtr pals)
+{
+	copy_short(gb, pals, wTempPals1, PALS_SIZE);
+}
+
+void load_pals_to_temp_pals2(GB *gb, RomPtr pals)
+{
+	copy_short(gb, pals, wTempPals2, PALS_SIZE);
+}
+
+void load_obj_pals(GB *gb, RomPtr pals)
 {
 	copy_short(gb, pals, wTempPals2 + 4 * PAL_SIZE, 4 * PAL_SIZE);
 }

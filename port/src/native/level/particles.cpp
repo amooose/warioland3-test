@@ -165,8 +165,9 @@ uint16_t Particles::update_animation(uint16_t at, uint16_t frameset)
 	if (duration) // .no_new_frame
 		return static_cast<uint16_t>(at + 2);
 
-	uint16_t entry = static_cast<uint16_t>(frameset + mem_[static_cast<uint16_t>(at + 1)]);
-	uint8_t frame = mem_[entry];
+	// the particles' framesets, in their bank
+	RomPtr entry = RomPtr(gb_, BANK_UpdateParticles, frameset) + mem_[static_cast<uint16_t>(at + 1)];
+	uint8_t frame = *entry;
 	if (frame == 0xff) { // .reset_anim
 		mem_[static_cast<uint16_t>(at + 1)] = 0; // frameset offset
 		mem_[at] = 0; // duration
@@ -176,7 +177,7 @@ uint16_t Particles::update_animation(uint16_t at, uint16_t frameset)
 	mem_[static_cast<uint16_t>(at + 2)] = frame;
 	// the offset is read again after the frame's written (they can alias)
 	mem_[static_cast<uint16_t>(at + 1)] = static_cast<uint8_t>(mem_[static_cast<uint16_t>(at + 1)] + 2);
-	mem_[at] = mem_[static_cast<uint16_t>(entry + 1)]; // duration
+	mem_[at] = entry[1]; // duration
 	return static_cast<uint16_t>(at + 2);
 }
 
@@ -232,7 +233,7 @@ void Particles::load_sprite(uint16_t oam)
 	mem_.cur_sprite_x_coord() = static_cast<uint8_t>(mem_.cur_particle_x_coord() + OAM_X_OFS - mem_[scx]);
 	mem_.cur_sprite_frame() = mem_.cur_particle_frame();
 	mem_.cur_sprite_attributes() = mem_.cur_particle_attributes();
-	home::load_sprite(gb_, oam);
+	home::load_sprite(gb_, RomPtr(gb_, BANK_UpdateParticles, oam)); // the particles' OAM data, in their bank
 }
 
 constexpr ParticleFunc DEBRIS{Pre::ALWAYS, Init::IN_PLACE, ADDR_ParticleAnim_Debris, End::ANIM, SFX_BLOCK_BREAK};

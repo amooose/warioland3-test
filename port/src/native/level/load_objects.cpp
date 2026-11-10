@@ -34,7 +34,7 @@ private:
 	uint16_t slot(int n) const { return static_cast<uint16_t>(wObj1 + n * OBJ_STRUCT_LENGTH); }
 	int free_slot();
 	uint8_t relative(uint16_t pos, uint8_t offset, uint16_t &at);
-	uint16_t load_data_pointers(uint16_t from, uint8_t count);
+	RomPtr load_data_pointers(RomPtr from, uint8_t count);
 
 	GB *gb_;
 	Memory mem_;
@@ -185,14 +185,16 @@ void ObjectLoader::despawn_all()
 
 // wObjDataPtr01 on: up to count of the pointers at from, until a $ffxx
 // one (hffa0 counts down); returns where the reading stopped
-uint16_t ObjectLoader::load_data_pointers(uint16_t from, uint8_t count)
+RomPtr ObjectLoader::load_data_pointers(RomPtr from, uint8_t count)
 {
 	mem_.unk_ffa0() = count;
 	uint8_t dest = static_cast<uint8_t>(wObjDataPtr01); // inc e: within the page
-	uint16_t src = from;
+	RomPtr src = from;
 	for (;;) {
-		uint8_t lo = mem_[src++];
-		uint8_t hi = mem_[src++];
+		uint8_t lo = *src;
+		++src;
+		uint8_t hi = *src;
+		++src;
 		if (hi == 0xff)
 			break;
 		mem_[static_cast<uint16_t>((wObjDataPtr01 & 0xff00) | dest++)] = lo;
@@ -206,7 +208,7 @@ uint16_t ObjectLoader::load_data_pointers(uint16_t from, uint8_t count)
 // the Hidden Figure's room: its object data alone
 void ObjectLoader::load_hidden_figure_data()
 {
-	load_data_pointers(HIDDEN_FIGURE_POINTERS, 0x0d);
+	load_data_pointers(RomPtr(gb_, BANK_LoadHiddenFigureData, HIDDEN_FIGURE_POINTERS), 0x0d);
 }
 
 // the room's object group: the object data pointers (the dummy object in
@@ -223,24 +225,24 @@ void ObjectLoader::load_group()
 		return;
 	}
 
-	uint16_t entry = static_cast<uint16_t>(ADDR_ObjectGroups + group * 4);
-	uint16_t items = Word(gb_, entry);
+	RomPtr entry = ROM(gb_, ObjectGroups) + group * 4;
+	RomPtr items = entry.with_addr(entry.word());
 	for (int i = 0; i < 6; i++) // chest, key and musical coin
-		mem_[wChestObjDataPtr + i] = mem_[items + i];
-	home::copy_short(gb_, static_cast<uint16_t>(items + 6), wTempPals2 + 3 * PAL_SIZE, PAL_SIZE);
+		mem_[wChestObjDataPtr + i] = items[i];
+	home::copy_short(gb_, items + 6, wTempPals2 + 3 * PAL_SIZE, PAL_SIZE);
 
-	uint16_t enemies = Word(gb_, entry + 2);
+	RomPtr enemies = entry.with_addr(entry.word(2));
 	mem_[rVBK] = VRAM1;
-	mem_.unk_ffa0() = mem_[enemies];
+	mem_.unk_ffa0() = *enemies;
 	static constexpr uint16_t dest[4] = {
 		v1Tiles0, v1Tiles0 + 0x40 * TILE_SIZE, v1Tiles1, v1Tiles1 + 0x40 * TILE_SIZE,
 	};
-	uint16_t ptrs = enemies + 1;
+	RomPtr ptrs = enemies + 1;
 	for (int i = 0; i < 4; i++) {
-		uint16_t src = Word(gb_, ptrs);
+		uint16_t src = ptrs.word();
 		ptrs += 2;
 		uint8_t bank = static_cast<uint8_t>(mem_.unk_ffa0() + ENEMY_GFX_1_SLOT_1 + i);
-		routines_.in_bank(bank, ADDR_Decompress, [&] { routines_.decompress(src, dest[i]); }); // hcall Decompress
+		routines_.in_bank(bank, ADDR_Decompress, [&] { routines_.decompress(RomPtr(gb_, bank, src), dest[i]); }); // hcall Decompress
 	}
 	mem_[rVBK] = 0; // VRAM0
 	home::load_obj_pals(gb_, load_data_pointers(ptrs, 13));

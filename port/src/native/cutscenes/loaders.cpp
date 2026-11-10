@@ -279,7 +279,7 @@ void set_bg_priority_on_block(GB *gb)
 // its .Func (0x51 bytes) to wVBlankFunc
 void set_vblank_cutscene(GB *gb)
 {
-	home::copy(gb, ADDR_VBlank_Cutscene + 0x0c, wVBlankFunc, 0x51);
+	home::copy(gb, ROM(gb, VBlank_Cutscene) + 0x0c, wVBlankFunc, 0x51);
 }
 
 void load_cutscene_bg_maps(GB *gb, int cutscene)

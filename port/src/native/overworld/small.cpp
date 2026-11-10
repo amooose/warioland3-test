@@ -115,7 +115,7 @@ void init_cutscene(GB *gb)
 	home::clear_virtual_oam(gb);
 	stop_music2(mem);
 	home::fill(gb, wLCDCFlagsToFlip, 0, 0x30);
-	home::copy(gb, ADDR_VBlank_Cutscene + 0x0c, wVBlankFunc, 0x51); // VBlank_Cutscene
+	home::copy(gb, ROM(gb, VBlank_Cutscene) + 0x0c, wVBlankFunc, 0x51); // VBlank_Cutscene
 	cutscenes::Cutscenes(gb).init(); // InitEventCutscene
 	mem[rSCY] = 0;
 	mem.scy() = 0;

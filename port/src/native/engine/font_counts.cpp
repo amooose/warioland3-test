@@ -8,32 +8,32 @@ namespace wl3::engine {
 
 void load_font_tiles(GB *gb)
 {
-	home::decompress(gb, ADDR_FontGfx, v0Tiles0);
+	home::decompress(gb, ROM(gb, FontGfx), v0Tiles0);
 }
 
 void load_font_pals(GB *gb)
 {
-	home::load_pals_to_temp_pals1(gb, ADDR_Pals_1f3610);
-	home::load_pals_to_temp_pals2(gb, ADDR_Pals_1f3610);
+	home::load_pals_to_temp_pals1(gb, ROM(gb, Pals_1f3610));
+	home::load_pals_to_temp_pals2(gb, ROM(gb, Pals_1f3610));
 }
 
 void load_language_selection_text(GB *gb)
 {
 	Memory mem(gb);
 	mem[rVBK] = BANK_v1BGMap0; // BANK("VRAM1")
-	home::decompress(gb, ADDR_LanguageSelection2TextMap, v1BGMap0);
+	home::decompress(gb, ROM(gb, LanguageSelection2TextMap), v1BGMap0);
 	mem[rVBK] = 0;
-	home::decompress(gb, ADDR_LanguageSelection1TextMap, v0BGMap0);
+	home::decompress(gb, ROM(gb, LanguageSelection1TextMap), v0BGMap0);
 }
 
 void load_gb_incompatible_screen_gfx(GB *gb)
 {
-	home::decompress(gb, ADDR_GBIncompatibleGfx, v0Tiles0);
+	home::decompress(gb, ROM(gb, GBIncompatibleGfx), v0Tiles0);
 }
 
 void load_gb_incompatible_screen_map(GB *gb)
 {
-	home::decompress(gb, ADDR_GBIncompatibleTilemap, v0BGMap0);
+	home::decompress(gb, ROM(gb, GBIncompatibleTilemap), v0BGMap0);
 	Memory(gb).byte(rBGP) = 0xe4; // %11100100
 }
 

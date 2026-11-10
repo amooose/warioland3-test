@@ -204,15 +204,15 @@ void SaveScreen::show_complete_box()
 
 void SaveScreen::load_pals() // LoadSaveScreenPals
 {
-	routines_.load_pals_to_temp_pals1(ADDR_Pals_1f628c);
-	routines_.load_pals_to_temp_pals2(ADDR_Pals_1f628c);
+	routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_1f628c));
+	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_1f628c));
 }
 
 void SaveScreen::load_gfx() // LoadSaveScreenGfx
 {
 	mem_[rVBK] = 0;
 	// an hcall, though SaveBoxGfx is in this bank
-	routines_.in_bank(BANK_SaveBoxGfx, ADDR_Decompress, [&] { routines_.decompress(ADDR_SaveBoxGfx, v0Tiles0); });
+	routines_.in_bank(BANK_SaveBoxGfx, ADDR_Decompress, [&] { routines_.decompress(ROM(gb_, SaveBoxGfx), v0Tiles0); });
 	mem_.temp_bank() = BANK_WarioSleepGfx;
 	routines_.far_copy(ADDR_WarioSleepGfx, v0Tiles0, 0x800); // FarCopyHLToDE_BC
 }

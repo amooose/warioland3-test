@@ -106,8 +106,8 @@ void PauseMenu::init_menu()
 	home::fill_bg_map0(gb_, 0xff);
 	routines_.clear_virtual_oam();
 	routines_.in_bank(BANK_LoadPauseMenuPals, ADDR_LoadPauseMenuPals, [&] {
-		routines_.load_pals_to_temp_pals1(ADDR_Pals_1f4182);
-		routines_.load_pals_to_temp_pals2(ADDR_Pals_1f41c2);
+		routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_1f4182));
+		routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_1f41c2));
 	});
 	routines_.in_bank(BANK_LoadPauseMenuGfx, ADDR_LoadPauseMenuGfx, [&] { load_gfx(); });
 	routines_.in_bank(BANK_Func_1f403f, ADDR_Func_1f403f, [&] { draw_maps(); });
@@ -330,7 +330,7 @@ void PauseMenu::handle_input()
 
 void PauseMenu::load_gfx()
 {
-	routines_.decompress(ADDR_PauseMenuGfx, v0Tiles0);
+	routines_.decompress(ROM(gb_, PauseMenuGfx), v0Tiles0);
 	uint16_t gfx = transformation_frameset(ADDR_ActionHelpOwlGfx, ADDR_ActionHelpRailGfx,
 		ADDR_ActionHelpVampireGfx, 0);
 	if (gfx)

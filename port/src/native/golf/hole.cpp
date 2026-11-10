@@ -62,7 +62,7 @@ void GolfHole::init()
 
 	uint16_t pals = mem_.word(static_cast<uint16_t>(COURSE_PALS + static_cast<uint8_t>(wram_.golf_menu_option() * 2)));
 	routines_.load_pals_to_temp_pals1(pals);
-	routines_.load_pals_to_temp_pals2(ADDR_Pals_1ca18f);
+	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_1ca18f));
 
 	ram(rVBK) = VRAM1;
 	routines_.far_decompress(BANK_GolfGfx, ADDR_GolfFlagGfx, v1Tiles0);

@@ -24,7 +24,7 @@ public:
 	// called by register-level code too (cutscene/init.cpp)
 	void port_VBlank_Cutscene()
 	{
-		home::copy(gb_, ADDR_VBlank_Cutscene + 0x0c, wVBlankFunc, 0x51); // .Func, .end - .Func
+		home::copy(gb_, ROM(gb_, VBlank_Cutscene) + 0x0c, wVBlankFunc, 0x51); // .Func, .end - .Func
 	}
 
 	// VBlank_Cutscene.Func, as copied to wVBlankFunc (see ram_code.c): the

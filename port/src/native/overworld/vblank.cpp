@@ -9,12 +9,12 @@ namespace wl3::overworld {
 
 void set_vblank_overworld(GB *gb)
 {
-	home::copy(gb, ADDR_VBlank_Overworld + 0x0c, wVBlankFunc, ADDR_VBlank_OWScene - (ADDR_VBlank_Overworld + 0x0c));
+	home::copy(gb, ROM(gb, VBlank_Overworld) + 0x0c, wVBlankFunc, ADDR_VBlank_OWScene - (ADDR_VBlank_Overworld + 0x0c));
 }
 
 void set_vblank_ow_scene(GB *gb)
 {
-	home::copy(gb, ADDR_VBlank_OWScene + 0x0c, wVBlankFunc,
+	home::copy(gb, ROM(gb, VBlank_OWScene) + 0x0c, wVBlankFunc,
 		ADDR_UnreferencedOpenTreasureCollection - (ADDR_VBlank_OWScene + 0x0c));
 }
 

@@ -114,7 +114,7 @@ void LevelState::init()
 // the levels' common tiles to v0Tiles1, and the treasures
 void LevelState::load_common_gfx()
 {
-	home::copy(gb_, ADDR_LevelsCommonGfx, v0Tiles1, ADDR_LevelsCommonGfxEnd - ADDR_LevelsCommonGfx ? ADDR_LevelsCommonGfxEnd - ADDR_LevelsCommonGfx : 0x10000);
+	home::copy(gb_, ROM(gb_, LevelsCommonGfx), v0Tiles1, ADDR_LevelsCommonGfxEnd - ADDR_LevelsCommonGfx ? ADDR_LevelsCommonGfxEnd - ADDR_LevelsCommonGfx : 0x10000);
 	routines_.farcall(BANK_LoadLevelTreasureData, ADDR_LoadLevelTreasureData);
 }
 
@@ -289,7 +289,7 @@ PORT(SetTileQueueProcessingFunctions) { wl3::level::set_tile_queue_processing_fu
 // registers
 PORT_EX(VBlank_Level, 0, ALL_REGISTERS)
 {
-	wl3::home::copy(gb, ADDR_VBlank_Level + 0x0c, wVBlankFunc, 0x03); // .Func, .end - .Func
+	wl3::home::copy(gb, ROM(gb, VBlank_Level) + 0x0c, wVBlankFunc, 0x03); // .Func, .end - .Func
 }
 
 // The routines implemented inside this module (they have no hooks).

@@ -64,16 +64,16 @@ void update_object_animation(GB *gb)
 		return;
 	uint8_t bank = mem.rom_bank();
 	bankswitch(gb, BANK_Frameset_68000, ADDR_UpdateObjectAnimation);
-	uint16_t frameset = mem.word(wCurObjFramesetPtr);
-	auto entry = static_cast<uint16_t>(frameset + mem.cur_obj_frameset_offset());
-	if (mem[entry] != 0xff) {
-		mem.cur_obj_frame() = mem[entry];
+	RomPtr frameset(gb, BANK_Frameset_68000, mem.word(wCurObjFramesetPtr));
+	RomPtr entry = frameset + mem.cur_obj_frameset_offset();
+	if (*entry != 0xff) {
+		mem.cur_obj_frame() = *entry;
 		mem.cur_obj_frameset_offset() = static_cast<uint8_t>(mem.cur_obj_frameset_offset() + 2);
-		mem.cur_obj_frame_duration() = mem[static_cast<uint16_t>(entry + 1)];
+		mem.cur_obj_frame_duration() = entry[1];
 	} else { // .reset
 		mem.cur_obj_frameset_offset() = 2;
-		mem.cur_obj_frame() = mem[frameset];
-		mem.cur_obj_frame_duration() = mem[static_cast<uint16_t>(frameset + 1)];
+		mem.cur_obj_frame() = frameset[0];
+		mem.cur_obj_frame_duration() = frameset[1];
 	}
 	bankswitch(gb, bank, ADDR_HomeJumpRet);
 }
@@ -85,9 +85,9 @@ void update_object_frame(GB *gb)
 		return;
 	uint8_t bank = mem.rom_bank();
 	bankswitch(gb, BANK_Frameset_68000, ADDR_UpdateObjectFrame);
-	uint16_t frameset = mem.word(wCurObjFramesetPtr);
-	uint8_t frame = mem[static_cast<uint16_t>(frameset + mem.cur_obj_frameset_offset())];
-	mem.cur_obj_frame() = frame == 0xff ? mem[frameset] : frame;
+	RomPtr frameset(gb, BANK_Frameset_68000, mem.word(wCurObjFramesetPtr));
+	uint8_t frame = frameset[mem.cur_obj_frameset_offset()];
+	mem.cur_obj_frame() = frame == 0xff ? frameset[0] : frame;
 	bankswitch(gb, bank, ADDR_HomeJumpRet);
 }
 

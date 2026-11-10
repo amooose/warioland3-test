@@ -140,7 +140,7 @@ bool Palettes::fade_in_level_name()
 		mem_.unk_2d0e0() = 0x02;
 		routines_.copy(wTempPals1 + 7 * PAL_SIZE, wTempBGPals + 7 * PAL_SIZE, PAL_SIZE);
 		if (mem_.unk_2d0e4())
-			routines_.copy(ADDR_Pals_852dd + COLOR_SIZE, wTempPals1 + 7 * PAL_SIZE + COLOR_SIZE, 6);
+			routines_.copy(ROM(gb_, Pals_852dd) + COLOR_SIZE, wTempPals1 + 7 * PAL_SIZE + COLOR_SIZE, 6);
 		else
 			routines_.copy((mem_.unk_2d011() ? ADDR_Pals_840c0 : ADDR_Pals_84000) + 7 * PAL_SIZE,
 				wTempPals1 + 7 * PAL_SIZE, PAL_SIZE);
@@ -297,7 +297,7 @@ void Palettes::func_8518c()
 // LoadOWStarIndicatorPals
 void Palettes::star_indicator_pals()
 {
-	routines_.copy(ADDR_Pals_848e0, wTempPals2 + 4 * PAL_SIZE, 2 * PAL_SIZE);
+	routines_.copy(ROM(gb_, Pals_848e0), wTempPals2 + 4 * PAL_SIZE, 2 * PAL_SIZE);
 	config(wPalConfig1, wTempPals2 + 4 * PAL_SIZE, OBPI_AUTOINC | (4 * PAL_SIZE), 2);
 	mem_.pal_config1_register() = static_cast<uint8_t>(rOBPI);
 }
@@ -418,7 +418,7 @@ void Palettes::load_base_and_target(uint8_t which)
 void Palettes::transition_vblank()
 {
 	gb_->cpu.ime = false; // di
-	routines_.copy(ADDR_VBlank_OWPalTransition + 0xc, wVBlankFunc, 0x63 - 0xc);
+	routines_.copy(ROM(gb_, VBlank_OWPalTransition) + 0xc, wVBlankFunc, 0x63 - 0xc);
 	gb_->cpu.ime = true; // ei
 	gb_->cpu.ime_delay = 0;
 }
@@ -691,16 +691,16 @@ void Palettes::prologue_fade()
 		break;
 	case 1: case 6: // .one / .six
 		from_current();
-		routines_.copy(ADDR_Pals_869cd, wTempPals1, 8 * PAL_SIZE);
-		routines_.copy(ADDR_Pals_86a8d, wTempPals2, 8 * PAL_SIZE);
+		routines_.copy(ROM(gb_, Pals_869cd), wTempPals1, 8 * PAL_SIZE);
+		routines_.copy(ROM(gb_, Pals_86a8d), wTempPals2, 8 * PAL_SIZE);
 		if (mem_.unk_2d880() == 6)
-			routines_.copy(ADDR_Pals_86acd, wTempPals2, PAL_SIZE);
+			routines_.copy(ROM(gb_, Pals_86acd), wTempPals2, PAL_SIZE);
 		break;
 	case 2: // .two
 		from_current();
-		routines_.copy(ADDR_Pals_86a4d, wTempPals1, 8 * PAL_SIZE);
-		routines_.copy(ADDR_Pals_86a8d, wTempPals2, 8 * PAL_SIZE);
-		routines_.copy(ADDR_Pals_86ad5, wTempPals2, PAL_SIZE);
+		routines_.copy(ROM(gb_, Pals_86a4d), wTempPals1, 8 * PAL_SIZE);
+		routines_.copy(ROM(gb_, Pals_86a8d), wTempPals2, 8 * PAL_SIZE);
+		routines_.copy(ROM(gb_, Pals_86ad5), wTempPals2, PAL_SIZE);
 		break;
 	case 3: // .three
 		from_current();
@@ -714,9 +714,9 @@ void Palettes::prologue_fade()
 		break;
 	case 5: // .five
 		from_current();
-		routines_.copy(ADDR_Pals_86a4d + 6 * PAL_SIZE, wTempPals1 + 6 * PAL_SIZE, 2 * PAL_SIZE);
-		routines_.copy(ADDR_Pals_86a8d, wTempPals2, 8 * PAL_SIZE);
-		routines_.copy(ADDR_Pals_86ad5, wTempPals2, PAL_SIZE);
+		routines_.copy(ROM(gb_, Pals_86a4d) + 6 * PAL_SIZE, wTempPals1 + 6 * PAL_SIZE, 2 * PAL_SIZE);
+		routines_.copy(ROM(gb_, Pals_86a8d), wTempPals2, 8 * PAL_SIZE);
+		routines_.copy(ROM(gb_, Pals_86ad5), wTempPals2, PAL_SIZE);
 		break;
 	default: // straight to the configs
 		break;

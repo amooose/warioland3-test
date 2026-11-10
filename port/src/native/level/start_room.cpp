@@ -661,7 +661,7 @@ void RoomStart::from_level_start()
 		routines_.farcall(BANK_SetState_Idling, ADDR_SetState_Idling);
 		set_be(wWarioPalsPtr, ADDR_WarioDefaultPal);
 		// CopyHLToDE_Short takes hl, de and b
-		routines_.in_bank(BANK_WarioDefaultPal, ADDR_CopyHLToDE_Short, [&] { home::copy_short(gb_, ADDR_WarioDefaultPal, wTempPals2, 2 * PAL_SIZE); });
+		routines_.in_bank(BANK_WarioDefaultPal, ADDR_CopyHLToDE_Short, [&] { home::copy_short(gb_, ROM(gb_, WarioDefaultPal), wTempPals2, 2 * PAL_SIZE); });
 	} else {
 		// .asm_883a
 		routines_.in_bank(BANK_WarioDefaultPal, ADDR_CopyHLToDE_Short, [&] { home::copy_short(gb_, be(wWarioPalsPtr), wTempPals2, 2 * PAL_SIZE); });
@@ -670,7 +670,7 @@ void RoomStart::from_level_start()
 	}
 
 	// .asm_8861
-	routines_.in_bank(BANK_Pals_d1fe, ADDR_CopyHLToDE_Short, [&] { home::copy_short(gb_, ADDR_Pals_d1fe, wTempPals2 + 2 * PAL_SIZE, 1 * PAL_SIZE); });
+	routines_.in_bank(BANK_Pals_d1fe, ADDR_CopyHLToDE_Short, [&] { home::copy_short(gb_, ROM(gb_, Pals_d1fe), wTempPals2 + 2 * PAL_SIZE, 1 * PAL_SIZE); });
 
 	routines_.call(ADDR_SetInitialCameraScroll);
 	routines_.call(ADDR_ApplyInitialCameraScroll);

@@ -130,31 +130,31 @@ bool GameOver::update_sprites(uint8_t bank, bool snore)
 
 void GameOver::load_pals()
 {
-	routines_.load_pals_to_temp_pals1(ADDR_Pals_db509);
-	routines_.load_pals_to_temp_pals2(ADDR_Pals_db549);
-	routines_.copy_short(ADDR_Pals_86ad5, wTempPals2, 1 * 8, BANK_Pals_86ad5);
+	routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_db509));
+	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_db549));
+	routines_.copy_short(ROM(gb_, Pals_86ad5), wTempPals2, 1 * 8, BANK_Pals_86ad5);
 }
 
 void GameOver::load_gfx()
 {
 	ram(rVBK) = 0;
-	routines_.decompress(ADDR_GameOverGfx, v0Tiles0);
+	routines_.decompress(ROM(gb_, GameOverGfx), v0Tiles0);
 	routines_.copy_bc(ADDR_WarioSleepGfx, v0Tiles0, 0x80 * TILE_SIZE, BANK_WarioSleepGfx);
 }
 
 void GameOver::load_tilemap()
 {
 	ram(rVBK) = VRAM1;
-	routines_.decompress(ADDR_GameOverAttrmap, v0BGMap0);
+	routines_.decompress(ROM(gb_, GameOverAttrmap), v0BGMap0);
 	ram(rVBK) = 0;
-	routines_.decompress(ADDR_GameOverTilemap, v0BGMap0);
+	routines_.decompress(ROM(gb_, GameOverTilemap), v0BGMap0);
 }
 
 // The hidden figure behind the final battle.
 void GameOver::load_hidden_figure_gfx()
 {
-	routines_.load_pals_to_temp_pals1(ADDR_Pals_db000);
-	routines_.copy_short(ADDR_Pals_db040, wTempPals2 + 3 * 8, 5 * 8);
+	routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_db000));
+	routines_.copy_short(ROM(gb_, Pals_db040), wTempPals2 + 3 * 8, 5 * 8);
 
 	ram(rVBK) = VRAM1;
 	routines_.copy_bc(ADDR_HiddenFigure2Gfx, v1Tiles0, 0x180 * TILE_SIZE);
@@ -162,11 +162,11 @@ void GameOver::load_hidden_figure_gfx()
 	routines_.copy_bc(ADDR_HiddenFigure1Gfx, v0Tiles0, 0x180 * TILE_SIZE);
 
 	ram(rVBK) = VRAM1;
-	routines_.decompress(ADDR_HiddenFigure2Map, v1BGMap0);
-	routines_.decompress(ADDR_HiddenFigure4Map, v1BGMap1);
+	routines_.decompress(ROM(gb_, HiddenFigure2Map), v1BGMap0);
+	routines_.decompress(ROM(gb_, HiddenFigure4Map), v1BGMap1);
 	ram(rVBK) = 0;
-	routines_.decompress(ADDR_HiddenFigure1Map, v0BGMap0);
-	routines_.decompress(ADDR_HiddenFigure3Map, v0BGMap1);
+	routines_.decompress(ROM(gb_, HiddenFigure1Map), v0BGMap0);
+	routines_.decompress(ROM(gb_, HiddenFigure3Map), v0BGMap1);
 }
 
 } // namespace wl3::title

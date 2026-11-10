@@ -74,7 +74,7 @@ void load_ob_pals_4_to_7(GB *gb)
 		break;
 	case PowerUp::OWNED:
 		home::copy_short(gb, src, wTempPals2 + 4 * PAL_SIZE, PAL_SIZE);
-		home::copy_short(gb, ADDR_Pals_1e4f2f + 7 * PAL_SIZE, wTempPals2 + 7 * PAL_SIZE, PAL_SIZE);
+		home::copy_short(gb, ROM(gb, Pals_1e4f2f) + 7 * PAL_SIZE, wTempPals2 + 7 * PAL_SIZE, PAL_SIZE);
 		break;
 	}
 	mem[rOBPI] = OBPI_AUTOINC | (4 * PAL_SIZE);

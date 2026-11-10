@@ -282,7 +282,7 @@ void SceneInit::west(uint8_t param, uint8_t c)
 		place(wSceneObj14, {0x3c, 0x57, 0x00});
 		place(wSceneObj15, {0x3c, 0x5d, 0x00});
 		place(wSceneObj10, VOLCANO);
-		routines_.copy(ADDR_Func_b43dd + 0x63, wTempPals2 + 2 * PAL_SIZE, PAL_SIZE); // .pal
+		routines_.copy(ROM(gb_, Func_b43dd) + 0x63, wTempPals2 + 2 * PAL_SIZE, PAL_SIZE); // .pal
 		gfx(BANK_OverworldRocksGfx, ADDR_OverworldRocksGfx, 0x58); // LoadOverworldRocksGfx
 		return;
 	case WOWFUNC_VULCANO_ERUPTION: // Func_b4448
@@ -447,7 +447,7 @@ void SceneInit::east(uint8_t param, uint8_t c)
 		return;
 	case EOWFUNC_FREEZE_SEA: // Func_b46a0
 		if (!static_cast<uint8_t>(c * 2))
-			routines_.copy(ADDR_Func_b4874 + 0xb, wTempPals1 + 4 * PAL_SIZE, PAL_SIZE); // Func_b4874: the sea's palette
+			routines_.copy(ROM(gb_, Func_b4874) + 0xb, wTempPals1 + 4 * PAL_SIZE, PAL_SIZE); // Func_b4874: the sea's palette
 		if (c == PLAY) {
 			place(wSceneObj1, {0x64, 0xe8, 0x01});
 		} else if (c == DONE) { // the frozen sea

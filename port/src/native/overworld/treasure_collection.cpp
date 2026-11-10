@@ -96,8 +96,8 @@ void TreasureCollection::init()
 	set_row_and_column(wCollectionRow, wram_.collection_cell());
 	move_cursor();
 
-	routines_.load_pals_to_temp_pals1(ADDR_Pals_9ad45);
-	routines_.load_pals_to_temp_pals2(ADDR_Pals_9ad05);
+	routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_9ad45));
+	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_9ad05));
 	decompress(BANK_TreasureCollectionCursorGfx, ADDR_TreasureCollectionCursorGfx, v0Tiles0);
 	decompress(BANK_TreasureCollectionGfx, ADDR_TreasureCollectionGfx, v0Tiles2);
 	load_page_gfx();
@@ -140,7 +140,7 @@ void TreasureCollection::load_page_gfx()
 	constexpr uint16_t PAGE_SIZE = NUM_TREASURE_TILES * NUM_COLLECTION_CELLS * TILE_SIZE;
 	uint16_t gfx = static_cast<uint16_t>(ADDR_TreasureGfx + 4 * TILE_SIZE + wram_.collection_page() * PAGE_SIZE);
 	routines_.copy_bc(gfx, v0Tiles1 + 0x20 * TILE_SIZE, PAGE_SIZE);
-	routines_.copy(ADDR_Treasure101Gfx, v0Tiles1 + 0x7c * TILE_SIZE, NUM_TREASURE_TILES * TILE_SIZE);
+	routines_.copy(ROM(gb_, Treasure101Gfx), v0Tiles1 + 0x7c * TILE_SIZE, NUM_TREASURE_TILES * TILE_SIZE);
 }
 
 // The page's treasures: the ones found in their palettes, the others

@@ -89,18 +89,19 @@ void Scenes::copy_far_bytes(uint8_t bank, uint16_t src, uint16_t dest, uint8_t c
 // none (the asm's z)
 bool Scenes::get_params(uint8_t event)
 {
-	return read_params(mem_.word(add_offset(ADDR_OWSceneParams, event)));
+	return read_params(RomPtr(gb_, BANK_OWSceneParams, add_offset(ADDR_OWSceneParams, event)).word());
 }
 
 // GetOWSceneParams_GotPtr: the action at ptr; false at the scene's end
 bool Scenes::read_params(uint16_t ptr)
 {
-	uint8_t action = mem_[ptr];
+	RomPtr params(gb_, BANK_OWSceneParams, ptr); // the scenes' actions, all in its bank
+	uint8_t action = params[0];
 	wram_.ow_scene_action() = action;
 	if (action == SCENE_END)
 		return false;
-	wram_.ow_scene_map_side() = mem_[static_cast<uint16_t>(ptr + 1)];
-	wram_.ow_scene_action_param() = mem_[static_cast<uint16_t>(ptr + 2)];
+	wram_.ow_scene_map_side() = params[1];
+	wram_.ow_scene_action_param() = params[2];
 	wram_.ow_scene_params_ptr().word() = static_cast<uint16_t>(ptr + 3);
 	return true;
 }

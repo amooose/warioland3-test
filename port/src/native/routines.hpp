@@ -82,6 +82,17 @@ public:
 		home::copy(gb_, src, dest, count ? count : 0x100);
 	}
 
+	// from ROM by bank (a label: ROM(gb_, Label))
+	void copy(RomPtr src, uint16_t dest, uint8_t count)
+	{
+		home::copy(gb_, src, dest, count ? count : 0x100);
+	}
+
+	void decompress(RomPtr src, uint16_t dest)
+	{
+		home::decompress(gb_, src, dest);
+	}
+
 	// CopyHLToDE_BC and CopyHLToDE_Short, with bank mapped (farcall) or
 	// from the bank mapped (bank 0)
 	void copy_bc(uint16_t src, uint16_t dest, uint16_t count, uint8_t bank = 0)
@@ -101,6 +112,18 @@ public:
 		else
 			copy();
 	}
+
+	void copy_short(RomPtr src, uint16_t dest, uint8_t count, uint8_t bank = 0)
+	{
+		auto copy = [&] { home::copy_short(gb_, src, dest, count); };
+		if (bank)
+			home::farcall(gb_, bank, ADDR_CopyHLToDE_Short, copy);
+		else
+			copy();
+	}
+
+	void load_pals_to_temp_pals1(RomPtr pals) { home::load_pals_to_temp_pals1(gb_, pals); }
+	void load_pals_to_temp_pals2(RomPtr pals) { home::load_pals_to_temp_pals2(gb_, pals); }
 
 	void load_pals_to_temp_pals1(uint16_t pals)
 	{

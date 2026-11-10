@@ -148,8 +148,8 @@ void Title::set_menu_priority()
 	}
 	ram(rVBK) = 0;
 	uint16_t box = static_cast<uint16_t>(v0BGMap0 + 14 * TILEMAP_WIDTH + 4);
-	routines_.copy(ADDR_TitleScreenBoxTilemap, box, 12);
-	routines_.copy(ADDR_TitleScreenBoxTilemap + 12, static_cast<uint16_t>(box + TILEMAP_WIDTH), 12);
+	routines_.copy(ROM(gb_, TitleScreenBoxTilemap), box, 12);
+	routines_.copy(ROM(gb_, TitleScreenBoxTilemap) + 12, static_cast<uint16_t>(box + TILEMAP_WIDTH), 12);
 }
 
 void Title::intro_phase1()
@@ -316,8 +316,8 @@ void Title::intro_phase3()
 		p.set_frameset(ADDR_Frameset_7198);
 		p.var() = 0;
 		wram_.timer() = 0;
-		routines_.load_pals_to_temp_pals1(ADDR_Pals_5002);
-		routines_.load_pals_to_temp_pals2(ADDR_Pals_5042);
+		routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_5002));
+		routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_5042));
 		play_music(mem_, MUSIC_TITLE_SCREEN);
 		++wram_.sub_state();
 		break;
@@ -390,28 +390,28 @@ void Title::draw_intro(MenuObject first, MenuObject second, MenuObject third)
 void Title::load_title_pals()
 {
 	if (!wram_.unk_ceef()) {
-		routines_.load_pals_to_temp_pals1(ADDR_Pals_4f82);
-		routines_.load_pals_to_temp_pals2(ADDR_Pals_4fc2);
+		routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_4f82));
+		routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_4fc2));
 	} else {
-		routines_.load_pals_to_temp_pals1(ADDR_Pals_5002);
-		routines_.load_pals_to_temp_pals2(ADDR_Pals_5042);
+		routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_5002));
+		routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_5042));
 	}
 }
 
 void Title::load_title_tiles()
 {
 	ram(rVBK) = VRAM1;
-	routines_.decompress(ADDR_PlaneGfx, v1Tiles0);
+	routines_.decompress(ROM(gb_, PlaneGfx), v1Tiles0);
 	ram(rVBK) = 0;
-	routines_.decompress(ADDR_TitleScreenGfx, v0Tiles0);
+	routines_.decompress(ROM(gb_, TitleScreenGfx), v0Tiles0);
 }
 
 void Title::load_title_tilemap()
 {
 	ram(rVBK) = VRAM1;
-	routines_.decompress(ADDR_TitleScreenAttrmap, v1BGMap0);
+	routines_.decompress(ROM(gb_, TitleScreenAttrmap), v1BGMap0);
 	ram(rVBK) = 0;
-	routines_.decompress(ADDR_TitleScreenTilemap, v0BGMap0);
+	routines_.decompress(ROM(gb_, TitleScreenTilemap), v0BGMap0);
 }
 
 void Title::load_time_attack_tiles()
@@ -720,7 +720,7 @@ void Title::init_time_attack_description()
 	routines_.disable_lcd();
 	home::fill_bg_map0(gb_, 0x7f);
 	routines_.clear_virtual_oam();
-	routines_.load_pals_to_temp_pals1(ADDR_Pals_71b0);
+	routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_71b0));
 	routines_.call(ADDR_ApplyTempPals1ToBGPals);
 	load_time_attack_tiles();
 	load_time_attack_text();

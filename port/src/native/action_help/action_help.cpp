@@ -283,7 +283,7 @@ void ActionHelp::colour_slot(uint8_t slot, uint8_t attributes)
 void ActionHelp::load_common_pals()
 {
 	wram_.action_help_blacked_out() = TRUE;
-	routines_.load_pals_to_temp_pals1(ADDR_Pals_1e4eef);
+	routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_1e4eef));
 }
 
 // The OB palettes: garlic and the later power-ups, and the vampire, recolour
@@ -303,7 +303,7 @@ void ActionHelp::load_gfx()
 	ram(rVBK) = VRAM1;
 	routines_.decompress(main_power_up() ? ADDR_ActionHelpObjects1Gfx : ADDR_ActionHelpObjects2Gfx, v1Tiles0);
 	ram(rVBK) = 0;
-	routines_.decompress(ADDR_ActionHelpHUDGfx, v0Tiles0);
+	routines_.decompress(ROM(gb_, ActionHelpHUDGfx), v0Tiles0);
 }
 
 // The power-up bar: the power-ups Wario has coloured, the rest empty; all
@@ -311,9 +311,9 @@ void ActionHelp::load_gfx()
 void ActionHelp::load_bg_maps()
 {
 	ram(rVBK) = VRAM1;
-	routines_.decompress(ADDR_ActionHelpAttrmap, v1BGMap1);
+	routines_.decompress(ROM(gb_, ActionHelpAttrmap), v1BGMap1);
 	ram(rVBK) = 0;
-	routines_.decompress(ADDR_ActionHelpTilemap, v0BGMap1);
+	routines_.decompress(ROM(gb_, ActionHelpTilemap), v0BGMap1);
 
 	uint8_t empty = NUM_BAR_SLOTS;
 	if (main_power_up()) {

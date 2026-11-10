@@ -78,8 +78,8 @@ public:
 		if (mem_.unk_cee4() & 0x80) {
 			mem_[rVBK] = 0;
 			constexpr uint16_t dest = v0BGMap0 + 14 * TILEMAP_WIDTH + 4; // debgcoord 4, 14
-			home::copy(gb_, ADDR_TitleScreenBoxTilemap, dest, 12);
-			home::copy(gb_, ADDR_TitleScreenBoxTilemap + 12, dest + TILEMAP_WIDTH, 12);
+			home::copy(gb_, ROM(gb_, TitleScreenBoxTilemap), dest, 12);
+			home::copy(gb_, ROM(gb_, TitleScreenBoxTilemap) + 12, dest + TILEMAP_WIDTH, 12);
 			mem_.unk_cee4() &= 0x7f;
 		}
 		bankswitch(bank);

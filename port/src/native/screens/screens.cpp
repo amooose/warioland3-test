@@ -149,14 +149,14 @@ void Perfect::init()
 	routines_.disable_lcd();
 	home::fill_bg_map0(gb_, 0x7f);
 	routines_.clear_virtual_oam();
-	routines_.load_pals_to_temp_pals1(ADDR_Pals_dc173);
-	routines_.load_pals_to_temp_pals2(ADDR_Pals_dc1fb);
+	routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_dc173));
+	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_dc1fb));
 	mem_[rVBK] = 0;
-	routines_.decompress(ADDR_PerfectGfx, v0Tiles0);
+	routines_.decompress(ROM(gb_, PerfectGfx), v0Tiles0);
 	mem_[rVBK] = VRAM1;
-	routines_.decompress(ADDR_PerfectAttrmap, v0BGMap0);
+	routines_.decompress(ROM(gb_, PerfectAttrmap), v0BGMap0);
 	mem_[rVBK] = 0;
-	routines_.decompress(ADDR_PerfectTilemap, v0BGMap0);
+	routines_.decompress(ROM(gb_, PerfectTilemap), v0BGMap0);
 	routines_.call(ADDR_VBlank_Perfect);
 
 	mem_[rSCX] = 0;

@@ -138,17 +138,17 @@ void ClearScreen::init()
 	count_music_boxes();
 
 	routines_.in_bank(BANK_LoadClearScreenPals, ADDR_LoadClearScreenPals, [&] {
-		routines_.load_pals_to_temp_pals1(ADDR_Pals_1e0378);
-		routines_.load_pals_to_temp_pals2(ADDR_Pals_1e03b8);
+		routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_1e0378));
+		routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_1e03b8));
 	});
 	routines_.call(ADDR_LoadCollectedTreasurePal_ClearScreen);
 	routines_.in_bank(BANK_LoadClearScreenGfx, ADDR_LoadClearScreenGfx, [&] { load_gfx(); });
 	routines_.farcall(BANK_LoadLevelTreasureData, ADDR_LoadLevelTreasureData);
 	routines_.in_bank(BANK_Func_1e0045, ADDR_Func_1e0045, [&] {
 		mem_[rVBK] = VRAM1;
-		routines_.decompress(ADDR_ClearScreenTreasureAttrmap, v1BGMap0);
+		routines_.decompress(ROM(gb_, ClearScreenTreasureAttrmap), v1BGMap0);
 		mem_[rVBK] = 0;
-		routines_.decompress(ADDR_ClearScreenTreasureTilemap, v0BGMap0);
+		routines_.decompress(ROM(gb_, ClearScreenTreasureTilemap), v0BGMap0);
 	});
 		routines_.in_bank(BANK_PrintNumberCoins, ADDR_PrintNumberCoins, [&] { engine::print_number_coins(gb_, v0BGMap0 + 16 * TILEMAP_WIDTH + 6); });
 
@@ -289,9 +289,9 @@ void ClearScreen::update_num_collected_treasures()
 void ClearScreen::load_gfx()
 {
 	mem_[rVBK] = VRAM1;
-	routines_.decompress(ADDR_ClearScreen2Gfx, v0Tiles0);
+	routines_.decompress(ROM(gb_, ClearScreen2Gfx), v0Tiles0);
 	mem_[rVBK] = 0;
-	routines_.decompress(ADDR_ClearScreen1Gfx, v0Tiles1);
+	routines_.decompress(ROM(gb_, ClearScreen1Gfx), v0Tiles1);
 	wram_.temp_bank() = BANK_WarioClearGfx;
 	routines_.far_copy(ADDR_WarioClearGfx, v0Tiles0, 0x80 * TILE_SIZE);
 }
@@ -360,8 +360,8 @@ void ClearScreen::init_time_attack()
 	routines_.clear_virtual_oam();
 	wram_.transition_param() = TRANSITION_RETURN_TO_MAP;
 	routines_.in_bank(BANK_Func_1e000d, ADDR_Func_1e000d, [&] {
-		routines_.load_pals_to_temp_pals1(ADDR_Pals_1e03f8);
-		routines_.load_pals_to_temp_pals2(ADDR_Pals_1e0438);
+		routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_1e03f8));
+		routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_1e0438));
 	});
 	routines_.in_bank(BANK_LoadClearScreenGfx, ADDR_LoadClearScreenGfx, [&] { load_gfx(); });
 	routines_.in_bank(BANK_Func_1e005f, ADDR_Func_1e005f, [&] { time_attack_result(); });
@@ -390,9 +390,9 @@ void ClearScreen::init_time_attack()
 void ClearScreen::time_attack_result()
 {
 	mem_[rVBK] = VRAM1;
-	routines_.decompress(ADDR_ClearScreenTimeAttackAttrmap, v0BGMap0);
+	routines_.decompress(ROM(gb_, ClearScreenTimeAttackAttrmap), v0BGMap0);
 	mem_[rVBK] = 0;
-	routines_.decompress(ADDR_ClearScreenTimeAttackTilemap, v0BGMap0);
+	routines_.decompress(ROM(gb_, ClearScreenTimeAttackTilemap), v0BGMap0);
 
 	Byte result = wram_.time_attack_result();
 	uint16_t best = static_cast<uint16_t>(wLevelTimeAttackScores + (wram_.level() >> 3) * 2);
@@ -471,14 +471,14 @@ void ClearScreen::init_musical_coins()
 	routines_.disable_lcd();
 	home::fill_bg_map0(gb_, 0xff);
 	routines_.clear_virtual_oam();
-	routines_.load_pals_to_temp_pals1(ADDR_Pals_d50a4);
-	routines_.load_pals_to_temp_pals2(ADDR_Pals_d50e4);
+	routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_d50a4));
+	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_d50e4));
 	mem_[rVBK] = 0;
-	routines_.decompress(ADDR_GolfMenuGfx, v0Tiles0);
+	routines_.decompress(ROM(gb_, GolfMenuGfx), v0Tiles0);
 	mem_[rVBK] = VRAM1;
-	routines_.decompress(ADDR_GolfMenuAttrmap, v1BGMap0);
+	routines_.decompress(ROM(gb_, GolfMenuAttrmap), v1BGMap0);
 	mem_[rVBK] = 0;
-	routines_.decompress(ADDR_GolfMenuTilemap, v0BGMap0);
+	routines_.decompress(ROM(gb_, GolfMenuTilemap), v0BGMap0);
 	draw_coin_flags();
 	wram_.all_musical_coins_level() = 0xff;
 	if (wram_.num_musical_coins() == NUM_LEVEL_MUSICAL_COINS)

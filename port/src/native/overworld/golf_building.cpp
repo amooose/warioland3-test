@@ -43,7 +43,7 @@ void GolfBuilding::init()
 	mem_[rSCY] = 0;
 	wram_.scy() = 0;
 	// .VBlank_GolfBuilding: its V-Blank function, run from wVBlankFunc
-	routines_.copy(ADDR__GolfBuilding + 0xfa, wVBlankFunc, 0x140 - 0xfa);
+	routines_.copy(ROM(gb_, _GolfBuilding) + 0xfa, wVBlankFunc, 0x140 - 0xfa);
 	SceneCommon(gb_).clear_scene_ram();
 	SceneCommon(gb_).clear_scene_objs();
 	fill_bg_pals();
@@ -123,14 +123,14 @@ void GolfBuilding::fill_bg_pals()
 		{CRAYON_PINK_F, PINK, 1},
 	};
 
-	home::load_pals_to_temp_pals1(gb_, ADDR_Pals_addc9);
+	home::load_pals_to_temp_pals1(gb_, ROM(gb_, Pals_addc9));
 	routines_.copy(wTempPals1, wTempBGPals, 8 * PAL_SIZE);
 	for (const Crayon &crayon : CRAYONS) {
 		if (!(wram_.crayon_flags() & (1 << crayon.bit)))
 			continue;
 		for (size_t i = 0; i < crayon.count; i++) {
 			const Part &part = crayon.parts[i];
-			routines_.copy(ADDR_Pals_ade09 + part.offset, wTempBGPals + part.offset, part.count);
+			routines_.copy(ROM(gb_, Pals_ade09) + part.offset, wTempBGPals + part.offset, part.count);
 		}
 	}
 	routines_.copy(wTempBGPals, wTempPals1, 8 * PAL_SIZE);

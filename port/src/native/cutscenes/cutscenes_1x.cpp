@@ -328,7 +328,7 @@ void Cutscenes::init_cart_wheels()
 	decompress(BANK_Cutscene11Tilemap, ADDR_Cutscene11Tilemap, v0BGMap0);
 	copy_far(BANK_Pals_cc5c0, ADDR_Pals_cc5c0, wTempPals1, 8 * PAL_SIZE);
 	decompress(BANK_CartGfx, ADDR_CartGfx, v0Tiles1, true);
-	routines_.copy(ADDR_InitCutscene27 + 0x91, wTempPals2 + 6 * PAL_SIZE, PAL_SIZE); // .palette
+	routines_.copy(ROM(gb_, InitCutscene27) + 0x91, wTempPals2 + 6 * PAL_SIZE, PAL_SIZE); // .palette
 	place(wSceneObj2, 86, 88, 0x01);
 	draw_cart();
 }

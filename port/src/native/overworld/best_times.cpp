@@ -48,7 +48,7 @@ void BestTimes::init()
 	mem_[rWBK] = 2;
 	routines_.copy(VBLANK_FUNC, wVBlankFunc, VBLANK_FUNC_SIZE);
 	home::fill(gb_, wCollectionRow, 0, SCREEN_WRAM_SIZE);
-	routines_.load_pals_to_temp_pals1(ADDR_Pals_158b63);
+	routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_158b63));
 
 	decompress(BANK_BestTimeListGfx, ADDR_BestTimeListGfx, v0Tiles1 + 0x20 * TILE_SIZE);
 	mem_[rVBK] = 1;

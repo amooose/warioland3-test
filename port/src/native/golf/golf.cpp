@@ -116,8 +116,8 @@ void Golf::init_lobby()
 	wram_.unk_1d800() = 0x02;
 	wram_.room_animated_tiles_enabled() = 0;
 	clear_golf_ram_from(wPredeterminedGolfHole);
-	routines_.load_pals_to_temp_pals1(ADDR_Pals_1ca1cf);
-	routines_.load_pals_to_temp_pals2(ADDR_Pals_1ca20f);
+	routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_1ca1cf));
+	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_1ca20f));
 	load_lobby_gfx();
 
 	if (!wram_.golf_menu_option()) {
@@ -425,8 +425,8 @@ void Golf::init_clear_cutscene()
 	routines_.disable_lcd();
 	routines_.clear_virtual_oam();
 	clear_golf_ram_from(GOLF_RAM_START);
-	routines_.load_pals_to_temp_pals1(ADDR_Pals_1ca24f);
-	routines_.load_pals_to_temp_pals2(ADDR_Pals_1ca34f);
+	routines_.load_pals_to_temp_pals1(ROM(gb_, Pals_1ca24f));
+	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_1ca34f));
 
 	ram(rVBK) = 0;
 	routines_.far_decompress(BANK_GolfMenuGfx, ADDR_GolfMenuGfx, v0Tiles0);
@@ -438,7 +438,7 @@ void Golf::init_clear_cutscene()
 	object(wGolfObj1).y() = 0x70;
 	update_clear_cutscene_animation();
 	// VBlank_1c84e0: its V-Blank function
-	routines_.copy(ADDR_VBlank_1c84e0 + 0x0b, wVBlankFunc, 0x0e);
+	routines_.copy(ROM(gb_, VBlank_1c84e0) + 0x0b, wVBlankFunc, 0x0e);
 	reset_scroll();
 	ram(rLCDC) = LCDC_DEFAULT;
 	++wram_.sub_state();
@@ -501,7 +501,7 @@ void Golf::init_building()
 
 	draw_course_menu();
 	routines_.load_pals_to_temp_pals1(w1db00);
-	routines_.load_pals_to_temp_pals2(ADDR_Pals_1ca34f);
+	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_1ca34f));
 	ram(wGolfNumCoins + 0) = ram(wNumCoins + 0);
 	ram(wGolfNumCoins + 1) = ram(wNumCoins + 1);
 	update_building_animations();
