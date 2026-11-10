@@ -204,15 +204,15 @@ bool hooks_write_report(const char *path)
 	static const Hook *ran[MAX_HOOKS];
 	int n = 0;
 	for (int i = 0; i < nhooks; i++)
-		if (hooks[i].calls)
+		if (hooks[i].calls || hooks[i].by_direct)
 			ran[n++] = &hooks[i];
 	qsort(ran, (size_t)n, sizeof(ran[0]), by_calls);
-	fprintf(f, "# hook calls by_call by_jump by_irq\n");
+	fprintf(f, "# hook calls by_call by_jump by_irq direct\n");
 	for (int i = 0; i < n; i++) {
 		const Hook *h = ran[i];
-		fprintf(f, "%s %llu %llu %llu %llu\n", h->name, (unsigned long long)h->calls,
+		fprintf(f, "%s %llu %llu %llu %llu %llu\n", h->name, (unsigned long long)h->calls,
 			(unsigned long long)h->by_call, (unsigned long long)(h->calls - h->by_call - h->by_irq),
-			(unsigned long long)h->by_irq);
+			(unsigned long long)h->by_irq, (unsigned long long)h->by_direct);
 	}
 	fclose(f);
 	return true;

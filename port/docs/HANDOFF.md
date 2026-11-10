@@ -1382,6 +1382,14 @@ interrupt. First run (2026-11-10, 13 recordings): 415 hooks, 383 by native
 call, 35 by jump (the frame loop's parts, the screens' V-Blank functions),
 1 interrupt (VBlankVector). A hook nothing reaches in play is fuzz-only:
 its register glue can move under WL3_INTERPRETER.
+gb_call_native (cpu.c, 2026-11-10): gb_call and hCallFunc run a ROM
+routine whose hook returns normally straight from the hook table, with no
+CPU dispatch, return address or stack (the report's "direct" column).
+Manual-ret hooks, gb_call_ret's explicit return addresses and RAM code still
+go through the CPU. After it: 57 hooks CPU-dispatched in play (26 by native
+call, 35 by jump, 1 interrupt), 358 direct. A direct call never reaches the
+routine's address, so code that keys on PC (the trace's LY site) needs
+trace_entry (native.hpp) in the plain function.
 To find what reads a register: poison it, relax the contracts, run the
 full tier. Stop if the build fails: ctest happily runs the old binary.
 Routines nothing references and whose callers' hooks have their own copies

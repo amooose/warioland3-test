@@ -264,9 +264,40 @@ int cpu_step(GB *gb)
 // no real code ever runs there.
 #define CALL_SENTINEL 0xfea0
 
+bool gb_call_native(GB *gb, uint16_t addr)
+{
+	// ROM routines only: code in RAM (hCallFunc, the V-Blank functions)
+	// runs from what's there now
+	if (addr >= 0x8000)
+		return false;
+	Hook *hook = hook_find(gb, addr);
+	if (!hook || (hook->flags & HOOK_MANUAL_RET))
+		return false;
+	// Fuzzed jump tables can send a call back into its caller: stop
+	// runaway recursion as gb_call_ret does
+	if (gb->test.active && gb->call_depth >= 256) {
+		gb->test.unrealistic = true;
+		gb->test.crashed = true;
+		return true;
+	}
+	uint16_t saved_pc = PC;
+	PC = addr;
+	if (gb->pc_cb)
+		gb->pc_cb(gb);
+	hook->by_direct++;
+	gb->call_depth++;
+	hook->fn(gb);
+	gb->call_depth--;
+	came_from_wram = false;
+	prev_pc = PREV_NATIVE;
+	PC = saved_pc;
+	return true;
+}
+
 void gb_call(GB *gb, uint16_t addr)
 {
-	gb_call_ret(gb, addr, CALL_SENTINEL);
+	if (!gb_call_native(gb, addr))
+		gb_call_ret(gb, addr, CALL_SENTINEL);
 }
 
 // The call loop of gb_call_ret. With may_unwind, code that pops past the

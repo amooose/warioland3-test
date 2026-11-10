@@ -49,7 +49,8 @@ static bool hcall_func(GB *gb)
 	// object's update function), as for jp hl in the interpreter.
 	if (gb->test.active && func < 0x8000 && !sym_is_rom_label(gb->rom_bank, func))
 		gb->test.unrealistic = true;
-	gb_call_ret(gb, func, (uint16_t)(hCallFunc + 0x0f));
+	if (!gb_call_native(gb, func))
+		gb_call_ret(gb, func, (uint16_t)(hCallFunc + 0x0f));
 	pop_af(gb);
 	bankswitch(gb, gb->cpu.a);
 	RET();

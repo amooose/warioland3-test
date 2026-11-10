@@ -56,6 +56,9 @@ typedef struct {
 	// by the CPU at an interrupt vector; the rest by a jump, a ret or
 	// falling through (JUMP_TO, HOOK_MANUAL_RET hooks)
 	uint64_t by_call, by_irq;
+	// calls run straight from native code (gb_call_native), not counted in
+	// calls: no CPU dispatch, return address or stack
+	uint64_t by_direct;
 } Hook;
 
 // The labels come from the disassembly's .sym file, built into the

@@ -268,6 +268,10 @@ int interp_exec(GB *gb);
 // completion, through hooks or the interpreter. Used by native code to call
 // routines that may or may not have been ported yet.
 void gb_call(GB *gb, uint16_t addr);
+// Runs the native routine at addr straight from native code, if it has one
+// that returns (not HOOK_MANUAL_RET): no CPU dispatch, return address or
+// stack, as a direct call. False if there's none (then use gb_call_ret).
+bool gb_call_native(GB *gb, uint16_t addr);
 // gb_call, but pushing ret as the return address, as the asm's own call
 // would: for callees that may look at the stack. ret is where the asm's call
 // instruction returns to; it is never executed here.
