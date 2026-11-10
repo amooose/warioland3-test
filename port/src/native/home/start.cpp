@@ -4,6 +4,8 @@
 // callers (see src/native/asm_module.hpp).
 #include "../asm_module.hpp"
 #include "memory.hpp"
+#include "system.hpp"
+#include "../engine/main_state_table.hpp"
 #include "../audio/audio.hpp"
 
 namespace wl3::home {
@@ -80,8 +82,7 @@ public:
 	// The main game loop (InitWithoutDemoPowerUpReset.GameLoop), one game
 	// frame per pass, in parts around its halt: .GameLoop halts the CPU as the
 	// halt does (the V-Blank interrupt wakes it as on the hardware), and the
-	// loop goes on at .after_halt. Every call returns to the asm's own return
-	// address.
+	// loop goes on at .after_halt.
 	#define GAME_LOOP (ADDR_InitWithoutDemoPowerUpReset + 0xcc)        // .GameLoop
 	#define GAME_LOOP_HALT (ADDR_InitWithoutDemoPowerUpReset + 0x113)   // halt
 	#define WAIT_VBLANK_EXEC (ADDR_InitWithoutDemoPowerUpReset + 0x115) // .wait_vblank_exec
@@ -89,19 +90,18 @@ public:
 	void port_InitWithoutDemoPowerUpReset__GameLoop()
 	{
 		Memory mem(gb_);
-		gb_call_ret(gb_, ADDR_UpdateJoypad, GAME_LOOP + 0x03);
+		update_joypad(gb_);
 		// restart the game if all four buttons are down
 		if (!mem[wResetDisabled]
 			&& (mem[wJoypadDown] & PAD_BUTTONS) == (PAD_A | PAD_B | PAD_SELECT | PAD_START)) {
-			gb_call_ret(gb_, ADDR_TurnMusicOff, GAME_LOOP + 0x15);
-			SET_BC(gb_, SOUND_OFF); // TurnOffSFXID's c goes on to UpdateAudio
-			gb_call_ret(gb_, ADDR_TurnOffSFXID, GAME_LOOP + 0x1b);
-			gb_call_ret(gb_, ADDR_UpdateAudio, GAME_LOOP + 0x1e);
+			audio::turn_music_off(gb_);
+			audio::turn_off_sfx(gb_, SOUND_OFF);
+			audio::update(gb_);
 			JUMP_TO(ADDR_Init);
 			return;
 		}
 		// .no_reset: where all main game logic is handled
-		gb_call_ret(gb_, ADDR_MainStateTable, GAME_LOOP + 0x24);
+		engine::run_main_state(gb_);
 
 		// The game logic took most of the frame on the hardware, but native code
 		// takes no time: without this, LY would still be in V-Blank here, and
@@ -112,14 +112,10 @@ public:
 			while (mem[rLY] >= LY_VBLANK)
 				idle(32);
 
-		if (mem[wRoomAnimatedTilesEnabled]) { // farcall, to the asm's return address
-			mem[hCallFuncBank] = BANK_UpdateRoomAnimatedTiles;
-			mem[hCallFuncPointer + 0] = static_cast<uint8_t>(ADDR_UpdateRoomAnimatedTiles);
-			mem[hCallFuncPointer + 1] = static_cast<uint8_t>(ADDR_UpdateRoomAnimatedTiles >> 8);
-			gb_call_ret(gb_, hCallFunc, GAME_LOOP + 0x39);
-		}
+		if (mem[wRoomAnimatedTilesEnabled])
+			routines_.farcall(BANK_UpdateRoomAnimatedTiles, ADDR_UpdateRoomAnimatedTiles);
 		if (mem[wRoomAnimatedPalsEnabled])
-			gb_call_ret(gb_, ADDR_UpdateRoomAnimatedPals, GAME_LOOP + 0x42);
+			routines_.call(ADDR_UpdateRoomAnimatedPals);
 
 		// enable the V-Blank handler and wait for it
 		mem[wEnableVBlankFunc] = TRUE;
@@ -140,14 +136,13 @@ public:
 		++mem[wGlobalCounter];
 		mem[wEnableVBlankFunc] = FALSE;
 		mem[wVBlankFuncExecuted] = FALSE;
-		gb_call_ret(gb_, ADDR_HandleSound, WAIT_VBLANK_EXEC + 0x14);
+		port_HandleSound();
 		JUMP_TO(GAME_LOOP); // loop back to game loop
 	}
 
 	void port_DebugReset() { JUMP(Init); }
 
-	// The boot and reset code, falling into the main game loop. Calls return to
-	// the asm's own return addresses (all in ROM0, from the call bytes).
+	// The boot and reset code, falling into the main game loop.
 	#define INIT_WO (ADDR_InitWithoutDemoPowerUpReset) // $0161
 
 	// a: what the boot ROM left (BOOTUP_A_CGB on a CGB)
@@ -185,8 +180,8 @@ public:
 
 		// enable BG and OBJ
 		mem[rLCDC] = LCDC_BG_ON | LCDC_OBJ_ON;
-		gb_call_ret(gb_, ADDR_ClearVRAM, INIT_WO + 0x25);
-		gb_call_ret(gb_, ADDR_EnableDoubleSpeed, INIT_WO + 0x28);
+		routines_.call(ADDR_ClearVRAM);
+		routines_.call(ADDR_EnableDoubleSpeed);
 		if (mem[hCGB]) {
 			mem[rVBK] = 0;
 			mem[rWBK] = 0;
@@ -196,13 +191,13 @@ public:
 		// .clear_wram: all WRAM but the stack, OAM, and HRAM but
 		// hDemoPowerUp, hUnused_fffd and hCGB
 		fill(gb_, 0xc000, 0, 0x0f00); // STARTOF(WRAM0), SIZEOF(WRAM0) - SIZEOF("Stack")
-		gb_call_ret(gb_, ADDR_ClearWRAM, INIT_WO + 0x41);
+		routines_.call(ADDR_ClearWRAM);
 		fill(gb_, 0xfe00, 0, 0x100); // STARTOF(OAM)
 		fill(gb_, 0xff80, 0, hDemoPowerUp - 0xff80); // STARTOF(HRAM)
 
 		// clear BGMap0 and BGMap1
 		home::fill_bg_map0(gb_, 0x7f);
-		gb_call_ret(gb_, ADDR_ClearBGMap1, INIT_WO + 0x59);
+		routines_.call(ADDR_ClearBGMap1);
 
 		bankswitch(BANK_MainStateTable); // BANK("Main State Table")
 		mem[rROMB1 + 0x100] = 0;
@@ -220,15 +215,15 @@ public:
 			mem[static_cast<uint16_t>(0xff00 | at++)] = mem[src];
 
 		// init VBlank function, HRAM call function
-		gb_call_ret(gb_, ADDR_VBlank_Ret, INIT_WO + 0x87);
-		gb_call_ret(gb_, ADDR_InitHRAMCallFunc, INIT_WO + 0x8a);
+		routines_.call(ADDR_VBlank_Ret);
+		routines_.call(ADDR_InitHRAMCallFunc);
 		mem[rIF] = 0;
 		mem[rIE] = IE_VBLANK;
-		gb_call_ret(gb_, ADDR_InitLCD, INIT_WO + 0x94);
+		routines_.call(ADDR_InitLCD);
 
 		// enable SRAM
 		mem[rRAMG] = RAMG_SRAM_ENABLE;
-		FARCALL_RET(ValidateSaveData, INIT_WO + 0xa8);
+		FARCALL(ValidateSaveData);
 		cpu_.ime = true; // ei
 
 		// if not playing on CGB, then show the GB Incompatible screen,
@@ -237,15 +232,15 @@ public:
 			mem[wState] = ST_GB_INCOMPATIBLE;
 			mem[wSubState] = 0;
 		} else {
-			gb_call_ret(gb_, ADDR_InitGameState, INIT_WO + 0xbc);
+			routines_.call(ADDR_InitGameState);
 		}
 		mem[wJoypadPressed] = 0;
-		gb_call_ret(gb_, ADDR_FillWhiteBGPal, INIT_WO + 0xc3);
+		routines_.call(ADDR_FillWhiteBGPal);
 		mem[rLCDC] = LCDC_ON;
 
 		// init audio
 		cpu_.ime = false; // di
-		gb_call_ret(gb_, ADDR_InitAudio, INIT_WO + 0xcb);
+		routines_.call(ADDR_InitAudio);
 		cpu_.ime = true; // ei
 		JUMP_TO(GAME_LOOP); // main game loop
 	}

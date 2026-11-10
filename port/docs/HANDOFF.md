@@ -1368,6 +1368,12 @@ Help), the difftests and traces no longer compare wSoundEngineParam1 (the
 user's decision, like the dead stack), and Action Help's volume mod is plain.
 Collisions::block still calls GetBlockPtr: ProcessBlock reads its hl and b
 (a plain block_ptr call broke the full tier but passed the quick one).
+Stage 4 (2026-11-09): the game loop and boot code call routines plainly
+(no emulated return addresses; HandleSound, the reset's audio and
+UpdateJoypad directly), and engine::run_main_state replaces
+MainStateTable's rst JumpTable (the index is wState * 2 in 8 bits). The
+frame boundary stays as it was: the GameLoop hook runs one frame and halts
+the CPU, so savestates and the traces still sync at .GameLoop.
 To find what reads a register: poison it, relax the contracts, run the
 full tier. Stop if the build fails: ctest happily runs the old binary.
 Routines nothing references and whose callers' hooks have their own copies
