@@ -39,10 +39,14 @@ enum class Progress { ANY, SNOWBALL, BIG_SNOWBALL };
 
 class BlockFuncs {
 public:
-	explicit BlockFuncs(GB *gb) : gb_(gb), cpu_(gb->cpu), mem_(gb), routines_(gb), b_(gb->cpu.b), hl_(REG_HL(gb)) {}
-	BlockFuncs(GB *gb, uint8_t b) : gb_(gb), cpu_(gb->cpu), mem_(gb), routines_(gb), b_(b), hl_(0) {}
+	explicit BlockFuncs(GB *gb) : gb_(gb), cpu_(gb->cpu), mem_(gb), routines_(gb), b_(gb->cpu.b), hl_(REG_HL(gb)), a_(gb->cpu.a) {}
+	BlockFuncs(GB *gb, uint8_t b) : gb_(gb), cpu_(gb->cpu), mem_(gb), routines_(gb), b_(b), hl_(0), a_(gb->cpu.a) {}
 
 	void process_block(); // ProcessBlock, as a hook
+	// the block function's result (what the asm leaves in a)
+	uint8_t result() const { return a_; }
+	// a hook's exit: the result in a
+	void exit_regs() { cpu_.a = a_; }
 	uint16_t block_function(); // ProcessBlock's lookup: the function to run
 	// ProcessBlock's jp hl and the chain it starts, to the last one's ret
 	void run_block_function(uint16_t func);
@@ -114,10 +118,11 @@ public:
 	void ball_o_string_block(); // Func_19502
 
 private:
-	void xor_a() { cpu_.a = 0; }
+	void xor_a() { a_ = 0; }
 	// the values a hook hands to the block function it jumps to
 	void leave()
 	{
+		cpu_.a = a_;
 		cpu_.b = b_;
 		SET_HL(gb_, hl_);
 	}
@@ -129,26 +134,26 @@ private:
 	// ld a, v / ld [addr], a
 	void st(uint16_t addr, uint8_t v)
 	{
-		cpu_.a = v;
+		a_ = v;
 		mem_[addr] = v;
 	}
 	// ld a, [addr] / and a: true if nz
 	bool ld_and(uint16_t addr)
 	{
-		cpu_.a = mem_[addr];
-		return cpu_.a;
+		a_ = mem_[addr];
+		return a_;
 	}
 	// ld a, [addr] / bit n, a
 	bool ld_bit(uint16_t addr, int n)
 	{
-		cpu_.a = mem_[addr];
-		return cpu_.a & (1 << n);
+		a_ = mem_[addr];
+		return a_ & (1 << n);
 	}
 	// ld a, [addr] / and mask: true if nz
 	bool ld_mask(uint16_t addr, uint8_t mask)
 	{
-		cpu_.a = mem_[addr] & mask;
-		return cpu_.a;
+		a_ = mem_[addr] & mask;
+		return a_;
 	}
 	// big-endian words (hPos, wWarioXPos, wBlockPtr)
 	uint16_t word_be(uint16_t addr) const { return static_cast<uint16_t>(mem_[addr] << 8 | mem_[addr + 1]); }
@@ -191,6 +196,8 @@ private:
 	uint16_t next_ = 0;
 	uint8_t b_; // the block a function replaces this one with
 	uint16_t hl_; // the block that breaks (where the chain has left it)
+	// the result (the asm's a), from the caller's a: some functions leave it
+	uint8_t a_;
 };
 
 // the function of the block at wBlockPtrBank:wBlockPtr
@@ -224,9 +231,10 @@ void BlockFuncs::run_block_function(uint16_t func)
 		leave();
 		return;
 	}
-	cpu_.a = static_cast<uint8_t>(func); // what jp hl runs may read it
+	a_ = static_cast<uint8_t>(func); // what jp hl runs may read it
 	leave();
 	routines_.call(func);
+	a_ = cpu_.a;
 }
 
 // jp hl, so what runs there returns to the caller
@@ -235,9 +243,10 @@ void BlockFuncs::process_block()
 	uint16_t func = block_function();
 	if (gb_->rom_bank == BANK_ProcessBlock && dispatch(func)) {
 		run(next_);
+		exit_regs();
 		return;
 	}
-	cpu_.a = static_cast<uint8_t>(func); // what jp hl runs may read it
+	a_ = static_cast<uint8_t>(func); // what jp hl runs may read it
 	leave();
 	gb_tail_jump(gb_, func);
 }
@@ -562,7 +571,7 @@ void BlockFuncs::solid()
 	}
 	// .snap_y_pos
 	mem_[hYPosLo] = mem_[hYPosLo] & 0xf0;
-	cpu_.a = 1;
+	a_ = 1;
 	mem_[wUnused_c18d] = 1;
 }
 
@@ -1403,7 +1412,7 @@ uint8_t process_block(GB *gb, uint8_t b)
 {
 	BlockFuncs f(gb, b);
 	f.run_block_function(f.block_function());
-	return gb->cpu.a;
+	return f.result();
 }
 
 } // namespace wl3::level
@@ -1418,19 +1427,19 @@ using wl3::level::Progress;
 // them, or Fire's ret, which is exact. So the hooks that only jump on
 // clobber them; the rest stay exact.
 PORT_EX(ProcessBlock, 0, ALL_REGISTERS & ~R_A) { BlockFuncs(gb).process_block(); }
-PORT_EX(BlockFunc_Free, 0, ALL_REGISTERS & ~R_A) { BlockFuncs(gb).free(); }
-PORT_EX(BlockFunc_Solid, 0, ALL_REGISTERS & ~R_A) { BlockFuncs(gb).solid(); }
+PORT_EX(BlockFunc_Free, 0, ALL_REGISTERS & ~R_A) { BlockFuncs b(gb); b.free(); b.exit_regs(); }
+PORT_EX(BlockFunc_Solid, 0, ALL_REGISTERS & ~R_A) { BlockFuncs b(gb); b.solid(); b.exit_regs(); }
 PORT_EX(BlockFunc_Water, HOOK_MANUAL_RET, ALL_REGISTERS) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Water); b.jump_on(); }
 PORT_EX(BlockFunc_RightCurrent, HOOK_MANUAL_RET, ALL_REGISTERS) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_RightCurrent); b.jump_on(); }
 PORT_EX(BlockFunc_UpCurrent, HOOK_MANUAL_RET, ALL_REGISTERS) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_UpCurrent); b.jump_on(); }
 PORT_EX(BlockFunc_LeftCurrent, HOOK_MANUAL_RET, ALL_REGISTERS) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_LeftCurrent); b.jump_on(); }
 PORT_EX(BlockFunc_DownCurrent, HOOK_MANUAL_RET, ALL_REGISTERS) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_DownCurrent); b.jump_on(); }
 PORT_EX(BlockFunc_Floor, HOOK_MANUAL_RET, ALL_REGISTERS) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_Floor); b.jump_on(); }
-PORT_EX(Func_1808c, 0, ALL_REGISTERS & ~R_A) { BlockFuncs(gb).free_1808c(); }
+PORT_EX(Func_1808c, 0, ALL_REGISTERS & ~R_A) { BlockFuncs b(gb); b.free_1808c(); b.exit_regs(); }
 PORT_EX(Func_182ec, HOOK_MANUAL_RET, ALL_REGISTERS) { BlockFuncs b(gb); b.dispatch(ADDR_Func_182ec); b.jump_on(); }
 PORT_EX(EnterDoor, HOOK_MANUAL_RET, ALL_REGISTERS) { BlockFuncs b(gb); b.dispatch(ADDR_EnterDoor); b.jump_on(); }
-PORT_EX(Func_18064, 0, ALL_REGISTERS & ~R_A) { BlockFuncs(gb).block_func_c18d(0x10); }
-PORT_EX(Func_18078, 0, ALL_REGISTERS & ~R_A) { BlockFuncs(gb).block_func_c18d(0x01); }
+PORT_EX(Func_18064, 0, ALL_REGISTERS & ~R_A) { BlockFuncs b(gb); b.block_func_c18d(0x10); b.exit_regs(); }
+PORT_EX(Func_18078, 0, ALL_REGISTERS & ~R_A) { BlockFuncs b(gb); b.block_func_c18d(0x01); b.exit_regs(); }
 PORT_EX(BlockFunc_180b5, HOOK_MANUAL_RET, ALL_REGISTERS) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_180b5); b.jump_on(); }
 PORT_EX(BlockFunc_1813f, HOOK_MANUAL_RET, ALL_REGISTERS) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1813f); b.jump_on(); }
 PORT_EX(BlockFunc_1809f, HOOK_MANUAL_RET, ALL_REGISTERS) { BlockFuncs b(gb); b.dispatch(ADDR_BlockFunc_1809f); b.jump_on(); }

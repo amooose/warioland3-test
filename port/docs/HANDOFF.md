@@ -67,9 +67,11 @@ scripting and expansion on top. The approach:
   and Object::call_a / call_bc are gone, and move_wario takes only its
   four routines. Their home wrappers (object_mechanics.cpp's homecalls,
   Func_3513 and the like) are now reached only by the difftest and
-  fuzzer. Still passing registers in play: the block functions (their
-  result in a; BlockFuncs reads b and hl from the CPU, process_block's
-  default calls by address), the copied V-Blank functions' palette calls
+  fuzzer. Block functions keep their result in BlockFuncs::a_ (from the
+  caller's a); hooks hand it over in a (exit_regs, leave) and the plain
+  process_block returns it. Still passing registers in play: the block
+  functions' leave() (b and hl, which objects read on; a for calls by
+  address), the copied V-Blank functions' palette calls
   (fades.cpp apply_vblank, exact-register hooks reached through
   wVBlankFunc), and object_mechanics' homejp states. Then step 2: the
   wrappers nothing reaches in play go under WL3_INTERPRETER.
