@@ -15,7 +15,7 @@ namespace wl3::cutscenes {
 
 class Cutscenes {
 public:
-	explicit Cutscenes(GB *gb) : gb_(gb), mem_(gb), wram_(gb), routines_(gb) {}
+	explicit Cutscenes(GB *gb) : gb_(gb), mem_(gb, BANK_DoCutsceneFunc), wram_(gb), routines_(gb) {}
 
 	void update(); // DoCutsceneFunc
 	void init(); // InitEventCutscene

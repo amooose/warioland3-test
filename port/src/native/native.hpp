@@ -23,12 +23,24 @@ namespace wl3 {
 
 // A byte of the Game Boy's address space. Reads and writes go through the
 // memory map (WRAM banking, I/O side effects), as the original's did.
+// A read of ROM bank `bank` at addr (RomPtr's; defined after it)
+uint8_t rom_read(GB *gb, uint8_t bank, uint16_t addr);
+
+// A read through the memory map, or with code_bank >= 0 its ROMX reads from
+// that bank (a module's own: Memory(gb, bank)) whatever is mapped
+inline uint8_t mem_read(GB *gb, int code_bank, uint16_t addr)
+{
+	if (code_bank >= 0 && addr >= 0x4000 && addr < 0x8000)
+		return rom_read(gb, static_cast<uint8_t>(code_bank), addr);
+	return gb_read(gb, addr);
+}
+
 class Byte {
 public:
-	Byte(GB *gb, uint16_t addr) : gb_(gb), addr_(addr) {}
+	Byte(GB *gb, uint16_t addr, int code_bank = -1) : gb_(gb), addr_(addr), bank_(code_bank) {}
 	Byte(const Byte &) = default; // another view of the same byte
 
-	operator uint8_t() const { return gb_read(gb_, addr_); }
+	operator uint8_t() const { return mem_read(gb_, bank_, addr_); }
 	Byte &operator=(uint8_t v)
 	{
 		gb_write(gb_, addr_, v);
@@ -53,17 +65,19 @@ public:
 private:
 	GB *gb_;
 	uint16_t addr_;
+	int bank_;
 };
 
 // A 16-bit value stored little-endian (dw): low byte first.
 class Word {
 public:
-	Word(GB *gb, uint16_t addr) : gb_(gb), addr_(addr) {}
+	Word(GB *gb, uint16_t addr, int code_bank = -1) : gb_(gb), addr_(addr), bank_(code_bank) {}
 	Word(const Word &) = default;
 
 	operator uint16_t() const
 	{
-		return static_cast<uint16_t>(gb_read(gb_, addr_) | gb_read(gb_, addr_ + 1) << 8);
+		return static_cast<uint16_t>(mem_read(gb_, bank_, addr_)
+			| mem_read(gb_, bank_, static_cast<uint16_t>(addr_ + 1)) << 8);
 	}
 	Word &operator=(uint16_t v)
 	{
@@ -72,16 +86,17 @@ public:
 		return *this;
 	}
 	Word &operator=(const Word &other) { return *this = static_cast<uint16_t>(other); }
-	Byte lo() const { return Byte(gb_, addr_); }
-	Byte hi() const { return Byte(gb_, static_cast<uint16_t>(addr_ + 1)); }
+	Byte lo() const { return Byte(gb_, addr_, bank_); }
+	Byte hi() const { return Byte(gb_, static_cast<uint16_t>(addr_ + 1), bank_); }
 	uint16_t addr() const { return addr_; }
 
 private:
 	GB *gb_;
 	uint16_t addr_;
+	int bank_;
 };
 
-inline Word Byte::word() const { return Word(gb_, addr_); }
+inline Word Byte::word() const { return Word(gb_, addr_, bank_); }
 
 // A big-endian word in memory: its high byte first (the game's positions in
 // the level, pointers it keeps as hi / lo, the sound IDs)
@@ -167,16 +182,21 @@ private:
 	bool mapped_ = false;
 };
 
+inline uint8_t rom_read(GB *gb, uint8_t bank, uint16_t addr) { return RomPtr(gb, bank, addr)[0]; }
+
 // RomPtr at a label: ROM(gb, Pals_86a4d)
 #define ROM(gb, label) ::wl3::RomPtr((gb), BANK_##label, ADDR_##label)
 
 class Memory {
 public:
 	explicit Memory(GB *gb) : gb_(gb) {}
+	// a module's memory: its ROMX reads from code_bank, the bank its code is
+	// in (the one the asm has mapped as it runs), whatever is mapped
+	Memory(GB *gb, uint8_t code_bank) : gb_(gb), bank_(code_bank) {}
 
-	Byte operator[](uint16_t addr) const { return Byte(gb_, addr); }
-	Byte byte(uint16_t addr) const { return Byte(gb_, addr); }
-	Word word(uint16_t addr) const { return Word(gb_, addr); }
+	Byte operator[](uint16_t addr) const { return Byte(gb_, addr, bank_); }
+	Byte byte(uint16_t addr) const { return Byte(gb_, addr, bank_); }
+	Word word(uint16_t addr) const { return Word(gb_, addr, bank_); }
 	GB *gb() const { return gb_; }
 
 	// The RAM by name (ram_fields.h, from the disassembly's labels: wFooBar
@@ -201,6 +221,7 @@ public:
 
 private:
 	GB *gb_;
+	int bank_ = -1;
 };
 
 } // namespace wl3
