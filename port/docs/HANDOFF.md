@@ -1359,6 +1359,14 @@ QueueBlockAttributesAlongRow_OddColumn's half first block could read
 (block about $5e to $71). None of the 14 recordings reach that read, so
 the tiers can't show the difference; see ASM_BUGS.md. Older notes in this
 file saying those frames are kept describe the earlier state.
+Audio (2026-11-09): src/native/audio/audio.hpp has plain entry points,
+used by HandleSound and Routines::play_new_music. They pass 0 for the
+caller's leftover c, which the original stores in wSoundEngineParam1 (also
+wCurSoundID, wTempTrackPriority); every reader writes it first, but the
+traces compare it. Action Help's volume mod still goes through the
+ExecuteAudioMod hook, since there the leftover c varies ($00, $10).
+Collisions::block still calls GetBlockPtr: ProcessBlock reads its hl and b
+(a plain block_ptr call broke the full tier but passed the quick one).
 To find what reads a register: poison it, relax the contracts, run the
 full tier. Stop if the build fails: ctest happily runs the old binary.
 Routines nothing references and whose callers' hooks have their own copies
