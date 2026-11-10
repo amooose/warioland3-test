@@ -23,7 +23,7 @@ namespace wl3::level {
 
 class WarioStateBase : public AsmModule {
 public:
-	using AsmModule::AsmModule;
+	using AsmModule::AsmModule; // (gb) or (gb, code_bank)
 
 protected:
 	void st(uint16_t addr, uint8_t v) { wr8(addr, v); }

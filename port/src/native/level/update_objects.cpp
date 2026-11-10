@@ -20,7 +20,7 @@ namespace {
 
 class ObjectEngine : public AsmModule {
 public:
-	using AsmModule::AsmModule;
+	explicit ObjectEngine(GB *gb) : AsmModule(gb, BANK_UpdateObjects) {} // all in bank $18
 
 	#define OBJ_STRUCT_SIZE (wObj2Flags - wObj1Flags)
 

@@ -12,7 +12,7 @@ namespace {
 
 class WarioStates1 : public WarioStateBase {
 public:
-	using WarioStateBase::WarioStateBase;
+	explicit WarioStates1(GB *gb) : WarioStateBase(gb, BANK_UpdateWarioStates_Group1) {} // its ROM data from its bank
 
 	void port_Func_1e6ea()
 	{

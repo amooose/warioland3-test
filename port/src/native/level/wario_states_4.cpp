@@ -11,7 +11,7 @@ namespace {
 
 class WarioStates4 : public WarioStateBase {
 public:
-	using WarioStateBase::WarioStateBase;
+	explicit WarioStates4(GB *gb) : WarioStateBase(gb, BANK_UpdateWarioStates_Group4) {} // its ROM data from its bank
 
 	void port_SetState_Splitting()
 	{

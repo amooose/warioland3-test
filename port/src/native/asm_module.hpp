@@ -51,11 +51,18 @@ constexpr uint8_t OAM3 = BANK_OAM_1dc000; // BANK("Wario OAM 3")
 class AsmModule {
 public:
 	explicit AsmModule(GB *gb) : gb_(gb), cpu_(gb->cpu), mem_(gb), routines_(gb), alu_(gb->cpu) {}
+	// a module whose code is all in code_bank: its ROMX reads from there
+	// (the bank the asm has mapped as it runs), whatever is mapped
+	AsmModule(GB *gb, uint8_t code_bank)
+		: gb_(gb), cpu_(gb->cpu), mem_(gb, code_bank), routines_(gb), alu_(gb->cpu), code_bank_(code_bank) {}
 
 protected:
-	uint8_t rd8(uint16_t addr) const { return gb_read(gb_, addr); }
+	uint8_t rd8(uint16_t addr) const { return mem_read(gb_, code_bank_, addr); }
 	void wr8(uint16_t addr, uint8_t v) { gb_write(gb_, addr, v); }
-	uint16_t rd16(uint16_t addr) const { return gb_read16(gb_, addr); }
+	uint16_t rd16(uint16_t addr) const
+	{
+		return static_cast<uint16_t>(rd8(addr) | rd8(static_cast<uint16_t>(addr + 1)) << 8);
+	}
 	void wr16(uint16_t addr, uint16_t v) { gb_write16(gb_, addr, v); }
 
 	// ld a, v / ld [addr], a
@@ -299,6 +306,7 @@ protected:
 	Memory mem_;
 	Routines routines_;
 	Alu alu_;
+	int code_bank_ = -1; // -1: ROM through the memory map
 };
 
 } // namespace wl3

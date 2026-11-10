@@ -11,7 +11,7 @@ namespace {
 
 class WarioStates3 : public WarioStateBase {
 public:
-	using WarioStateBase::WarioStateBase;
+	explicit WarioStates3(GB *gb) : WarioStateBase(gb, BANK_UpdateWarioStates_Group3) {} // its ROM data from its bank
 
 	// the 16-bit big-endian counter, decremented: the new value
 	uint16_t port_DecrementTransformationDuration()
@@ -938,7 +938,7 @@ public:
 		}
 		// Func_1f863: up by the table's entry at the jump velocity index
 		routines_.in_bank(BANK_Func_1f863, ADDR_Func_1f863, [&] {
-			home::move_wario_y(gb_, -rd8(static_cast<uint16_t>(ADDR_SwimStraightVelTable + index)));
+			home::move_wario_y(gb_, -ROM(gb_, SwimStraightVelTable)[index]); // in Func_1f863's bank
 		});
 	}
 

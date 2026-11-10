@@ -16,6 +16,8 @@ namespace wl3::title {
 class Screen {
 public:
 	explicit Screen(GB *gb) : gb_(gb), mem_(gb), wram_(gb), hram_(gb), routines_(gb) {}
+	// a screen whose code is all in code_bank: its ROM data from there
+	Screen(GB *gb, uint8_t code_bank) : gb_(gb), mem_(gb, code_bank), wram_(gb), hram_(gb), routines_(gb) {}
 
 protected:
 	Byte ram(uint16_t addr) const { return mem_[addr]; }
@@ -33,7 +35,7 @@ protected:
 
 class Title : public Screen {
 public:
-	using Screen::Screen;
+	explicit Title(GB *gb) : Screen(gb, BANK_TitleStateTable) {} // all in bank 1
 
 	void run_state(); // TitleStateTable.jump
 

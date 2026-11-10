@@ -10,7 +10,7 @@ namespace {
 
 class WarioStates2 : public WarioStateBase {
 public:
-	using WarioStateBase::WarioStateBase;
+	explicit WarioStates2(GB *gb) : WarioStateBase(gb, BANK_UpdateWarioStates_Group2) {} // its ROM data from its bank
 
 	// The slipping movement shared by the slipping states, from
 	// ld hl, wWarioStateCounter / inc [hl] on. Returns true if it ends at the
