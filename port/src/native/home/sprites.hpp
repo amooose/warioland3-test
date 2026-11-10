@@ -16,7 +16,9 @@ struct SpriteEnd {
 	uint8_t oam;   // wVirtualOAMByteSize
 	bool full;     // stopped by virtual OAM filling up
 };
-SpriteEnd load_sprite(GB *gb, uint16_t table);
+SpriteEnd load_sprite(GB *gb, RomPtr table);
+// the table in the bank mapped now
+inline SpriteEnd load_sprite(GB *gb, uint16_t table) { return load_sprite(gb, RomPtr::mapped(gb, table)); }
 // for the hooks: the registers LoadSprite leaves (b and c the position,
 // de the data, hl virtual OAM, a and f from its last check)
 void set_sprite_regs(GB *gb, const SpriteEnd &end);

@@ -156,7 +156,7 @@ PORT_EX(Func_1e4b6d, 0, 0)
 	mem.cur_sprite_x_coord() = static_cast<uint8_t>(mem[static_cast<uint16_t>(obj + 1)] + OAM_X_OFS);
 	mem.cur_sprite_frame() = mem[static_cast<uint16_t>(obj + 2)];
 	mem.cur_sprite_attributes() = mem[static_cast<uint16_t>(obj + 3)];
-	wl3::home::set_sprite_regs(gb, wl3::home::load_sprite(gb, ADDR_OAM_1e6bab));
+	wl3::home::set_sprite_regs(gb, wl3::home::load_sprite(gb, ROM(gb, OAM_1e6bab)));
 }
 
 // Only C++ modules call these now.

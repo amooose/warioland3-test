@@ -108,6 +108,60 @@ private:
 };
 
 // The Game Boy's address space, as the CPU sees it.
+// A place in the ROM by its bank and address (BANK(label) / label), read
+// straight from the loaded ROM whatever bank is mapped. Indexing and
+// stepping stay in the bank, as the asm's reads do within a ROMX bank.
+class RomPtr {
+public:
+	RomPtr(GB *gb, uint8_t bank, uint16_t addr) : gb_(gb), bank_(bank), addr_(addr) {}
+
+	uint8_t operator[](unsigned i) const { return at(static_cast<uint16_t>(addr_ + i)); }
+	uint8_t operator*() const { return at(addr_); }
+	RomPtr operator+(int n) const { return with_addr(static_cast<uint16_t>(addr_ + n)); }
+	RomPtr &operator+=(int n) { addr_ = static_cast<uint16_t>(addr_ + n); return *this; }
+	RomPtr &operator++() { ++addr_; return *this; }
+	// another address in the same bank (a pointer read from this table)
+	RomPtr with_addr(uint16_t addr) const
+	{
+		RomPtr p(gb_, bank_, addr);
+		p.mapped_ = mapped_;
+		return p;
+	}
+	// a little-endian word (dw), and a big-endian one (dbw's hi, lo)
+	uint16_t word(unsigned i = 0) const { return static_cast<uint16_t>((*this)[i] | (*this)[i + 1] << 8); }
+	uint16_t word_be(unsigned i = 0) const { return static_cast<uint16_t>((*this)[i] << 8 | (*this)[i + 1]); }
+	uint8_t bank() const { return bank_; }
+	uint16_t addr() const { return addr_; }
+	// addr in the bank mapped now (for code not yet given its bank)
+	// (--romx-report counts its reads as reads through the bank mapped)
+	static RomPtr mapped(GB *gb, uint16_t addr)
+	{
+		RomPtr p(gb, static_cast<uint8_t>(gb->rom_bank), addr);
+		p.mapped_ = true;
+		return p;
+	}
+
+private:
+	uint8_t at(uint16_t addr) const
+	{
+		if (addr >= 0x8000) // a table copied to RAM
+			return gb_read(gb_, addr);
+		size_t off = addr < 0x4000 ? addr : static_cast<size_t>(bank_ % gb_->rom_banks) * 0x4000 + (addr - 0x4000);
+		if (mapped_ && gb_->romx_reads && addr >= 0x4000) {
+			gb_->romx_reads[off]++;
+			gb_->romx_reader[off] = static_cast<uint32_t>(gb_->cpu.pc < 0x4000 ? 0 : gb_->rom_bank) << 16 | gb_->cpu.pc;
+		}
+		return gb_->rom[off];
+	}
+	GB *gb_;
+	uint8_t bank_;
+	uint16_t addr_;
+	bool mapped_ = false;
+};
+
+// RomPtr at a label: ROM(gb, Pals_86a4d)
+#define ROM(gb, label) ::wl3::RomPtr((gb), BANK_##label, ADDR_##label)
+
 class Memory {
 public:
 	explicit Memory(GB *gb) : gb_(gb) {}

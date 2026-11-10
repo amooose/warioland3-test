@@ -102,7 +102,7 @@ void set_scene_obj_state(GB *gb, uint16_t state_addr, uint8_t state)
 SpriteEnd load_ow_sprite(GB *gb, uint8_t bank, uint16_t table, uint16_t obj)
 {
 	set_cur_sprite(Memory(gb), obj, 0, 0);
-	return in_bank(gb, bank, ADDR_LoadOWSprite, [&] { return load_sprite(gb, table); });
+	return in_bank(gb, bank, ADDR_LoadOWSprite, [&] { return load_sprite(gb, RomPtr(gb, bank, table)); });
 }
 
 SpriteEnd load_ow_sprite_with_scroll(GB *gb, uint8_t bank, uint16_t table, uint16_t obj)
@@ -114,7 +114,7 @@ SpriteEnd load_ow_sprite_with_scroll(GB *gb, uint8_t bank, uint16_t table, uint1
 
 SpriteEnd load_ow_sprite_got_params(GB *gb, uint8_t bank, uint16_t table)
 {
-	return in_bank(gb, bank, ADDR_LoadOWSpriteWithScroll_GotParams, [&] { return load_sprite(gb, table); });
+	return in_bank(gb, bank, ADDR_LoadOWSpriteWithScroll_GotParams, [&] { return load_sprite(gb, RomPtr(gb, bank, table)); });
 }
 
 // a byte per 8 treasures, bit by the treasure's low 3 bits

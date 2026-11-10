@@ -104,6 +104,12 @@ static uint8_t gb_read_mem(GB *gb, uint16_t addr)
 	case 0x0: case 0x1: case 0x2: case 0x3:
 		return gb->rom[addr];
 	case 0x4: case 0x5: case 0x6: case 0x7:
+		if (gb->romx_reads)
+		{
+			size_t off = (size_t)(gb->rom_bank % gb->rom_banks) * 0x4000 + (addr - 0x4000);
+			gb->romx_reads[off]++;
+			gb->romx_reader[off] = (uint32_t)(gb->cpu.pc < 0x4000 ? 0 : gb->rom_bank) << 16 | gb->cpu.pc;
+		}
 		return rom_bank_ptr(gb, gb->rom_bank)[addr - 0x4000];
 	case 0x8: case 0x9:
 		return gb->vram[gb->io[0x4f] & 1][addr - 0x8000];

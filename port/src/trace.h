@@ -20,5 +20,7 @@ bool trace_write(GB *gb, const InputScript *input, int end_frame, const char *pa
 // profile_path, also write there what the interpreter still ran (asm the
 // native routines don't cover yet), by label.
 bool trace_check(GB *gb, const InputScript *input, const char *path, const char *profile_path);
+// --romx-report: gb->romx_reads by label
+bool write_romx_report(const GB *gb, const char *path);
 
 #endif

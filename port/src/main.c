@@ -395,6 +395,8 @@ static void usage(const char *argv0)
 		"  --trace-check PATH    replay --input with the ported routines and compare\n"
 		"                        every game frame against the trace\n"
 		"  --asm-profile PATH    with --trace-check: write what still ran as asm\n"
+		"  --romx-report PATH    with --trace-check: write the ROMX reads through the\n"
+		"                        memory map (the bank mapped), by label\n"
 		"  --trace               print CPU state every frame\n"
 		"  --hook-report PATH    at exit, write how often each hook ran and how it\n"
 		"                        was reached (by a native call, a jump or an interrupt)\n"
@@ -491,6 +493,7 @@ int main(int argc, char **argv)
 	bool no_hooks = false, force_hooks = false, difftest = false;
 	const char *coverage_path = NULL, *fuzz_routine = NULL;
 	const char *trace_write_path = NULL, *trace_check_path = NULL, *asm_profile_path = NULL;
+	const char *romx_report_path = NULL;
 	bool fuzz = false, fuzz_verbose = false;
 	int fuzz_variants = 0, fuzz_shard_i = 0, fuzz_shard_n = 1;
 	static Frontend fe;
@@ -516,6 +519,7 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--trace-write") && next) trace_write_path = argv[++i];
 		else if (!strcmp(a, "--trace-check") && next) trace_check_path = argv[++i];
 		else if (!strcmp(a, "--asm-profile") && next) asm_profile_path = argv[++i];
+		else if (!strcmp(a, "--romx-report") && next) romx_report_path = argv[++i];
 		else if (!strcmp(a, "--coverage") && next) coverage_path = argv[++i];
 		else if (!strcmp(a, "--fuzz")) fuzz = true;
 		else if (!strcmp(a, "--fuzz-variants") && next) fuzz_variants = atoi(argv[++i]);
@@ -620,8 +624,15 @@ int main(int argc, char **argv)
 			return coverage_run(&gb, script, end, coverage_path) ? 0 : 1;
 		if (trace_write_path)
 			return trace_write(&gb, script, end, trace_write_path) ? 0 : 1;
-		if (trace_check_path)
-			return trace_check(&gb, script, trace_check_path, asm_profile_path) ? 0 : 1;
+		if (trace_check_path) {
+			if (romx_report_path)
+				gb.romx_reads = calloc(gb.rom_size, sizeof(uint64_t)),
+				gb.romx_reader = calloc(gb.rom_size, sizeof(uint32_t));
+			bool ok = trace_check(&gb, script, trace_check_path, asm_profile_path);
+			if (romx_report_path && !write_romx_report(&gb, romx_report_path))
+				fprintf(stderr, "can't write %s\n", romx_report_path);
+			return ok ? 0 : 1;
+		}
 		if (fuzz) {
 			fuzz_configure(fuzz_variants, fuzz_routine, fuzz_shard_i, fuzz_shard_n, fuzz_verbose);
 			return fuzz_run(&gb, script, end) ? 0 : 1;

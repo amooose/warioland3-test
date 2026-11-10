@@ -6,22 +6,23 @@
 
 namespace wl3::home {
 
-SpriteEnd load_sprite(GB *gb, uint16_t table)
+SpriteEnd load_sprite(GB *gb, RomPtr table)
 {
 	Memory mem(gb);
-	uint16_t data = mem.word(static_cast<uint16_t>(table + static_cast<uint8_t>(mem.cur_sprite_frame() * 2)));
+	RomPtr data = table.with_addr(table.word(static_cast<uint8_t>(mem.cur_sprite_frame() * 2)));
 	uint8_t y = mem.cur_sprite_y_coord(), x = mem.cur_sprite_x_coord();
 	uint8_t oam = mem.virtual_oam_byte_size();
 	for (;;) {
 		if (oam >= OAM_SIZE)
-			return {data, oam, true};
-		if (mem[data] == 0x80)
-			return {data, oam, false};
+			return {data.addr(), oam, true};
+		if (*data == 0x80)
+			return {data.addr(), oam, false};
 		uint16_t dest = static_cast<uint16_t>((wVirtualOAM & 0xff00) | oam);
-		mem[dest++] = static_cast<uint8_t>(mem[data++] + y);
-		mem[dest++] = static_cast<uint8_t>(mem[data++] + x);
-		mem[dest++] = mem[data++];
-		mem[dest++] = static_cast<uint8_t>(mem[data++] ^ mem.cur_sprite_attributes());
+		mem[dest++] = static_cast<uint8_t>(data[0] + y);
+		mem[dest++] = static_cast<uint8_t>(data[1] + x);
+		mem[dest++] = data[2];
+		mem[dest++] = static_cast<uint8_t>(data[3] ^ mem.cur_sprite_attributes());
+		data += 4;
 		oam = static_cast<uint8_t>(dest);
 		mem.virtual_oam_byte_size() = oam;
 	}
@@ -46,7 +47,7 @@ bool draw_wario(GB *gb, SpriteEnd *end)
 	mem.cur_sprite_x_coord() = mem.wario_screen_x_pos();
 	mem.cur_sprite_frame() = mem.wario_frame();
 	mem.cur_sprite_attributes() = mem.wario_attributes();
-	SpriteEnd sprite = load_sprite(gb, table);
+	SpriteEnd sprite = load_sprite(gb, RomPtr(gb, mem.temp_bank(), table));
 	if (end)
 		*end = sprite;
 	bankswitch(gb, bank, ADDR_DrawWario);

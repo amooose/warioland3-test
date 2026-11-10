@@ -169,6 +169,11 @@ typedef struct GB {
 	// Counts of the instructions the interpreter runs (not native code):
 	// one per ROM byte, then one per address $0000-$ffff for code in RAM.
 	uint64_t *asm_profile;
+	// Counts of the reads of ROMX through the memory map (the bank mapped),
+	// one per ROM byte: what still relies on bank switching (--romx-report)
+	uint64_t *romx_reads;
+	// and for each ROM byte, the routine running at its last read (bank << 16 | pc)
+	uint32_t *romx_reader;
 	uint16_t tap_addr;
 	bool tap_override;
 	uint8_t tap_value;

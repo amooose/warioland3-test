@@ -123,8 +123,12 @@ static void hdma_copy_block(GB *gb)
 {
 	uint16_t src = (uint16_t)((gb->io[0x51] << 8 | gb->io[0x52]) & 0xfff0);
 	uint16_t dst = (uint16_t)(((gb->io[0x53] << 8 | gb->io[0x54]) & 0x1ff0) | 0x8000);
+	// the hardware reading the bank mapped: not native code's (--romx-report)
+	uint64_t *romx_reads = gb->romx_reads;
+	gb->romx_reads = NULL;
 	for (int i = 0; i < 16; i++)
 		gb->vram[gb->io[0x4f] & 1][(dst + i) & 0x1fff] = gb_read(gb, (uint16_t)(src + i));
+	gb->romx_reads = romx_reads;
 	src += 16;
 	dst += 16;
 	gb->io[0x51] = (uint8_t)(src >> 8);

@@ -102,6 +102,25 @@ scripting and expansion on top. The approach:
   `wr8(wFoo, v);`, and those fields' byte pairs. Left raw: offsets into
   tables and structs (wCurObj's other fields, wHDMA, wTimer's bytes, the
   camera), which want structs next.
+- **ROM data by bank (step 3, started).** RomPtr (native.hpp) reads the
+  loaded ROM by bank and address (`ROM(gb, Label)`, `RomPtr(gb, bank,
+  addr)`), whatever is mapped; RAM addresses still go through the memory
+  map. The port ships no ROM content, so ROM data stays views into the
+  player's ROM, not generated arrays. `tools/romx_report.sh` (after the
+  quick tier) runs every recording's trace check with --romx-report and
+  lists each label still read through the bank mapped, with a routine
+  reading it (the pc native code last set: approximate). That list is the
+  worklist; when it's empty the bank switches in play are bookkeeping
+  only, and step 4 (no bank switching) can drop them, once the trace check
+  stops comparing that bookkeeping (rom_bank, wROMBank, hCallFunc's bank),
+  a verification change to make together with it. HDMA's reads are the
+  hardware's and aren't counted (they go with the renderer).
+  RomPtr::mapped(gb, addr) stands for "the bank mapped now" in code not
+  yet given its bank, and still counts. First converted: load_sprite and
+  its callers that name the bank (DrawWario, the OW sprites, the action
+  help's). First report (2026-11-10): 1,932 labels, nearly all data read
+  through a few generic readers: sprite tables (OAM_*), animated tiles,
+  framesets, the audio engine's tables, block maps.
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`.
 - **Progress (2026-10-31):** 3497 / 3497 routines are ported. While the
   port plays the recordings, the interpreter runs no instructions at all

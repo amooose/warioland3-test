@@ -393,6 +393,7 @@ typedef struct {
 	uint64_t count;
 	int distinct;
 	bool ported;
+	uint32_t reader; // --romx-report: a routine that read it
 } ProfLabel;
 
 static int by_off(const void *a, const void *b)
@@ -496,6 +497,58 @@ static bool write_profile(const GB *gb, const char *path)
 	}
 	fclose(f);
 	printf("trace: asm profile written to %s (%llu instructions interpreted)\n", path, (unsigned long long)total);
+	free(l);
+	return true;
+}
+
+// The ROMX reads through the memory map, by label: "count distinct label
+// code|data" (code: the label has a hook), most read first
+bool write_romx_report(const GB *gb, const char *path)
+{
+	size_t n = 0, cap = (size_t)sym_count();
+	ProfLabel *l = calloc(cap ? cap : 1, sizeof(ProfLabel));
+	for (int i = 0; i < sym_count(); i++) {
+		const char *name;
+		int bank;
+		uint16_t addr;
+		if (!sym_get(i, &name, &bank, &addr) || strchr(name, '.') || addr < 0x4000 || addr >= 0x8000)
+			continue;
+		l[n++] = (ProfLabel){prof_off(gb, bank, addr), name, 0, 0, false};
+	}
+	qsort(l, n, sizeof(*l), by_off);
+	for (int i = 0; i < hook_count(); i++) {
+		Hook *h = hook_get(i);
+		long k = label_at(l, n, prof_off(gb, h->bank, h->addr));
+		if (k >= 0 && l[k].off == prof_off(gb, h->bank, h->addr))
+			l[k].ported = true;
+	}
+	uint64_t total = 0;
+	for (size_t off = 0x4000; off < gb->rom_size; off++) {
+		uint64_t c = gb->romx_reads[off];
+		if (!c)
+			continue;
+		long k = label_at(l, n, off);
+		if (k < 0)
+			continue;
+		l[k].count += c;
+		l[k].distinct++;
+		if (!l[k].reader)
+			l[k].reader = gb->romx_reader[off];
+		total += c;
+	}
+	qsort(l, n, sizeof(*l), by_count);
+	FILE *f = fopen(path, "w");
+	if (!f) {
+		free(l);
+		return false;
+	}
+	fprintf(f, "# ROMX reads through the memory map: %llu\n# count distinct label kind reader\n", (unsigned long long)total);
+	for (size_t i = 0; i < n && l[i].count; i++) {
+		const char *by = sym_name_at((int)(l[i].reader >> 16), (uint16_t)l[i].reader);
+		fprintf(f, "%llu %d %s %s %s\n", (unsigned long long)l[i].count, l[i].distinct, l[i].name,
+			l[i].ported ? "code" : "data", by ? by : "?");
+	}
+	fclose(f);
 	free(l);
 	return true;
 }
