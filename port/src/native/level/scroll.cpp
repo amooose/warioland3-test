@@ -271,7 +271,7 @@ void EdgeQueue::update()
 		}
 		queue_column_at_block();
 		mem_[wLevelEdgeUpdateFlags] &= ~(right ? LEVEL_EDGE_UPDATE_RIGHT : LEVEL_EDGE_UPDATE_LEFT);
-		routines_.farcall(BANK_SpawnRowEdgeObjects, ADDR_SpawnRowEdgeObjects);
+		routines_.in_bank(BANK_SpawnRowEdgeObjects, ADDR_SpawnRowEdgeObjects, [&] { spawn_row_edge_objects(gb_); });
 		edges = mem_[wLevelEdgeUpdateFlags];
 	}
 	// .check_vertical_direction
@@ -288,7 +288,7 @@ void EdgeQueue::update()
 	set_be(wBlockXPos, left_x());
 	queue_edge_row();
 	mem_[wLevelEdgeUpdateFlags] &= ~(up ? LEVEL_EDGE_UPDATE_UP : LEVEL_EDGE_UPDATE_DOWN);
-	routines_.farcall(BANK_SpawnColEdgeObjects, ADDR_SpawnColEdgeObjects);
+	routines_.in_bank(BANK_SpawnColEdgeObjects, ADDR_SpawnColEdgeObjects, [&] { spawn_col_edge_objects(gb_); });
 }
 
 } // namespace

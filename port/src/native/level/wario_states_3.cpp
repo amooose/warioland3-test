@@ -2,6 +2,7 @@
 // hot, flat, ball o' string, fat, electric, invisible, puffy, zombie,
 // bouncy, crazy, vampire and bat, in bubble, as plain C++ over
 // WarioStateBase. Its hooks are the labels called from other files.
+#include "frame.hpp"
 #include "wario_state_base.hpp"
 
 namespace wl3::level {
@@ -2841,4 +2842,8 @@ PORT_COVERED(UpdateState_VampireAirborne);
 PORT_COVERED(UpdateState_BatFlying);
 PORT_COVERED(UpdateState_CrazySpinning);
 PORT_COVERED(UpdateState_InBubble);
-PORT_EX(UpdateWarioStates_Group3, 0, ALL_REGISTERS) { WarioStates3(gb).port_UpdateWarioStates_Group3(); }
+PORT_EX(UpdateWarioStates_Group3, 0, ALL_REGISTERS) { wl3::level::update_wario_states_group3(gb); }
+
+namespace wl3::level {
+void update_wario_states_group3(GB *gb) { WarioStates3(gb).port_UpdateWarioStates_Group3(); }
+} // namespace wl3::level

@@ -5,6 +5,7 @@
 #include "../asm_module.hpp"
 #include "memory.hpp"
 #include "system.hpp"
+#include "../level/frame.hpp"
 #include "../engine/main_state_table.hpp"
 #include "../audio/audio.hpp"
 
@@ -113,9 +114,10 @@ public:
 				idle(32);
 
 		if (mem[wRoomAnimatedTilesEnabled])
-			routines_.farcall(BANK_UpdateRoomAnimatedTiles, ADDR_UpdateRoomAnimatedTiles);
+			routines_.in_bank(BANK_UpdateRoomAnimatedTiles, ADDR_UpdateRoomAnimatedTiles,
+				[&] { level::update_room_animated_tiles(gb_); });
 		if (mem[wRoomAnimatedPalsEnabled])
-			routines_.call(ADDR_UpdateRoomAnimatedPals);
+			update_room_animated_pals(gb_);
 
 		// enable the V-Blank handler and wait for it
 		mem[wEnableVBlankFunc] = TRUE;

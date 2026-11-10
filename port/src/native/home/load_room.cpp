@@ -6,6 +6,7 @@
 // game loop) and read no registers after, so the hooks clobber them all.
 // The debug asserts jump to Init with the asm's push af still on the
 // stack.
+#include "../level/frame.hpp"
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
@@ -245,6 +246,10 @@ PORT_EX(LoadRoomTileMap, 0, ALL_REGISTERS) { RoomLoader(gb).load_tile_map(); }
 PORT_EX(LoadRoomMainTiles, 0, ALL_REGISTERS) { RoomLoader(gb).load_main_tiles(); }
 PORT_EX(LoadRoomSpecialTiles, 0, ALL_REGISTERS) { RoomLoader(gb).load_special_tiles(); }
 PORT_EX(LoadRoomPalettes, 0, ALL_REGISTERS) { RoomLoader(gb).load_palettes(); }
-PORT_EX(UpdateRoomAnimatedPals, 0, ALL_REGISTERS) { RoomLoader(gb).update_animated_pals(); }
+PORT_EX(UpdateRoomAnimatedPals, 0, ALL_REGISTERS) { wl3::home::update_room_animated_pals(gb); }
 PORT_EX(LoadBlockFunctionTable, HOOK_MANUAL_RET, ALL_REGISTERS) { RoomLoader(gb).load_block_function_table(); }
 PORT_EX(LoadRoom, HOOK_MANUAL_RET, ALL_REGISTERS) { RoomLoader(gb).load(); }
+
+namespace wl3::home {
+void update_room_animated_pals(GB *gb) { RoomLoader(gb).update_animated_pals(); }
+} // namespace wl3::home

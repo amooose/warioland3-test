@@ -2,6 +2,7 @@
 // (src/engine/level/spawn_edge.asm). Plain C++ over memory: the edge
 // drawing (scroll.cpp) farcalls them and reads no registers after, so the
 // hooks clobber them all.
+#include "frame.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
 #include "object.hpp"
@@ -102,5 +103,10 @@ void EdgeSpawner::spawn_column()
 
 using wl3::level::EdgeSpawner;
 
-PORT_EX(SpawnRowEdgeObjects, 0, ALL_REGISTERS) { EdgeSpawner(gb).spawn_row(); }
-PORT_EX(SpawnColEdgeObjects, 0, ALL_REGISTERS) { EdgeSpawner(gb).spawn_column(); }
+PORT_EX(SpawnRowEdgeObjects, 0, ALL_REGISTERS) { wl3::level::spawn_row_edge_objects(gb); }
+PORT_EX(SpawnColEdgeObjects, 0, ALL_REGISTERS) { wl3::level::spawn_col_edge_objects(gb); }
+
+namespace wl3::level {
+void spawn_row_edge_objects(GB *gb) { EdgeSpawner(gb).spawn_row(); }
+void spawn_col_edge_objects(GB *gb) { EdgeSpawner(gb).spawn_column(); }
+} // namespace wl3::level

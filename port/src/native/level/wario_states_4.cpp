@@ -2,6 +2,7 @@
 // skatin', the owl, the rail, snowman and snowball, split, fan, blind,
 // swallowed and launched, magic and ball Wario, as plain C++ over
 // WarioStateBase. Its hooks are the labels called from other files.
+#include "frame.hpp"
 #include "wario_state_base.hpp"
 
 namespace wl3::level {
@@ -1641,7 +1642,7 @@ PORT_COVERED(UpdateState_SnowballAirborne);
 PORT_COVERED(UpdateState_SnowmanAirborne);
 PORT_COVERED(UpdateState_Splitting);
 PORT_COVERED(UpdateState_SplittingAirborne);
-PORT_EX(UpdateWarioStates_Group4, 0, ALL_REGISTERS) { WarioStates4(gb).port_UpdateWarioStates_Group4(); }
+PORT_EX(UpdateWarioStates_Group4, 0, ALL_REGISTERS) { wl3::level::update_wario_states_group4(gb); }
 PORT_COVERED(SetState_BlindAirborne);
 PORT_COVERED(Func_1ed548);
 PORT_COVERED(Func_1ed558);
@@ -1651,3 +1652,7 @@ PORT_COVERED(UpdateState_BlindWalking);
 PORT_COVERED(UpdateState_BlindTurning);
 PORT_COVERED(Func_1edf93);
 PORT_COVERED(Func_1edfa4);
+
+namespace wl3::level {
+void update_wario_states_group4(GB *gb) { WarioStates4(gb).port_UpdateWarioStates_Group4(); }
+} // namespace wl3::level

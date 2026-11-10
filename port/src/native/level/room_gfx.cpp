@@ -7,6 +7,7 @@
 // is called only by LoadRoom, which reads no registers after, so those
 // hooks clobber them all. The others leave the registers and flags the
 // original does.
+#include "frame.hpp"
 #include "../flags.hpp"
 #include "../native.hpp"
 #include "../routines.hpp"
@@ -230,7 +231,7 @@ PORT_EX(InitRoomAnimatedTiles, 0, ALL_REGISTERS) { RoomGfx(gb).init_animated_til
 // de = ROOM_PALCYCLE_LENGTH, hl = the cycle's duration; a = 0, f = Z
 PORT_EX(InitRoomAnimatedPals, 0, ALL_REGISTERS) { RoomGfx(gb).init_animated_pals(); }
 
-PORT(UpdateRoomAnimatedTiles) { RoomGfx(gb).update_animated_tiles(); }
+PORT(UpdateRoomAnimatedTiles) { wl3::level::update_room_animated_tiles(gb); }
 PORT(GetBlockBGPtr) { RoomGfx(gb).block_bg_ptr(); }
 PORT(GetWarioBGPtr) { RoomGfx(gb).wario_bg_ptr(); }
 
@@ -245,3 +246,11 @@ PORT(Func_8eac)
 	gb->cpu.a = v & 0x0f;
 	gb->cpu.f = wl3::flags::and_(gb->cpu.a);
 }
+
+namespace wl3::level {
+void update_room_animated_tiles(GB *gb)
+{
+	trace_entry(gb, ADDR_UpdateRoomAnimatedTiles); // it reads LY
+	RoomGfx(gb).update_animated_tiles();
+}
+} // namespace wl3::level

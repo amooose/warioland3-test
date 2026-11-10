@@ -123,6 +123,20 @@ private:
 // Every register: for an entry point whose callers use none after it.
 #define ALL_REGISTERS (R_A | R_F | R_B | R_C | R_D | R_E | R_H | R_L)
 
+// A direct call into the routine at addr (in the bank mapped now), which the
+// CPU never reaches: lets the per-frame trace's PC callback see the entry as
+// if it had (trace.c's sites, which hand the native code the asm's LY read
+// there). Through the routine's hook, the CPU already did.
+inline void trace_entry(GB *gb, uint16_t addr)
+{
+	if (!gb->pc_cb || gb->cpu.pc == addr)
+		return;
+	uint16_t pc = gb->cpu.pc;
+	gb->cpu.pc = addr;
+	gb->pc_cb(gb);
+	gb->cpu.pc = pc;
+}
+
 // A routine the module implements inside, with no hook of its own (its
 // callers are all in the module): marks it ported for the progress report.
 // Use as PORT_COVERED(Label);

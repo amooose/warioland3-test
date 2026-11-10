@@ -22,4 +22,15 @@ void queue_scrolled_edge(GB *gb); // Func_8ed9
 // queue had nothing, else 0, as the asm leaves it)
 void queue_changed_block(GB *gb);
 
+void update_room_animated_tiles(GB *gb); // UpdateRoomAnimatedTiles
+void spawn_row_edge_objects(GB *gb); // SpawnRowEdgeObjects
+void spawn_col_edge_objects(GB *gb); // SpawnColEdgeObjects
+void update_wario_states_group2(GB *gb); // UpdateWarioStates_Group2
+void update_wario_states_group3(GB *gb); // UpdateWarioStates_Group3
+void update_wario_states_group4(GB *gb); // UpdateWarioStates_Group4
+
 } // namespace wl3::level
+
+namespace wl3::home {
+void update_room_animated_pals(GB *gb); // UpdateRoomAnimatedPals
+} // namespace wl3::home

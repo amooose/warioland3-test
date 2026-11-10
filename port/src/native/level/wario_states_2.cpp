@@ -1,6 +1,7 @@
 // Wario's states, part 2 (src/engine/level/wario_states_2.asm): slipping,
 // sand, ladders, fences, the treasure's pickup and sleeping, as plain C++
 // over WarioStateBase. Its hooks are the labels called from other files.
+#include "frame.hpp"
 #include "wario_state_base.hpp"
 
 namespace wl3::level {
@@ -1170,7 +1171,7 @@ public:
 // they clobber them all.
 using wl3::level::WarioStates2;
 
-PORT_EX(UpdateWarioStates_Group2, 0, ALL_REGISTERS) { WarioStates2(gb).port_UpdateWarioStates_Group2(); }
+PORT_EX(UpdateWarioStates_Group2, 0, ALL_REGISTERS) { wl3::level::update_wario_states_group2(gb); }
 PORT_EX(SetState_Slipping, 0, ALL_REGISTERS) { WarioStates2(gb).port_SetState_Slipping(); }
 PORT_COVERED(UpdateState_Slipping);
 PORT_EX(SetState_CrouchSlipping, 0, ALL_REGISTERS) { WarioStates2(gb).port_SetState_CrouchSlipping(); }
@@ -1239,3 +1240,7 @@ PORT_COVERED(Func_1b322);
 PORT_COVERED(Func_1b333);
 PORT_COVERED(HandleLadderInput);
 PORT_COVERED(Func_1b480);
+
+namespace wl3::level {
+void update_wario_states_group2(GB *gb) { WarioStates2(gb).port_UpdateWarioStates_Group2(); }
+} // namespace wl3::level

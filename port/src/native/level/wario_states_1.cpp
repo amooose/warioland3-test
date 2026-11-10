@@ -2956,11 +2956,14 @@ public:
 		if (state < WARIO_STATES_GROUP_1)
 			port_UpdateWarioStates_Group1(state);
 		else if (state < WARIO_STATES_GROUP_2)
-			FARCALL(UpdateWarioStates_Group2);
+			routines_.in_bank(BANK_UpdateWarioStates_Group2, ADDR_UpdateWarioStates_Group2,
+				[&] { update_wario_states_group2(gb_); });
 		else if (state < WARIO_STATES_GROUP_3)
-			FARCALL(UpdateWarioStates_Group3);
+			routines_.in_bank(BANK_UpdateWarioStates_Group3, ADDR_UpdateWarioStates_Group3,
+				[&] { update_wario_states_group3(gb_); });
 		else
-			FARCALL(UpdateWarioStates_Group4);
+			routines_.in_bank(BANK_UpdateWarioStates_Group4, ADDR_UpdateWarioStates_Group4,
+				[&] { update_wario_states_group4(gb_); });
 	}
 };
 

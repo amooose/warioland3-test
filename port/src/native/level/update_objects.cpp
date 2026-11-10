@@ -1288,9 +1288,7 @@ public:
 
 	// Return addresses (the bytes after each call, checked against the ROM).
 	#define RET_TEMPLE_HCALL 0x5261  // UpdateObject_Temple: call hCallFunc
-	#define RET_TEMPLE_ANIM 0x5264
 	#define RET_NORMAL_HCALL 0x5479  // UpdateObject: call hCallFunc
-	#define RET_NORMAL_ANIM 0x547c
 	#define RET_FLOOR_HCALL 0x55b4  // UpdateObjectDuringFloorTransition: call hCallFunc
 	#define RET_FLOOR_FRAME 0x55b7
 	#define RET_TEMPLE_LOOP 0x5316  // first call c, UpdateObject_Temple (then +7 each)
@@ -1349,13 +1347,13 @@ public:
 		case UPD_NORMAL:
 			do_object_action();
 			call_update_function(0, true, RET_NORMAL_HCALL);
-			gb_call_ret(gb_, ADDR_UpdateObjectAnimation, RET_NORMAL_ANIM);
+			home::update_object_animation(gb_);
 			check_object_on_screen();
 			break;
 		case UPD_TEMPLE:
 			do_object_action();
 			call_update_function(OBJFUNCS4_BANK, false, RET_TEMPLE_HCALL);
-			gb_call_ret(gb_, ADDR_UpdateObjectAnimation, RET_TEMPLE_ANIM);
+			home::update_object_animation(gb_);
 			check_object_on_screen();
 			break;
 		case UPD_FLOOR:
