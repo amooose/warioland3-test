@@ -256,8 +256,7 @@ static void check_frame_end(GB *gb);
 static void trace_pc(GB *gb)
 {
 	if (checking) {
-		if (gb->cpu.pc == sync_pc)
-			check_frame_end(gb);
+		// the frame ends come from the native frame loop (loop_cb)
 		replay_tap(gb);
 	} else {
 		record_tap(gb);
@@ -631,6 +630,7 @@ bool trace_check(GB *gb, const InputScript *input, const char *path, const char 
 	gb->frame_cb = trace_frame;
 	gb->pc_cb = trace_pc;
 	gb->read_cb = trace_read;
+	gb->loop_cb = check_frame_end;
 	chk_recs = recs;
 	chk_n = n;
 	chk_i = 0;

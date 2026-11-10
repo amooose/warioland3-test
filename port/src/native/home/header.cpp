@@ -97,6 +97,31 @@ public:
 
 } // namespace
 
+// Interrupt i taken as the CPU takes it (cpu.c's service_interrupts), its
+// handler run to the reti: for the native frame loop, which waits for
+// V-Blank without the CPU
+void take_interrupt(GB *gb, int i)
+{
+	gb->io[0x0f] = static_cast<uint8_t>(gb->io[0x0f] & ~(1 << i));
+	gb->cpu.ime = false;
+	gb_push16(gb, gb->cpu.pc);
+	if (!gb->no_tick)
+		gb_tick(gb, 20);
+	HomeHeader handler(gb);
+	switch (i) {
+	case 0: // VBlankVector: jp VBlank
+		handler.port_VBlank();
+		break;
+	case 1: // LCDVector: jp wLCDFunc, which returns with its reti
+		gb_tail_jump(gb, wLCDFunc);
+		gb_pop16(gb);
+		break;
+	default: // reti
+		handler.vector_reti();
+		break;
+	}
+}
+
 } // namespace wl3::home
 
 using wl3::home::HomeHeader;

@@ -37,13 +37,28 @@ scripting and expansion on top. The approach:
   399 run directly (`tools/hook_report.sh`, 14 recordings). Kept original-game
   bugs are in `docs/ASM_BUGS.md`; the one asm quirk dropped is the block
   queue's stack read (b70ac05).
-- **Next: modernisation.** Verification moves from cycle-exact traces to
-  whole-game behaviour. First the native frame loop (game logic, the screen
-  to V-Blank with the LCD handler at its events, V-Blank: it can't match
-  cpu_step's per-step timing, so it waits for the new verification), then
-  the register glue of hooks nothing reaches in play, then typed state
-  instead of raw addresses, ROM data as arrays, no bank switching, the
-  renderer.
+- **Modernisation: branch `claude/modernise`** (from `faithful-native`;
+  worktree `../warioland3-modernise`). Order: the native frame loop (done,
+  below), then the register glue of hooks nothing reaches in play, then
+  typed state instead of raw addresses, ROM data as arrays, no bank
+  switching, the renderer.
+- **Verification in modernisation** is whole-game behaviour: the trace
+  check, which already compares every game frame's memory, I/O and screen
+  with the asm's at the frame's end and leaves out what only reflects
+  elapsed time. The difftest and fuzzer still check the routines that keep
+  their asm contract; a routine that drops it leaves their hook table.
+- **Native frame loop** (start.cpp `game_loop`): in play the .GameLoop hook
+  enters it and it never returns. Each pass: `loop_cb` (the frame's end:
+  the frontend saves / loads states there, the trace check compares the
+  frame), the frame's logic, then the wait for V-Blank without the CPU:
+  idle, taking interrupts as they come (header.cpp `take_interrupt`: V-Blank
+  natively, the LCD handler through gb_tail_jump), until V-Blank has run its
+  function; then HandleSound. A reset in it unwinds (`in_frame_loop`), and
+  a loaded state longjmps out of it to the main loop, which runs from the
+  state's pc back into it. The one-pass hooks (.GameLoop with test.active,
+  after_halt, wait_vblank_exec) stay for the difftest and for states taken
+  mid-frame. The trace check no longer syncs on pc = .GameLoop: its frame
+  ends come from loop_cb.
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`.
 - **Progress (2026-10-31):** 3497 / 3497 routines are ported. While the
   port plays the recordings, the interpreter runs no instructions at all

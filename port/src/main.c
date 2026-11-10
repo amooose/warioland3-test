@@ -239,6 +239,24 @@ static void do_pending(Frontend *fe, GB *gb)
 	}
 }
 
+// The top of the native frame loop, where states are saved and loaded once
+// the game runs in it. A loaded state leaves the loop: the main loop below
+// runs from the state's pc, back into the loop at .GameLoop.
+static void on_loop(GB *gb)
+{
+	Frontend *fe = gb->user;
+	if (!fe->pending_save && !fe->pending_load && !fe->quit)
+		return;
+	bool loading = fe->pending_load != NULL;
+	do_pending(fe, gb);
+	if (fe->quit)
+		shutdown(fe, gb);
+	if (loading) {
+		gb->in_frame_loop = false;
+		longjmp(*(jmp_buf *)gb->reset_unwind, 1);
+	}
+}
+
 static void on_frame(GB *gb)
 {
 	Frontend *fe = gb->user;
@@ -634,6 +652,7 @@ int main(int argc, char **argv)
 	if (!fe.headless && !frontend_init(&fe, scale))
 		return 1;
 	gb.frame_cb = on_frame;
+	gb.loop_cb = on_loop;
 	gb.user = &fe;
 
 	// A reset reached from native code comes back here (see reset_unwind).

@@ -12,6 +12,8 @@
 
 namespace wl3::home {
 
+void take_interrupt(GB *gb, int i); // header.cpp
+
 namespace {
 
 class HomeStart : public AsmModule {
@@ -89,7 +91,47 @@ public:
 	#define GAME_LOOP_HALT (ADDR_InitWithoutDemoPowerUpReset + 0x113)   // halt
 	#define WAIT_VBLANK_EXEC (ADDR_InitWithoutDemoPowerUpReset + 0x115) // .wait_vblank_exec
 
-	void port_InitWithoutDemoPowerUpReset__GameLoop()
+	// The native frame loop, which the game runs in once it reaches
+	// .GameLoop: one game frame per pass, with the wait for V-Blank done here
+	// rather than by the CPU (halt, then interrupts taken as they come). It
+	// never returns: a reset unwinds out of it (reset_unwind), and the
+	// frontend leaves it from loop_cb to load a state.
+	[[noreturn]] void game_loop()
+	{
+		Memory mem(gb_);
+		gb_->in_frame_loop = true;
+		for (;;) {
+			cpu_.pc = GAME_LOOP;
+			cpu_.halted = false;
+			if (gb_->loop_cb)
+				gb_->loop_cb(gb_);
+			if (!frame_logic())
+				continue; // reset without unwinding: it ran, start the loop over
+
+			// halt: wait for an interrupt, then (.wait_vblank_exec) for V-Blank's
+			// to have run the frame's V-Blank function
+			cpu_.pc = GAME_LOOP_HALT + 1;
+			cpu_.halted = true;
+			while (cpu_.halted || !mem[wVBlankFuncExecuted]) {
+				if (!cpu_.halted)
+					cpu_.pc = WAIT_VBLANK_EXEC;
+				uint8_t pending = gb_->ie & gb_->io[0x0f] & 0x1f;
+				if (pending) {
+					cpu_.halted = false;
+					if (cpu_.ime) {
+						take_interrupt(gb_, __builtin_ctz(pending));
+						continue;
+					}
+				}
+				idle(4);
+			}
+			end_of_frame();
+		}
+	}
+
+	// .GameLoop to the halt: the frame's logic. False when the game was reset
+	// and the reset ran here, without unwinding (then pc is .GameLoop).
+	bool frame_logic()
 	{
 		Memory mem(gb_);
 		update_joypad(gb_);
@@ -100,7 +142,7 @@ public:
 			audio::turn_off_sfx(gb_, SOUND_OFF);
 			audio::update(gb_);
 			port_Init();
-			return;
+			return false;
 		}
 		// .no_reset: where all main game logic is handled
 		engine::run_main_state(gb_);
@@ -120,8 +162,31 @@ public:
 		if (mem[wRoomAnimatedPalsEnabled])
 			update_room_animated_pals(gb_);
 
-		// enable the V-Blank handler and wait for it
+		// enable the V-Blank handler (and wait for it)
 		mem[wEnableVBlankFunc] = TRUE;
+		return true;
+	}
+
+	// .wait_vblank_exec once V-Blank has run its function
+	void end_of_frame()
+	{
+		Memory mem(gb_);
+		++mem[wGlobalCounter];
+		mem[wEnableVBlankFunc] = FALSE;
+		mem[wVBlankFuncExecuted] = FALSE;
+		port_HandleSound();
+	}
+
+	// The loop's parts as the CPU runs them, one per dispatch: in play only
+	// to get from where a save state was taken to .GameLoop, and checked
+	// against the asm by the difftest. In play .GameLoop enters the native
+	// loop.
+	void port_InitWithoutDemoPowerUpReset__GameLoop()
+	{
+		if (!gb_->test.active)
+			game_loop();
+		if (!frame_logic())
+			return;
 		cpu_.halted = true; // halt
 		JUMP_TO(GAME_LOOP_HALT + 1);
 	}
@@ -136,10 +201,7 @@ public:
 			JUMP_TO(WAIT_VBLANK_EXEC);
 			return;
 		}
-		++mem[wGlobalCounter];
-		mem[wEnableVBlankFunc] = FALSE;
-		mem[wVBlankFuncExecuted] = FALSE;
-		port_HandleSound();
+		end_of_frame();
 		JUMP_TO(GAME_LOOP); // loop back to game loop
 	}
 
@@ -168,9 +230,10 @@ public:
 		// A reset from inside native code (Init reached by a call or tail
 		// jump): drop the native frames, as call_ret does on reaching here,
 		// and start again from the top
-		if (gb_->call_depth && gb_->reset_unwind && !gb_->test.active) {
+		if ((gb_->call_depth || gb_->in_frame_loop) && gb_->reset_unwind && !gb_->test.active) {
 			cpu_.pc = INIT_WO;
 			gb_->call_depth = 0;
+			gb_->in_frame_loop = false;
 			std::longjmp(*static_cast<std::jmp_buf *>(gb_->reset_unwind), 1);
 		}
 		Memory mem(gb_);

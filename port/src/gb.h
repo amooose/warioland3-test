@@ -184,6 +184,16 @@ typedef struct GB {
 	// the stack away), gb_call_ret longjmps there instead of nesting the
 	// rest of the session inside the call, which would never return.
 	void *reset_unwind;
+	// The native frame loop (game_loop, src/native/home/start.cpp) is
+	// running: it never returns, so a reset from inside it unwinds
+	// (reset_unwind) as one from a nested call does.
+	bool in_frame_loop;
+	// Called at the top of each pass of the native frame loop, where no
+	// native code is mid-routine and a game frame has just ended: the
+	// frontend takes and loads save states there, and a trace check
+	// compares the frame. Code that loads a state here longjmps to
+	// reset_unwind after it, leaving the loop.
+	void (*loop_cb)(struct GB *gb);
 
 	// Support for the difftest and fuzzer; all zero in normal play.
 	struct {
