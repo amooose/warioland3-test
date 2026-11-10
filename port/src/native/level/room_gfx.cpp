@@ -156,7 +156,7 @@ void RoomGfx::update_animated_tiles()
 		wait_stat(false);
 		wait_stat(true);
 		for (int i = 0; i < 8; i++) {
-			mem_[dest] = mem_[src++];
+			mem_[dest] = RomPtr(gb_, BANK_AnimatedTilesGfx, src++)[0];
 			dest = static_cast<uint16_t>((dest & 0xff00) | static_cast<uint8_t>(dest + 1)); // inc e
 		}
 	}

@@ -54,7 +54,7 @@ void GameOver::init()
 	MenuObject text = object(wMenuObj1);
 	text.init(0x18, 0x18, ADDR_Frameset_dbbf5);
 	text.animate();
-	text.load_sprite(ADDR_OAM_dbbd2);
+	text.load_sprite(ROM(gb_, OAM_dbbd2));
 
 	ram(rLCDC) = LCDC_DEFAULT;
 	wram_.timer() = 64;
@@ -123,7 +123,7 @@ bool GameOver::update_sprites(uint8_t bank, bool snore)
 	home::load_game_over_sprite(gb_, wGameOverWario);
 	MenuObject text = object(wMenuObj1);
 	text.animate();
-	text.load_sprite(ADDR_OAM_dbbd2);
+	text.load_sprite(ROM(gb_, OAM_dbbd2));
 	routines_.clear_unused_virtual_oam();
 	return ended;
 }

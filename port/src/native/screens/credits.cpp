@@ -81,11 +81,11 @@ void Credits::init()
 	wram_.credits_music_box_var() = 0;
 	MenuObject box = music_box();
 	box.animate();
-	box.load_sprite(ADDR_OAM_1617e8, false);
+	box.load_sprite(ROM(gb_, OAM_1617e8), false);
 	MenuObject key = winding_key();
 	key.init(0x5b, 0x18, ADDR_Frameset_161caf);
 	key.animate();
-	key.load_sprite(ADDR_OAM_1617e8, false);
+	key.load_sprite(ROM(gb_, OAM_1617e8), false);
 	routines_.clear_unused_virtual_oam();
 
 	stop_music(mem_);
@@ -132,18 +132,18 @@ void Credits::show()
 	if (timer) {
 		if (!--timer)
 			play_music(mem_, MUSIC_CREDITS);
-		music_box().load_sprite(ADDR_OAM_1617e8, false);
-		winding_key().load_sprite(ADDR_OAM_1617e8, false);
+		music_box().load_sprite(ROM(gb_, OAM_1617e8), false);
+		winding_key().load_sprite(ROM(gb_, OAM_1617e8), false);
 		routines_.clear_unused_virtual_oam();
 		return;
 	}
 
 	MenuObject box = music_box();
 	box.animate();
-	box.load_sprite(ADDR_OAM_1617e8, false);
+	box.load_sprite(ROM(gb_, OAM_1617e8), false);
 	MenuObject key = winding_key();
 	key.animate();
-	key.load_sprite(ADDR_OAM_1617e8, false);
+	key.load_sprite(ROM(gb_, OAM_1617e8), false);
 	routines_.clear_unused_virtual_oam();
 
 	uint8_t page = wram_.credits_page();
@@ -233,7 +233,7 @@ update_anims:
 
 add_sprites:
 	draw_music_box();
-	winding_key().load_sprite(ADDR_OAM_1617e8, false);
+	winding_key().load_sprite(ROM(gb_, OAM_1617e8), false);
 	routines_.clear_unused_virtual_oam();
 }
 
@@ -274,7 +274,7 @@ void Credits::wind_key(bool slowly)
 	if (key.y() != 0x80 && !(slowly && (wram_.global_counter() & 0x01)))
 		--key.y();
 	key.animate();
-	key.load_sprite(ADDR_OAM_1617e8, false);
+	key.load_sprite(ROM(gb_, OAM_1617e8), false);
 	routines_.clear_unused_virtual_oam();
 
 	if (!slowly)

@@ -73,7 +73,7 @@ void PauseMenu::unrealistic()
 
 void PauseMenu::draw(MenuObject obj)
 {
-	obj.load_sprite(ADDR_OAM_1f156c, false);
+	obj.load_sprite(ROM(gb_, OAM_1f156c), false);
 }
 
 // ---------------------------------------------------------------------------

@@ -438,12 +438,12 @@ void Title::set_vblank()
 
 void Title::load_intro_sprite(MenuObject obj)
 {
-	obj.load_sprite(ADDR_OAM_6d21);
+	obj.load_sprite(ROM(gb_, OAM_6d21));
 }
 
 void Title::load_start_menu_sprite(MenuObject obj)
 {
-	obj.load_sprite(ADDR_OAM_6b5f);
+	obj.load_sprite(ROM(gb_, OAM_6b5f));
 }
 
 // ---------------------------------------------------------------------------

@@ -350,7 +350,7 @@ void ActionHelp::draw_empty_slot(uint16_t addr)
 void ActionHelp::load_sprite(MenuObject obj)
 {
 	routines_.in_bank(BANK_LoadActionHelpSprite, ADDR_LoadActionHelpSprite,
-		[&] { obj.load_sprite(ADDR_OAM_1e697c); });
+		[&] { obj.load_sprite(ROM(gb_, OAM_1e697c)); });
 }
 
 } // namespace wl3::action_help

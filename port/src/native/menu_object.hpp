@@ -67,10 +67,9 @@ public:
 		return Byte(gb_, wObjAnimWasReset);
 	}
 
-	// LoadSprite with the OAM data at oam (in the bank mapped), the y
-	// relative to the background (wSCY)
-	// (or, scrolled false, the y on screen)
-	void load_sprite(uint16_t oam, bool scrolled = true)
+	// LoadSprite with the OAM data at oam, the y relative to the background
+	// (wSCY) (or, scrolled false, the y on screen)
+	void load_sprite(RomPtr oam, bool scrolled = true)
 	{
 		set_cur_sprite(scrolled);
 		home::load_sprite(gb_, oam);

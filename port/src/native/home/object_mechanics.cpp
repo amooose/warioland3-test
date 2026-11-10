@@ -33,22 +33,24 @@ void update_obj_sprite(GB *gb, uint16_t id, uint16_t pos)
 	Memory mem(gb);
 	uint8_t bank = mem.rom_bank();
 	uint8_t v = mem[id];
-	bankswitch(gb, static_cast<uint8_t>((((v << 4) | (v >> 4)) & 0x7) | BANK_OAM_180000), ADDR_UpdateObjSprite);
+	// the object's OAM bank, from its id's high nibble
+	auto sprite_bank = static_cast<uint8_t>((((v << 4) | (v >> 4)) & 0x7) | BANK_OAM_180000);
+	bankswitch(gb, sprite_bank, ADDR_UpdateObjSprite);
 	uint8_t y = mem[pos], x = mem[pos + 1], frame = mem[pos + 2];
 	mem.cur_sprite_y_coord() = y;
 	mem.cur_sprite_x_coord() = x;
 	mem.cur_sprite_frame() = frame;
 	// the OAM pointer plus frame * 2 (an 8-bit add a)
 	uint16_t entry = static_cast<uint16_t>(mem.word(pos + 3) + static_cast<uint8_t>(frame * 2));
-	uint16_t data = mem.word(entry);
+	RomPtr data(gb, sprite_bank, RomPtr(gb, sprite_bank, entry).word());
 	uint16_t oam = static_cast<uint16_t>((wVirtualOAM & 0xff00) | mem.virtual_oam_byte_size());
-	while ((oam & 0xff) < (wVirtualOAMEnd & 0xff) && mem[data] != 0x80) {
-		mem[oam++] = static_cast<uint8_t>(mem[data++] + y); // SPRITEOAMSTRUCT_YCOORD
-		mem[oam++] = static_cast<uint8_t>(mem[data++] + x); // SPRITEOAMSTRUCT_XCOORD
-		mem[oam++] = mem[data++]; // SPRITEOAMSTRUCT_TILE_ID
-		mem[oam++] = mem[data]; // SPRITEOAMSTRUCT_ATTRIBUTES
+	while ((oam & 0xff) < (wVirtualOAMEnd & 0xff) && *data != 0x80) {
+		mem[oam++] = static_cast<uint8_t>(data[0] + y); // SPRITEOAMSTRUCT_YCOORD
+		mem[oam++] = static_cast<uint8_t>(data[1] + x); // SPRITEOAMSTRUCT_XCOORD
+		mem[oam++] = data[2]; // SPRITEOAMSTRUCT_TILE_ID
+		mem[oam++] = data[3]; // SPRITEOAMSTRUCT_ATTRIBUTES
 		mem.virtual_oam_byte_size() = static_cast<uint8_t>(oam);
-		data++;
+		data += 4;
 	}
 	bankswitch(gb, bank, ADDR_UpdateObjSprite);
 }

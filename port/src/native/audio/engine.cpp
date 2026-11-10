@@ -99,7 +99,7 @@ void Engine::map_rom_bank(uint8_t bank)
 uint8_t Engine::read_command_byte(uint16_t addr)
 {
 	map_rom_bank(wram_.sound_bank());
-	uint8_t value = mem_[addr];
+	uint8_t value = RomPtr(gb_, wram_.sound_bank(), addr)[0];
 	map_rom_bank(AUDIO_ENGINE_BANK);
 	return value;
 }
@@ -107,10 +107,9 @@ uint8_t Engine::read_command_byte(uint16_t addr)
 uint16_t Engine::read_command_word(uint16_t addr)
 {
 	map_rom_bank(wram_.sound_bank());
-	uint8_t lo = mem_[addr];
-	uint8_t hi = mem_[static_cast<uint16_t>(addr + 1)];
+	uint16_t value = RomPtr(gb_, wram_.sound_bank(), addr).word();
 	map_rom_bank(AUDIO_ENGINE_BANK);
-	return static_cast<uint16_t>(hi << 8 | lo);
+	return value;
 }
 
 // ---------------------------------------------------------------------------
@@ -324,12 +323,12 @@ bool Engine::load_sound(uint16_t id)
 		return false;
 	ram(wCurSoundID + 0) = static_cast<uint8_t>(id);
 
-	uint16_t header = static_cast<uint16_t>(ADDR_SoundHeaders - 8 + id * 8);
-	uint16_t commands = mem_.word(header);
-	wram_.sound_bank() = mem_[static_cast<uint16_t>(header + 2)];
-	wram_.sound_priority() = mem_[static_cast<uint16_t>(header + 4)];
-	wram_.start_channel() = mem_[static_cast<uint16_t>(header + 5)];
-	wram_.num_channels() = mem_[static_cast<uint16_t>(header + 6)];
+	RomPtr header = ROM(gb_, SoundHeaders) + (id * 8 - 8);
+	uint16_t commands = header.word();
+	wram_.sound_bank() = header[2];
+	wram_.sound_priority() = header[4];
+	wram_.start_channel() = header[5];
+	wram_.num_channels() = header[6];
 	wram_.audio_cmd_ptr().word() = static_cast<uint16_t>(commands + 2);
 	return true;
 }
@@ -703,7 +702,7 @@ void Engine::do_audio_commands(uint16_t cmd)
 		// cmd points at the argument now
 		bool next;
 		if (command >= 0xd0)
-			next = cmd_note(cmd, mem_[static_cast<uint16_t>(ADDR_Data_3102b + static_cast<uint8_t>(command - 0xcf))]);
+			next = cmd_note(cmd, ROM(gb_, Data_3102b)[static_cast<uint8_t>(command - 0xcf)]);
 		else if (command < 0xb1)
 			next = cmd_rest(cmd, command);
 		else
@@ -792,7 +791,7 @@ bool Engine::cmd_rest(uint16_t &cmd, uint8_t command)
 	uint8_t index = static_cast<uint8_t>(command - 0x80);
 	if (!index)
 		return true;
-	uint8_t duration = static_cast<uint8_t>(mem_[static_cast<uint16_t>(ADDR_Data_3102b + index)] - 1);
+	uint8_t duration = static_cast<uint8_t>(ROM(gb_, Data_3102b)[index] - 1);
 	Channel ch = cur_channel();
 	ch[CHANNEL_DURATION] = duration;
 	ch.word(CHANNEL_CMD_PTR) = cmd;
@@ -875,10 +874,10 @@ bool Engine::cmd_set_wave(uint16_t &cmd)
 		wram_.cur_channel_flags() |= CHANFLAGS_UPDATE_PERCUSSION;
 		return true;
 	}
-	uint16_t data = static_cast<uint16_t>(ADDR_Waves + wave * 6);
+	RomPtr data = ROM(gb_, Waves) + wave * 6;
 	Channel ch = cur_channel();
 	for (int i = 0; i < 5; i++)
-		ch[CHANNEL_TIMBRE + i] = mem_[static_cast<uint16_t>(data + i)];
+		ch[CHANNEL_TIMBRE + i] = data[i];
 	wram_.cur_channel_flags() &= ~CHANFLAGS_UPDATE_PERCUSSION;
 	return true;
 }
@@ -999,10 +998,10 @@ bool Engine::cmd_note(uint16_t &cmd, uint8_t duration)
 	ch[CHANNEL_VIBRATO_COUNTER] = ch[CHANNEL_VIBRATO_DELAY];
 
 	if (wram_.cur_channel_flags() & CHANFLAGS_UPDATE_PERCUSSION) {
-		uint16_t data = static_cast<uint16_t>(ADDR_Waves + static_cast<uint8_t>(note + 4) * 6);
+		RomPtr data = ROM(gb_, Waves) + static_cast<uint8_t>(note + 4) * 6;
 		for (int i = 0; i < 5; i++)
-			ch[CHANNEL_TIMBRE + i] = mem_[static_cast<uint16_t>(data + i)];
-		wram_.sound_engine_param4() = mem_[static_cast<uint16_t>(data + 5)];
+			ch[CHANNEL_TIMBRE + i] = data[i];
+		wram_.sound_engine_param4() = data[5];
 	}
 
 	// the timbre selects the track: duty cycles for the two square waves,
@@ -1384,9 +1383,9 @@ void Engine::set_timbre()
 		if (wram_.cur_wave_sample() == sample)
 			return;
 		wram_.cur_wave_sample() = sample;
-		uint16_t data = static_cast<uint16_t>(ADDR_WaveSamples + sample * 16);
+		RomPtr data = ROM(gb_, WaveSamples) + sample * 16;
 		for (int i = 0; i < AUD3WAVE_SIZE; i++)
-			mem_[static_cast<uint16_t>(_AUD3WAVERAM + i)] = mem_[static_cast<uint16_t>(data + i)];
+			mem_[static_cast<uint16_t>(_AUD3WAVERAM + i)] = data[i];
 		return;
 	}
 	// noise: the LFSR width, and length
@@ -1428,9 +1427,9 @@ void Engine::set_frequency()
 	uint8_t index = note < C_0 ? 0 : static_cast<uint8_t>(note - C_0);
 	if (index >= (B_9 + 1) - C_0)
 		index = B_9 - C_0;
-	uint16_t entry = static_cast<uint16_t>(ADDR_NoteFrequencies + index * 3);
-	uint16_t base = mem_.word(entry);
-	uint8_t step = mem_[static_cast<uint16_t>(entry + 2)];
+	RomPtr entry = ROM(gb_, NoteFrequencies) + index * 3;
+	uint16_t base = entry.word();
+	uint8_t step = entry[2];
 	uint16_t value = static_cast<uint16_t>(((multiply(step, static_cast<uint8_t>(frequency)) + 0x00ff) >> 8) + base);
 
 	mem_[io(static_cast<uint8_t>(reg + 1))] = static_cast<uint8_t>(value);

@@ -85,7 +85,7 @@ void LanguageSelection::init()
 	MenuObject cursor = object(wMenuObj1);
 	cursor.init(70, 24, ADDR_Frameset_76b5);
 	cursor.animate();
-	cursor.load_sprite(ADDR_OAM_75c3);
+	cursor.load_sprite(ROM(gb_, OAM_75c3));
 	routines_.clear_unused_virtual_oam();
 	mem_[rLCDC] = LCDC_DEFAULT;
 	++wram_.sub_state();
@@ -123,7 +123,7 @@ void LanguageSelection::draw_cursor()
 {
 	MenuObject cursor = object(wMenuObj1);
 	cursor.animate();
-	cursor.load_sprite(ADDR_OAM_75c3);
+	cursor.load_sprite(ROM(gb_, OAM_75c3));
 	routines_.clear_unused_virtual_oam();
 }
 
@@ -229,7 +229,7 @@ void Perfect::set_colours(uint16_t pals)
 
 void Perfect::draw_sprite()
 {
-	object(wMenuObj1).load_sprite(ADDR_OAM_dd710, false);
+	object(wMenuObj1).load_sprite(ROM(gb_, OAM_dd710), false);
 }
 
 } // namespace wl3::screens

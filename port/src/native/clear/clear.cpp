@@ -89,12 +89,12 @@ void ClearScreen::unrealistic()
 
 void ClearScreen::draw(MenuObject obj)
 {
-	obj.load_sprite(ADDR_OAM_d4e26);
+	obj.load_sprite(ROM(gb_, OAM_d4e26));
 }
 
 void ClearScreen::draw_wario()
 {
-	wario().load_sprite(ADDR_OAM_d49cc);
+	wario().load_sprite(ROM(gb_, OAM_d49cc));
 }
 
 void ClearScreen::update_object(MenuObject obj)
@@ -621,7 +621,7 @@ void ClearScreen::pencil_scribbles()
 
 void ClearScreen::draw_pencil()
 {
-	object(wMenuObj1).load_sprite(ADDR_OAM_d65e1);
+	object(wMenuObj1).load_sprite(ROM(gb_, OAM_d65e1));
 }
 
 // A or a while: on to Action Help after a new power-up, or the map.
