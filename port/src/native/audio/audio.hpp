@@ -19,7 +19,8 @@ void turn_music_off(GB *gb);                        // TurnMusicOff
 // UpdateAudio. The original passes its caller's leftover c to
 // wSoundEngineParam1 when a music fade-out step lowers the volume. Every
 // reader of that byte (and of wCurSoundID, wTempTrackPriority at the same
-// address) writes it first, so this passes 0.
+// address) writes it first, so this passes 0 (the difftests and traces
+// don't compare that byte).
 void update(GB *gb);
 
 // ExecuteAudioMod, for the mods with one 8-bit value (tempo, volume, pan,

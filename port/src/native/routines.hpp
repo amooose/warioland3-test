@@ -114,17 +114,9 @@ public:
 
 	void play_new_music(uint16_t music) { audio::play_new_music(gb_, music); }
 
-	// a = mod, b = value, d = SFX channels, e = music channels. Still through
-	// the register-level hook: the original also stores the caller's
-	// leftover c in wSoundEngineParam1, a byte nothing reads before writing
-	// it, but the traces compare it, and the leftover c varies (Action Help).
 	void execute_audio_mod(uint8_t mod, uint8_t value, uint8_t sfx_channels, uint8_t music_channels)
 	{
-		gb_->cpu.a = mod;
-		gb_->cpu.b = value;
-		gb_->cpu.d = sfx_channels;
-		gb_->cpu.e = music_channels;
-		call(ADDR_ExecuteAudioMod);
+		audio::execute_audio_mod(gb_, mod, value, sfx_channels, music_channels);
 	}
 
 	bool check_has_all_musical_coin_flags()

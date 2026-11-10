@@ -65,6 +65,12 @@ static bool fuzzed;
 // different return addresses there than the asm does, so it's not compared.
 static uint16_t stack_bottom, stack_top, dead_stack_end, wrom_bank;
 
+// wSoundEngineParam1 isn't compared either: the original stores its
+// caller's leftover c there (UpdateAudio's fade-out, ExecuteAudioMod), and
+// every reader writes it first. The native callers pass 0.
+static int param1_bank = -1;
+static uint16_t param1_addr;
+
 static void cmp_mem(Report *r, const char *region, const uint8_t *asm_, const uint8_t *nat,
 	size_t len, uint16_t base, int bank)
 {
@@ -74,6 +80,8 @@ static void cmp_mem(Report *r, const char *region, const uint8_t *asm_, const ui
 		if (asm_[i] == nat[i])
 			continue;
 		if (base == 0xc000 && base + i >= stack_bottom && base + i < dead_stack_end)
+			continue;
+		if (base == 0xd000 && bank == param1_bank && base + i == param1_addr)
 			continue;
 		if (r->diffs++ < MAX_REPORTED_DIFFS) {
 			uint16_t addr = (uint16_t)(base + i);
@@ -451,6 +459,8 @@ static void setup_common(void)
 		stack_top = 0xd000;
 	if (!sym_lookup("wROMBank", &bank, &wrom_bank))
 		wrom_bank = 0xc5ff;
+	if (!sym_lookup("wSoundEngineParam1", &param1_bank, &param1_addr))
+		param1_bank = -1;
 	if (!ref) {
 		ref = malloc(sizeof(GB));
 		nat = malloc(sizeof(GB));

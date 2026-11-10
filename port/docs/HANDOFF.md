@@ -1363,8 +1363,9 @@ Audio (2026-11-09): src/native/audio/audio.hpp has plain entry points,
 used by HandleSound and Routines::play_new_music. They pass 0 for the
 caller's leftover c, which the original stores in wSoundEngineParam1 (also
 wCurSoundID, wTempTrackPriority); every reader writes it first, but the
-traces compare it. Action Help's volume mod still goes through the
-ExecuteAudioMod hook, since there the leftover c varies ($00, $10).
+traces compared it. Since the leftover c varies ($00, $10 in Action
+Help), the difftests and traces no longer compare wSoundEngineParam1 (the
+user's decision, like the dead stack), and Action Help's volume mod is plain.
 Collisions::block still calls GetBlockPtr: ProcessBlock reads its hl and b
 (a plain block_ptr call broke the full tier but passed the quick one).
 To find what reads a register: poison it, relax the contracts, run the

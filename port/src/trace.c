@@ -76,6 +76,11 @@ static bool checking;
 static int pending_site = -1; // trace_write: tap armed for this site
 
 static uint16_t sync_pc, update_joypad_pc, stack_bottom;
+// wSoundEngineParam1 isn't compared: the original stores its caller's
+// leftover c there (UpdateAudio's fade-out, ExecuteAudioMod), and every
+// reader writes it first. The native callers pass 0.
+static int param1_bank = -1;
+static uint16_t param1_addr;
 static const InputScript *script;
 static uint64_t screen_hash;
 // trace_check: the buttons of the game frame being run, once the first
@@ -131,7 +136,12 @@ static void hash_state(const GB *gb, uint64_t h[NREGIONS])
 	size_t start, dead = dead_stack(gb, &start);
 	h[R_WRAM0] = fnv(fnv(FNV_START, gb->wram[0], start), gb->wram[0] + start + dead, 0x1000 - start - dead);
 	for (int b = 1; b < 8; b++)
-		h[R_WRAM0 + b] = fnv(FNV_START, gb->wram[b], 0x1000);
+		if (b == param1_bank) {
+			size_t at = (size_t)(param1_addr - 0xd000);
+			h[R_WRAM0 + b] = fnv(fnv(FNV_START, gb->wram[b], at), gb->wram[b] + at + 1, 0x1000 - at - 1);
+		} else {
+			h[R_WRAM0 + b] = fnv(FNV_START, gb->wram[b], 0x1000);
+		}
 	h[R_VRAM0] = fnv(FNV_START, gb->vram[0], 0x2000);
 	h[R_VRAM1] = fnv(FNV_START, gb->vram[1], 0x2000);
 	h[R_OAM] = fnv(FNV_START, gb->oam, sizeof(gb->oam));
@@ -304,6 +314,8 @@ static bool setup(void)
 		return false;
 	}
 	stack_bottom = sym_lookup("wStackBottom", &bank, &addr) ? addr : 0xcf00;
+	if (!sym_lookup("wSoundEngineParam1", &param1_bank, &param1_addr))
+		param1_bank = -1;
 	for (size_t s = 0; s < NSITES; s++) {
 		if (!sym_lookup(sites[s].label, &site_bank[s], &site_addr[s])) {
 			fprintf(stderr, "trace: %s isn't in the .sym file\n", sites[s].label);
@@ -548,7 +560,8 @@ static void diff_states(const GB *ref, const GB *nat, const uint64_t ref_hash[NR
 			diff_bytes("wram", 0, 0xc000, ref->wram[0], nat->wram[0], 0x1000, start, dead);
 			break;
 		case R_WRAM1: case R_WRAM2: case R_WRAM3: case R_WRAM4: case R_WRAM5: case R_WRAM6: case R_WRAM7:
-			diff_bytes("wram", r - R_WRAM0, 0xd000, ref->wram[r - R_WRAM0], nat->wram[r - R_WRAM0], 0x1000, 0, 0);
+			diff_bytes("wram", r - R_WRAM0, 0xd000, ref->wram[r - R_WRAM0], nat->wram[r - R_WRAM0], 0x1000,
+				r - R_WRAM0 == param1_bank ? (size_t)(param1_addr - 0xd000) : 0, r - R_WRAM0 == param1_bank ? 1 : 0);
 			break;
 		case R_VRAM0: case R_VRAM1:
 			diff_bytes("vram", r - R_VRAM0, 0x8000, ref->vram[r - R_VRAM0], nat->vram[r - R_VRAM0], 0x2000, 0, 0);
