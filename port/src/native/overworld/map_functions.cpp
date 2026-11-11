@@ -140,7 +140,7 @@ uint8_t MapFunctions::falling_offset(uint16_t counter)
 
 bool MapFunctions::move(uint16_t obj, uint16_t data)
 {
-	return !home::apply_ow_movement(gb_, obj, data, false).finished;
+	return !home::apply_ow_movement(gb_, obj, data, false, mem_.code_bank()).finished;
 }
 
 void MapFunctions::set_state(uint16_t state, uint8_t value)

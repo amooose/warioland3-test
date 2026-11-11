@@ -71,7 +71,7 @@ struct OWMovement {
 	uint8_t next;     // the next entry's y offset
 	bool finished;
 };
-OWMovement apply_ow_movement(GB *gb, uint16_t obj, uint16_t table, bool mirrored);
+OWMovement apply_ow_movement(GB *gb, uint16_t obj, uint16_t table, bool mirrored, int code_bank = -1); // the table in code_bank (-1: mapped)
 void play_overworld_music(GB *gb); // PlayOverworldMusic: by day or night
 
 } // namespace wl3::home

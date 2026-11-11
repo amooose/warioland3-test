@@ -13,9 +13,12 @@ namespace {
 
 // count palettes from src to the palette data register, a palette per
 // H-Blank (wait_not_hblank / wait_hblank)
+// (the palettes all in this module's bank, LoadActionHelpBGPals's; or wTempPals2)
+constexpr uint8_t PALS_BANK = BANK_LoadActionHelpBGPals;
+
 void apply_pals_in_hblank(GB *gb, uint16_t src, uint16_t data_reg, int count)
 {
-	Memory mem(gb);
+	Memory mem(gb, PALS_BANK);
 	while (count--) {
 		while (!(mem[rSTAT] & STAT_MODE))
 			home::idle(gb, 32);
@@ -53,7 +56,7 @@ void load_ob_pals(GB *gb)
 		src = wTempPals2;
 		break;
 	case PowerUp::OWNED:
-		home::copy_short(gb, src, wTempPals2, 8 * PAL_SIZE);
+		home::copy_short(gb, RomPtr(gb, PALS_BANK, src), wTempPals2, 8 * PAL_SIZE);
 		break;
 	}
 	mem[rOBPI] = OBPI_AUTOINC | 0;
@@ -73,7 +76,7 @@ void load_ob_pals_4_to_7(GB *gb)
 		src = wTempPals2 + 4 * PAL_SIZE;
 		break;
 	case PowerUp::OWNED:
-		home::copy_short(gb, src, wTempPals2 + 4 * PAL_SIZE, PAL_SIZE);
+		home::copy_short(gb, RomPtr(gb, PALS_BANK, src), wTempPals2 + 4 * PAL_SIZE, PAL_SIZE);
 		home::copy_short(gb, ROM(gb, Pals_1e4f2f) + 7 * PAL_SIZE, wTempPals2 + 7 * PAL_SIZE, PAL_SIZE);
 		break;
 	}
@@ -83,7 +86,7 @@ void load_ob_pals_4_to_7(GB *gb)
 
 void load_bg_pals(GB *gb, uint16_t pals)
 {
-	home::copy_short(gb, pals, wTempPals1, 8 * PAL_SIZE);
+	home::copy_short(gb, RomPtr(gb, PALS_BANK, pals), wTempPals1, 8 * PAL_SIZE);
 	Memory(gb).byte(rBGPI) = BGPI_AUTOINC | 0;
 	apply_pals_in_hblank(gb, pals, rBGPD, 8);
 }

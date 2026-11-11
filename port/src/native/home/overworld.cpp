@@ -75,9 +75,9 @@ PalConfigEnd apply_pal_config(GB *gb, uint16_t config)
 	return {src, data, last};
 }
 
-OWMovement apply_ow_movement(GB *gb, uint16_t obj, uint16_t table, bool mirrored)
+OWMovement apply_ow_movement(GB *gb, uint16_t obj, uint16_t table, bool mirrored, int code_bank)
 {
-	Memory mem(gb);
+	Memory mem = Memory::in(gb, code_bank);
 	// the step counter at obj | 7 indexes the table's (y, x) offsets
 	Byte counter = mem[static_cast<uint16_t>(obj | 7)];
 	uint8_t step = counter;

@@ -276,7 +276,7 @@ uint8_t TempleRocks::y_velocity(Byte counter)
 // end (the asm's z)
 bool TempleRocks::move(uint16_t obj, uint16_t data, bool left)
 {
-	return !home::apply_ow_movement(gb_, obj, data, !left).finished;
+	return !home::apply_ow_movement(gb_, obj, data, !left, mem_.code_bank()).finished;
 }
 
 } // namespace wl3::overworld

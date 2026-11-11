@@ -693,7 +693,7 @@ void TempleScene::music_box_hover(int index)
 		return;
 	}
 	case 3: // .MoveCircle
-		home::apply_ow_movement(gb_, box.obj, ADDR_Data_ad654, false);
+		home::apply_ow_movement(gb_, box.obj, ADDR_Data_ad654, false, mem_.code_bank());
 		return;
 	default: // InvalidMusicBoxAction
 		unrealistic();
@@ -913,7 +913,7 @@ void TempleScene::left_hand()
 {
 	if (!mem_.unk_2d8da())
 		return;
-	home::apply_ow_movement(gb_, wSceneObj3, ADDR_Data_ad939, false);
+	home::apply_ow_movement(gb_, wSceneObj3, ADDR_Data_ad939, false, mem_.code_bank());
 }
 
 // DoHiddenFigureRightHandMovement: and the right one (4), mirrored
@@ -921,7 +921,7 @@ void TempleScene::right_hand()
 {
 	if (!mem_.unk_2d8dc())
 		return;
-	home::apply_ow_movement(gb_, wSceneObj4, ADDR_Data_ad939, true);
+	home::apply_ow_movement(gb_, wSceneObj4, ADDR_Data_ad939, true, mem_.code_bank());
 }
 
 } // namespace wl3::overworld

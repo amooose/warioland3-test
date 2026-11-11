@@ -250,12 +250,12 @@ protected:
 	// and applied from OB palette `first`, one per H-Blank
 	void copy_and_apply_ob_pals(uint16_t src, uint16_t dest, uint8_t count, uint8_t first)
 	{
-		home::copy_and_apply_ob_pals(gb_, src, dest, count, first);
+		home::copy_and_apply_ob_pals(gb_, src, dest, count, first, mem_.code_bank());
 	}
 	// SetBGPals / SetOBPals, BlackOutBGPals / BlackOutOBPals: count
 	// palettes from palette `first`, from src or black, one per H-Blank
-	void set_bg_pals(uint16_t src, uint8_t count, uint8_t first) { home::set_pals(gb_, true, src, count, first); }
-	void set_ob_pals(uint16_t src, uint8_t count, uint8_t first) { home::set_pals(gb_, false, src, count, first); }
+	void set_bg_pals(uint16_t src, uint8_t count, uint8_t first) { home::set_pals(gb_, true, src, count, first, nullptr, mem_.code_bank()); }
+	void set_ob_pals(uint16_t src, uint8_t count, uint8_t first) { home::set_pals(gb_, false, src, count, first, nullptr, mem_.code_bank()); }
 	void black_out_bg_pals(uint8_t count, uint8_t first) { home::black_out_pals(gb_, true, count, first); }
 	void black_out_ob_pals(uint8_t count, uint8_t first) { home::black_out_pals(gb_, false, count, first); }
 	// CreateParticle (farcalled): particle `id` at hYPos / hXPos

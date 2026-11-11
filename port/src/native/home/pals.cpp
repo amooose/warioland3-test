@@ -211,9 +211,9 @@ static void select_pal(GB *gb, bool bg, uint8_t first)
 	mem[bg ? rBGPI : rOBPI] = static_cast<uint8_t>((first * 8) | BGPI_AUTOINC);
 }
 
-uint16_t set_pals(GB *gb, bool bg, uint16_t src, uint8_t count, uint8_t first, uint8_t *last)
+uint16_t set_pals(GB *gb, bool bg, uint16_t src, uint8_t count, uint8_t first, uint8_t *last, int code_bank)
 {
-	Memory mem(gb);
+	Memory mem = Memory::in(gb, code_bank);
 	select_pal(gb, bg, first);
 	uint8_t v = 0;
 	for (int i = 0; i < (count ? count : 256); i++) {
@@ -237,13 +237,14 @@ void black_out_pals(GB *gb, bool bg, uint8_t count, uint8_t first)
 	}
 }
 
-void copy_and_apply_ob_pals(GB *gb, uint16_t src, uint16_t dest, uint8_t count, uint8_t first)
+void copy_and_apply_ob_pals(GB *gb, uint16_t src, uint16_t dest, uint8_t count, uint8_t first, int code_bank)
 {
 	Memory mem(gb);
-	copy_short(gb, src, dest, static_cast<uint8_t>(count * 8));
+	RomPtr from = code_bank < 0 ? RomPtr::mapped(gb, src) : RomPtr(gb, static_cast<uint8_t>(code_bank), src);
+	copy_short(gb, from, dest, static_cast<uint8_t>(count * 8));
 	mem[rOBPI] = static_cast<uint8_t>((first * 8) | OBPI_AUTOINC);
 	for (int i = 0; i < (count ? count : 256); i++)
-		src = apply_ob_pal_in_hblank(gb, src);
+		from = apply_ob_pal_in_hblank(gb, from);
 }
 
 } // namespace wl3::home

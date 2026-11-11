@@ -140,7 +140,7 @@ LevelMusic level_music(GB *gb)
 		uint16_t id = static_cast<uint16_t>(ADDR_TransformationMusicIDs + index);
 		uint8_t bank = mem.rom_bank();
 		bankswitch(gb, BANK_TransformationMusicIDs, ADDR_UpdateLevelMusic);
-		bool has_music = mem[id] != 0xff;
+		bool has_music = RomPtr(gb, BANK_TransformationMusicIDs, id)[0] != 0xff;
 		bankswitch(gb, bank, ADDR_UpdateLevelMusic);
 		if (has_music)
 			return {id, true, true, index, false};
@@ -162,8 +162,10 @@ void update_level_music(GB *gb)
 	if (music.banked)
 		bankswitch(gb, music.by_transformation ? BANK_TransformationMusicIDs : BANK_LevelMusic,
 			ADDR_UpdateLevelMusic);
-	mem.music().lo() = mem[music.id];
-	mem.music().hi() = mem[static_cast<uint16_t>(music.id + 1)];
+	// the bank switched to (or, for a boss's, home's table, as mapped)
+	Memory ids = Memory::in(gb, music.banked ? (music.by_transformation ? BANK_TransformationMusicIDs : BANK_LevelMusic) : -1);
+	mem.music().lo() = ids[music.id];
+	mem.music().hi() = ids[static_cast<uint16_t>(music.id + 1)];
 	if (music.banked)
 		bankswitch(gb, bank, ADDR_UpdateLevelMusic);
 }

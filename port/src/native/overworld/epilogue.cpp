@@ -659,7 +659,7 @@ void Epilogue::thrown_out()
 void Epilogue::bounce_wario()
 {
 	if (mem_.pal_fade2_colour2_green_unk1() && (mem_[SUB_FRAMES] & 0x03)) {
-		if (home::apply_ow_movement(gb_, wOWUIObj1YCoord, ADDR_Data_aed06, true).finished)
+		if (home::apply_ow_movement(gb_, wOWUIObj1YCoord, ADDR_Data_aed06, true, mem_.code_bank()).finished)
 			mem_.pal_fade2_colour2_green_unk1() = 0;
 	}
 	Byte action = mem_.unk_2d892();
@@ -707,7 +707,7 @@ void Epilogue::bounce_wario()
 void Epilogue::bounce_treasure()
 {
 	if (mem_.pal_fade2_colour4_green_sign()) {
-		if (home::apply_ow_movement(gb_, wSceneObj9, ADDR_Data_aed06, true).finished)
+		if (home::apply_ow_movement(gb_, wSceneObj9, ADDR_Data_aed06, true, mem_.code_bank()).finished)
 			mem_.pal_fade2_colour4_green_sign() = 0;
 	}
 	Byte action = mem_.temple_rock5_action();

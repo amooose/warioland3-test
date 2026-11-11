@@ -220,7 +220,7 @@ void TempleNotes::update_prologue_objects()
 			break;
 		}
 		case Kind::Move:
-			if (home::apply_ow_movement(gb_, o.obj, s.path, o.mirrored).finished)
+			if (home::apply_ow_movement(gb_, o.obj, s.path, o.mirrored, mem_.code_bank()).finished)
 				++step;
 			break;
 		case Kind::Restart:

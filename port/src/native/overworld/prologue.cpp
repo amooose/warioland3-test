@@ -735,7 +735,7 @@ void Prologue::fall_from_plane()
 void Prologue::bounce()
 {
 	if (mem_.unk_2d894() && (mem_.unk_2d891() & 0x03)) {
-		if (home::apply_ow_movement(gb_, wSceneWario, ADDR_Data_aed06, false).finished)
+		if (home::apply_ow_movement(gb_, wSceneWario, ADDR_Data_aed06, false, mem_.code_bank()).finished)
 			mem_.unk_2d894() = 0;
 	}
 	Byte action = mem_.unk_2d892();
@@ -952,7 +952,7 @@ void Prologue::plane_part(int index)
 	const PartStep &step = part.steps[i];
 	uint16_t obj = part.obj;
 	auto move = [&] { // ApplyOWMovement: whether still moving
-		return !home::apply_ow_movement(gb_, obj, step.data, false).finished;
+		return !home::apply_ow_movement(gb_, obj, step.data, false, mem_.code_bank()).finished;
 	};
 	auto follow = [&] { // the shadow under it
 		mem_[part.shadow] = mem_[obj];

@@ -373,7 +373,7 @@ void Cutscenes::move_debris()
 	for (const auto &d : DEBRIS) {
 		if (!mem_[d.flag])
 			continue;
-		if (!home::apply_ow_movement(gb_, d.obj, d.path, false).finished)
+		if (!home::apply_ow_movement(gb_, d.obj, d.path, false, mem_.code_bank()).finished)
 			continue;
 		mem_[d.flag] = 0;
 		mem_[static_cast<uint16_t>(d.obj + 6)] = 0;

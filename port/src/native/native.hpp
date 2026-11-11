@@ -198,6 +198,13 @@ public:
 	Byte byte(uint16_t addr) const { return Byte(gb_, addr, bank_); }
 	Word word(uint16_t addr) const { return Word(gb_, addr, bank_); }
 	GB *gb() const { return gb_; }
+	// the module's code bank (-1: none, ROM through the memory map), for a
+	// helper reading the module's data: Memory::in(gb, code_bank)
+	int code_bank() const { return bank_; }
+	static Memory in(GB *gb, int code_bank)
+	{
+		return code_bank < 0 ? Memory(gb) : Memory(gb, static_cast<uint8_t>(code_bank));
+	}
 
 	// The RAM by name (ram_fields.h, from the disassembly's labels: wFooBar
 	// -> foo_bar()): the byte at the label, as operator[] gives it
