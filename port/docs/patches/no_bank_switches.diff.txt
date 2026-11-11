@@ -1,0 +1,146 @@
+diff --git a/port/src/gb.h b/port/src/gb.h
+index be981d5..e6529c1 100644
+--- a/port/src/gb.h
++++ b/port/src/gb.h
+@@ -291,6 +291,13 @@ void gb_call(GB *gb, uint16_t addr);
+ // Runs the native routine at addr straight from native code, if it has one
+ // that returns (not HOOK_MANUAL_RET): no CPU dispatch, return address or
+ // stack, as a direct call. False if there's none (then use gb_call_ret).
++// The asm's ROM bank switches are bookkeeping in play: native code reads ROM
++// and finds its routines by bank. They're kept under test, where the hooks
++// are compared against the asm, and where code runs from the bank mapped
++// (the asm by address, a DMA's source).
++static inline bool gb_switches_banks(const GB *gb) { return gb->test.active; }
++// maps bank for real (wROMBank and the MBC), for code that runs from it
++void gb_map_rom_bank(GB *gb, uint8_t bank);
+ bool gb_call_native(GB *gb, uint16_t addr);
+ // The same for the routine at bank:addr, found and run whatever bank is
+ // mapped (no bank switch): native code that knows its callee's bank
+diff --git a/port/src/native/asm_module.hpp b/port/src/native/asm_module.hpp
+index e52bab9..447f041 100644
+--- a/port/src/native/asm_module.hpp
++++ b/port/src/native/asm_module.hpp
+@@ -149,6 +149,8 @@ protected:
+ 	}
+ 	void bankswitch(uint8_t bank)
+ 	{
++		if (!gb_switches_banks(gb_))
++			return;
+ 		mem_.rom_bank() = bank;
+ 		wr8(rROMB0 + 0x100, bank);
+ 	}
+diff --git a/port/src/native/audio/audio.cpp b/port/src/native/audio/audio.cpp
+index d81930f..c5ec90e 100644
+--- a/port/src/native/audio/audio.cpp
++++ b/port/src/native/audio/audio.cpp
+@@ -104,6 +104,8 @@ public:
+ private:
+ 	void map_rom_bank(uint8_t bank)
+ 	{
++		if (!gb_switches_banks(gb_))
++			return;
+ 		wram_.rom_bank() = bank;
+ 		mem_[rROMB0] = bank;
+ 	}
+diff --git a/port/src/native/audio/engine.cpp b/port/src/native/audio/engine.cpp
+index 6bb4444..755a545 100644
+--- a/port/src/native/audio/engine.cpp
++++ b/port/src/native/audio/engine.cpp
+@@ -92,6 +92,8 @@ bool Engine::next_track()
+ 
+ void Engine::map_rom_bank(uint8_t bank)
+ {
++	if (!gb_switches_banks(gb_))
++		return;
+ 	wram_.rom_bank() = bank;
+ 	ram(rROMB0) = bank;
+ }
+diff --git a/port/src/native/home/decompress_level_data.cpp b/port/src/native/home/decompress_level_data.cpp
+index d97a1d9..bb6d52c 100644
+--- a/port/src/native/home/decompress_level_data.cpp
++++ b/port/src/native/home/decompress_level_data.cpp
+@@ -29,6 +29,8 @@ void sram_switch(Memory mem, uint8_t bank)
+ 
+ void rom_switch(GB *gb, uint8_t bank, uint16_t routine)
+ {
++	if (!gb_switches_banks(gb))
++		return;
+ 	Memory mem(gb);
+ 	uint16_t pc = gb->cpu.pc;
+ 	gb->cpu.pc = routine; // home code
+diff --git a/port/src/native/home/load_level.cpp b/port/src/native/home/load_level.cpp
+index 3010740..6d47523 100644
+--- a/port/src/native/home/load_level.cpp
++++ b/port/src/native/home/load_level.cpp
+@@ -34,6 +34,8 @@ private:
+ 	Memory maps_rom() const { return Memory(gb_, BANK_LevelBlockAndObjectMaps); }
+ 	void rom_switch(uint8_t bank)
+ 	{
++		if (!gb_switches_banks(gb_))
++			return;
+ 		mem_.rom_bank() = bank;
+ 		mem_[rROMB0 + 0x100] = bank;
+ 	}
+diff --git a/port/src/native/home/memory.cpp b/port/src/native/home/memory.cpp
+index 5b60c82..462be26 100644
+--- a/port/src/native/home/memory.cpp
++++ b/port/src/native/home/memory.cpp
+@@ -5,6 +5,8 @@ namespace wl3::home {
+ 
+ void bankswitch(GB *gb, uint8_t bank, uint16_t home_routine)
+ {
++	if (!gb_switches_banks(gb))
++		return;
+ 	uint16_t pc = gb->cpu.pc;
+ 	gb->cpu.pc = home_routine;
+ 	Memory mem(gb);
+diff --git a/port/src/native/routines.hpp b/port/src/native/routines.hpp
+index bd388a7..cb667a0 100644
+--- a/port/src/native/routines.hpp
++++ b/port/src/native/routines.hpp
+@@ -48,6 +48,8 @@ public:
+ 	{
+ 		if (!gb_->test.active && gb_call_native_in(gb_, bank, addr))
+ 			return;
++		if (!gb_switches_banks(gb_) && addr >= 0x4000 && addr < 0x8000)
++			gb_map_rom_bank(gb_, bank); // the asm runs from the bank mapped
+ 		gb_call(gb_, addr);
+ 	}
+ 
+@@ -73,6 +75,8 @@ public:
+ 	// the bankswitch macro
+ 	void switch_bank(uint8_t bank)
+ 	{
++		if (!gb_switches_banks(gb_))
++			return;
+ 		Memory mem(gb_);
+ 		mem.rom_bank() = bank;
+ 		mem[rROMB0 + 0x100] = bank;
+diff --git a/port/src/ported.c b/port/src/ported.c
+index 7961b4c..98adf53 100644
+--- a/port/src/ported.c
++++ b/port/src/ported.c
+@@ -4,6 +4,12 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
++void gb_map_rom_bank(GB *gb, uint8_t bank)
++{
++	wr8(gb, wROMBank, bank);
++	gb_write(gb, 0x2100, bank); // rROMB0 + $100, as home's bankswitch
++}
++
+ void port_register(const PortInfo *info)
+ {
+ 	hook_register(info->name, info->fn, info->flags, info->clobbers);
+@@ -17,6 +23,10 @@ void port_register(const PortInfo *info)
+ static bool check_bank(GB *gb, int bank, uint16_t addr, const char *what, const char *name)
+ {
+ 	if (addr >= 0x4000 && addr < 0x8000 && gb->rom_bank != bank) {
++		if (!gb_switches_banks(gb)) { // in play: banks aren't kept mapped
++			gb_map_rom_bank(gb, (uint8_t)bank);
++			return true;
++		}
+ 		if (gb->test.active) {
+ 			gb->test.unrealistic = true;
+ 			return false;

@@ -160,6 +160,28 @@ scripting and expansion on top. The approach:
   Code the recordings don't reach can still depend on the bank mapped
   (RomPtr::mapped, Memory without a bank, the interpreter), so the
   switches stay under test and on paths that fall back to the asm.
+  Done since (db0faf7, 933f6cd): native calls find their routine by bank.
+  gb_call_native_in / hook_find_bank look a hook up by bank and address;
+  in play hcall / farcall run a native callee straight from hCallFuncBank
+  (hCallFunc's register effects, no switch), port_call (CALL),
+  Routines::call_in, Routines::call in a module with its code bank, the
+  object update functions (port_hcall) and homecall by their bank; the
+  block functions dispatch whatever is mapped. Hooks count the calls still
+  found by the bank mapped (by_mapped in --hook-report, run with --hooks):
+  0 of 1.79M over every recording. The trace check also ignores
+  wAudioBankBackup (the audio engine's copy of wROMBank).
+  **What still needs the switches: the VRAM DMA.** With the bookkeeping
+  switches made no-ops in play (docs/patches/no_bank_switches.diff.txt:
+  gb_switches_banks, gb_map_rom_bank, and the switch helpers returning
+  early), 12 of the 17 traces fail, all in VRAM: a DMA from ROM reads
+  through the bank mapped, and an H-Blank DMA keeps reading it at every
+  H-Blank of the frame, so which bank the asm has mapped as the main code
+  runs decides what reaches VRAM. Removing the switches needs the DMA to
+  take its source bank explicitly (captured at the transfer's start, from
+  the routine that set it up), a change to the hardware model that differs
+  from the original when the bank changes mid-transfer; decide that first.
+  (Whether the other failures are all DMA wasn't checked: the first
+  differences in the four looked at were all VRAM tiles.)
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`.
 - **Progress (2026-10-31):** 3497 / 3497 routines are ported. While the
   port plays the recordings, the interpreter runs no instructions at all

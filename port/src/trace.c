@@ -85,6 +85,9 @@ static uint16_t param1_addr;
 // wROMBank and hCallFuncBank. The native code reads ROM by bank and calls
 // its routines directly, so it doesn't switch banks where the asm does.
 static uint16_t rom_bank_addr, call_bank_addr; // 0: not in the .sym file
+// and the audio engine's copy of wROMBank (the bank to map back)
+static int audio_backup_bank = -1;
+static uint16_t audio_backup_addr;
 static const InputScript *script;
 static uint64_t screen_hash;
 // trace_check: the buttons of the game frame being run, once the first
@@ -144,6 +147,17 @@ static void masked_wram0(const GB *gb, uint8_t out[0x1000])
 		out[rom_bank_addr - 0xc000] = 0;
 }
 
+// a WRAM bank from 1 with the bytes not compared zeroed (wSoundEngineParam1,
+// wAudioBankBackup)
+static void masked_wramx(const GB *gb, int b, uint8_t out[0x1000])
+{
+	memcpy(out, gb->wram[b], 0x1000);
+	if (b == param1_bank)
+		out[param1_addr - 0xd000] = 0;
+	if (b == audio_backup_bank)
+		out[audio_backup_addr - 0xd000] = 0;
+}
+
 static void masked_hram(const GB *gb, uint8_t out[sizeof(gb->hram)])
 {
 	memcpy(out, gb->hram, sizeof(gb->hram));
@@ -158,13 +172,11 @@ static void hash_state(const GB *gb, uint64_t h[NREGIONS])
 	masked_wram0(gb, wram0);
 	masked_hram(gb, hram);
 	h[R_WRAM0] = fnv(fnv(FNV_START, wram0, start), wram0 + start + dead, 0x1000 - start - dead);
-	for (int b = 1; b < 8; b++)
-		if (b == param1_bank) {
-			size_t at = (size_t)(param1_addr - 0xd000);
-			h[R_WRAM0 + b] = fnv(fnv(FNV_START, gb->wram[b], at), gb->wram[b] + at + 1, 0x1000 - at - 1);
-		} else {
-			h[R_WRAM0 + b] = fnv(FNV_START, gb->wram[b], 0x1000);
-		}
+	for (int b = 1; b < 8; b++) {
+		uint8_t wram[0x1000];
+		masked_wramx(gb, b, wram);
+		h[R_WRAM0 + b] = fnv(FNV_START, wram, 0x1000);
+	}
 	h[R_VRAM0] = fnv(FNV_START, gb->vram[0], 0x2000);
 	h[R_VRAM1] = fnv(FNV_START, gb->vram[1], 0x2000);
 	h[R_OAM] = fnv(FNV_START, gb->oam, sizeof(gb->oam));
@@ -338,6 +350,8 @@ static bool setup(void)
 	stack_bottom = sym_lookup("wStackBottom", &bank, &addr) ? addr : 0xcf00;
 	if (!sym_lookup("wSoundEngineParam1", &param1_bank, &param1_addr))
 		param1_bank = -1;
+	if (!sym_lookup("wAudioBankBackup", &audio_backup_bank, &audio_backup_addr))
+		audio_backup_bank = -1;
 	if (!sym_lookup("wROMBank", &bank, &rom_bank_addr))
 		rom_bank_addr = 0;
 	if (!sym_lookup("hCallFuncBank", &bank, &call_bank_addr))
@@ -644,8 +658,12 @@ static void diff_states(const GB *ref, const GB *nat, const uint64_t ref_hash[NR
 			break;
 		}
 		case R_WRAM1: case R_WRAM2: case R_WRAM3: case R_WRAM4: case R_WRAM5: case R_WRAM6: case R_WRAM7:
-			diff_bytes("wram", r - R_WRAM0, 0xd000, ref->wram[r - R_WRAM0], nat->wram[r - R_WRAM0], 0x1000,
-				r - R_WRAM0 == param1_bank ? (size_t)(param1_addr - 0xd000) : 0, r - R_WRAM0 == param1_bank ? 1 : 0);
+		{
+			uint8_t a[0x1000], b[0x1000];
+			masked_wramx(ref, r - R_WRAM0, a);
+			masked_wramx(nat, r - R_WRAM0, b);
+			diff_bytes("wram", r - R_WRAM0, 0xd000, a, b, 0x1000, 0, 0);
+		}
 			break;
 		case R_VRAM0: case R_VRAM1:
 			diff_bytes("vram", r - R_VRAM0, 0x8000, ref->vram[r - R_VRAM0], nat->vram[r - R_VRAM0], 0x2000, 0, 0);
