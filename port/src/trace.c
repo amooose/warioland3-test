@@ -81,6 +81,10 @@ static uint16_t sync_pc, update_joypad_pc, stack_bottom;
 // reader writes it first. The native callers pass 0.
 static int param1_bank = -1;
 static uint16_t param1_addr;
+// The ROM bank bookkeeping isn't compared either: the mapped bank,
+// wROMBank and hCallFuncBank. The native code reads ROM by bank and calls
+// its routines directly, so it doesn't switch banks where the asm does.
+static uint16_t rom_bank_addr, call_bank_addr; // 0: not in the .sym file
 static const InputScript *script;
 static uint64_t screen_hash;
 // trace_check: the buttons of the game frame being run, once the first
@@ -119,8 +123,9 @@ static size_t dead_stack(const GB *gb, size_t *start)
 static void cpu_bytes(const GB *gb, uint8_t out[16])
 {
 	const CPU *c = &gb->cpu;
+	// (the rom bank's two bytes left 0: bookkeeping, not compared)
 	uint8_t b[16] = {0, 0, 0, 0, 0, 0, 0, 0, (uint8_t)c->sp, (uint8_t)(c->sp >> 8),
-		(uint8_t)gb->rom_bank, (uint8_t)(gb->rom_bank >> 8), (uint8_t)gb->sram_bank, gb->sram_enabled,
+		0, 0, (uint8_t)gb->sram_bank, gb->sram_enabled,
 		c->double_speed, gb->ie};
 	memcpy(out, b, 16);
 }
@@ -131,10 +136,28 @@ static void io_bytes(const GB *gb, uint8_t out[sizeof(io_regs)])
 		out[i] = gb->io[io_regs[i]];
 }
 
+// WRAM bank 0 and HRAM with the bank bookkeeping zeroed
+static void masked_wram0(const GB *gb, uint8_t out[0x1000])
+{
+	memcpy(out, gb->wram[0], 0x1000);
+	if (rom_bank_addr >= 0xc000 && rom_bank_addr < 0xd000)
+		out[rom_bank_addr - 0xc000] = 0;
+}
+
+static void masked_hram(const GB *gb, uint8_t out[sizeof(gb->hram)])
+{
+	memcpy(out, gb->hram, sizeof(gb->hram));
+	if (call_bank_addr >= 0xff80 && call_bank_addr < 0xff80 + sizeof(gb->hram))
+		out[call_bank_addr - 0xff80] = 0;
+}
+
 static void hash_state(const GB *gb, uint64_t h[NREGIONS])
 {
 	size_t start, dead = dead_stack(gb, &start);
-	h[R_WRAM0] = fnv(fnv(FNV_START, gb->wram[0], start), gb->wram[0] + start + dead, 0x1000 - start - dead);
+	uint8_t wram0[0x1000], hram[sizeof(gb->hram)];
+	masked_wram0(gb, wram0);
+	masked_hram(gb, hram);
+	h[R_WRAM0] = fnv(fnv(FNV_START, wram0, start), wram0 + start + dead, 0x1000 - start - dead);
 	for (int b = 1; b < 8; b++)
 		if (b == param1_bank) {
 			size_t at = (size_t)(param1_addr - 0xd000);
@@ -145,7 +168,7 @@ static void hash_state(const GB *gb, uint64_t h[NREGIONS])
 	h[R_VRAM0] = fnv(FNV_START, gb->vram[0], 0x2000);
 	h[R_VRAM1] = fnv(FNV_START, gb->vram[1], 0x2000);
 	h[R_OAM] = fnv(FNV_START, gb->oam, sizeof(gb->oam));
-	h[R_HRAM] = fnv(FNV_START, gb->hram, sizeof(gb->hram));
+	h[R_HRAM] = fnv(FNV_START, hram, sizeof(hram));
 	h[R_BG_PAL] = fnv(FNV_START, gb->bg_pal, sizeof(gb->bg_pal));
 	h[R_OBJ_PAL] = fnv(FNV_START, gb->obj_pal, sizeof(gb->obj_pal));
 	h[R_SRAM] = fnv(FNV_START, gb->sram, sizeof(gb->sram));
@@ -315,6 +338,10 @@ static bool setup(void)
 	stack_bottom = sym_lookup("wStackBottom", &bank, &addr) ? addr : 0xcf00;
 	if (!sym_lookup("wSoundEngineParam1", &param1_bank, &param1_addr))
 		param1_bank = -1;
+	if (!sym_lookup("wROMBank", &bank, &rom_bank_addr))
+		rom_bank_addr = 0;
+	if (!sym_lookup("hCallFuncBank", &bank, &call_bank_addr))
+		call_bank_addr = 0;
 	for (size_t s = 0; s < NSITES; s++) {
 		if (!sym_lookup(sites[s].label, &site_bank[s], &site_addr[s])) {
 			fprintf(stderr, "trace: %s isn't in the .sym file\n", sites[s].label);
@@ -445,7 +472,7 @@ static bool write_profile(const GB *gb, const char *path)
 		uint16_t addr;
 		if (!sym_get(i, &name, &bank, &addr) || strchr(name, '.'))
 			continue;
-		l[n++] = (ProfLabel){prof_off(gb, bank, addr), name, 0, 0, false};
+		l[n++] = (ProfLabel){prof_off(gb, bank, addr), name, 0, 0, false, 0};
 	}
 	qsort(l, n, sizeof(*l), by_off);
 	for (int i = 0; i < hook_count(); i++) {
@@ -513,7 +540,7 @@ bool write_romx_report(const GB *gb, const char *path)
 		uint16_t addr;
 		if (!sym_get(i, &name, &bank, &addr) || strchr(name, '.') || addr < 0x4000 || addr >= 0x8000)
 			continue;
-		l[n++] = (ProfLabel){prof_off(gb, bank, addr), name, 0, 0, false};
+		l[n++] = (ProfLabel){prof_off(gb, bank, addr), name, 0, 0, false, 0};
 	}
 	qsort(l, n, sizeof(*l), by_off);
 	for (int i = 0; i < hook_count(); i++) {
@@ -608,9 +635,14 @@ static void diff_states(const GB *ref, const GB *nat, const uint64_t ref_hash[NR
 		size_t start, dead;
 		switch (r) {
 		case R_WRAM0:
+		{
+			uint8_t a[0x1000], b[0x1000];
+			masked_wram0(ref, a);
+			masked_wram0(nat, b);
 			dead = dead_stack(ref, &start);
-			diff_bytes("wram", 0, 0xc000, ref->wram[0], nat->wram[0], 0x1000, start, dead);
+			diff_bytes("wram", 0, 0xc000, a, b, 0x1000, start, dead);
 			break;
+		}
 		case R_WRAM1: case R_WRAM2: case R_WRAM3: case R_WRAM4: case R_WRAM5: case R_WRAM6: case R_WRAM7:
 			diff_bytes("wram", r - R_WRAM0, 0xd000, ref->wram[r - R_WRAM0], nat->wram[r - R_WRAM0], 0x1000,
 				r - R_WRAM0 == param1_bank ? (size_t)(param1_addr - 0xd000) : 0, r - R_WRAM0 == param1_bank ? 1 : 0);
@@ -622,7 +654,12 @@ static void diff_states(const GB *ref, const GB *nat, const uint64_t ref_hash[NR
 			diff_bytes("oam", 0, 0xfe00, ref->oam, nat->oam, sizeof(ref->oam), 0, 0);
 			break;
 		case R_HRAM:
-			diff_bytes("hram", 0, 0xff80, ref->hram, nat->hram, sizeof(ref->hram), 0, 0);
+		{
+			uint8_t a[sizeof(ref->hram)], b[sizeof(ref->hram)];
+			masked_hram(ref, a);
+			masked_hram(nat, b);
+			diff_bytes("hram", 0, 0xff80, a, b, sizeof(a), 0, 0);
+		}
 			break;
 		case R_BG_PAL:
 			diff_bytes("bg pal", 0, 0, ref->bg_pal, nat->bg_pal, sizeof(ref->bg_pal), 0, 0);

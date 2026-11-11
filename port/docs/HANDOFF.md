@@ -142,6 +142,24 @@ scripting and expansion on top. The approach:
   wSoundEngineParam1; the bank switches in play are then deleted. The
   hooks keep switching banks under test, where difftest / fuzz compare
   them against the asm.
+- **No bank switching (step 4, started 2026-11-10).** The trace check no
+  longer compares the bank bookkeeping: the mapped bank (cpu bytes),
+  wROMBank and hCallFuncBank are zeroed before hashing and diffing
+  (trace.c, masked_wram0 / masked_hram). Deleting the bank switches isn't
+  possible yet: ROM data is read by bank (step 3), but native code still
+  finds routines by the mapped bank. A run of every recording with
+  `--hooks --hook-report` shows 277 hooks reached by address (1.79M
+  dispatches): hook_find looks a ROMX address up in the bank mapped. The
+  sources: routines_.call(ADDR_X) / farcall(BANK_X, ADDR_X) (about 360
+  sites), the state tables (run_state_table, through home::farcall), and
+  the object update functions (call_update_function: the pointer and bank
+  into hCallFunc, and the interpreted HRAM trampoline maps the bank). Next:
+  dispatch with an explicit bank (a hook lookup by bank and address, with
+  no MBC write) for those three, keeping hCallFunc's pointer bytes
+  written (HRAM, still compared); then the bank switches in play can go.
+  Code the recordings don't reach can still depend on the bank mapped
+  (RomPtr::mapped, Memory without a bank, the interpreter), so the
+  switches stay under test and on paths that fall back to the asm.
 - **Branch:** `claude/relaxed-sagan-aui07s` on `amooose/warioland3-test`.
 - **Progress (2026-10-31):** 3497 / 3497 routines are ported. While the
   port plays the recordings, the interpreter runs no instructions at all
