@@ -127,7 +127,7 @@ private:
 	bool cam_border(int bit) const { return mem_.camera_config_flags() & (1 << bit); }
 	void draw_room_column(uint16_t queue);
 	void queue_row_tiles_and_attributes();
-	void call_in_sram1(uint16_t addr);
+	void call_in_sram1(uint8_t bank, uint16_t addr);
 	void farcall_obj_wram(uint8_t bank, uint16_t addr);
 
 	uint8_t saved_wbk_[4] = {};
@@ -458,7 +458,7 @@ void RoomStart::farcall_obj_wram(uint8_t bank, uint16_t addr)
 // a multi-block's blocks, then a frame's drawing
 void RoomStart::process_multi_block()
 {
-	routines_.call(PROCESS_BLOCKS);
+	routines_.call_in(BANK_ProcessMultiBlock, PROCESS_BLOCKS);
 	routines_.in_bank(BANK_UpdateParticles, ADDR_UpdateParticles, [&] { level::update_particles(gb_); });
 	farcall_obj_wram(BANK_DrawObjects_NoPriority, ADDR_DrawObjects_NoPriority);
 	home::draw_wario(gb_);
@@ -525,11 +525,11 @@ void RoomStart::process_blocks()
 
 // ld a, [wSRAMBank] / push af / ld a, BANK("SRAM1") / sramswitch /
 // call addr / pop af / sramswitch
-void RoomStart::call_in_sram1(uint16_t addr)
+void RoomStart::call_in_sram1(uint8_t bank, uint16_t addr)
 {
 	uint8_t sram = mem_.sram_bank();
 	sram_switch(SRAM1);
-	routines_.call(addr);
+	routines_.call_in(bank, addr);
 	sram_switch(sram);
 }
 
@@ -588,8 +588,8 @@ void RoomStart::from_transition()
 	mem_.room_transition_param() = 0;
 
 	routines_.call_in(BANK_UpdateSwitchableBlocks, ADDR_UpdateSwitchableBlocks);
-	call_in_sram1(ADDR_DrawRoom_FromStart);
-	call_in_sram1(ADDR_Func_896f);
+	call_in_sram1(BANK_DrawRoom_FromStart, ADDR_DrawRoom_FromStart);
+	call_in_sram1(BANK_Func_896f, ADDR_Func_896f);
 	level::set_wario_screen_pos(gb_);
 
 	if (mem_.wario_state() == WST_ENTERING_DOOR) {
@@ -677,9 +677,9 @@ void RoomStart::from_level_start()
 	routines_.call_in(BANK_ApplyInitialCameraScroll, ADDR_ApplyInitialCameraScroll);
 	routines_.call_in(BANK_VBlank_Level, ADDR_VBlank_Level);
 	level::set_tile_queue_processing_functions(gb_);
-	call_in_sram1(ADDR_DrawRoom_FromStart);
+	call_in_sram1(BANK_DrawRoom_FromStart, ADDR_DrawRoom_FromStart);
 	if (!from_saved_level())
-		call_in_sram1(ADDR_Func_896f);
+		call_in_sram1(BANK_Func_896f, ADDR_Func_896f);
 
 	// .asm_88b7
 	if (mem_.level() == THE_TEMPLE) {

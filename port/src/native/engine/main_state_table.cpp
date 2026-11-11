@@ -11,7 +11,7 @@ void run_main_state(GB *gb)
 	Memory mem(gb);
 	// rst JumpTable over the table after it (add a, a: the index wraps at $80)
 	uint16_t target = (ROM(gb, MainStateTable) + 4).word(static_cast<uint8_t>(mem.state() * 2));
-	Routines(gb).call(target);
+	Routines(gb).call_in(BANK_MainStateTable, target); // the handlers, all in its bank (or home)
 }
 
 namespace {

@@ -32,7 +32,16 @@ public:
 	}
 
 	// any routine, by address (one in a ROMX bank runs from the bank mapped)
-	void call(uint16_t addr) { gb_call(gb_, addr); }
+	void call(uint16_t addr)
+	{
+		// in a module with its code bank, a ROMX address is in that bank
+		// (an asm call from there runs it with its own bank mapped)
+		if (bank_ >= 0 && addr >= 0x4000 && addr < 0x8000) {
+			call_in(static_cast<uint8_t>(bank_), addr);
+			return;
+		}
+		gb_call(gb_, addr);
+	}
 	// the routine at bank:addr: in play, a native one runs straight from
 	// there, no bank switched (else as call, the bank mapped)
 	void call_in(uint8_t bank, uint16_t addr)
