@@ -313,9 +313,8 @@ void ClearScreen::set_up_sprites()
 	for (int t = 0; t < 4; t++)
 		if (screen == SCREENS[t]) {
 			uint16_t params = static_cast<uint16_t>(TREASURE_PARAMS + 4 * t);
-			uint16_t frameset = static_cast<uint16_t>(mem_[static_cast<uint16_t>(params + 2)] << 8 |
-				mem_[static_cast<uint16_t>(params + 3)]);
-			object(wMenuObj1).init(mem_[params], mem_[static_cast<uint16_t>(params + 1)], frameset);
+			RomPtr p(gb_, BANK_Func_1e015b, params); // in its bank ($78, mapped to run it)
+			object(wMenuObj1).init(p[0], p[1], p.word_be(2));
 			music = MUSIC_LEVEL_CLEAR_GOT_TREASURE;
 			break;
 		}

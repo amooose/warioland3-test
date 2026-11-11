@@ -104,7 +104,20 @@ protected:
 	void animate_wario(uint8_t bank); // UpdateObjAnim with bank mapped
 	void load_wario_sprite(); // LoadActionHelpWarioSprite
 
-	void call(uint16_t addr) { routines_.call(addr); }
+	// a show routine passed by address: its C++ (the ones the demos pass),
+	// else run by address
+	void call(uint16_t addr)
+	{
+		switch (addr) {
+		case ADDR_ActionHelp_ShowWarioIdle: show_wario_idle(); return;
+		case ADDR_ActionHelp_ShowWarioJump: show_wario_jump(); return;
+		case ADDR_ActionHelp_ShowParaGoomStun: show_paragoom_stun(); return;
+		case ADDR_ActionHelp_ShowParaGoomThrown: show_paragoom_thrown(); return;
+		case ADDR_ActionHelp_ShowCountRichtertoffStun: show_count_richtertoff_stun(); return;
+		case ADDR_ActionHelp_ShowCountRichtertoffThrown: show_count_richtertoff_thrown(); return;
+		default: routines_.call(addr); return;
+		}
+	}
 	void load_pals_without_water(); // LoadActionHelpPalsWithoutWater, farcalled
 
 	// common1.asm: the shared states

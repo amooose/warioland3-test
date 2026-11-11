@@ -227,7 +227,7 @@ void ActionHelp::run_special_power_up()
 
 void ActionHelp::set_vblank()
 {
-	routines_.copy(VBLANK_FUNC, wVBlankFunc, VBLANK_FUNC_SIZE);
+	routines_.copy(RomPtr(gb_, BANK_VBlank_1fb6b7, VBLANK_FUNC), wVBlankFunc, VBLANK_FUNC_SIZE);
 }
 
 // Left and right move between the power-ups Wario can see: the one left
@@ -291,11 +291,11 @@ void ActionHelp::load_common_pals()
 void ActionHelp::load_power_up_pals()
 {
 	bool main = main_power_up();
-	routines_.load_pals_to_temp_pals2(main ? ADDR_Pals_1e4f2f : ADDR_Pals_1e4f7f);
+	routines_.load_pals_to_temp_pals2(main ? ROM(gb_, Pals_1e4f2f) : ROM(gb_, Pals_1e4f7f));
 	uint8_t power_up = wram_.action_help_power_up();
 	if (main ? power_up < GARLIC : power_up != POWER_UP_VAMPIRE)
 		return;
-	routines_.copy_short(main ? ADDR_Pals_1e4f6f : ADDR_Pals_1e4fbf, wTempPals2, 2 * PAL_SIZE);
+	routines_.copy_short(main ? ROM(gb_, Pals_1e4f6f) : ROM(gb_, Pals_1e4fbf), wTempPals2, 2 * PAL_SIZE);
 }
 
 void ActionHelp::load_gfx()

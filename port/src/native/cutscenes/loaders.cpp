@@ -15,7 +15,7 @@ void decompress_far(GB *gb, uint8_t bank, uint16_t gfx, uint16_t dest)
 	Memory mem(gb);
 	mem.temp_bank() = bank;
 	mem.call_func_bank() = bank;
-	home::hcall(gb, ADDR_Decompress, [&] { home::decompress(gb, gfx, dest); });
+	home::hcall(gb, ADDR_Decompress, [&] { home::decompress(gb, RomPtr(gb, bank, gfx), dest); });
 }
 
 // decompress_tiles1: into VRAM bank 1, then back to bank 0

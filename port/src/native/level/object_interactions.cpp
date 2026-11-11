@@ -125,7 +125,7 @@ public:
 
 			// .do_interaction: the jumptable after the $ef
 			uint16_t entry = static_cast<uint16_t>(ProcessInteractions_table + (mem_.obj_interaction_type() & INTERACTION_MASK) * 2);
-			return static_cast<uint16_t>(rd8(entry) | rd8(static_cast<uint16_t>(entry + 1)) << 8);
+			return RomPtr(gb_, BANK_ProcessInteractions, entry).word(); // in its own bank
 		}
 	}
 

@@ -112,12 +112,12 @@ void Events::next_treasure_to_collect()
 	}
 	uint16_t entry = event_with_treasure(next).next;
 	for (;;) {
-		uint8_t treasure = mem_[entry];
+		uint8_t treasure = RomPtr(gb_, BANK_EventTreasures, entry)[0]; // on along EventTreasures
 		if (treasure != INVALID_TREASURE && !collected(treasure)) {
 			wram_.next_treasure() = treasure;
 			return;
 		}
-		if (mem_[entry++] == TREASURES_END) {
+		if (RomPtr(gb_, BANK_EventTreasures, entry++)[0] == TREASURES_END) {
 			wram_.next_treasure() = TREASURES_END;
 			return;
 		}
@@ -132,9 +132,9 @@ Events::SideLevel Events::map_level_id(uint8_t level)
 	uint8_t side = 0xff;
 	uint8_t first;
 	do {
-		first = mem_[entry++];
+		first = RomPtr(gb_, BANK_MapSideInitialLevels, entry++)[0];
 		++side;
-	} while (static_cast<uint8_t>(mem_[entry] - 1) < level);
+	} while (static_cast<uint8_t>(RomPtr(gb_, BANK_MapSideInitialLevels, entry)[0] - 1) < level);
 	return {side, static_cast<uint8_t>(level - first)};
 }
 

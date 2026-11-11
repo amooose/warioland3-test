@@ -77,8 +77,8 @@ void GolfBuilding::place_wario()
 		static constexpr uint16_t DATA = ADDR__GolfBuilding + 0xbc; // .data
 		uint16_t side = static_cast<uint16_t>(DATA + static_cast<uint8_t>(wram_.next_map_side() * 4));
 		mem_.owui_obj1_y_coord() = 0x58;
-		mem_.owui_obj1_x_coord() = mem_[side];
-		mem_[PHASE] = mem_[side + 2];
+		mem_.owui_obj1_x_coord() = RomPtr(gb_, BANK__GolfBuilding, side)[0];
+		mem_[PHASE] = RomPtr(gb_, BANK__GolfBuilding, side)[2];
 		mem_.owui_obj2_y_coord() = 0xff;
 		wario_state(0);
 	};

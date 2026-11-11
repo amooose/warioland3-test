@@ -74,7 +74,7 @@ void LanguageSelection::init()
 	routines_.in_bank(BANK_LoadFontPals, ADDR_LoadFontPals, [&] { engine::load_font_pals(gb_); });
 	routines_.in_bank(BANK_LoadFontTiles, ADDR_LoadFontTiles, [&] { engine::load_font_tiles(gb_); });
 	routines_.in_bank(BANK_LoadLanguageSelectionText, ADDR_LoadLanguageSelectionText, [&] { engine::load_language_selection_text(gb_); });
-	routines_.copy(VBLANK_LANGUAGE_FUNC, wVBlankFunc, VBLANK_LANGUAGE_FUNC_SIZE);
+	routines_.copy(RomPtr(gb_, BANK_VBlank_LanguageSelection, VBLANK_LANGUAGE_FUNC), wVBlankFunc, VBLANK_LANGUAGE_FUNC_SIZE);
 
 	wram_.scy() = 0;
 	mem_[rSCY] = 0;
@@ -84,7 +84,7 @@ void LanguageSelection::init()
 
 	MenuObject cursor = object(wMenuObj1);
 	cursor.init(70, 24, ADDR_Frameset_76b5);
-	cursor.animate();
+	cursor.animate_in(BANK_LanguageSelectionStateTable);
 	cursor.load_sprite(ROM(gb_, OAM_75c3));
 	routines_.clear_unused_virtual_oam();
 	mem_[rLCDC] = LCDC_DEFAULT;
@@ -122,7 +122,7 @@ void LanguageSelection::choose(uint8_t language, uint8_t cursor_y)
 void LanguageSelection::draw_cursor()
 {
 	MenuObject cursor = object(wMenuObj1);
-	cursor.animate();
+	cursor.animate_in(BANK_LanguageSelectionStateTable);
 	cursor.load_sprite(ROM(gb_, OAM_75c3));
 	routines_.clear_unused_virtual_oam();
 }
@@ -166,7 +166,7 @@ void Perfect::init()
 
 	MenuObject text = object(wMenuObj1);
 	text.init(0x23, 0x2b, ADDR_Frameset_dd848);
-	text.animate();
+	text.animate_in(BANK__PerfectStateTable);
 	draw_sprite();
 	play_music(mem_, MUSIC_PERFECT);
 
@@ -178,7 +178,7 @@ void Perfect::init()
 
 void Perfect::update()
 {
-	object(wMenuObj1).animate();
+	object(wMenuObj1).animate_in(BANK__PerfectStateTable);
 	draw_sprite();
 	routines_.clear_unused_virtual_oam();
 

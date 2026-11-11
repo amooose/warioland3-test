@@ -165,8 +165,8 @@ void Overworld::select_level()
 	uint16_t requirements = static_cast<uint16_t>(ADDR_LevelTreasureRequirements + level);
 	uint8_t variant = 0;
 	for (int pair = 0; pair < 3; pair++) {
-		uint8_t first = treasure_collected(mem_[static_cast<uint16_t>(requirements + 2 * pair)]);
-		uint8_t second = treasure_collected(mem_[static_cast<uint16_t>(requirements + 2 * pair + 1)]);
+		uint8_t first = treasure_collected(RomPtr(gb_, BANK_LevelTreasureRequirements, requirements)[2 * pair]);
+		uint8_t second = treasure_collected(RomPtr(gb_, BANK_LevelTreasureRequirements, requirements)[2 * pair + 1]);
 		if (first & second) {
 			variant = static_cast<uint8_t>(3 - pair);
 			break;
@@ -623,7 +623,7 @@ void Overworld::load_pals_for_scene()
 	if (wram_.ow_scene_action() == UNLOCK_LEVEL) {
 		uint16_t side = ROM(gb_, UnlockableConnections).word(wram_.ow_scene_map_side() * 2);
 		uint8_t action = mem_[wOWSceneMapSide + 1]; // wOWSceneActionParam
-		if (mem_[static_cast<uint16_t>(side + action * 2)] >= OW_EXITS)
+		if (RomPtr(gb_, BANK_UnlockableConnections, static_cast<uint16_t>(side + action * 2))[0] >= OW_EXITS)
 			wram_.ow_exit_unlocked() = TRUE;
 	}
 	routines_.in_bank(BANK__LoadPalsForOWScene, ADDR__LoadPalsForOWScene, [&] { load_map_side_pals(true); });

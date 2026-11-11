@@ -759,13 +759,13 @@ void Palettes::freeze_column(uint16_t base)
 // address then bytes to 0x70, until a 0 address
 void Palettes::update_tiles(uint16_t data)
 {
-	while (uint8_t lo = mem_[data++]) {
-		uint8_t hi = mem_[data++];
+	while (uint8_t lo = OW_ROM(data++)[0]) {
+		uint8_t hi = OW_ROM(data++)[0];
 		uint16_t tiles = static_cast<uint16_t>(hi << 8 | lo);
 		uint16_t attrs = static_cast<uint16_t>((hi - 3) << 8 | lo);
-		for (uint8_t b; (b = mem_[data++]) != 0x70;)
+		for (uint8_t b; (b = OW_ROM(data++)[0]) != 0x70;)
 			mem_[tiles++] = b;
-		for (uint8_t b; (b = mem_[data++]) != 0x70;)
+		for (uint8_t b; (b = OW_ROM(data++)[0]) != 0x70;)
 			mem_[attrs++] = b;
 	}
 }

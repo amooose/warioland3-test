@@ -665,7 +665,7 @@ void RoomStart::from_level_start()
 		routines_.in_bank(BANK_WarioDefaultPal, ADDR_CopyHLToDE_Short, [&] { home::copy_short(gb_, ROM(gb_, WarioDefaultPal), wTempPals2, 2 * PAL_SIZE); });
 	} else {
 		// .asm_883a
-		routines_.in_bank(BANK_WarioDefaultPal, ADDR_CopyHLToDE_Short, [&] { home::copy_short(gb_, be(wWarioPalsPtr), wTempPals2, 2 * PAL_SIZE); });
+		routines_.in_bank(BANK_WarioDefaultPal, ADDR_CopyHLToDE_Short, [&] { home::copy_short(gb_, RomPtr(gb_, BANK_WarioDefaultPal, be(wWarioPalsPtr)), wTempPals2, 2 * PAL_SIZE); });
 
 		home::copy(gb_, wcaa1, wTempPals2 + 4 * PAL_SIZE, 4 * PAL_SIZE);
 	}
