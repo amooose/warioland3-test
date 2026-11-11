@@ -29,6 +29,9 @@ private:
 		mem_.sram_bank() = bank;
 		mem_[rRAMB + 0x100] = bank;
 	}
+	// the levels' map headers, in LevelBlockAndObjectMaps' bank (mapped
+	// while they're read)
+	Memory maps_rom() const { return Memory(gb_, BANK_LevelBlockAndObjectMaps); }
 	void rom_switch(uint8_t bank)
 	{
 		mem_.rom_bank() = bank;
@@ -51,7 +54,7 @@ bool LevelLoader::maps(uint8_t &rom, uint16_t &header)
 	uint16_t at = static_cast<uint16_t>(table + offset);
 	rom = mem_.rom_bank();
 	rom_switch(BANK_LevelBlockAndObjectMaps);
-	header = Word(gb_, at);
+	header = maps_rom().word(at);
 	if (header >> 8 != 0xff)
 		return true;
 	// push af saved rl d's z and add hl, de's h and c
@@ -68,9 +71,10 @@ bool LevelLoader::maps(uint8_t &rom, uint16_t &header)
 // map's header starts (the block map's bank byte is also its bank)
 uint16_t LevelLoader::read_block_map_header(uint16_t header)
 {
-	mem_[wCompressedLevelBlockMapPtr + 1] = mem_[header + 0];
-	mem_[wCompressedLevelBlockMapPtr + 0] = mem_[header + 1];
-	mem_.temp_bank() = mem_[header + 2];
+	Memory rom = maps_rom();
+	mem_[wCompressedLevelBlockMapPtr + 1] = rom[header + 0];
+	mem_[wCompressedLevelBlockMapPtr + 0] = rom[header + 1];
+	mem_.temp_bank() = rom[header + 2];
 	return static_cast<uint16_t>(header + 2);
 }
 
@@ -82,9 +86,9 @@ void LevelLoader::load()
 		return;
 	header = read_block_map_header(header);
 	Routines(gb_).call(ADDR_DecompressLevelBlockMap);
-	mem_.temp_bank() = mem_[header + 0];
-	mem_[wCompressedLevelBlockMapPtr + 1] = mem_[header + 1];
-	mem_[wCompressedLevelBlockMapPtr + 0] = mem_[header + 2];
+	mem_.temp_bank() = maps_rom()[header + 0];
+	mem_[wCompressedLevelBlockMapPtr + 1] = maps_rom()[header + 1];
+	mem_[wCompressedLevelBlockMapPtr + 0] = maps_rom()[header + 2];
 	rom_switch(rom);
 	if (!(mem_.unk_ceef() & 0x3c))
 		Routines(gb_).call(ADDR_DecompressLevelObjectMap);

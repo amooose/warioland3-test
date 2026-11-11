@@ -38,7 +38,8 @@ private:
 	// table's dw at index (add a: the index's low 7 bits)
 	uint16_t pointer(uint16_t table, uint8_t index)
 	{
-		return Word(gb_, static_cast<uint16_t>(table + static_cast<uint8_t>(index * 2)));
+		// the room tables, all in LoadRoomGfx's bank ($30), which calls these
+		return RomPtr(gb_, BANK_LoadRoomGfx, static_cast<uint16_t>(table + static_cast<uint8_t>(index * 2))).word();
 	}
 	// copies count bytes from src to dest with the ROM bank in bank_var
 	// mapped (by way of wTempBank)

@@ -21,6 +21,15 @@ namespace wl3 {
 class Routines {
 public:
 	explicit Routines(GB *gb) : gb_(gb) {}
+	// a module's routines: its ROM sources (an address alone) read from
+	// code_bank, the bank its code is in, whatever is mapped
+	Routines(GB *gb, int code_bank) : gb_(gb), bank_(code_bank) {}
+
+	// src in the module's bank (or, without one, the bank mapped)
+	RomPtr rom(uint16_t src) const
+	{
+		return bank_ < 0 ? RomPtr::mapped(gb_, src) : RomPtr(gb_, static_cast<uint8_t>(bank_), src);
+	}
 
 	// any routine, by address (one in a ROMX bank runs from the bank mapped)
 	void call(uint16_t addr) { gb_call(gb_, addr); }
@@ -68,7 +77,7 @@ public:
 	// decompresses src (from the ROM bank mapped) to dest
 	void decompress(uint16_t src, uint16_t dest)
 	{
-		home::decompress(gb_, src, dest);
+		home::decompress(gb_, rom(src), dest);
 	}
 
 	// copies count bytes from src, in the ROM bank wTempBank, to dest
@@ -79,7 +88,7 @@ public:
 
 	void copy(uint16_t src, uint16_t dest, uint8_t count)
 	{
-		home::copy(gb_, src, dest, count ? count : 0x100);
+		home::copy(gb_, rom(src), dest, count ? count : 0x100);
 	}
 
 	// from ROM by bank (a label: ROM(gb_, Label))
@@ -97,7 +106,8 @@ public:
 	// from the bank mapped (bank 0)
 	void copy_bc(uint16_t src, uint16_t dest, uint16_t count, uint8_t bank = 0)
 	{
-		auto copy = [&] { home::copy(gb_, src, dest, count ? count : 0x10000); };
+		RomPtr from = bank ? RomPtr(gb_, bank, src) : rom(src);
+		auto copy = [&] { home::copy(gb_, from, dest, count ? count : 0x10000); };
 		if (bank)
 			home::farcall(gb_, bank, ADDR_CopyHLToDE_BC, copy);
 		else
@@ -115,7 +125,8 @@ public:
 
 	void copy_short(uint16_t src, uint16_t dest, uint8_t count, uint8_t bank = 0)
 	{
-		auto copy = [&] { home::copy_short(gb_, src, dest, count); };
+		RomPtr from = bank ? RomPtr(gb_, bank, src) : rom(src);
+		auto copy = [&] { home::copy_short(gb_, from, dest, count); };
 		if (bank)
 			home::farcall(gb_, bank, ADDR_CopyHLToDE_Short, copy);
 		else
@@ -136,12 +147,12 @@ public:
 
 	void load_pals_to_temp_pals1(uint16_t pals)
 	{
-		home::load_pals_to_temp_pals1(gb_, pals);
+		home::load_pals_to_temp_pals1(gb_, rom(pals));
 	}
 
 	void load_pals_to_temp_pals2(uint16_t pals)
 	{
-		home::load_pals_to_temp_pals2(gb_, pals);
+		home::load_pals_to_temp_pals2(gb_, rom(pals));
 	}
 
 	void play_new_music(uint16_t music) { audio::play_new_music(gb_, music); }
@@ -172,6 +183,7 @@ public:
 
 private:
 	GB *gb_;
+	int bank_ = -1; // -1: ROM sources through the bank mapped
 };
 
 // A state table's home wrapper (GolfStateTable, PauseMenuStateTable...):

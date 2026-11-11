@@ -69,7 +69,7 @@ public:
 	explicit Object(GB *gb) : gb_(gb), mem_(gb), wram_(gb), routines_(gb) {}
 	// an object whose code is in code_bank: its ROM data read from there
 	// (the bank the asm has mapped as it runs), whatever is mapped
-	Object(GB *gb, uint8_t code_bank) : gb_(gb), mem_(gb, code_bank), wram_(gb), routines_(gb) {}
+	Object(GB *gb, uint8_t code_bank) : gb_(gb), mem_(gb, code_bank), wram_(gb), routines_(gb, code_bank) {}
 
 protected:
 	// an input the game never gives (a state out of a jumptable's range)

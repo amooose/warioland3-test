@@ -37,7 +37,7 @@ uint16_t scene_obj_state(int n)
 
 } // namespace
 
-TreasureCollection::TreasureCollection(GB *gb) : gb_(gb), mem_(gb, BANK__TreasureCollection), wram_(gb), routines_(gb) {}
+TreasureCollection::TreasureCollection(GB *gb) : gb_(gb), mem_(gb, BANK__TreasureCollection), wram_(gb), routines_(gb, BANK__TreasureCollection) {}
 
 // InitTreasureCollection: farcall _InitTreasureCollection
 void TreasureCollection::init_far()

@@ -142,7 +142,7 @@ private:
 // (mem_ with that bank: Memory(gb, bank)), whatever is mapped.
 class TopBar {
 public:
-	explicit TopBar(GB *gb) : gb_(gb), mem_(gb, BANK_UpdateTopBar), wram_(gb), routines_(gb) {}
+	explicit TopBar(GB *gb) : gb_(gb), mem_(gb, BANK_UpdateTopBar), wram_(gb), routines_(gb, BANK_UpdateTopBar) {}
 
 	void update(); // UpdateTopBar
 	void init_buttons(); // UpdateTopBar.InitTopBarButtons
@@ -189,7 +189,7 @@ private:
 // The map's bottom bar (bank20.asm): HandleBottomBar and DrawBottomBar.
 class BottomBar {
 public:
-	explicit BottomBar(GB *gb) : gb_(gb), mem_(gb, BANK_HandleBottomBar), wram_(gb), routines_(gb) {}
+	explicit BottomBar(GB *gb) : gb_(gb), mem_(gb, BANK_HandleBottomBar), wram_(gb), routines_(gb, BANK_HandleBottomBar) {}
 
 	void handle(); // HandleBottomBar
 	void draw(); // DrawBottomBar
@@ -220,7 +220,7 @@ private:
 // Wario on a side of the map (bank20.asm): Func_80e89 and its states.
 class MapWalk {
 public:
-	explicit MapWalk(GB *gb) : gb_(gb), mem_(gb, BANK_Func_80e89), wram_(gb), routines_(gb) {}
+	explicit MapWalk(GB *gb) : gb_(gb), mem_(gb, BANK_Func_80e89), wram_(gb), routines_(gb, BANK_Func_80e89) {}
 
 	void update(); // Func_80e89
 	void place_on_level(); // Func_8212c
@@ -272,7 +272,7 @@ private:
 // Holding B on a level (bank20.asm): arrows along its paths.
 class PathPreview {
 public:
-	explicit PathPreview(GB *gb) : gb_(gb), mem_(gb, BANK_Func_81477), wram_(gb), routines_(gb) {}
+	explicit PathPreview(GB *gb) : gb_(gb), mem_(gb, BANK_Func_81477), wram_(gb), routines_(gb, BANK_Func_81477) {}
 
 	void update(); // Func_81477
 	void start_arrows(); // Func_814ec
@@ -299,7 +299,7 @@ private:
 // The map's scenes (bank20.asm): set up for the unlocked events, and played.
 class Scenes {
 public:
-	explicit Scenes(GB *gb) : gb_(gb), mem_(gb, BANK_Func_81dce), wram_(gb), routines_(gb) {}
+	explicit Scenes(GB *gb) : gb_(gb), mem_(gb, BANK_Func_81dce), wram_(gb), routines_(gb, BANK_Func_81dce) {}
 
 	void init(); // Func_81dce
 	bool get_params(uint8_t event); // GetOWSceneParams
@@ -378,7 +378,7 @@ private:
 // The temple shaking, with its falling and bouncing rocks (bank56.asm).
 class TempleRocks {
 public:
-	explicit TempleRocks(GB *gb) : gb_(gb), mem_(gb, BANK__HandleTempleShakeAndRocks), wram_(gb), routines_(gb) {}
+	explicit TempleRocks(GB *gb) : gb_(gb), mem_(gb, BANK__HandleTempleShakeAndRocks), wram_(gb), routines_(gb, BANK__HandleTempleShakeAndRocks) {}
 
 	void update(); // _HandleTempleShakeAndRocks
 
@@ -423,7 +423,7 @@ private:
 // The map's scene objects (bank2d.asm): each side's object scripts.
 class SceneObjects {
 public:
-	explicit SceneObjects(GB *gb) : gb_(gb), mem_(gb, BANK_Func_b4a37), wram_(gb), routines_(gb) {}
+	explicit SceneObjects(GB *gb) : gb_(gb), mem_(gb, BANK_Func_b4a37), wram_(gb), routines_(gb, BANK_Func_b4a37) {}
 
 	void update_before(); // Func_b4a3d
 	void update_after(); // Func_b4aa9
@@ -446,7 +446,7 @@ private:
 // one at a time.
 class MapFunctions {
 public:
-	explicit MapFunctions(GB *gb) : gb_(gb), mem_(gb, BANK_NOWFunc_CutTree), wram_(gb), routines_(gb) {}
+	explicit MapFunctions(GB *gb) : gb_(gb), mem_(gb, BANK_NOWFunc_CutTree), wram_(gb), routines_(gb, BANK_NOWFunc_CutTree) {}
 
 	void run(); // _DoOWFunction
 
@@ -578,7 +578,7 @@ private:
 // by w2d065: 0 before the event, 0x80 to play it, 1 after.
 class SceneInit {
 public:
-	explicit SceneInit(GB *gb) : gb_(gb), mem_(gb, BANK__InitOWObjects), wram_(gb), routines_(gb) {}
+	explicit SceneInit(GB *gb) : gb_(gb), mem_(gb, BANK__InitOWObjects), wram_(gb), routines_(gb, BANK__InitOWObjects) {}
 
 	void run(); // _InitOWObjects
 
@@ -612,7 +612,7 @@ private:
 // switching day and night, the leaves falling.
 class SideAnimations {
 public:
-	explicit SideAnimations(GB *gb) : gb_(gb), mem_(gb, BANK_UpdateMapSideOWAnimations), wram_(gb), routines_(gb) {}
+	explicit SideAnimations(GB *gb) : gb_(gb), mem_(gb, BANK_UpdateMapSideOWAnimations), wram_(gb), routines_(gb, BANK_UpdateMapSideOWAnimations) {}
 
 	void update(); // UpdateMapSideOWAnimations
 	void fall_leaves(); // Func_b542e
@@ -715,7 +715,7 @@ private:
 // have sub-steps in w2d890 (frames in w2d891).
 class Epilogue {
 public:
-	explicit Epilogue(GB *gb) : gb_(gb), mem_(gb, BANK__InitEpilogue), wram_(gb), routines_(gb) {}
+	explicit Epilogue(GB *gb) : gb_(gb), mem_(gb, BANK__InitEpilogue), wram_(gb), routines_(gb, BANK__InitEpilogue) {}
 
 	void init(); // _InitEpilogue
 	void update(); // Func_af13c
@@ -758,7 +758,7 @@ private:
 // (Prologue_Wario*) still run by address.
 class Prologue {
 public:
-	explicit Prologue(GB *gb) : gb_(gb), mem_(gb, BANK_Prologue), wram_(gb), routines_(gb) {}
+	explicit Prologue(GB *gb) : gb_(gb), mem_(gb, BANK_Prologue), wram_(gb), routines_(gb, BANK_Prologue) {}
 
 	void update(); // Prologue
 	void music_box_close_up(); // Func_ae1de
@@ -806,7 +806,7 @@ private:
 // HiddenFigureRevealScene, still by address) and he walks out.
 class TempleScene {
 public:
-	explicit TempleScene(GB *gb) : gb_(gb), mem_(gb, BANK_HandleEnterTempleWithAllMusicBoxesScene), wram_(gb), routines_(gb) {}
+	explicit TempleScene(GB *gb) : gb_(gb), mem_(gb, BANK_HandleEnterTempleWithAllMusicBoxesScene), wram_(gb), routines_(gb, BANK_HandleEnterTempleWithAllMusicBoxesScene) {}
 
 	void init(); // _InitTempleScene
 	void update(); // _UpdateTempleScene
@@ -852,7 +852,7 @@ private:
 // sprites and tiles of each group of states.
 class SceneWario {
 public:
-	explicit SceneWario(GB *gb) : gb_(gb), mem_(gb, BANK_UpdateSceneWario), routines_(gb) {}
+	explicit SceneWario(GB *gb) : gb_(gb), mem_(gb, BANK_UpdateSceneWario), routines_(gb, BANK_UpdateSceneWario) {}
 
 	void update(); // UpdateSceneWario
 	void set_state(uint8_t state); // SetSceneWarioState
@@ -877,7 +877,7 @@ private:
 // configs. The scenes' steps count in w2d013 (step) and w2d014 (frames).
 class SceneCommon {
 public:
-	explicit SceneCommon(GB *gb) : gb_(gb), mem_(gb, BANK_ApplySceneWarioMovementRight), routines_(gb) {}
+	explicit SceneCommon(GB *gb) : gb_(gb), mem_(gb, BANK_ApplySceneWarioMovementRight), routines_(gb, BANK_ApplySceneWarioMovementRight) {}
 
 	uint8_t walk(bool right); // ApplySceneWarioMovementLeft / Right: x after the step
 	void clear_scene_ram(); // ClearGeneralSceneRAM
@@ -922,7 +922,7 @@ private:
 // prologue's): three state machines over tables of animations.
 class SceneSprites {
 public:
-	explicit SceneSprites(GB *gb) : gb_(gb), mem_(gb, BANK_Func_ac074), routines_(gb) {}
+	explicit SceneSprites(GB *gb) : gb_(gb), mem_(gb, BANK_Func_ac074), routines_(gb, BANK_Func_ac074) {}
 
 	void func_ac074(); // Func_ac074
 	void func_ac080(); // Func_ac080

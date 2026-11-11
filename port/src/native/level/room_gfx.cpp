@@ -54,17 +54,19 @@ uint16_t RoomGfx::table_entry(uint16_t table, uint8_t index)
 // and its palettes; a room without data ($ff) resets the game
 void RoomGfx::load()
 {
-	uint16_t data = Word(gb_, table_entry(ADDR_RoomBlockAndGfxData, mem_.room()));
+	// the room tables and data, all in bank $30 (LoadRoomGfx's and these routines')
+	Memory rom(gb_, BANK_LoadRoomGfx);
+	uint16_t data = rom.word(table_entry(ADDR_RoomBlockAndGfxData, mem_.room()));
 	if (data >> 8 == 0xff) { // debug_assert_not $ff
 		gb_tail_jump(gb_, ADDR_Init);
 		return;
 	}
-	uint8_t function_table = mem_[data + 0];
+	uint8_t function_table = rom[data + 0];
 	mem_.room_block_function_table() = function_table;
-	mem_.room_tile_map() = mem_[data + 1];
-	mem_.room_main_tiles() = mem_[data + 2];
-	mem_.room_special_tiles() = mem_[data + 3];
-	mem_.room_palettes() = mem_[data + 4];
+	mem_.room_tile_map() = rom[data + 1];
+	mem_.room_main_tiles() = rom[data + 2];
+	mem_.room_special_tiles() = rom[data + 3];
+	mem_.room_palettes() = rom[data + 4];
 
 	// the function table's bank: one per 6 tables
 	mem_.room_block_function_table_bank() = static_cast<uint8_t>(LEVEL_DATA_1 + function_table / 6);
@@ -82,21 +84,23 @@ void RoomGfx::load()
 
 void RoomGfx::init_animated_tiles()
 {
+	Memory rom(gb_, BANK_LoadRoomGfx); // the groups, in bank $30
 	uint16_t entry = table_entry(ADDR_AnimatedTilesGroups, mem_.animated_tiles_group());
-	mem_.animated_tiles_frame_duration() = mem_[entry];
-	mem_.animated_tiles_gfx() = mem_[entry + 1];
+	mem_.animated_tiles_frame_duration() = rom[entry];
+	mem_.animated_tiles_gfx() = rom[entry + 1];
 	mem_.animated_tiles_frame() = 0;
 	mem_.animated_tiles_frame_count() = 0;
 }
 
 void RoomGfx::init_animated_pals()
 {
+	Memory rom(gb_, BANK_LoadRoomGfx); // the cycles, in bank $30
 	uint16_t entry = table_entry(ADDR_RoomPalCycles, mem_.room_pal_cycle());
-	uint8_t lo = mem_[entry], hi = mem_[entry + 1];
+	uint8_t lo = rom[entry], hi = rom[entry + 1];
 	mem_[wRoomPalCyclePtr + 1] = lo;
 	mem_[wRoomPalCyclePtr + 0] = hi;
-	uint16_t cycle = static_cast<uint16_t>((mem_[entry] | hi << 8) + ROOM_PALCYCLE_LENGTH);
-	uint8_t duration = mem_[cycle];
+	uint16_t cycle = static_cast<uint16_t>((rom[entry] | hi << 8) + ROOM_PALCYCLE_LENGTH);
+	uint8_t duration = rom[cycle];
 	mem_.room_pal_cycle_duration() = duration;
 	mem_.room_pal_cycle_counter() = duration >> 1;
 	mem_.room_pal_cycle_index() = 0;

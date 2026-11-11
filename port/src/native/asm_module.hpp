@@ -54,7 +54,7 @@ public:
 	// a module whose code is all in code_bank: its ROMX reads from there
 	// (the bank the asm has mapped as it runs), whatever is mapped
 	AsmModule(GB *gb, uint8_t code_bank)
-		: gb_(gb), cpu_(gb->cpu), mem_(gb, code_bank), routines_(gb), alu_(gb->cpu), code_bank_(code_bank) {}
+		: gb_(gb), cpu_(gb->cpu), mem_(gb, code_bank), routines_(gb, code_bank), alu_(gb->cpu), code_bank_(code_bank) {}
 
 protected:
 	uint8_t rd8(uint16_t addr) const { return mem_read(gb_, code_bank_, addr); }
