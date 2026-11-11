@@ -96,7 +96,7 @@ void TopBar::update()
 
 void TopBar::start_close_bottom_bar()
 {
-	routines_.call(ADDR_DrawBottomBar);
+	routines_.call_in(BANK_DrawBottomBar, ADDR_DrawBottomBar);
 	wram_.bottom_bar_action() = BOTBAR_CLOSING;
 	wram_.bottom_bar_state() = 0;
 	wram_.magnifying_glass_counter() = 0;
@@ -105,8 +105,8 @@ void TopBar::start_close_bottom_bar()
 
 void TopBar::handle_bottom_bar_close()
 {
-	routines_.call(ADDR_HandleBottomBar);
-	routines_.call(ADDR_DrawBottomBar);
+	routines_.call_in(BANK_HandleBottomBar, ADDR_HandleBottomBar);
+	routines_.call_in(BANK_DrawBottomBar, ADDR_DrawBottomBar);
 	if (wram_.bottom_bar_action())
 		return;
 	play_sfx(mem_, SFX_0E9);

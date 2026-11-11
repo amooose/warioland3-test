@@ -41,15 +41,6 @@ void wait_hblank(GB *gb)
 }
 
 // a palette from src to rOBPD, in the next H-Blank
-uint16_t apply_ob_pal_in_hblank(GB *gb, uint16_t src)
-{
-	Memory mem(gb);
-	wait_hblank(gb);
-	for (int i = 0; i < PAL_SIZE; i++)
-		mem[rOBPD] = mem[src++];
-	return src;
-}
-
 RomPtr apply_ob_pal_in_hblank(GB *gb, RomPtr src)
 {
 	Memory mem(gb);

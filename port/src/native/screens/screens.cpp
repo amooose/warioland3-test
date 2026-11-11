@@ -96,7 +96,7 @@ void LanguageSelection::update()
 {
 	Byte pressed = wram_.joypad_pressed();
 	if (pressed.bit(B_PAD_A)) {
-		routines_.call(ADDR_StartOverworldStateAndNewGameParam);
+		routines_.call_in(BANK_StartOverworldStateAndNewGameParam, ADDR_StartOverworldStateAndNewGameParam);
 		return;
 	}
 	if (pressed.bit(B_PAD_DOWN)) {

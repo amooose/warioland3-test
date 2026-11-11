@@ -32,9 +32,9 @@ void init_prologue(GB *gb)
 {
 	Memory mem(gb);
 	Routines routines(gb);
-	routines.call(ADDR_ClearGeneralSceneRAM);
-	routines.call(ADDR_ClearSceneObjsRAM);
-	routines.call(ADDR_VBlank_PrologueEpilogue);
+	routines.call_in(BANK_ClearGeneralSceneRAM, ADDR_ClearGeneralSceneRAM);
+	routines.call_in(BANK_ClearSceneObjsRAM, ADDR_ClearSceneObjsRAM);
+	routines.call_in(BANK_VBlank_PrologueEpilogue, ADDR_VBlank_PrologueEpilogue);
 
 	// the prologue's BG maps and gfx
 	decompress_vram1(gb, BANK_PrologueAttrmap, ADDR_PrologueAttrmap, v1BGMap1);
@@ -53,7 +53,7 @@ void init_prologue(GB *gb)
 		decompress(gb, BANK_TextEN_HiddenFigureAreYouAware, ADDR_TextEN_HiddenFigureAreYouAware, wTextBuffer);
 	else
 		decompress(gb, BANK_TextJP_HiddenFigureAreYouAware, ADDR_TextJP_HiddenFigureAreYouAware, wTextBuffer);
-	routines.call(ADDR_FillClearedTextBuffer);
+	routines.call_in(BANK_FillClearedTextBuffer, ADDR_FillClearedTextBuffer);
 
 	home::fill(gb, wTempPals1, 0, 8 * PAL_SIZE);
 	home::fill(gb, wTempPals2, 0, 8 * PAL_SIZE);

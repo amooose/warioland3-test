@@ -578,16 +578,16 @@ void RoomStart::from_transition()
 	home::fill_bg_map0(gb_, 0x7f);
 	routines_.call(ADDR_ClearVirtualOAM);
 	routines_.call(ADDR_ClearParticles);
-	routines_.call(ADDR_SetWarioPositionToSpawn);
-	routines_.call(ADDR_SetInitialCameraScroll);
-	routines_.call(ADDR_ApplyInitialCameraScroll);
+	routines_.call_in(BANK_SetWarioPositionToSpawn, ADDR_SetWarioPositionToSpawn);
+	routines_.call_in(BANK_SetInitialCameraScroll, ADDR_SetInitialCameraScroll);
+	routines_.call_in(BANK_ApplyInitialCameraScroll, ADDR_ApplyInitialCameraScroll);
 
 	if (mem_.room_transition_param() & (1 << ROOMTRANSITIONF_RELOAD_OBJECTS_F))
 		routines_.call(ADDR_ReloadLevelObjects);
 	// .no_object_reloading
 	mem_.room_transition_param() = 0;
 
-	routines_.call(ADDR_UpdateSwitchableBlocks);
+	routines_.call_in(BANK_UpdateSwitchableBlocks, ADDR_UpdateSwitchableBlocks);
 	call_in_sram1(ADDR_DrawRoom_FromStart);
 	call_in_sram1(ADDR_Func_896f);
 	level::set_wario_screen_pos(gb_);
@@ -657,7 +657,7 @@ void RoomStart::from_level_start()
 	pop_wram();
 
 	if (!from_saved_level()) {
-		routines_.call(ADDR_SetWarioPositionToSpawn);
+		routines_.call_in(BANK_SetWarioPositionToSpawn, ADDR_SetWarioPositionToSpawn);
 		mem_.direction() = DIRECTION_RIGHT;
 		routines_.farcall(BANK_SetState_Idling, ADDR_SetState_Idling);
 		set_be(wWarioPalsPtr, ADDR_WarioDefaultPal);
@@ -673,9 +673,9 @@ void RoomStart::from_level_start()
 	// .asm_8861
 	routines_.in_bank(BANK_Pals_d1fe, ADDR_CopyHLToDE_Short, [&] { home::copy_short(gb_, ROM(gb_, Pals_d1fe), wTempPals2 + 2 * PAL_SIZE, 1 * PAL_SIZE); });
 
-	routines_.call(ADDR_SetInitialCameraScroll);
-	routines_.call(ADDR_ApplyInitialCameraScroll);
-	routines_.call(ADDR_VBlank_Level);
+	routines_.call_in(BANK_SetInitialCameraScroll, ADDR_SetInitialCameraScroll);
+	routines_.call_in(BANK_ApplyInitialCameraScroll, ADDR_ApplyInitialCameraScroll);
+	routines_.call_in(BANK_VBlank_Level, ADDR_VBlank_Level);
 	level::set_tile_queue_processing_functions(gb_);
 	call_in_sram1(ADDR_DrawRoom_FromStart);
 	if (!from_saved_level())

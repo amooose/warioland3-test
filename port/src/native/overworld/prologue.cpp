@@ -82,9 +82,9 @@ void Prologue::hdma(uint8_t vram_bank, uint16_t src, uint8_t dest_hi, uint8_t mo
 void Prologue::update()
 {
 	step();
-	routines_.call(ADDR_UpdatePrologueSceneObjects);
-	routines_.call(ADDR_UpdateSceneWario);
-	routines_.call(ADDR_Func_ac3fd);
+	routines_.call_in(BANK_UpdatePrologueSceneObjects, ADDR_UpdatePrologueSceneObjects);
+	routines_.call_in(BANK_UpdateSceneWario, ADDR_UpdateSceneWario);
+	routines_.call_in(BANK_Func_ac3fd, ADDR_Func_ac3fd);
 }
 
 // Prologue.PlayCutscene: the plane, the cave, the music box, the temple

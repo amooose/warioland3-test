@@ -381,7 +381,7 @@ void Title::draw_intro(MenuObject first, MenuObject second, MenuObject third)
 	load_intro_sprite(second);
 	load_intro_sprite(third);
 	routines_.clear_unused_virtual_oam();
-	routines_.call(ADDR_PanIntroBackgroundLayers);
+	routines_.call_in(BANK_PanIntroBackgroundLayers, ADDR_PanIntroBackgroundLayers);
 }
 
 // ---------------------------------------------------------------------------
@@ -737,7 +737,7 @@ void Title::init_time_attack_description()
 
 void Title::time_attack_description()
 {
-	routines_.call(ADDR_AdjustJapaneseTimeAttackDescriptionWindow);
+	routines_.call_in(BANK_AdjustJapaneseTimeAttackDescriptionWindow, ADDR_AdjustJapaneseTimeAttackDescriptionWindow);
 	if (!(wram_.joypad_pressed() & PAD_A))
 		return;
 	routines_.disable_lcd();

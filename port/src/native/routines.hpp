@@ -33,6 +33,14 @@ public:
 
 	// any routine, by address (one in a ROMX bank runs from the bank mapped)
 	void call(uint16_t addr) { gb_call(gb_, addr); }
+	// the routine at bank:addr: in play, a native one runs straight from
+	// there, no bank switched (else as call, the bank mapped)
+	void call_in(uint8_t bank, uint16_t addr)
+	{
+		if (!gb_->test.active && gb_call_native_in(gb_, bank, addr))
+			return;
+		gb_call(gb_, addr);
+	}
 
 	// the farcall macro: any routine, with the given ROM bank mapped
 	// (through hCallFunc)

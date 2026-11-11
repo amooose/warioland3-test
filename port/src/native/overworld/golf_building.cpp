@@ -52,7 +52,7 @@ void GolfBuilding::init()
 	decompress(BANK_GolfBuildingAttrmap, ADDR_GolfBuildingAttrmap, v1BGMap0, true);
 	decompress(BANK_GolfBuildingTilemap, ADDR_GolfBuildingTilemap, v0BGMap0, false);
 	place_wario();
-	routines_.call(ADDR_UpdateSceneWario);
+	routines_.call_in(BANK_UpdateSceneWario, ADDR_UpdateSceneWario);
 	mem_[rLCDC] = LCDC_DEFAULT;
 	++wram_.sub_state();
 }
@@ -145,7 +145,7 @@ void GolfBuilding::update()
 		step();
 	else
 		leave();
-	routines_.call(ADDR_UpdateSceneWario);
+	routines_.call_in(BANK_UpdateSceneWario, ADDR_UpdateSceneWario);
 	routines_.clear_unused_virtual_oam();
 }
 

@@ -143,6 +143,8 @@ bool hook_register(const char *name, HookFn fn, unsigned flags, unsigned clobber
 	return true;
 }
 
+static Hook *hook_find_in(GB *gb, int rom_bank, uint16_t pc);
+
 Hook *hook_find(GB *gb, uint16_t pc)
 {
 	if (!all_enabled)
@@ -152,9 +154,21 @@ Hook *hook_find(GB *gb, uint16_t pc)
 
 Hook *hook_find_any(GB *gb, uint16_t pc)
 {
+	return hook_find_in(gb, gb->rom_bank, pc);
+}
+
+Hook *hook_find_bank(GB *gb, int bank, uint16_t pc)
+{
+	if (!all_enabled)
+		return NULL;
+	return hook_find_in(gb, bank, pc);
+}
+
+static Hook *hook_find_in(GB *gb, int rom_bank, uint16_t pc)
+{
 	if (pc >= 0x8000 || !hook_bitmap)
 		return NULL;
-	int bank = pc < 0x4000 ? 0 : gb->rom_bank % gb->rom_banks;
+	int bank = pc < 0x4000 ? 0 : rom_bank % gb->rom_banks;
 	size_t off = rom_offset(bank, pc);
 	if (!(hook_bitmap[off / 8] & (1 << (off % 8))))
 		return NULL;
@@ -207,12 +221,12 @@ bool hooks_write_report(const char *path)
 		if (hooks[i].calls || hooks[i].by_direct)
 			ran[n++] = &hooks[i];
 	qsort(ran, (size_t)n, sizeof(ran[0]), by_calls);
-	fprintf(f, "# hook calls by_call by_jump by_irq direct\n");
+	fprintf(f, "# hook calls by_call by_jump by_irq direct by_mapped\n");
 	for (int i = 0; i < n; i++) {
 		const Hook *h = ran[i];
-		fprintf(f, "%s %llu %llu %llu %llu %llu\n", h->name, (unsigned long long)h->calls,
+		fprintf(f, "%s %llu %llu %llu %llu %llu %llu\n", h->name, (unsigned long long)h->calls,
 			(unsigned long long)h->by_call, (unsigned long long)(h->calls - h->by_call - h->by_irq),
-			(unsigned long long)h->by_irq, (unsigned long long)h->by_direct);
+			(unsigned long long)h->by_irq, (unsigned long long)h->by_direct, (unsigned long long)h->by_mapped);
 	}
 	fclose(f);
 	return true;

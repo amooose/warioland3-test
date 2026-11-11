@@ -227,14 +227,16 @@ uint16_t BlockFuncs::block_function()
 // jp runs whatever is, here through the emulator)
 void BlockFuncs::run_block_function(uint16_t func)
 {
-	if (gb_->rom_bank == BANK_ProcessBlock && dispatch(func)) {
+	// (in play they're always this file's, in its bank, mapped or not;
+	// under test the asm runs whatever bank is mapped)
+	if ((!gb_->test.active || gb_->rom_bank == BANK_ProcessBlock) && dispatch(func)) {
 		run(next_);
 		leave();
 		return;
 	}
 	a_ = static_cast<uint8_t>(func); // what jp hl runs may read it
 	leave();
-	routines_.call(func);
+	routines_.call_in(BANK_ProcessBlock, func);
 	a_ = cpu_.a;
 }
 
@@ -242,7 +244,7 @@ void BlockFuncs::run_block_function(uint16_t func)
 void BlockFuncs::process_block()
 {
 	uint16_t func = block_function();
-	if (gb_->rom_bank == BANK_ProcessBlock && dispatch(func)) {
+	if ((!gb_->test.active || gb_->rom_bank == BANK_ProcessBlock) && dispatch(func)) {
 		run(next_);
 		exit_regs();
 		return;

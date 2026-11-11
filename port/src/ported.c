@@ -30,6 +30,9 @@ static bool check_bank(GB *gb, int bank, uint16_t addr, const char *what, const 
 
 void port_call(GB *gb, int bank, uint16_t addr, const char *name)
 {
+	// in play, a native callee runs straight from its bank
+	if (!gb->test.active && gb_call_native_in(gb, bank, addr))
+		return;
 	if (check_bank(gb, bank, addr, "CALL", name))
 		gb_call(gb, addr);
 }
@@ -48,6 +51,20 @@ static void hcall_ret(GB *gb, uint16_t addr, uint16_t ret)
 	gb->cpu.a = (uint8_t)(addr >> 8);
 	wr8(gb, hCallFuncPointer + 1, gb->cpu.a);
 	uint8_t entry_bank = rd8(gb, wROMBank);
+	// In play, a native callee runs straight from its bank and address, no
+	// bank switched: hCallFunc's effects but the bank's (the callee gets a
+	// = the bank; after, a = the entry bank and f as at the call, from its
+	// push af / pop af)
+	if (!ret && !gb->test.active) {
+		uint8_t bank = rd8(gb, hCallFuncBank), f = gb->cpu.f, a = gb->cpu.a;
+		gb->cpu.a = bank;
+		if (gb_call_native_in(gb, bank, addr)) {
+			gb->cpu.a = entry_bank;
+			gb->cpu.f = f;
+			return;
+		}
+		gb->cpu.a = a;
+	}
 	if (ret)
 		gb_call_ret(gb, hCallFunc, ret);
 	else

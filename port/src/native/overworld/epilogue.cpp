@@ -95,9 +95,9 @@ void Epilogue::init()
 void Epilogue::update()
 {
 	step();
-	routines_.call(ADDR_Func_ac074);
-	routines_.call(ADDR_UpdateSceneWario);
-	routines_.call(ADDR_Func_ac080);
+	routines_.call_in(BANK_Func_ac074, ADDR_Func_ac074);
+	routines_.call_in(BANK_UpdateSceneWario, ADDR_UpdateSceneWario);
+	routines_.call_in(BANK_Func_ac080, ADDR_Func_ac080);
 	routines_.clear_unused_virtual_oam();
 }
 

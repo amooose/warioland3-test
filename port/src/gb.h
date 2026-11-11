@@ -292,6 +292,9 @@ void gb_call(GB *gb, uint16_t addr);
 // that returns (not HOOK_MANUAL_RET): no CPU dispatch, return address or
 // stack, as a direct call. False if there's none (then use gb_call_ret).
 bool gb_call_native(GB *gb, uint16_t addr);
+// The same for the routine at bank:addr, found and run whatever bank is
+// mapped (no bank switch): native code that knows its callee's bank
+bool gb_call_native_in(GB *gb, int bank, uint16_t addr);
 // The asm's jp addr at the end of a routine, from a hook that returns
 // normally: what runs there returns for it. A ROM routine with a native
 // routine that returns, or RAM code ram_tail_jump knows, runs directly;

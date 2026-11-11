@@ -197,7 +197,7 @@ void PauseMenu::exit()
 {
 	routines_.disable_lcd();
 	routines_.clear_virtual_oam();
-	routines_.call(ADDR_DrawLevelObjectsAfterLevelReturn);
+	routines_.call_in(BANK_DrawLevelObjectsAfterLevelReturn, ADDR_DrawLevelObjectsAfterLevelReturn);
 	routines_.load_backup_vram();
 	wram_.unused_is_paused() = 0;
 	wram_.animated_tiles_frame_duration() = wram_.temp_animated_tiles_frame_duration();

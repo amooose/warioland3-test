@@ -123,11 +123,18 @@ public:
 		bankswitch(bank);
 	}
 
+	// the routine at bank:addr (in play found by its bank)
+	void call_in(uint8_t bank, uint16_t addr)
+	{
+		if (gb_->test.active || !gb_call_native_in(gb_, bank, addr))
+			gb_call(gb_, addr);
+	}
+
 	// The homecall macro: homejp, but with a call, then pop af / bankswitch
 	void homecall(uint8_t bank, uint16_t addr)
 	{
 		homejp(bank);
-		gb_call(gb_, addr);
+		call_in(bank, addr);
 		pop_af();
 		bankswitch(cpu_.a);
 	}
@@ -198,7 +205,7 @@ public:
 	void homecall_process_block(uint8_t bank, uint16_t addr)
 	{
 		homejp(bank);
-		gb_call(gb_, addr);
+		call_in(bank, addr);
 		pop_af();
 		bankswitch(cpu_.a);
 		cpu_.a = cpu_.b;

@@ -59,6 +59,9 @@ typedef struct {
 	// calls run straight from native code (gb_call_native), not counted in
 	// calls: no CPU dispatch, return address or stack
 	uint64_t by_direct;
+	// of those, the ones found by the bank mapped (gb_call_native with a
+	// ROMX address, outside tests): what still needs the bank switches
+	uint64_t by_mapped;
 } Hook;
 
 // The labels come from the disassembly's .sym file, built into the
@@ -81,6 +84,9 @@ bool hook_register(const char *name, HookFn fn, unsigned flags, unsigned clobber
 Hook *hook_find(GB *gb, uint16_t pc);
 // Same, but ignores whether hooks are enabled (used by the difftest).
 Hook *hook_find_any(GB *gb, uint16_t pc);
+// The hook at bank:pc (bank ignored below $4000), whatever is mapped; NULL
+// if none or hooks are off
+Hook *hook_find_bank(GB *gb, int bank, uint16_t pc);
 // The enabled hook for a routine in a given bank, whatever is mapped; NULL
 // if none (or hooks are off).
 Hook *hook_at(int bank, uint16_t addr);

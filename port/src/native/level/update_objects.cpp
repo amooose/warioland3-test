@@ -1322,7 +1322,8 @@ public:
 		if (gb_->test.active && rd8(wCurObjUpdateFunction + 1) < 0x40)
 			gb_->test.unrealistic = true;
 		uint8_t entry_bank = mem_.rom_bank();
-		gb_call(gb_, hCallFunc);
+		// hCallFunc (in play the update function runs straight from its bank)
+		port_hcall(gb_, static_cast<uint16_t>(rd8(wCurObjUpdateFunction + 0) | rd8(wCurObjUpdateFunction + 1) << 8));
 		if (gb_->test.active && gb_->rom_bank != entry_bank)
 			gb_->test.unrealistic = true;
 	}

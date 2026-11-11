@@ -425,7 +425,7 @@ void Overworld::finish_map_side()
 	routines_.in_bank(BANK_DrawCoinCount, ADDR_DrawCoinCount, [&] { draw_coin_count(gb_); });
 	set_compass();
 	if (!wram_.ow_bars_state())
-		routines_.call(ADDR_DrawBottomBar);
+		routines_.call_in(BANK_DrawBottomBar, ADDR_DrawBottomBar);
 	wram_.level_arrow_directions1() = 0;
 	wram_.ow_pal_transition_state() = 0;
 	wram_.unk_2d013() = 0;
@@ -649,7 +649,7 @@ void Overworld::load_map_side_pals(bool scene)
 	routines_.load_pals_to_temp_pals1(RomPtr(gb_, BANK_Pals_84000, bg)); // bank21's palettes
 	routines_.load_pals_to_temp_pals2(ROM(gb_, Pals_84900) + side * 8 * PAL_SIZE);
 	if (scene && wram_.ow_exit_unlocked())
-		routines_.call(ADDR_LoadGreyOWPals);
+		routines_.call_in(BANK_LoadGreyOWPals, ADDR_LoadGreyOWPals);
 }
 
 void Overworld::load_west_maps()

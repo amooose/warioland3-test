@@ -83,7 +83,7 @@ void TempleScene::init()
 	mem_.scene_wario_x_coord() = 0xe8;
 	mem_.scene_wario_state_group() = SCENEWARIO_GROUP_NONE;
 	wario_state(SCENEWARIO_NONE);
-	routines_.call(ADDR_UpdateSceneWario);
+	routines_.call_in(BANK_UpdateSceneWario, ADDR_UpdateSceneWario);
 	wram_.unk_2d013() = 0;
 	wram_.unk_2d014() = 0;
 	uint8_t lcdc = LCDC_BG_ON | LCDC_OBJ_ON | LCDC_OBJ_16 | LCDC_WIN_9C00 | LCDC_ON;
@@ -97,9 +97,9 @@ void TempleScene::init()
 void TempleScene::update()
 {
 	step(); // .UpdateScene
-	routines_.call(ADDR_Func_ac2b2);
-	routines_.call(ADDR_UpdateSceneWario);
-	routines_.call(ADDR_UpdateTempleSceneObjs);
+	routines_.call_in(BANK_Func_ac2b2, ADDR_Func_ac2b2);
+	routines_.call_in(BANK_UpdateSceneWario, ADDR_UpdateSceneWario);
+	routines_.call_in(BANK_UpdateTempleSceneObjs, ADDR_UpdateTempleSceneObjs);
 	routines_.clear_unused_virtual_oam();
 }
 
